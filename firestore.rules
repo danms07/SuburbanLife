@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user has Admin role
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+
+    // Check if user has Guard role
+    function isGuard() {
+      return isAuthenticated() && request.auth.token.guard == true;
+    }
+
+    // Check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isOwner(userId);
+    }
+
+    match /addresses/{addressId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        (
+          resource.data.residentUid == request.auth.uid ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.addressRef == /databases/$(database)/documents/addresses/$(addressId)
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus']) &&
+        (request.resource.data.paymentStatus == 'reviewing' || request.resource.data.paymentStatus == 'pending' || request.resource.data.paymentStatus == 'restricted')
+      );
+    }
+
+    match /qr_codes/{qrId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || (
+        isAuthenticated() && 
+        request.resource.data.creatorUid == request.auth.uid &&
+        get(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.addressRef).data.paymentStatus == 'paid'
+      );
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.creatorUid == request.auth.uid);
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || (
+        isAuthenticated() && 
+        request.resource.data.userUid == request.auth.uid &&
+        get(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.addressRef).data.paymentStatus == 'paid'
+      );
+      allow update, delete: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /documents/{documentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /ownership_claims/{claimId} {
+      allow read, create: if isAuthenticated();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
+      allow update: if isAdmin();
+    }
+
+    match /access_logs/{logId} {
+      allow read, write: if isGuard() || isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    match /facilities/{facilityId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

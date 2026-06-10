@@ -1,0 +1,38 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+
+    function isGuard() {
+      return isAuthenticated() && request.auth.token.guard == true;
+    }
+
+    match /documents/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /payments/{allPaths=**} {
+      allow read: if isAdmin() || (isAuthenticated() && (request.auth.uid == resource.metadata.uploaderUid || request.auth.uid == resource.metadata.uploader));
+      allow write: if isAuthenticated();
+    }
+
+    match /ownership_proofs/{userId}/{allPaths=**} {
+      allow read, write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+    }
+
+    match /visitor_ids/{allPaths=**} {
+      allow read, write: if isGuard() || isAdmin();
+    }
+
+    match /visitor_plates/{allPaths=**} {
+      allow read, write: if isGuard() || isAdmin();
+    }
+  }
+}

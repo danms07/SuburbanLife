@@ -1,0 +1,5 @@
+street_name,initial_number,final_number,exclusions
+"1st Avenue",99,101,"100"
+"Oak Street",1,50,"12,25"
+"Pine Road",100,200,"105,110,115"
+"Maple Boulevard",20,40,""
