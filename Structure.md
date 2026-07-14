@@ -17,6 +17,7 @@ Current state of project files and folders:
     - `index.js`: Core function logic holding Gemini translations, address-based access restriction, address unbinding, and own-account deletion.
 - `ios/`: Native iOS configuration and build files.
 - `LICENSE`: MIT No Attribution (MIT-0) license file.
+- `PRIVACY_POLICY.md`: Bilingual Privacy Policy (LFPDPPP/ARCO compliant).
 - `lib/`: Main Flutter source code.
     - `core/`: Core configuration and themes.
         - `backend/`: Agnostic BaaS service abstractions and service locator.
