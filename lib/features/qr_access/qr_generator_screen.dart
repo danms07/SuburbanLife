@@ -6,8 +6,6 @@ import 'package:suburban_life/features/qr_access/qr_code.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
@@ -336,17 +334,49 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
               style: TextStyle(color: AppConfig.textColor),
             ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              icon: Icon(kIsWeb ? Icons.download : Icons.share),
-              label: Text(kIsWeb ? l10n.downloadCodeButton : l10n.shareCodeButton),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppConfig.secondaryColor,
-                foregroundColor: Colors.white,
+            if (kIsWeb)
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.share),
+                    label: Text(l10n.shareCodeButton),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConfig.secondaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => _shareQrCode(
+                      '${addressData?['streetName'] ?? ''} ${addressData?['number'] ?? ''}'.trim(),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.download),
+                    label: Text(l10n.downloadCodeButton),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConfig.primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => _shareQrCode(
+                      '${addressData?['streetName'] ?? ''} ${addressData?['number'] ?? ''}'.trim(),
+                      forceDownload: true,
+                    ),
+                  ),
+                ],
+              )
+            else
+              ElevatedButton.icon(
+                icon: const Icon(Icons.share),
+                label: Text(l10n.shareCodeButton),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppConfig.secondaryColor,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => _shareQrCode(
+                  '${addressData?['streetName'] ?? ''} ${addressData?['number'] ?? ''}'.trim(),
+                ),
               ),
-              onPressed: () => _shareQrCode(
-                '${addressData?['streetName'] ?? ''} ${addressData?['number'] ?? ''}'.trim(),
-              ),
-            ),
           ],
         ],
       ),
@@ -362,7 +392,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
     }
   }
 
-  void _shareQrCode(String addressLabel) async {
+  void _shareQrCode(String addressLabel, {bool forceDownload = false}) async {
     if (_generatedQrId == null) return;
     final l10n = AppLocalizations.of(context)!;
     
@@ -379,7 +409,6 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       canvas.drawRect(const Rect.fromLTWH(0, 0, 800, 240), paintHeader);
       
       final logoImage = await _loadAssetImage('assets/icon/app_icon.png');
-      //canvas.drawCircle(const Offset(400, 95), 55, Paint()..color = Colors.white);
       canvas.drawImageRect(
         logoImage,
         Rect.fromLTWH(0, 0, logoImage.width.toDouble(), logoImage.height.toDouble()),
@@ -449,37 +478,39 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       final picture = recorder.endRecording();
       final img = await picture.toImage(800, 1200);
       final picData = await img.toByteData(format: ui.ImageByteFormat.png);
-      final bytes = picData!.buffer.asUint8List();
-      
-      if (kIsWeb) {
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute("download", "qr_access_${DateTime.now().millisecondsSinceEpoch}.png")
-          ..click();
-        html.Url.revokeObjectUrl(url);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.downloadCodeSuccess), backgroundColor: AppConfig.secondaryColor),
-        );
+      final Uint8List bytes = picData!.buffer.asUint8List();
+      final String fileName = 'qr_access_${DateTime.now().millisecondsSinceEpoch}.png';
+
+      if (forceDownload && kIsWeb) {
+        _triggerWebDownload(bytes, fileName, l10n);
         return;
       }
-      
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/qr_access.png');
-      await file.writeAsBytes(bytes);
-      final XFile xFile = XFile(file.path);
 
-      final params = ShareParams(
-      files: [xFile],
-      // Crucial fix: XFile.fromData ignores the name parameter on many platforms.
-      // Use fileNameOverrides inside ShareParams to explicitly name your file!
-      fileNameOverrides: ['shared_image.png'], 
-      text: 'Here is your access QR code!',
-      title: 'Share Image', // Used as the browser Navigator Share title
-    );
-      
-      await SharePlus.instance.share(params);
+      try {
+        final XFile file = XFile.fromData(
+          bytes,
+          mimeType: 'image/png',
+        );
+
+        final params = ShareParams(
+          files: [file],
+          fileNameOverrides: [fileName],
+          text: 'Here is your access QR code!',
+          title: AppConfig.appName,
+        );
+
+        final ShareResult result = await SharePlus.instance.share(params);
+        if (result.status == ShareResultStatus.success) {
+          debugPrint('User successfully shared the QR code!');
+        }
+      } catch (e) {
+        debugPrint('Error sharing image via SharePlus: $e');
+        if (kIsWeb) {
+          _triggerWebDownload(bytes, fileName, l10n);
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error sharing/downloading: $e')),
@@ -487,6 +518,19 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
     } finally {
       setState(() { _isLoading = false; });
     }
+  }
+
+  void _triggerWebDownload(Uint8List bytes, String fileName, AppLocalizations l10n) {
+    final blob = html.Blob([bytes]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..setAttribute('download', fileName)
+      ..click();
+    html.Url.revokeObjectUrl(url);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.downloadCodeSuccess), backgroundColor: AppConfig.secondaryColor),
+    );
   }
   
   Future<ui.Image> _loadAssetImage(String path) async {

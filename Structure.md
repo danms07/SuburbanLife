@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-07-30 (Added Bulk Address Import CSV screen in Admin Panel and adminBulkImportAddresses Cloud Function)*
+*Last Verified/Updated: 2026-07-30 (Added snippets/ directory to .gitignore)*
 
 Current state of project files and folders:
 

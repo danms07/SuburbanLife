@@ -57,4 +57,7 @@ app.*.map.json
 **/ios/Flutter/Generated.xcconfig
 .firebase/
 
+# Code Snippets
+snippets/
+
 
