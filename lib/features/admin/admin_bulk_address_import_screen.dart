@@ -41,7 +41,7 @@ class _AdminBulkAddressImportScreenState
   Future<void> _pickAndParseCsv() async {
     final l10n = AppLocalizations.of(context)!;
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'txt'],
         withData: true,
@@ -319,7 +319,7 @@ class _AdminBulkAddressImportScreenState
               ),
               const SizedBox(height: 10),
               Container(
-                maxHeight: 280,
+                constraints: const BoxConstraints(maxHeight: 280),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),

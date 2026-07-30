@@ -25,7 +25,7 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
 
   void _pickCsvFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv'],
         withData: true,
