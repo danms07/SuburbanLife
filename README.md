@@ -7,6 +7,7 @@ A white-label residential management platform built using **Flutter** and **Fire
 ## Features
 
 - **Secure Multi-Role Access Control**: Integrated with Firebase Auth and Cloud Functions.
+- **Bulk Resident Creation via CSV**: Administrator bulk account creation supporting optional/deterministic temporary password generation and instant resident claims.
 - **QR-based Visitor Access**: Live validation logs and ID uploads for security personnel.
 - **Facility Booking & Document Viewers**: Seamless management of common spaces and important residential files.
 - **AI-Powered Announcement Translations**: Integrated with Gemini 2.5 Flash for automated Spanish-to-English translations.
@@ -206,3 +207,24 @@ A helper script [populate_addresses.js](scripts/populate_addresses.js) is provid
 cd scripts
 node populate_addresses.js
 ```
+
+---
+
+## Bulk Resident Account Creation via CSV
+
+Administrators can create resident user accounts in bulk by uploading a CSV file through the app UI or calling the Cloud Function backend.
+
+### Quick Start:
+1. Refer to the sample template at [resident_import_template.csv](resident_import_template.csv).
+2. Populate the CSV with `name`, `email`, `password` (optional), `street` (optional), and `number` (optional).
+3. Open the app as an admin, tap **Bulk User Creation (CSV)** on the dashboard, and select your file.
+4. Accounts are created server-side with instant **`resident`** claims (`{ resident: true }`). If `password` is omitted, the system generates a deterministic password (`Suburban#<localPart>2026`).
+
+For complete architectural details, formula specs, and Cloud Function documentation, see [docs/bulk_user_creation.md](docs/bulk_user_creation.md).
+
+For a complete guide to all administrative tools (address import, payment approvals, user directory, amenities configurator, security guard management, and reporting), consult the Administrator User Manual available in:
+- [English Administrator User Manual](docs/admin_user_manual.md)
+- [Manual de Usuario para Administradores en Español](docs/admin_user_manual_es.md)
+
+
+

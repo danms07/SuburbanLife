@@ -1,13 +1,16 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:suburban_life/core/config/app_config.dart';
 import 'package:suburban_life/features/auth/login_screen.dart';
 import 'package:suburban_life/features/auth/roommates_screen.dart';
 import 'package:suburban_life/features/auth/signup_screen.dart';
 import 'package:suburban_life/features/auth/admin_resident_approval_screen.dart';
+import 'package:suburban_life/features/auth/forgot_password_screen.dart';
 import 'firebase_options.dart';
 import 'package:suburban_life/features/booking/booking_screen.dart';
 import 'package:suburban_life/features/booking/manage_bookings_screen.dart';
@@ -25,6 +28,8 @@ import 'package:suburban_life/features/admin/admin_facilities_screen.dart';
 import 'package:suburban_life/features/admin/admin_settings_screen.dart';
 import 'package:suburban_life/features/admin/admin_payment_report_screen.dart';
 import 'package:suburban_life/features/admin/admin_guard_management_screen.dart';
+import 'package:suburban_life/features/admin/admin_bulk_user_import_screen.dart';
+import 'package:suburban_life/features/admin/admin_bulk_address_import_screen.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'l10n/app_localizations.dart';
 import 'package:suburban_life/core/backend/backend.dart';
@@ -123,6 +128,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _claimStreet;
   Map<String, dynamic>? _claimAddress;
   bool _isClaimSubmitting = false;
+  int _onboardingModeIndex = 0;
   late final Stream<List<Map<String, dynamic>>> _unclaimedAddressesStream;
 
   @override
@@ -430,190 +436,405 @@ class _MyHomePageState extends State<MyHomePage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      l10n.selectAddressTitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppConfig.primaryColor,
-                      ),
+                    SegmentedButton<int>(
+                      segments: [
+                        ButtonSegment<int>(
+                          value: 0,
+                          label: Text(l10n.claimPropertyTab),
+                          icon: const Icon(Icons.house),
+                        ),
+                        ButtonSegment<int>(
+                          value: 1,
+                          label: Text(l10n.joinAsRoommateTab),
+                          icon: const Icon(Icons.qr_code),
+                        ),
+                      ],
+                      selected: {_onboardingModeIndex},
+                      onSelectionChanged: (Set<int> newSelection) {
+                        setState(() {
+                          _onboardingModeIndex = newSelection.first;
+                        });
+                      },
                     ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppConfig.primaryColor.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppConfig.primaryColor.withOpacity(0.2)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline, color: AppConfig.primaryColor),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              l10n.addressClaimInstructions,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.black87,
-                                height: 1.4,
-                                fontFamily: AppConfig.fontFamily,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    if (streets.isEmpty)
+                    const SizedBox(height: 20),
+                    if (_onboardingModeIndex == 1)
+                      _buildRoommateQrCodeCard(l10n, uid)
+                    else ...[
                       Text(
-                        l10n.noUnclaimedAddresses,
+                        l10n.selectAddressTitle,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppConfig.primaryColor,
                         ),
-                      )
-                    else ...[
-                      // Street Spinner
-                      DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          labelText: l10n.selectStreetLabel,
-                          prefixIcon: const Icon(
-                            Icons.signpost,
-                            color: AppConfig.primaryColor,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        value: _claimStreet,
-                        items: streets.map((street) {
-                          return DropdownMenuItem<String>(
-                            value: street,
-                            child: Text(street),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _claimStreet = value;
-                            _claimAddress = null;
-                          });
-                        },
                       ),
-                      const SizedBox(height: 20),
-
-                      // Number Spinner
-                      DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          labelText: l10n.selectNumberLabel,
-                          prefixIcon: const Icon(
-                            Icons.home,
-                            color: AppConfig.primaryColor,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        initialValue: _claimAddress?['id'],
-                        items: numbers.map((doc) {
-                          final numVal = doc['number'] ?? '';
-                          return DropdownMenuItem<String>(
-                            value: doc['id'],
-                            child: Text(numVal.toString()),
-                          );
-                        }).toList(),
-                        onChanged: _claimStreet == null
-                            ? null
-                            : (value) {
-                                setState(() {
-                                  _claimAddress = numbers.firstWhere(
-                                    (doc) => doc['id'] == value,
-                                  );
-                                });
-                              },
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Privacy Notice
+                      const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppConfig.warningColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppConfig.warningColor.withValues(alpha: 0.3),
-                          ),
+                          color: AppConfig.primaryColor.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                              Icons.privacy_tip,
-                              color: AppConfig.warningColor,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
+                            const Icon(Icons.info_outline, color: AppConfig.primaryColor),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                l10n.privacyNoticeProofDeletion,
+                                l10n.addressClaimInstructions,
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   color: Colors.black87,
-                                  height: 1.3,
+                                  height: 1.4,
+                                  fontFamily: AppConfig.fontFamily,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
-
-                      // Primary Camera Trigger Button
-                      ElevatedButton.icon(
-                        icon: _isClaimSubmitting
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.camera_alt),
-                        label: Text(
-                          _isClaimSubmitting
-                              ? l10n.uploadingProof
-                              : l10n.captureProofPhoto,
+                      const SizedBox(height: 24),
+                      if (streets.isEmpty)
+                        Text(
+                          l10n.noUnclaimedAddresses,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        )
+                      else ...[
+                        // Street Spinner
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: l10n.selectStreetLabel,
+                            prefixIcon: const Icon(
+                              Icons.signpost,
+                              color: AppConfig.primaryColor,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          value: _claimStreet,
+                          items: streets.map((street) {
+                            return DropdownMenuItem<String>(
+                              value: street,
+                              child: Text(street),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              _claimStreet = value;
+                              _claimAddress = null;
+                            });
+                          },
                         ),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(250, 50),
-                          backgroundColor: AppConfig.primaryColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                        const SizedBox(height: 20),
+
+                        // Number Spinner
+                        DropdownButtonFormField<String>(
+                          decoration: InputDecoration(
+                            labelText: l10n.selectNumberLabel,
+                            prefixIcon: const Icon(
+                              Icons.home,
+                              color: AppConfig.primaryColor,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          initialValue: _claimAddress?['id'],
+                          items: numbers.map((doc) {
+                            final numVal = doc['number'] ?? '';
+                            return DropdownMenuItem<String>(
+                              value: doc['id'],
+                              child: Text(numVal.toString()),
+                            );
+                          }).toList(),
+                          onChanged: _claimStreet == null
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _claimAddress = numbers.firstWhere(
+                                      (doc) => doc['id'] == value,
+                                    );
+                                  });
+                                },
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Privacy Notice
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppConfig.warningColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppConfig.warningColor.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.privacy_tip,
+                                color: AppConfig.warningColor,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  l10n.privacyNoticeProofDeletion,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.black87,
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        onPressed: (_claimAddress == null || _isClaimSubmitting)
-                            ? null
-                            : () => _takeClaimPhoto(uid),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        l10n.receiptNotice,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.grey,
+                        const SizedBox(height: 32),
+
+                        // Primary Camera Trigger Button
+                        ElevatedButton.icon(
+                          icon: _isClaimSubmitting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.camera_alt),
+                          label: Text(
+                            _isClaimSubmitting
+                                ? l10n.uploadingProof
+                                : l10n.captureProofPhoto,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            minimumSize: const Size(250, 50),
+                            backgroundColor: AppConfig.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          onPressed: (_claimAddress == null || _isClaimSubmitting)
+                              ? null
+                              : () => _takeClaimPhoto(uid),
                         ),
-                      ),
+                        const SizedBox(height: 20),
+                        Text(
+                          l10n.receiptNotice,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ],
                   ],
                 ),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRoommateQrCodeCard(AppLocalizations l10n, String uid) {
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: Backend.db.streamDocument('users', uid),
+      builder: (context, snapshot) {
+        final userData = snapshot.data;
+        final userName = userData?['name'] ?? '';
+        final userEmail = userData?['email'] ?? '';
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.myRoommateQrCode,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: AppConfig.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppConfig.primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: AppConfig.primaryColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l10n.showQrToResidentInstructions,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black87,
+                        height: 1.4,
+                        fontFamily: AppConfig.fontFamily,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: QrImageView(
+                  data: 'roommate_uid:$uid',
+                  version: QrVersions.auto,
+                  size: 200.0,
+                  backgroundColor: Colors.white,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: AppConfig.primaryColor,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: AppConfig.primaryColor,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (userName.isNotEmpty || userEmail.isNotEmpty) ...[
+              Text(
+                userName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  fontFamily: AppConfig.fontFamily,
+                ),
+              ),
+              if (userEmail.isNotEmpty)
+                Text(
+                  userEmail,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                    fontFamily: AppConfig.fontFamily,
+                  ),
+                ),
+              const SizedBox(height: 12),
+            ],
+            Center(
+              child: Container(
+                padding: const EdgeInsets.only(left: 12, right: 4, top: 4, bottom: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: SelectableText(
+                        'UID: $uid',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'monospace',
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.copy, size: 18, color: AppConfig.primaryColor),
+                      tooltip: l10n.copyUidButton,
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: uid));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.uidCopiedSnackbar),
+                            backgroundColor: AppConfig.secondaryColor,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.copy, size: 18),
+              label: Text(l10n.copyUidButton),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConfig.primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: uid));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.uidCopiedSnackbar),
+                    backgroundColor: AppConfig.secondaryColor,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppConfig.primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.waitingToBeLinked,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ],
         );
       },
     );
@@ -1180,6 +1401,32 @@ class _MyHomePageState extends State<MyHomePage> {
           const SizedBox(height: 16),
 
           _buildAdminMenuButton(
+            label: l10n.bulkUserImportMenu,
+            icon: Icons.group_add,
+            color: Colors.indigo,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminBulkUserImportScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _buildAdminMenuButton(
+            label: l10n.bulkAddressImportMenu,
+            icon: Icons.domain_add,
+            color: Colors.teal,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminBulkAddressImportScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _buildAdminMenuButton(
             label: l10n.uploadPaymentOnBehalfMenu,
             icon: Icons.upload_file,
             color: Colors.orange,
@@ -1571,6 +1818,19 @@ class _MyHomePageState extends State<MyHomePage> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => const ManageQrScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.lock_reset),
+                            title: Text(l10n.resetPasswordTitle),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ForgotPasswordScreen(),
                                 ),
                               );
                             },

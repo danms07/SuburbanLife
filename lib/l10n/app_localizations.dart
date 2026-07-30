@@ -1445,13 +1445,13 @@ abstract class AppLocalizations {
   /// No description provided for @addressClaimInstructions.
   ///
   /// In en, this message translates to:
-  /// **'You can start the address claim process here or ask a resident to add you as a roommate from their app.'**
+  /// **'You can claim a property as a primary resident or show your Household QR Code to be linked by a primary resident.'**
   String get addressClaimInstructions;
 
   /// No description provided for @roommateOnboardingInstructions.
   ///
   /// In en, this message translates to:
-  /// **'Ask your roommates to sign up for the app and share their email address so you can add them to your family group.'**
+  /// **'Ask family members to show their Household QR Code or share their User ID/email so you can add them to your family group.'**
   String get roommateOnboardingInstructions;
 
   /// No description provided for @deliveryDateLabel.
@@ -1537,6 +1537,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Residents Only'**
   String get audienceResidents;
+
+  /// No description provided for @joinAsRoommateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join Household as Roommate'**
+  String get joinAsRoommateTitle;
+
+  /// No description provided for @joinAsRoommateTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Join as Roommate'**
+  String get joinAsRoommateTab;
+
+  /// No description provided for @claimPropertyTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim Property'**
+  String get claimPropertyTab;
+
+  /// No description provided for @showQrToResidentInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this QR code to the primary resident of your household. They can scan it from their app to link your account.'**
+  String get showQrToResidentInstructions;
+
+  /// No description provided for @myRoommateQrCode.
+  ///
+  /// In en, this message translates to:
+  /// **'My Household QR Code'**
+  String get myRoommateQrCode;
+
+  /// No description provided for @copyUidButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy User ID'**
+  String get copyUidButton;
+
+  /// No description provided for @uidCopiedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'User ID copied to clipboard.'**
+  String get uidCopiedSnackbar;
+
+  /// No description provided for @scanRoommateQrButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR Code'**
+  String get scanRoommateQrButton;
+
+  /// No description provided for @enterEmailOrUidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Roommate Email or User ID (UID)'**
+  String get enterEmailOrUidLabel;
+
+  /// No description provided for @roommateQrScannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan Roommate QR Code'**
+  String get roommateQrScannerTitle;
+
+  /// No description provided for @invalidRoommateQrCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid Roommate QR Code scanned.'**
+  String get invalidRoommateQrCode;
+
+  /// No description provided for @roommateAddedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Family member added successfully.'**
+  String get roommateAddedSuccess;
+
+  /// No description provided for @waitingToBeLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a resident to scan or link your account...'**
+  String get waitingToBeLinked;
+
+  /// No description provided for @pasteFromClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste from Clipboard'**
+  String get pasteFromClipboard;
+
+  /// No description provided for @bulkUserImportMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk User Creation (CSV)'**
+  String get bulkUserImportMenu;
+
+  /// No description provided for @bulkUserImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk Resident Creation'**
+  String get bulkUserImportTitle;
+
+  /// No description provided for @uploadCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload CSV File'**
+  String get uploadCsvButton;
+
+  /// No description provided for @copyCsvTemplateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy CSV Template'**
+  String get copyCsvTemplateButton;
+
+  /// No description provided for @processImportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Accounts ({count})'**
+  String processImportButton(int count);
+
+  /// No description provided for @importSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Completed'**
+  String get importSuccessTitle;
+
+  /// No description provided for @importSummaryText.
+  ///
+  /// In en, this message translates to:
+  /// **'{successCount} accounts created successfully, {failureCount} failed.'**
+  String importSummaryText(int successCount, int failureCount);
+
+  /// No description provided for @noFileSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No file selected.'**
+  String get noFileSelected;
+
+  /// No description provided for @invalidCsvFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid CSV format or missing headers.'**
+  String get invalidCsvFormat;
+
+  /// No description provided for @copyPasswordsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Passwords'**
+  String get copyPasswordsButton;
+
+  /// No description provided for @passwordsCopiedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords copied to clipboard.'**
+  String get passwordsCopiedSnackbar;
+
+  /// No description provided for @csvColumnsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected CSV columns: name, email, password (optional), street (optional), number (optional)'**
+  String get csvColumnsHint;
+
+  /// No description provided for @csvTemplateCopiedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV template copied to clipboard.'**
+  String get csvTemplateCopiedSnackbar;
+
+  /// No description provided for @downloadResultCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Result CSV'**
+  String get downloadResultCsvButton;
+
+  /// No description provided for @copyResultCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Result CSV'**
+  String get copyResultCsvButton;
+
+  /// No description provided for @csvDownloadedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Result CSV downloaded successfully.'**
+  String get csvDownloadedSuccess;
+
+  /// No description provided for @csvCopiedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Result CSV copied to clipboard.'**
+  String get csvCopiedSuccess;
+
+  /// No description provided for @bulkAddressImportMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk Address Creation (CSV)'**
+  String get bulkAddressImportMenu;
+
+  /// No description provided for @bulkAddressImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk Address Creation'**
+  String get bulkAddressImportTitle;
+
+  /// No description provided for @addressCsvColumnsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected CSV columns: streetName, initialNumber, finalNumber, exclusions (optional)'**
+  String get addressCsvColumnsHint;
+
+  /// No description provided for @importAddressesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Addresses ({count})'**
+  String importAddressesButton(int count);
+
+  /// No description provided for @addressesImportedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully created {created} addresses ({skipped} skipped/duplicates).'**
+  String addressesImportedSuccess(int created, int skipped);
 }
 
 class _AppLocalizationsDelegate

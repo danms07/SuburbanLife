@@ -1,0 +1,5 @@
+name,email,password,street,number
+John Doe,john.doe@example.com,,1st Avenue,101
+Jane Smith,jane.smith@example.com,SecretPass123!,Oak Street,12
+Carlos Rodriguez,carlos.rodriguez@example.com,,Pine Road,105
+Maria Garcia,maria.garcia@example.com,,Maple Boulevard,20

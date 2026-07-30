@@ -379,10 +379,10 @@ exports.addRoommate = onCall({ enforceAppCheck: true }, async (request) => {
   }
 
   const residentUid = request.auth.uid;
-  const { email } = request.data;
+  let { email, roommateUid } = request.data;
 
-  if (!email) {
-    throw new HttpsError('invalid-argument', 'Missing email.');
+  if (!email && !roommateUid) {
+    throw new HttpsError('invalid-argument', 'Missing email or roommateUid.');
   }
 
   try {
@@ -398,31 +398,38 @@ exports.addRoommate = onCall({ enforceAppCheck: true }, async (request) => {
       throw new HttpsError('failed-precondition', 'Resident is not linked to any address.');
     }
 
-    // 2. Find user by email
-    const userQuery = await admin.firestore().collection('users').where('email', '==', email).get();
-    if (userQuery.empty) {
-      throw new HttpsError('not-found', 'No user found with that email.');
+    let targetUid = roommateUid ? roommateUid.replace(/^roommate_uid:/, '').replace(/^roommate:/, '').trim() : null;
+
+    // 2. Find target user by email or by roommateUid
+    if (!targetUid && email) {
+      const userQuery = await admin.firestore().collection('users').where('email', '==', email.trim()).get();
+      if (userQuery.empty) {
+        throw new HttpsError('not-found', 'No user found with that email.');
+      }
+      targetUid = userQuery.docs[0].id;
     }
 
-    const roommateDoc = userQuery.docs[0];
-    const roommateUid = roommateDoc.id;
+    const roommateDoc = await admin.firestore().collection('users').doc(targetUid).get();
+    if (!roommateDoc.exists) {
+      throw new HttpsError('not-found', 'No user found with that ID.');
+    }
 
-    if (roommateUid === residentUid) {
+    if (targetUid === residentUid) {
       throw new HttpsError('invalid-argument', 'You cannot add yourself as a roommate.');
     }
 
     // 3. Set role claim
-    await admin.auth().setCustomUserClaims(roommateUid, { roommate: true });
+    await admin.auth().setCustomUserClaims(targetUid, { roommate: true });
 
     // 4. Link address (roommate inherits address's payment status) and set role to roommate
-    await admin.firestore().collection('users').doc(roommateUid).update({
+    await admin.firestore().collection('users').doc(targetUid).update({
       addressRef: addressRef,
       role: 'roommate',
     });
 
     // 5. Add to resident's familyMembers array
     await admin.firestore().collection('users').doc(residentUid).update({
-      familyMembers: admin.firestore.FieldValue.arrayUnion(roommateUid)
+      familyMembers: admin.firestore.FieldValue.arrayUnion(targetUid)
     });
 
     return { success: true };
@@ -705,5 +712,289 @@ exports.removeRoommate = onCall({ enforceAppCheck: true }, async (request) => {
     throw new HttpsError('internal', error.message);
   }
 });
+
+exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { users } = request.data;
+  if (!users || !Array.isArray(users) || users.length === 0) {
+    throw new HttpsError('invalid-argument', 'Must provide a non-empty array of user objects.');
+  }
+
+  const results = [];
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (const userRow of users) {
+    const name = (userRow.name || userRow.fullName || '').toString().trim();
+    const email = (userRow.email || '').toString().trim().toLowerCase();
+    const rawPassword = (userRow.password || '').toString().trim();
+    const streetName = (userRow.streetName || userRow.street || '').toString().trim();
+    const numberStr = (userRow.number || userRow.houseNumber || '').toString().trim();
+
+    if (!name || !email || !email.includes('@')) {
+      results.push({
+        email: email || 'unknown',
+        name: name || 'unknown',
+        status: 'error',
+        error: 'Invalid name or email address.',
+      });
+      failureCount++;
+      continue;
+    }
+
+    // Determine password: if not specified or < 6 chars, generate deterministic temp password
+    let password = rawPassword;
+    let isDeterministic = false;
+    if (!password || password.length < 6) {
+      const localPart = email.split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '');
+      password = `Suburban#${localPart}2026`;
+      isDeterministic = true;
+    }
+
+    try {
+      const db = admin.firestore();
+      let addressRef = null;
+      let addressMatched = false;
+
+      // 1. Verify address existence if streetName and number are provided (do NOT create new addresses!)
+      if (streetName && numberStr) {
+        const numVal = isNaN(Number(numberStr)) ? numberStr : Number(numberStr);
+
+        let addressQuery = await db.collection('addresses')
+          .where('streetName', '==', streetName)
+          .where('number', '==', numVal)
+          .get();
+
+        if (addressQuery.empty && typeof numVal === 'number') {
+          addressQuery = await db.collection('addresses')
+            .where('streetName', '==', streetName)
+            .where('number', '==', numberStr)
+            .get();
+        }
+
+        // Case-insensitive & trimmed fallback lookup if direct query yields no results
+        if (addressQuery.empty) {
+          const allAddressesSnap = await db.collection('addresses').get();
+          const matchedDoc = allAddressesSnap.docs.find(doc => {
+            const d = doc.data();
+            const sName = (d.streetName || '').toString().trim().toLowerCase();
+            const sNum = (d.number !== undefined && d.number !== null) ? d.number.toString().trim() : '';
+            return sName === streetName.toLowerCase() && sNum === numberStr;
+          });
+
+          if (matchedDoc) {
+            addressQuery = { empty: false, docs: [matchedDoc] };
+          }
+        }
+
+        if (addressQuery.empty) {
+          // Reject row: Address does not exist in DB records
+          results.push({
+            name,
+            email,
+            password: rawPassword,
+            streetName,
+            number: numberStr,
+            status: 'error',
+            assignedPassword: password,
+            error: `Address "${streetName} #${numberStr}" not found in database.`,
+          });
+          failureCount++;
+          continue;
+        }
+
+        const existingDoc = addressQuery.docs[0];
+        addressRef = existingDoc.ref;
+        addressMatched = true;
+      }
+
+      // 2. Create user account in Firebase Auth
+      const userRecord = await admin.auth().createUser({
+        email,
+        password,
+        displayName: name,
+      });
+
+      // Grant resident custom claim since the beginning (no ownership claim needed)
+      await admin.auth().setCustomUserClaims(userRecord.uid, { resident: true });
+
+      // 3. Mark existing address document as claimed by resident
+      if (addressRef) {
+        await addressRef.update({
+          residentUid: userRecord.uid,
+          paymentStatus: 'paid',
+        });
+      }
+
+      // 4. Create user document in Firestore users collection
+      const userDocData = {
+        uid: userRecord.uid,
+        name: name,
+        email: email,
+        role: 'resident',
+        createdAt: Date.now(),
+      };
+      if (addressRef) {
+        userDocData.addressRef = addressRef;
+      }
+
+      await db.collection('users').doc(userRecord.uid).set(userDocData);
+
+      results.push({
+        name,
+        email,
+        password: rawPassword,
+        streetName,
+        number: numberStr,
+        status: 'ok',
+        assignedPassword: password,
+        isDeterministicPassword: isDeterministic,
+        addressLinked: addressMatched ? `${streetName} #${numberStr}` : null,
+        uid: userRecord.uid,
+        error: '',
+      });
+      successCount++;
+    } catch (err) {
+      console.error(`Error creating user ${email}:`, err);
+      results.push({
+        name,
+        email,
+        password: rawPassword,
+        streetName,
+        number: numberStr,
+        status: 'error',
+        assignedPassword: password,
+        error: err.message || 'Failed to create user account.',
+      });
+      failureCount++;
+    }
+  }
+
+  return {
+    success: true,
+    totalProcessed: users.length,
+    successCount,
+    failureCount,
+    results,
+  };
+});
+
+exports.adminBulkImportAddresses = onCall({ enforceAppCheck: true }, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { items } = request.data;
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new HttpsError('invalid-argument', 'Must provide a non-empty array of address items.');
+  }
+
+  const db = admin.firestore();
+  let createdCount = 0;
+  let skippedCount = 0;
+  const results = [];
+
+  // Fetch all current addresses for collision checks
+  const existingSnap = await db.collection('addresses').get();
+  const existingSet = new Set();
+  existingSnap.docs.forEach(doc => {
+    const d = doc.data();
+    if (d.streetName && d.number !== undefined && d.number !== null) {
+      const key = `${d.streetName.toString().trim().toLowerCase()}::${d.number.toString().trim()}`;
+      existingSet.add(key);
+    }
+  });
+
+  const batchList = [];
+  let currentBatch = db.batch();
+  let operationCount = 0;
+
+  for (const item of items) {
+    const streetName = (item.streetName || item.street || '').toString().trim();
+    const initialNum = parseInt(item.initialNumber ?? item.number, 10);
+    const finalNum = parseInt(item.finalNumber ?? item.number, 10);
+
+    let exclusions = [];
+    if (item.exclusions) {
+      if (Array.isArray(item.exclusions)) {
+        exclusions = item.exclusions.map(n => parseInt(n, 10));
+      } else if (typeof item.exclusions === 'string') {
+        exclusions = item.exclusions.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+      }
+    }
+
+    if (!streetName || isNaN(initialNum) || isNaN(finalNum)) {
+      results.push({
+        streetName,
+        range: `${initialNum || ''}-${finalNum || ''}`,
+        status: 'error',
+        error: 'Invalid street name or house numbers.',
+      });
+      continue;
+    }
+
+    let itemCreated = 0;
+    let itemSkipped = 0;
+
+    for (let num = Math.min(initialNum, finalNum); num <= Math.max(initialNum, finalNum); num++) {
+      if (exclusions.includes(num)) {
+        itemSkipped++;
+        continue;
+      }
+
+      const checkKey = `${streetName.toLowerCase()}::${num}`;
+      if (existingSet.has(checkKey)) {
+        itemSkipped++;
+        skippedCount++;
+        continue;
+      }
+
+      const docRef = db.collection('addresses').doc();
+      currentBatch.set(docRef, {
+        streetName: streetName,
+        number: num,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      existingSet.add(checkKey);
+      itemCreated++;
+      createdCount++;
+      operationCount++;
+
+      if (operationCount === 500) {
+        batchList.push(currentBatch);
+        currentBatch = db.batch();
+        operationCount = 0;
+      }
+    }
+
+    results.push({
+      streetName,
+      range: initialNum === finalNum ? `${initialNum}` : `${initialNum}-${finalNum}`,
+      created: itemCreated,
+      skipped: itemSkipped,
+      status: 'ok',
+    });
+  }
+
+  if (operationCount > 0) {
+    batchList.push(currentBatch);
+  }
+
+  for (const b of batchList) {
+    await b.commit();
+  }
+
+  return {
+    success: true,
+    totalProcessed: items.length,
+    createdCount,
+    skippedCount,
+    results,
+  };
+});
+
 
 

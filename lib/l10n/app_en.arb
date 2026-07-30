@@ -239,8 +239,8 @@
   "cooldownDays": "Days",
   "cooldownMonths": "Months",
   "cooldownYears": "Years",
-  "addressClaimInstructions": "You can start the address claim process here or ask a resident to add you as a roommate from their app.",
-  "roommateOnboardingInstructions": "Ask your roommates to sign up for the app and share their email address so you can add them to your family group.",
+  "addressClaimInstructions": "You can claim a property as a primary resident or show your Household QR Code to be linked by a primary resident.",
+  "roommateOnboardingInstructions": "Ask family members to show their Household QR Code or share their User ID/email so you can add them to your family group.",
   "deliveryDateLabel": "Property Handover Date",
   "selectDeliveryDate": "Select delivery date",
   "selectPeriodLabel": "Select maintenance period",
@@ -254,5 +254,76 @@
   "categoryNameLabel": "Category Name",
   "targetAudienceLabel": "Target Audience",
   "audienceAll": "All Users",
-  "audienceResidents": "Residents Only"
+  "audienceResidents": "Residents Only",
+  "joinAsRoommateTitle": "Join Household as Roommate",
+  "joinAsRoommateTab": "Join as Roommate",
+  "claimPropertyTab": "Claim Property",
+  "showQrToResidentInstructions": "Show this QR code to the primary resident of your household. They can scan it from their app to link your account.",
+  "myRoommateQrCode": "My Household QR Code",
+  "copyUidButton": "Copy User ID",
+  "uidCopiedSnackbar": "User ID copied to clipboard.",
+  "scanRoommateQrButton": "Scan QR Code",
+  "enterEmailOrUidLabel": "Enter Roommate Email or User ID (UID)",
+  "roommateQrScannerTitle": "Scan Roommate QR Code",
+  "invalidRoommateQrCode": "Invalid Roommate QR Code scanned.",
+  "roommateAddedSuccess": "Family member added successfully.",
+  "waitingToBeLinked": "Waiting for a resident to scan or link your account...",
+  "pasteFromClipboard": "Paste from Clipboard",
+  "bulkUserImportMenu": "Bulk User Creation (CSV)",
+  "bulkUserImportTitle": "Bulk Resident Creation",
+  "uploadCsvButton": "Upload CSV File",
+  "copyCsvTemplateButton": "Copy CSV Template",
+  "processImportButton": "Create Accounts ({count})",
+  "@processImportButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importSuccessTitle": "Import Completed",
+  "importSummaryText": "{successCount} accounts created successfully, {failureCount} failed.",
+  "@importSummaryText": {
+    "placeholders": {
+      "successCount": {
+        "type": "int"
+      },
+      "failureCount": {
+        "type": "int"
+      }
+    }
+  },
+  "noFileSelected": "No file selected.",
+  "invalidCsvFormat": "Invalid CSV format or missing headers.",
+  "copyPasswordsButton": "Copy Passwords",
+  "passwordsCopiedSnackbar": "Passwords copied to clipboard.",
+  "csvColumnsHint": "Expected CSV columns: name, email, password (optional), street (optional), number (optional)",
+  "csvTemplateCopiedSnackbar": "CSV template copied to clipboard.",
+  "downloadResultCsvButton": "Download Result CSV",
+  "copyResultCsvButton": "Copy Result CSV",
+  "csvDownloadedSuccess": "Result CSV downloaded successfully.",
+  "csvCopiedSuccess": "Result CSV copied to clipboard.",
+  "bulkAddressImportMenu": "Bulk Address Creation (CSV)",
+  "bulkAddressImportTitle": "Bulk Address Creation",
+  "addressCsvColumnsHint": "Expected CSV columns: streetName, initialNumber, finalNumber, exclusions (optional)",
+  "importAddressesButton": "Import Addresses ({count})",
+  "@importAddressesButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addressesImportedSuccess": "Successfully created {created} addresses ({skipped} skipped/duplicates).",
+  "@addressesImportedSuccess": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  }
 }
+

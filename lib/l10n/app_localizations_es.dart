@@ -713,11 +713,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get addressClaimInstructions =>
-      'Puedes iniciar el proceso de reclamo de dirección aquí o pedirle a un residente que te agregue como cohabitante desde su aplicación.';
+      'Puedes reclamar una propiedad como residente principal o mostrar tu Código QR de Hogar para ser vinculado por un residente principal.';
 
   @override
   String get roommateOnboardingInstructions =>
-      'Pídele a tus cohabitantes que se registren en la aplicación y compartan su correo electrónico para que los puedas agregar a tu grupo familiar.';
+      'Pide a los miembros de tu familia que muestren su Código QR de Hogar o compartan su ID de usuario/correo para agregarlos a tu grupo familiar.';
 
   @override
   String get deliveryDateLabel => 'Fecha de entrega de la propiedad';
@@ -762,4 +762,128 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get audienceResidents => 'Solo residentes';
+
+  @override
+  String get joinAsRoommateTitle => 'Unirse al Hogar como Coinquilino';
+
+  @override
+  String get joinAsRoommateTab => 'Unirse como Coinquilino';
+
+  @override
+  String get claimPropertyTab => 'Reclamar Propiedad';
+
+  @override
+  String get showQrToResidentInstructions =>
+      'Muestra este código QR al residente principal de tu hogar. Puede escanearlo desde su aplicación para vincular tu cuenta.';
+
+  @override
+  String get myRoommateQrCode => 'Mi Código QR de Hogar';
+
+  @override
+  String get copyUidButton => 'Copiar ID de Usuario';
+
+  @override
+  String get uidCopiedSnackbar => 'ID de usuario copiado al portapapeles.';
+
+  @override
+  String get scanRoommateQrButton => 'Escanear Código QR';
+
+  @override
+  String get enterEmailOrUidLabel => 'Ingresa Correo o ID de Usuario (UID)';
+
+  @override
+  String get roommateQrScannerTitle => 'Escanear QR de Coinquilino';
+
+  @override
+  String get invalidRoommateQrCode => 'Código QR de coinquilino no válido.';
+
+  @override
+  String get roommateAddedSuccess =>
+      'Miembro de la familia agregado exitosamente.';
+
+  @override
+  String get waitingToBeLinked =>
+      'Esperando a que un residente escanee o vincule tu cuenta...';
+
+  @override
+  String get pasteFromClipboard => 'Pegar del portapapeles';
+
+  @override
+  String get bulkUserImportMenu => 'Creación Masiva de Usuarios (CSV)';
+
+  @override
+  String get bulkUserImportTitle => 'Creación Masiva de Residentes';
+
+  @override
+  String get uploadCsvButton => 'Subir Archivo CSV';
+
+  @override
+  String get copyCsvTemplateButton => 'Copiar Plantilla CSV';
+
+  @override
+  String processImportButton(int count) {
+    return 'Crear Cuentas ($count)';
+  }
+
+  @override
+  String get importSuccessTitle => 'Importación Completada';
+
+  @override
+  String importSummaryText(int successCount, int failureCount) {
+    return '$successCount cuentas creadas exitosamente, $failureCount fallidas.';
+  }
+
+  @override
+  String get noFileSelected => 'Ningún archivo seleccionado.';
+
+  @override
+  String get invalidCsvFormat =>
+      'Formato CSV inválido o encabezados faltantes.';
+
+  @override
+  String get copyPasswordsButton => 'Copiar Contraseñas';
+
+  @override
+  String get passwordsCopiedSnackbar => 'Contraseñas copiadas al portapapeles.';
+
+  @override
+  String get csvColumnsHint =>
+      'Columnas CSV esperadas: name, email, password (opcional), street (opcional), number (opcional)';
+
+  @override
+  String get csvTemplateCopiedSnackbar =>
+      'Plantilla CSV copiada al portapapeles.';
+
+  @override
+  String get downloadResultCsvButton => 'Descargar CSV de Resultados';
+
+  @override
+  String get copyResultCsvButton => 'Copiar CSV de Resultados';
+
+  @override
+  String get csvDownloadedSuccess =>
+      'CSV de resultados descargado exitosamente.';
+
+  @override
+  String get csvCopiedSuccess => 'CSV de resultados copiado al portapapeles.';
+
+  @override
+  String get bulkAddressImportMenu => 'Creación Masiva de Direcciones (CSV)';
+
+  @override
+  String get bulkAddressImportTitle => 'Creación Masiva de Direcciones';
+
+  @override
+  String get addressCsvColumnsHint =>
+      'Columnas CSV esperadas: streetName, initialNumber, finalNumber, exclusions (opcional)';
+
+  @override
+  String importAddressesButton(int count) {
+    return 'Importar Direcciones ($count)';
+  }
+
+  @override
+  String addressesImportedSuccess(int created, int skipped) {
+    return 'Se crearon $created direcciones exitosamente ($skipped omitidas/duplicadas).';
+  }
 }

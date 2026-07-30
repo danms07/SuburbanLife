@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-06-10 (Refactored all custom header bars to use responsive MediaQuery top padding, resolving high padding alignment issues on web/desktop)*
+*Last Verified/Updated: 2026-07-30 (Added Bulk Address Import CSV screen in Admin Panel and adminBulkImportAddresses Cloud Function)*
 
 Current state of project files and folders:
 
@@ -9,12 +9,15 @@ Current state of project files and folders:
     - `icon/`: Launcher and branding icon assets.
         - `app_icon.png`: Original high-resolution premium app icon.
 - `docs/`: Technical plans and documentation archives.
+    - `admin_user_manual.md`: Comprehensive operational User Manual for system administrators (English).
+    - `admin_user_manual_es.md`: Comprehensive operational User Manual for system administrators (Spanish).
+    - `bulk_user_creation.md`: Complete guide and Cloud Function spec for bulk resident creation via CSV.
     - `plans/`: Future implementation plans.
         - `biometric_auth_plan.md`: Plan for persistent biometric gating.
         - `credential_manager_plan.md`: Plan for Passkeys and Credential Manager integration.
 - `flutter_launcher_icons.yaml`: Configuration for generating platform-specific launcher icons.
 - `functions/`: Cloud Functions for Firebase.
-    - `index.js`: Core function logic holding Gemini translations, address-based access restriction, address unbinding, and own-account deletion.
+    - `index.js`: Core function logic holding Gemini translations, address-based access restriction, address unbinding, own-account deletion, roommate account linking, admin bulk resident creation, and bulk address CSV creation.
 - `ios/`: Native iOS configuration and build files.
 - `LICENSE`: MIT No Attribution (MIT-0) license file.
 - `PRIVACY_POLICY.md`: Bilingual Privacy Policy (LFPDPPP/ARCO compliant).
@@ -27,6 +30,8 @@ Current state of project files and folders:
     - `features/`: Specific feature modules separated by domain.
         - `admin/`: Core management modules for administrators.
             - `admin_resident_registration_screen.dart`: Direct resident and roommate onboarding view with address collision detection.
+            - `admin_bulk_user_import_screen.dart`: Bulk resident account creation screen via CSV upload with optional/deterministic passwords and automated resident claim granting.
+            - `admin_bulk_address_import_screen.dart`: Bulk address creation screen via CSV upload supporting number ranges, exclusions, and collision checks.
             - `admin_payment_approval_screen.dart`: Payment proofs review showing payment period, and triggering status recalculation. Keyed stateful cards prevent redundant downloads/fetches.
             - `admin_upload_payment_screen.dart`: Interface for uploading maintenance receipts on behalf of addresses via cascading street name and house number dropdown filters.
             - `admin_user_management_screen.dart`: User directory mapping client role switching, claim state tables, and admin force-unbind actions.
@@ -41,7 +46,7 @@ Current state of project files and folders:
             - `ownership_proof_screen.dart`: Mandatory proof of ownership capture with property handover date picker, and upload interface.
             - `admin_resident_approval_screen.dart`: Dedicated admin list view for validating property ownership proofs and propagating delivery date to address upon approval. Keyed stateful cards prevent redundant downloads/fetches.
             - `forgot_password_screen.dart`: Password recovery request interface.
-            - `roommates_screen.dart`: Family group management interface.
+            - `roommates_screen.dart`: Family group management interface with camera QR scanner and UID/email roommate addition options.
         - `booking/`: Facility booking screens and service logic.
             - `booking_screen.dart`: Main booking interface.
             - `manage_bookings_screen.dart`: History and management of bookings.
@@ -63,6 +68,7 @@ Current state of project files and folders:
     - `populate_addresses.js`: Batched write logic for address import on csv files.
 - `test/`: Project unit and widget test suites.
     - `import_boundary_test.dart`: Static boundary verification test enforcing zero direct Firebase SDK imports inside `lib/features/`.
+- `resident_import_template.csv`: Sample CSV template for administrator bulk user account import.
 - `Structure.md`: This inventory map file.
 
 ## Architectural Decisions & Coding Guidelines

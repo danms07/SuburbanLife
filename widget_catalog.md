@@ -25,6 +25,8 @@ The following table maps each visual component to its feature domain and source 
 | **Dynamic Shortcuts Grid & Drawer** | Core / Navigation | [main.dart](lib/main.dart) |
 | **Branding Navigation Drawer Header** | Core / Navigation | [main.dart](lib/main.dart) |
 | **Custom Branded QR Access Card** | QR Access | [qr_generator_screen.dart](lib/features/qr_access/qr_generator_screen.dart) |
+| **Roommate QR Code Onboarding & Scanner** | Auth / Roommates | [main.dart](lib/main.dart) & [roommates_screen.dart](lib/features/auth/roommates_screen.dart) |
+| **Bulk User Import CSV Manager** | Admin Management | [admin_bulk_user_import_screen.dart](lib/features/admin/admin_bulk_user_import_screen.dart) |
 
 ---
 
@@ -112,6 +114,21 @@ The following table maps each visual component to its feature domain and source 
 ## 17. Custom Branded QR Access Card
 - **Description**: An on-the-fly generated shareable/downloadable graphic card (`800x1200` PNG). Uses a Custom Paint canvas recorder layout combining a branded header strip (featuring the brand app logo and name), a centered QR access code, a content divider, and five custom rows detailing the guest's name, authorized address, access category, validity/expiry status, and vehicle information.
 - **Usage**: Dynamically compiled when the user clicks 'Download' or 'Share' in the QR Generator screen.
+
+## 18. Roommate QR Code Onboarding & Scanner
+- **Description**: A dual-sided QR and UID account linking system for roommates and family members. On the unlinked account onboarding card (`main.dart`), an interactive `SegmentedButton` lets users toggle between "Claim Property" and "Join as Roommate". The Roommate tab presents a high-contrast `QrImageView` encoding `roommate_uid:$uid`, user credentials, a selectable plain-text UID box with an inline "Copy to Clipboard" icon button (`Clipboard.setData`), a full-width copy action button, and a live stream builder waiting indicator. In `RoommatesScreen`, primary residents can launch an inline camera QR scanner sheet powered by `MobileScanner` to scan roommate QR codes or manually type/paste a roommate UID or email address using the built-in `content_paste` suffix button in the input field.
+- **Usage**: Used during initial onboarding in `main.dart` and inside `RoommatesScreen`.
+
+## 19. Bulk User Import CSV Manager
+- **Description**: An administrative interface allowing bulk creation of resident user accounts from an uploaded CSV file. Features a file picker, a robust CSV parser (detecting headers or positional defaults), an interactive preview list of parsed rows showing assigned or deterministic temporary passwords, a copy template action, and a full results report view with copy-all passwords functionality.
+- **Usage**: Exposed via `AdminBulkUserImportScreen`.
+
+## 20. Bulk Address Import CSV Manager
+- **Description**: An administrative interface for pre-populating physical neighborhood address records into Firestore from a CSV file. Supports parsing street names, initial house numbers, final house numbers, and optional house number exclusions. Offers a CSV template copy helper, live row preview listing, and collision checks against existing database records.
+- **Usage**: Exposed via `AdminBulkAddressImportScreen`.
+
+
+
 
 
 

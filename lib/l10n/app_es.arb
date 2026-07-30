@@ -239,8 +239,8 @@
   "cooldownDays": "Días",
   "cooldownMonths": "Meses",
   "cooldownYears": "Años",
-  "addressClaimInstructions": "Puedes iniciar el proceso de reclamo de dirección aquí o pedirle a un residente que te agregue como cohabitante desde su aplicación.",
-  "roommateOnboardingInstructions": "Pídele a tus cohabitantes que se registren en la aplicación y compartan su correo electrónico para que los puedas agregar a tu grupo familiar.",
+  "addressClaimInstructions": "Puedes reclamar una propiedad como residente principal o mostrar tu Código QR de Hogar para ser vinculado por un residente principal.",
+  "roommateOnboardingInstructions": "Pide a los miembros de tu familia que muestren su Código QR de Hogar o compartan su ID de usuario/correo para agregarlos a tu grupo familiar.",
   "deliveryDateLabel": "Fecha de entrega de la propiedad",
   "selectDeliveryDate": "Selecciona la fecha de entrega",
   "selectPeriodLabel": "Seleccionar período de mantenimiento",
@@ -254,5 +254,76 @@
   "categoryNameLabel": "Nombre de la categoría",
   "targetAudienceLabel": "Público objetivo",
   "audienceAll": "Todos los usuarios",
-  "audienceResidents": "Solo residentes"
+  "audienceResidents": "Solo residentes",
+  "joinAsRoommateTitle": "Unirse al Hogar como Coinquilino",
+  "joinAsRoommateTab": "Unirse como Coinquilino",
+  "claimPropertyTab": "Reclamar Propiedad",
+  "showQrToResidentInstructions": "Muestra este código QR al residente principal de tu hogar. Puede escanearlo desde su aplicación para vincular tu cuenta.",
+  "myRoommateQrCode": "Mi Código QR de Hogar",
+  "copyUidButton": "Copiar ID de Usuario",
+  "uidCopiedSnackbar": "ID de usuario copiado al portapapeles.",
+  "scanRoommateQrButton": "Escanear Código QR",
+  "enterEmailOrUidLabel": "Ingresa Correo o ID de Usuario (UID)",
+  "roommateQrScannerTitle": "Escanear QR de Coinquilino",
+  "invalidRoommateQrCode": "Código QR de coinquilino no válido.",
+  "roommateAddedSuccess": "Miembro de la familia agregado exitosamente.",
+  "waitingToBeLinked": "Esperando a que un residente escanee o vincule tu cuenta...",
+  "pasteFromClipboard": "Pegar del portapapeles",
+  "bulkUserImportMenu": "Creación Masiva de Usuarios (CSV)",
+  "bulkUserImportTitle": "Creación Masiva de Residentes",
+  "uploadCsvButton": "Subir Archivo CSV",
+  "copyCsvTemplateButton": "Copiar Plantilla CSV",
+  "processImportButton": "Crear Cuentas ({count})",
+  "@processImportButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "importSuccessTitle": "Importación Completada",
+  "importSummaryText": "{successCount} cuentas creadas exitosamente, {failureCount} fallidas.",
+  "@importSummaryText": {
+    "placeholders": {
+      "successCount": {
+        "type": "int"
+      },
+      "failureCount": {
+        "type": "int"
+      }
+    }
+  },
+  "noFileSelected": "Ningún archivo seleccionado.",
+  "invalidCsvFormat": "Formato CSV inválido o encabezados faltantes.",
+  "copyPasswordsButton": "Copiar Contraseñas",
+  "passwordsCopiedSnackbar": "Contraseñas copiadas al portapapeles.",
+  "csvColumnsHint": "Columnas CSV esperadas: name, email, password (opcional), street (opcional), number (opcional)",
+  "csvTemplateCopiedSnackbar": "Plantilla CSV copiada al portapapeles.",
+  "downloadResultCsvButton": "Descargar CSV de Resultados",
+  "copyResultCsvButton": "Copiar CSV de Resultados",
+  "csvDownloadedSuccess": "CSV de resultados descargado exitosamente.",
+  "csvCopiedSuccess": "CSV de resultados copiado al portapapeles.",
+  "bulkAddressImportMenu": "Creación Masiva de Direcciones (CSV)",
+  "bulkAddressImportTitle": "Creación Masiva de Direcciones",
+  "addressCsvColumnsHint": "Columnas CSV esperadas: streetName, initialNumber, finalNumber, exclusions (opcional)",
+  "importAddressesButton": "Importar Direcciones ({count})",
+  "@importAddressesButton": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addressesImportedSuccess": "Se crearon {created} direcciones exitosamente ({skipped} omitidas/duplicadas).",
+  "@addressesImportedSuccess": {
+    "placeholders": {
+      "created": {
+        "type": "int"
+      },
+      "skipped": {
+        "type": "int"
+      }
+    }
+  }
 }
+

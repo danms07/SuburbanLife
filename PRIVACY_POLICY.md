@@ -17,7 +17,7 @@ By accessing, registering, or using the Suburban Life application, you acknowled
 
 ### 2. Information We Collect
 Suburban Life is a white-label residential management platform. To facilitate home onboarding, gate validation, fee administration, and service quality monitoring, we collect:
-*   **Account Data**: Name, email address, password, community role (Resident, Roommate, Admin, Security Guard), and future social profile details as integration with Google Sign-In and Facebook Login expands.
+*   **Account Data**: Name, email address, password, and community role (Resident, Roommate, Admin, Security Guard).
 *   **Property Information**: Street name, house number, and active linked physical addresses.
 *   **Property Ownership Verification**: Photos of deeds or handover documents, along with property delivery/handover dates, stored in secure cloud infrastructure.
 *   **Payment Verification**: Maintenance fee receipts (images) and payment history logs.
@@ -25,8 +25,9 @@ Suburban Life is a white-label residential management platform. To facilitate ho
 *   **Security Scanning Verification**: Temporary photos of visitor ID cards or vehicles captured by security guards at check-in points to confirm identity.
 *   **Usage Stats & Crash Reporting**: Automated usage metrics, performance telemetry, and crash diagnostics (via Google Analytics and Firebase Crashlytics on Android/iOS platforms) to identify bugs, ensure stability, and continuously improve app performance.
 
-### 3. Administrator Access & Internal Disclosure
+### 3. Administrator and Security Guard Access & Internal Disclosure
 *   **Full Administrative Access**: Please be aware that designated Condominium Administrators (Admins) have full visibility and access to all information, documents, payment proofs, visitor logs, vehicle plates, and address records submitted or uploaded through the app for the purpose of community governance, security oversight, and financial bookkeeping.
+*   **Security Guard Access**: Security Guards at access control checkpoints have access to specific resident and visitor information—including house numbers/addresses, resident names, pre-authorized guest names, vehicle license plates, QR access codes, and entry validity times—strictly for identity verification, gate validation, and access-control purposes.
 
 ### 4. How We Use Your Information
 We process your information to:
@@ -63,7 +64,7 @@ Al acceder, registrarse o utilizar la aplicación Suburban Life, usted reconoce 
 
 ### 2. Información que Recopilamos
 Suburban Life es una plataforma de gestión residencial. Para facilitar el registro en el hogar, la validación de accesos en caseta, el control de mantenimiento y la mejora continua del servicio, recopilamos:
-*   **Datos de la Cuenta**: Nombre, dirección de correo electrónico, contraseña, rol asignado (Residente, Roommate, Administrador, Guardia de Seguridad), y datos derivados de redes sociales a medida que se integre el inicio de sesión con Google y Facebook.
+*   **Datos de la Cuenta**: Nombre, dirección de correo electrónico, contraseña y rol asignado (Residente, Roommate, Administrador, Guardia de Seguridad).
 *   **Información de la Propiedad**: Nombre de la calle, número de casa y vinculación de inmuebles físicos.
 *   **Verificación de Propiedad**: Fotografías de escrituras o actas de entrega, junto con fechas de entrega de la propiedad cargadas a almacenamiento en la nube seguro.
 *   **Verificación de Pagos**: Comprobantes de pago de mantenimiento (imágenes) e historial de cuotas mensuales.
@@ -71,8 +72,9 @@ Suburban Life es una plataforma de gestión residencial. Para facilitar el regis
 *   **Verificación de Seguridad**: Fotografías temporales de identificaciones de visitantes o vehículos tomadas por los guardias en caseta para confirmar la identidad del visitante.
 *   **Estadísticas de Uso y Reportes de Fallas**: Métricas automatizadas de uso, telemetría de rendimiento y diagnósticos de fallas (a través de Google Analytics y Firebase Crashlytics en Android e iOS) con el fin exclusivo de solucionar errores, corregir fallas y mejorar la estabilidad de la aplicación.
 
-### 3. Acceso de los Administradores de la Comunidad
+### 3. Acceso de Administradores y Personal de Seguridad
 *   **Acceso Completo de Administración**: Le informamos que los Administradores designados del Condominio tienen visibilidad y acceso total a toda la información, documentos, comprobantes de pago, registros de visitantes, placas vehiculares y datos de propiedad compartidos o cargados a través de la aplicación para fines de gobernanza, seguridad y control contable del residencial.
+*   **Acceso del Personal de Seguridad**: Los Guardias de Seguridad en las casetas de control de acceso tienen acceso a información específica de residentes y visitantes —incluyendo números de casa/direcciones, nombres de residentes, nombres de invitados preautorizados, placas vehiculares, códigos QR de acceso y horarios de vigencia— estrictamente para fines de verificación de identidad, validación en caseta y control de acceso.
 
 ### 4. Cómo Utilizamos su Información
 Procesamos la información recopilada para:

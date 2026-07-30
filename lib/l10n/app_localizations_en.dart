@@ -706,11 +706,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addressClaimInstructions =>
-      'You can start the address claim process here or ask a resident to add you as a roommate from their app.';
+      'You can claim a property as a primary resident or show your Household QR Code to be linked by a primary resident.';
 
   @override
   String get roommateOnboardingInstructions =>
-      'Ask your roommates to sign up for the app and share their email address so you can add them to your family group.';
+      'Ask family members to show their Household QR Code or share their User ID/email so you can add them to your family group.';
 
   @override
   String get deliveryDateLabel => 'Property Handover Date';
@@ -755,4 +755,124 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get audienceResidents => 'Residents Only';
+
+  @override
+  String get joinAsRoommateTitle => 'Join Household as Roommate';
+
+  @override
+  String get joinAsRoommateTab => 'Join as Roommate';
+
+  @override
+  String get claimPropertyTab => 'Claim Property';
+
+  @override
+  String get showQrToResidentInstructions =>
+      'Show this QR code to the primary resident of your household. They can scan it from their app to link your account.';
+
+  @override
+  String get myRoommateQrCode => 'My Household QR Code';
+
+  @override
+  String get copyUidButton => 'Copy User ID';
+
+  @override
+  String get uidCopiedSnackbar => 'User ID copied to clipboard.';
+
+  @override
+  String get scanRoommateQrButton => 'Scan QR Code';
+
+  @override
+  String get enterEmailOrUidLabel => 'Enter Roommate Email or User ID (UID)';
+
+  @override
+  String get roommateQrScannerTitle => 'Scan Roommate QR Code';
+
+  @override
+  String get invalidRoommateQrCode => 'Invalid Roommate QR Code scanned.';
+
+  @override
+  String get roommateAddedSuccess => 'Family member added successfully.';
+
+  @override
+  String get waitingToBeLinked =>
+      'Waiting for a resident to scan or link your account...';
+
+  @override
+  String get pasteFromClipboard => 'Paste from Clipboard';
+
+  @override
+  String get bulkUserImportMenu => 'Bulk User Creation (CSV)';
+
+  @override
+  String get bulkUserImportTitle => 'Bulk Resident Creation';
+
+  @override
+  String get uploadCsvButton => 'Upload CSV File';
+
+  @override
+  String get copyCsvTemplateButton => 'Copy CSV Template';
+
+  @override
+  String processImportButton(int count) {
+    return 'Create Accounts ($count)';
+  }
+
+  @override
+  String get importSuccessTitle => 'Import Completed';
+
+  @override
+  String importSummaryText(int successCount, int failureCount) {
+    return '$successCount accounts created successfully, $failureCount failed.';
+  }
+
+  @override
+  String get noFileSelected => 'No file selected.';
+
+  @override
+  String get invalidCsvFormat => 'Invalid CSV format or missing headers.';
+
+  @override
+  String get copyPasswordsButton => 'Copy Passwords';
+
+  @override
+  String get passwordsCopiedSnackbar => 'Passwords copied to clipboard.';
+
+  @override
+  String get csvColumnsHint =>
+      'Expected CSV columns: name, email, password (optional), street (optional), number (optional)';
+
+  @override
+  String get csvTemplateCopiedSnackbar => 'CSV template copied to clipboard.';
+
+  @override
+  String get downloadResultCsvButton => 'Download Result CSV';
+
+  @override
+  String get copyResultCsvButton => 'Copy Result CSV';
+
+  @override
+  String get csvDownloadedSuccess => 'Result CSV downloaded successfully.';
+
+  @override
+  String get csvCopiedSuccess => 'Result CSV copied to clipboard.';
+
+  @override
+  String get bulkAddressImportMenu => 'Bulk Address Creation (CSV)';
+
+  @override
+  String get bulkAddressImportTitle => 'Bulk Address Creation';
+
+  @override
+  String get addressCsvColumnsHint =>
+      'Expected CSV columns: streetName, initialNumber, finalNumber, exclusions (optional)';
+
+  @override
+  String importAddressesButton(int count) {
+    return 'Import Addresses ($count)';
+  }
+
+  @override
+  String addressesImportedSuccess(int created, int skipped) {
+    return 'Successfully created $created addresses ($skipped skipped/duplicates).';
+  }
 }

@@ -3,6 +3,8 @@ import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 
+import 'admin_bulk_user_import_screen.dart';
+
 class AdminResidentRegistrationScreen extends StatefulWidget {
   const AdminResidentRegistrationScreen({Key? key}) : super(key: key);
 
@@ -112,6 +114,20 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
         title: Text(l10n.registerResidentTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
         backgroundColor: AppConfig.primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_upload),
+            tooltip: l10n.bulkUserImportMenu,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminBulkUserImportScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
