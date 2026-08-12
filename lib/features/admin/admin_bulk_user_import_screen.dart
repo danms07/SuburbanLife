@@ -198,9 +198,13 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
         'users': _parsedUsers,
       });
 
-      setState(() {
-        _importResult = Map<String, dynamic>.from(response.data as Map);
-      });
+      if (response != null && response is Map) {
+        setState(() {
+          _importResult = Map<String, dynamic>.from(response);
+        });
+      } else {
+        throw Exception('Invalid response format received from server.');
+      }
 
       final successCount = _importResult?['successCount'] ?? 0;
       final failureCount = _importResult?['failureCount'] ?? 0;
@@ -314,7 +318,9 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
 
   void _copyAllPasswords() {
     if (_importResult == null) return;
-    final results = List<Map<String, dynamic>>.from(_importResult!['results'] as List);
+    final results = List<Map<String, dynamic>>.from(
+      (_importResult!['results'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
+    );
     final buffer = StringBuffer();
     buffer.writeln('Email, Name, Assigned Password, Status, Linked Address');
 
@@ -596,6 +602,23 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                             ),
                           );
                         },
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _parsedUsers = [];
+                              _fileName = null;
+                              _importResult = null;
+                            });
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: Text(l10n.importAnotherFileButton),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                        ),
                       ),
                     ],
                   ),

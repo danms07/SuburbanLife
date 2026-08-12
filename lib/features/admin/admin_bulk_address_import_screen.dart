@@ -404,9 +404,9 @@ class _AdminBulkAddressImportScreenState
                             size: 28,
                           ),
                           const SizedBox(width: 12),
-                          const Text(
-                            'Import Completed',
-                            style: TextStyle(
+                          Text(
+                            l10n.importSuccessTitle,
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               fontFamily: AppConfig.fontFamily,
@@ -429,7 +429,7 @@ class _AdminBulkAddressImportScreenState
                           });
                         },
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Import Another File'),
+                        label: Text(l10n.importAnotherFileButton),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConfig.primaryColor,
                           foregroundColor: Colors.white,

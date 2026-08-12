@@ -39,16 +39,26 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize App Check with debug providers in development, standard providers in production
-  await FirebaseAppCheck.instance.activate(
-    providerAndroid: kDebugMode
-        ? const AndroidDebugProvider()
-        : const AndroidPlayIntegrityProvider(),
-    providerApple: kDebugMode
-        ? const AppleDebugProvider()
-        : const AppleAppAttestProvider(),
-    providerWeb: ReCaptchaEnterpriseProvider(AppConfig.recaptchaSiteKey),
-  );
+  try {
+    await FirebaseAppCheck.instance.activate(
+      providerAndroid: kDebugMode
+          ? const AndroidDebugProvider()
+          : const AndroidPlayIntegrityProvider(),
+      providerApple: kDebugMode
+          ? const AppleDebugProvider()
+          : const AppleAppAttestProvider(),
+      providerWeb: ReCaptchaEnterpriseProvider(AppConfig.recaptchaSiteKey),
+    );
+  } catch (e) {
+    debugPrint('App Check activation error (Enterprise): $e');
+    try {
+      await FirebaseAppCheck.instance.activate(
+        providerWeb: ReCaptchaV3Provider(AppConfig.recaptchaSiteKey),
+      );
+    } catch (e2) {
+      debugPrint('App Check activation error (V3): $e2');
+    }
+  }
 
   Backend.initialize(
     auth: FirebaseAuthService(),

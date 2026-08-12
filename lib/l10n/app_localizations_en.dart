@@ -875,4 +875,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String addressesImportedSuccess(int created, int skipped) {
     return 'Successfully created $created addresses ($skipped skipped/duplicates).';
   }
+
+  @override
+  String get importAnotherFileButton => 'Import Another File';
 }

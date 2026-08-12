@@ -324,6 +324,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "importAnotherFileButton": "Import Another File"
 }
 

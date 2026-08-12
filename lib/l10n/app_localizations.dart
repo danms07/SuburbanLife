@@ -1753,6 +1753,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Successfully created {created} addresses ({skipped} skipped/duplicates).'**
   String addressesImportedSuccess(int created, int skipped);
+
+  /// No description provided for @importAnotherFileButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Another File'**
+  String get importAnotherFileButton;
 }
 
 class _AppLocalizationsDelegate

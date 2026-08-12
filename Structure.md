@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-07-30 (Added snippets/ directory to .gitignore)*
+*Last Verified/Updated: 2026-07-30 (Audited and aligned firestore.rules, storage.rules, and added firestore.indexes.json for composite query performance)*
 
 Current state of project files and folders:
 
@@ -15,6 +15,10 @@ Current state of project files and folders:
     - `plans/`: Future implementation plans.
         - `biometric_auth_plan.md`: Plan for persistent biometric gating.
         - `credential_manager_plan.md`: Plan for Passkeys and Credential Manager integration.
+- `firebase.json`: Firebase project deployment configuration mapping Firestore rules, Storage rules, functions, and composite indexes.
+- `firestore.rules`: Security rules for Cloud Firestore collections.
+- `firestore.indexes.json`: Composite index definitions for Firestore queries (bookings, payments, qr_codes, documents).
+- `storage.rules`: Security rules for Firebase Cloud Storage buckets.
 - `flutter_launcher_icons.yaml`: Configuration for generating platform-specific launcher icons.
 - `functions/`: Cloud Functions for Firebase.
     - `index.js`: Core function logic holding Gemini translations, address-based access restriction, address unbinding, own-account deletion, roommate account linking, admin bulk resident creation, and bulk address CSV creation.

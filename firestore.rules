@@ -70,6 +70,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /document_categories/{catId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     match /ownership_claims/{claimId} {
       allow read, create: if isAuthenticated();
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
