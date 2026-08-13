@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const admin = require('firebase-admin');
+const { FieldValue } = require('firebase-admin/firestore');
 const { GoogleGenAI } = require('@google/genai');
 const nodemailer = require('nodemailer');
 admin.initializeApp();
@@ -586,7 +587,7 @@ exports.addRoommate = onCall({ enforceAppCheck: true }, async (request) => {
 
     // 5. Add to resident's familyMembers array
     await admin.firestore().collection('users').doc(residentUid).update({
-      familyMembers: admin.firestore.FieldValue.arrayUnion(targetUid)
+      familyMembers: FieldValue.arrayUnion(targetUid)
     });
 
     return { success: true };
@@ -1059,7 +1060,7 @@ exports.unbindAddress = onCall({ enforceAppCheck: true }, async (request) => {
     // 2. Clear addressRef and familyMembers on primary resident user document
     batch.update(userDoc.ref, {
       addressRef: null,
-      familyMembers: admin.firestore.FieldValue.delete()
+      familyMembers: FieldValue.delete()
     });
 
     // Clear resident custom claims
@@ -1146,13 +1147,13 @@ exports.removeRoommate = onCall({ enforceAppCheck: true }, async (request) => {
 
     // 1. Remove roommateUid from resident's familyMembers list
     batch.update(residentDoc.ref, {
-      familyMembers: admin.firestore.FieldValue.arrayRemove(roommateUid)
+      familyMembers: FieldValue.arrayRemove(roommateUid)
     });
 
     // 2. Clear addressRef and role on roommate's user document
     batch.update(roommateDoc.ref, {
       addressRef: null,
-      role: admin.firestore.FieldValue.delete()
+      role: FieldValue.delete()
     });
 
     await batch.commit();
@@ -1432,7 +1433,7 @@ exports.adminBulkImportAddresses = onCall({ enforceAppCheck: true }, async (requ
         number: num,
         residentUid: null,
         paymentStatus: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
       existingSet.add(checkKey);
       itemCreated++;
