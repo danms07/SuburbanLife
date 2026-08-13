@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -54,17 +55,31 @@ class _AdminBulkAddressImportScreenState
       final file = result.files.first;
       final bytes = file.bytes;
       if (bytes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.noFileSelected),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.noFileSelected),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
         return;
       }
 
       final content = utf8.decode(bytes);
       final items = _parseCsvContent(content);
+
+      if (items.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.invalidCsvFormat),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
 
       setState(() {
         _fileName = file.name;
@@ -76,7 +91,7 @@ class _AdminBulkAddressImportScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.invalidCsvFormat),
+            content: Text('${l10n.invalidCsvFormat}: $e'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -85,58 +100,98 @@ class _AdminBulkAddressImportScreenState
   }
 
   List<Map<String, dynamic>> _parseCsvContent(String content) {
-    final lines = content
-        .split(RegExp(r'\r\n|\n|\r'))
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty)
-        .toList();
-
-    if (lines.isEmpty) return [];
-
-    final List<Map<String, dynamic>> items = [];
-    int startIndex = 0;
-
-    // Check if first row is header
-    final firstLineLower = lines.first.toLowerCase();
-    if (firstLineLower.contains('street') ||
-        firstLineLower.contains('initial') ||
-        firstLineLower.contains('number')) {
-      startIndex = 1;
+    // Strip UTF-8 BOM if present
+    String cleanedContent = content;
+    if (cleanedContent.startsWith('\uFEFF')) {
+      cleanedContent = cleanedContent.substring(1);
     }
 
-    final csvRegex = RegExp(r'(".*?"|[^",\s]+)(?=\s*,|\s*$)');
+    final rawLines = const LineSplitter().convert(cleanedContent);
+    final lines = rawLines.map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    if (lines.isEmpty) return [];
+
+    // Delimiter auto-detection (comma vs semicolon vs tab)
+    final firstLine = lines.first;
+    String delimiter = ',';
+    if (!firstLine.contains(',') && firstLine.contains(';')) {
+      delimiter = ';';
+    } else if (!firstLine.contains(',') && firstLine.contains('\t')) {
+      delimiter = '\t';
+    }
+
+    int streetCol = -1;
+    int initNumCol = -1;
+    int finalNumCol = -1;
+    int numCol = -1;
+    int exclCol = -1;
+
+    final firstRowCells = _splitCsvLine(lines[0], delimiter);
+    final lowerHeaders = firstRowCells.map((c) => c.toLowerCase().trim()).toList();
+
+    for (int i = 0; i < lowerHeaders.length; i++) {
+      final h = lowerHeaders[i];
+      if (h == 'street' || h == 'streetname' || h == 'street_name' || h == 'calle' || h == 'nombre_calle' || h == 'address' || h == 'direccion' || h == 'dirección') {
+        streetCol = i;
+      } else if (h == 'initialnumber' || h == 'initial_number' || h == 'initial' || h == 'start' || h == 'start_number' || h == 'from' || h == 'numero_inicial' || h == 'numeroinicial' || h == 'desde' || h == 'inicio') {
+        initNumCol = i;
+      } else if (h == 'finalnumber' || h == 'final_number' || h == 'final' || h == 'end' || h == 'end_number' || h == 'to' || h == 'numero_final' || h == 'numerofinal' || h == 'hasta' || h == 'fin') {
+        finalNumCol = i;
+      } else if (h == 'number' || h == 'house_number' || h == 'numero' || h == 'número' || h == 'no' || h == 'num') {
+        numCol = i;
+      } else if (h == 'exclusions' || h == 'exclusion' || h == 'exclusiones' || h == 'excluidos' || h == 'except' || h == 'excepto' || h == 'omit') {
+        exclCol = i;
+      }
+    }
+
+    int startIndex = 1;
+    // Check if header row was detected
+    if (streetCol == -1 && initNumCol == -1 && numCol == -1) {
+      startIndex = 0;
+      streetCol = 0;
+      initNumCol = 1;
+      finalNumCol = 2;
+      exclCol = 3;
+    }
+
+    final List<Map<String, dynamic>> items = [];
 
     for (int i = startIndex; i < lines.length; i++) {
-      final line = lines[i];
-      final matches =
-          csvRegex.allMatches(line).map((m) => m.group(0)!).toList();
-      if (matches.isEmpty) continue;
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
 
-      final cleanMatches =
-          matches.map((m) => m.replaceAll('"', '').trim()).toList();
+      final cells = _splitCsvLine(line, delimiter);
+      if (cells.isEmpty) continue;
 
-      if (cleanMatches.isEmpty) continue;
-
-      final street = cleanMatches[0];
-      if (street.isEmpty) continue;
+      String street = streetCol >= 0 && streetCol < cells.length ? cells[streetCol] : '';
+      if (street.isEmpty && cells.isNotEmpty) {
+        street = cells[0];
+      }
 
       int initialNum = 0;
       int finalNum = 0;
       String exclusions = '';
 
-      if (cleanMatches.length >= 3) {
-        initialNum = int.tryParse(cleanMatches[1]) ?? 0;
-        finalNum = int.tryParse(cleanMatches[2]) ?? 0;
-        if (cleanMatches.length >= 4) {
-          exclusions = cleanMatches[3];
-        }
-      } else if (cleanMatches.length == 2) {
-        // Single house number row format: streetName, number
-        initialNum = int.tryParse(cleanMatches[1]) ?? 0;
+      if (initNumCol >= 0 && initNumCol < cells.length && finalNumCol >= 0 && finalNumCol < cells.length) {
+        initialNum = int.tryParse(cells[initNumCol].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        finalNum = int.tryParse(cells[finalNumCol].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      } else if (numCol >= 0 && numCol < cells.length) {
+        initialNum = int.tryParse(cells[numCol].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        finalNum = initialNum;
+      } else if (cells.length >= 3) {
+        initialNum = int.tryParse(cells[1].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        finalNum = int.tryParse(cells[2].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      } else if (cells.length == 2) {
+        initialNum = int.tryParse(cells[1].replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
         finalNum = initialNum;
       }
 
-      if (initialNum > 0 && finalNum > 0) {
+      if (exclCol >= 0 && exclCol < cells.length) {
+        exclusions = cells[exclCol];
+      } else if (cells.length >= 4) {
+        exclusions = cells[3];
+      }
+
+      if (street.isNotEmpty && initialNum > 0 && finalNum > 0) {
         items.add({
           'streetName': street,
           'initialNumber': initialNum,
@@ -147,6 +202,57 @@ class _AdminBulkAddressImportScreenState
     }
 
     return items;
+  }
+
+  List<String> _splitCsvLine(String line, [String delimiter = ',']) {
+    final List<String> cells = [];
+    final StringBuffer buffer = StringBuffer();
+    bool inQuotes = false;
+
+    for (int i = 0; i < line.length; i++) {
+      final char = line[i];
+      if (char == '"') {
+        inQuotes = !inQuotes;
+      } else if (char == delimiter && !inQuotes) {
+        cells.add(_cleanCell(buffer.toString()));
+        buffer.clear();
+      } else {
+        buffer.write(char);
+      }
+    }
+    cells.add(_cleanCell(buffer.toString()));
+    return cells;
+  }
+
+  String _cleanCell(String val) {
+    String trimmed = val.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+      trimmed = trimmed.substring(1, trimmed.length - 1).trim();
+    }
+    return trimmed;
+  }
+
+  int _calculateTotalAddressCount() {
+    int total = 0;
+    for (final item in _parsedItems) {
+      final initN = item['initialNumber'] as int? ?? 0;
+      final finN = item['finalNumber'] as int? ?? 0;
+      final exclStr = item['exclusions']?.toString() ?? '';
+
+      int exclCount = 0;
+      if (exclStr.isNotEmpty) {
+        final exclList = exclStr
+            .split(',')
+            .map((s) => int.tryParse(s.trim()))
+            .where((n) => n != null && n >= math.min(initN, finN) && n <= math.max(initN, finN))
+            .toSet();
+        exclCount = exclList.length;
+      }
+
+      final rangeCount = (finN - initN).abs() + 1;
+      total += (rangeCount - exclCount).clamp(0, rangeCount);
+    }
+    return total;
   }
 
   void _processImport() async {
@@ -296,11 +402,28 @@ class _AdminBulkAddressImportScreenState
 
             if (_fileName != null) ...[
               const SizedBox(height: 12),
-              Text(
-                'File: $_fileName (${_parsedItems.length} items parsed)',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppConfig.secondaryColor,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppConfig.secondaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppConfig.secondaryColor.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle_outline, color: AppConfig.secondaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$_fileName: ${_parsedItems.length} ranges (${_calculateTotalAddressCount()} addresses to create)',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppConfig.secondaryColor,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -309,13 +432,18 @@ class _AdminBulkAddressImportScreenState
 
             // Parsed Items Preview Table / List
             if (_parsedItems.isNotEmpty && _importResult == null) ...[
-              Text(
-                'Preview (${_parsedItems.length} entries)',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: AppConfig.fontFamily,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Preview (${_parsedItems.length} ranges / ${_calculateTotalAddressCount()} addresses)',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: AppConfig.fontFamily,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               Container(
