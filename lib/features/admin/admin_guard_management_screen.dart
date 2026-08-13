@@ -35,10 +35,11 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
     });
 
     try {
-      await FunctionsService().callFunction('adminProvisionGuard', {
+      await FunctionsService().callFunction('adminCreateUser', {
         'name': name,
         'email': email,
         'password': password,
+        'role': 'guard',
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

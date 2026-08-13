@@ -1003,4 +1003,44 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get defaultWelcomeBody =>
       'Hello %name%,\n\nYour %role% account has been created successfully. Below are your login credentials:\n\n- Email: %email%\n- Password: %password%\n- Address: %address%\n\nWe recommend logging in and updating your password.\n\nBest regards,\nAdministration of %appName%';
+
+  @override
+  String get createUserMenu => 'Create User';
+
+  @override
+  String get createUserTitle => 'Create User Account';
+
+  @override
+  String get userTypeLabel => 'User Type';
+
+  @override
+  String get guardInfoBanner =>
+      'Security guard accounts have permissions to scan visitor QR passes, log entry access, and verify guest IDs.';
+
+  @override
+  String get adminInfoBanner =>
+      'Administrator accounts have full control. This user will be automatically linked to the \'Admin office\' address.';
+
+  @override
+  String get userCreatedSuccess => 'User account created successfully!';
+
+  @override
+  String get createUserButton => 'Create User Account';
+
+  @override
+  String get generatePasswordButton => 'Generate Password';
+
+  @override
+  String get selectStreetPrompt => 'Select Street';
+
+  @override
+  String get selectNumberPrompt => 'Select House Number';
+
+  @override
+  String get noAvailableAddressesError =>
+      'No available unclaimed addresses found on this street.';
+
+  @override
+  String get addressMustBeSelected =>
+      'Please select a street and house number for the resident.';
 }

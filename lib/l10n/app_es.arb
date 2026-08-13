@@ -371,6 +371,18 @@
   "availablePlaceholdersLabel": "Marcadores Disponibles (clic para insertar):",
   "resetDefaultTemplateButton": "Restablecer Plantilla Predeterminada",
   "defaultWelcomeSubject": "¡Bienvenido(a) a %appName%! Credenciales de Acceso",
-  "defaultWelcomeBody": "Hola %name%,\n\nTu cuenta de %role% ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso:\n\n- Correo electrónico: %email%\n- Contraseña inicial: %password%\n- Dirección asignada: %address%\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\nAtentamente,\nAdministración de %appName%"
+  "defaultWelcomeBody": "Hola %name%,\n\nTu cuenta de %role% ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso:\n\n- Correo electrónico: %email%\n- Contraseña inicial: %password%\n- Dirección asignada: %address%\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\nAtentamente,\nAdministración de %appName%",
+  "createUserMenu": "Crear Usuario",
+  "createUserTitle": "Crear Cuenta de Usuario",
+  "userTypeLabel": "Tipo de Usuario",
+  "guardInfoBanner": "Las cuentas de guardia de seguridad tienen permisos para escanear pases QR de visitantes, registrar accesos y verificar identificaciones en caseta.",
+  "adminInfoBanner": "Las cuentas de administrador tienen control total. Este usuario será vinculado automáticamente a la dirección 'Oficina de administración'.",
+  "userCreatedSuccess": "¡Cuenta de usuario creada con éxito!",
+  "createUserButton": "Crear Cuenta de Usuario",
+  "generatePasswordButton": "Generar Contraseña",
+  "selectStreetPrompt": "Seleccionar Calle",
+  "selectNumberPrompt": "Seleccionar Número",
+  "noAvailableAddressesError": "No hay números disponibles sin asignar en esta calle.",
+  "addressMustBeSelected": "Por favor selecciona una calle y número para el residente."
 }
 

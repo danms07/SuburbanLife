@@ -29,6 +29,7 @@ The following table maps each visual component to its feature domain and source 
 | **Bulk User Import CSV Manager** | Admin Management | [admin_bulk_user_import_screen.dart](lib/features/admin/admin_bulk_user_import_screen.dart) |
 | **Bulk Address Import CSV Manager** | Admin Management | [admin_bulk_address_import_screen.dart](lib/features/admin/admin_bulk_address_import_screen.dart) |
 | **Admin Settings & SMTP Configurator** | Admin Settings | [admin_settings_screen.dart](lib/features/admin/admin_settings_screen.dart) |
+| **Unified User Creation Manager** | Admin Management | [admin_create_user_screen.dart](lib/features/admin/admin_create_user_screen.dart) |
 
 ---
 
@@ -132,6 +133,11 @@ The following table maps each visual component to its feature domain and source 
 ## 21. Admin Settings & SMTP Configurator
 - **Description**: A multi-section configuration panel for administrators to adjust payment cutoff days, grace period limits, and configure a custom SMTP mail server. Includes preset chips for standard ports (587, 465, 25), SSL/TLS switch, password visibility toggle, a rich customizable welcome message template editor with placeholder chips (`%password%`, `%name%`, `%email%`, `%address%`, `%role%`, `%appName%`) and reset defaults action, and an interactive connection testing tool that executes an SMTP handshake and sends a test email to verify credentials before saving.
 - **Usage**: Exposed via `AdminSettingsScreen`.
+
+## 22. Unified User Creation Manager
+- **Description**: A centralized administrative interface for provisioning new accounts across all user tiers: Resident, Security Guard, and Administrator. Features a dynamic form switcher driven by a user type selector (defaulting to Resident), password visibility toggles, automated secure password generator, and reactive cascading street-and-number selectors ensuring collision-free address assignment. For Administrator accounts, automatically ensures linkage to the fixed "Admin office" address.
+- **Usage**: Exposed via `AdminCreateUserScreen`.
+
 
 
 

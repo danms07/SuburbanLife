@@ -92,10 +92,14 @@ Administrators can create resident accounts in bulk without requiring residents 
 * **Address Linking & Verification**: If `street` and `number` are provided, the system verifies the address in the database, sets `residentUid`, and marks `paymentStatus: 'paid'`. If the address is not found in the DB, the row is rejected with a clear error message.
 * **Result CSV Export**: After execution, administrators can tap **Download Result CSV** or **Copy Result CSV** to retrieve a complete spreadsheet containing execution status (`ok`/`error`), assigned passwords, and detailed error messages.
 
-### 3.2 Single Resident & Roommate Registration
-* **Navigation**: Dashboard $\rightarrow$ **Register Resident** (`AdminResidentRegistrationScreen`).
-* Allows manual registration of individual primary residents or roommates.
-* Features cascading street and house number selectors with address collision warnings if the property is already claimed.
+### 3.2 Unified User Account Creation
+* **Navigation**: Dashboard $\rightarrow$ **Create User** (`AdminCreateUserScreen`).
+* Provides a single, centralized interface for administrators to provision new accounts with automated credential delivery:
+  * **User Type Selector**: Choose between **Resident** (default), **Security Guard**, and **Administrator**.
+  * **Resident Accounts**: Captures full name, email, password (with auto-generator), and offers cascading street & number dropdowns with collision prevention to link the resident's home immediately with `{ resident: true }` claim and `paymentStatus: 'paid'`.
+  * **Security Guard Accounts**: Captures name, email, and password, granting `{ guard: true }` security clearance for scanning QR codes at entry gates.
+  * **Administrator Accounts**: Captures credentials and automatically links the administrator to the fixed community address **"Admin office"** (creating the address record automatically if not already present).
+  * **Welcome Notification**: If SMTP is configured, sends an automated welcome email containing login credentials directly to the user's inbox.
 
 ### 3.3 Property Ownership Claim Approvals
 When residents self-register via the mobile app, they submit property proof photos and handover dates.

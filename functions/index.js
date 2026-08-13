@@ -667,6 +667,177 @@ exports.adminUpdatePassword = onCall({ enforceAppCheck: true }, async (request) 
   }
 });
 
+exports.adminCreateUser = onCall({ enforceAppCheck: true }, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { name, email, password, role, streetName, number, addressId } = request.data;
+  if (!name || !email || !password || !role) {
+    throw new HttpsError('invalid-argument', 'Missing name, email, password, or role.');
+  }
+
+  const cleanName = name.toString().trim();
+  const cleanEmail = email.toString().trim().toLowerCase();
+  const cleanPassword = password.toString().trim();
+  const cleanRole = role.toString().trim().toLowerCase();
+
+  if (cleanPassword.length < 6) {
+    throw new HttpsError('invalid-argument', 'Password must be at least 6 characters long.');
+  }
+
+  if (!['resident', 'guard', 'admin'].includes(cleanRole)) {
+    throw new HttpsError('invalid-argument', `Invalid role: ${cleanRole}. Must be resident, guard, or admin.`);
+  }
+
+  const db = admin.firestore();
+
+  try {
+    let addressRef = null;
+    let addressDisplay = null;
+
+    // 1. Handle Role Specific Address Requirements
+    if (cleanRole === 'admin') {
+      // Admin users are linked to the fixed address "admin office" / "Oficina de administración"
+      // Make sure to create this address if it does not exist before the admin user is created
+      const adminOfficeSnap = await db.collection('addresses').where('streetName', '==', 'Admin office').get();
+      
+      if (adminOfficeSnap.empty) {
+        const adminOfficeEsSnap = await db.collection('addresses').where('streetName', '==', 'Oficina de administración').get();
+        if (adminOfficeEsSnap.empty) {
+          const newDocRef = db.collection('addresses').doc('admin_office');
+          await newDocRef.set({
+            id: 'admin_office',
+            streetName: 'Admin office',
+            number: 0,
+            paymentStatus: 'paid',
+            createdAt: Date.now(),
+          });
+          addressRef = newDocRef;
+        } else {
+          addressRef = adminOfficeEsSnap.docs[0].ref;
+        }
+      } else {
+        addressRef = adminOfficeSnap.docs[0].ref;
+      }
+      addressDisplay = 'Admin office';
+    } else if (cleanRole === 'resident') {
+      // Resident requires an existing physical address in the neighborhood
+      let targetAddressDoc = null;
+      if (addressId) {
+        const doc = await db.collection('addresses').doc(addressId).get();
+        if (doc.exists) {
+          targetAddressDoc = doc;
+        }
+      }
+
+      if (!targetAddressDoc && streetName && number !== undefined) {
+        const numVal = isNaN(Number(number)) ? number : Number(number);
+        let addressQuery = await db.collection('addresses')
+          .where('streetName', '==', streetName.toString().trim())
+          .where('number', '==', numVal)
+          .get();
+
+        if (addressQuery.empty && typeof numVal === 'number') {
+          addressQuery = await db.collection('addresses')
+            .where('streetName', '==', streetName.toString().trim())
+            .where('number', '==', number.toString().trim())
+            .get();
+        }
+
+        if (!addressQuery.empty) {
+          targetAddressDoc = addressQuery.docs[0];
+        }
+      }
+
+      if (!targetAddressDoc) {
+        throw new HttpsError('not-found', 'Specified address was not found in database.');
+      }
+
+      const addressData = targetAddressDoc.data();
+      const currentResident = addressData.residentUid;
+      if (currentResident && currentResident.toString().trim().length > 0) {
+        throw new HttpsError('already-exists', `The address "${addressData.streetName} #${addressData.number}" is already claimed by another resident.`);
+      }
+
+      addressRef = targetAddressDoc.ref;
+      addressDisplay = `${addressData.streetName} #${addressData.number}`;
+    }
+
+    // 2. Create user in Firebase Authentication
+    const userRecord = await admin.auth().createUser({
+      email: cleanEmail,
+      password: cleanPassword,
+      displayName: cleanName,
+    });
+
+    // 3. Set Custom User Claims based on selected role
+    const claims = {};
+    if (cleanRole === 'admin') claims.admin = true;
+    if (cleanRole === 'guard') claims.guard = true;
+    if (cleanRole === 'resident') claims.resident = true;
+
+    await admin.auth().setCustomUserClaims(userRecord.uid, claims);
+
+    // 4. Update address if resident (claim address and mark paymentStatus: 'paid')
+    if (cleanRole === 'resident' && addressRef) {
+      await addressRef.update({
+        residentUid: userRecord.uid,
+        paymentStatus: 'paid',
+      });
+    }
+
+    // 5. Create user document in Firestore users collection
+    const userDocData = {
+      uid: userRecord.uid,
+      name: cleanName,
+      email: cleanEmail,
+      role: cleanRole,
+      createdAt: Date.now(),
+    };
+    if (addressRef) {
+      userDocData.addressRef = addressRef;
+    }
+
+    await db.collection('users').doc(userRecord.uid).set(userDocData);
+
+    // 6. Send Welcome Email if SMTP is configured
+    let emailSent = false;
+    let emailError = null;
+    const smtpConfig = await getSmtpConfig();
+    if (smtpConfig) {
+      const roleDisplayMap = {
+        'admin': 'administrador',
+        'guard': 'guardia de seguridad',
+        'resident': 'residente',
+      };
+      const emailResult = await sendWelcomeEmail(smtpConfig, {
+        email: cleanEmail,
+        name: cleanName,
+        password: cleanPassword,
+        addressLinked: addressDisplay,
+        appName: 'Suburban Life',
+        role: roleDisplayMap[cleanRole] || cleanRole,
+      });
+      emailSent = emailResult.sent === true;
+      emailError = emailResult.error || null;
+    }
+
+    return {
+      success: true,
+      uid: userRecord.uid,
+      role: cleanRole,
+      addressLinked: addressDisplay,
+      emailSent,
+      emailError,
+    };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    console.error('adminCreateUser error:', error);
+    throw new HttpsError('internal', error.message || 'Failed to create user account.');
+  }
+});
+
 exports.adminProvisionGuard = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');

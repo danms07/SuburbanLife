@@ -20,6 +20,7 @@ import 'package:suburban_life/features/announcements/announcements_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_generator_screen.dart';
 import 'package:suburban_life/features/qr_access/manage_qr_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_scanner_screen.dart';
+import 'package:suburban_life/features/admin/admin_create_user_screen.dart';
 import 'package:suburban_life/features/admin/admin_resident_registration_screen.dart';
 import 'package:suburban_life/features/admin/admin_payment_approval_screen.dart';
 import 'package:suburban_life/features/admin/admin_upload_payment_screen.dart';
@@ -1398,13 +1399,13 @@ class _MyHomePageState extends State<MyHomePage> {
           const SizedBox(height: 16),
 
           _buildAdminMenuButton(
-            label: l10n.registerResidentMenu,
-            icon: Icons.person_add,
+            label: l10n.createUserMenu,
+            icon: Icons.person_add_alt_1,
             color: AppConfig.primaryColor,
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const AdminResidentRegistrationScreen(),
+                builder: (context) => const AdminCreateUserScreen(),
               ),
             ),
           ),

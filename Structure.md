@@ -33,6 +33,7 @@ Current state of project files and folders:
         - `config/app_config.dart`: Theming, palette, and app name strings.
     - `features/`: Specific feature modules separated by domain.
         - `admin/`: Core management modules for administrators.
+            - `admin_create_user_screen.dart`: Unified user creation interface supporting dynamic form switching for Resident (with street/number cascading selection), Security Guard, and Administrator accounts (linked to fixed Admin office address).
             - `admin_resident_registration_screen.dart`: Direct resident and roommate onboarding view with address collision detection.
             - `admin_bulk_user_import_screen.dart`: Bulk resident account creation screen via CSV upload with optional/deterministic passwords, automated resident claim granting, SMTP status indicator, and email dispatch status reporting.
             - `admin_bulk_address_import_screen.dart`: Bulk address creation screen via CSV upload supporting number ranges, exclusions, and collision checks.

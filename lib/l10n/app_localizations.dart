@@ -1993,6 +1993,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hello %name%,\n\nYour %role% account has been created successfully. Below are your login credentials:\n\n- Email: %email%\n- Password: %password%\n- Address: %address%\n\nWe recommend logging in and updating your password.\n\nBest regards,\nAdministration of %appName%'**
   String get defaultWelcomeBody;
+
+  /// No description provided for @createUserMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Create User'**
+  String get createUserMenu;
+
+  /// No description provided for @createUserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create User Account'**
+  String get createUserTitle;
+
+  /// No description provided for @userTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'User Type'**
+  String get userTypeLabel;
+
+  /// No description provided for @guardInfoBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Security guard accounts have permissions to scan visitor QR passes, log entry access, and verify guest IDs.'**
+  String get guardInfoBanner;
+
+  /// No description provided for @adminInfoBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Administrator accounts have full control. This user will be automatically linked to the \'Admin office\' address.'**
+  String get adminInfoBanner;
+
+  /// No description provided for @userCreatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'User account created successfully!'**
+  String get userCreatedSuccess;
+
+  /// No description provided for @createUserButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create User Account'**
+  String get createUserButton;
+
+  /// No description provided for @generatePasswordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Password'**
+  String get generatePasswordButton;
+
+  /// No description provided for @selectStreetPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Street'**
+  String get selectStreetPrompt;
+
+  /// No description provided for @selectNumberPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Select House Number'**
+  String get selectNumberPrompt;
+
+  /// No description provided for @noAvailableAddressesError.
+  ///
+  /// In en, this message translates to:
+  /// **'No available unclaimed addresses found on this street.'**
+  String get noAvailableAddressesError;
+
+  /// No description provided for @addressMustBeSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a street and house number for the resident.'**
+  String get addressMustBeSelected;
 }
 
 class _AppLocalizationsDelegate

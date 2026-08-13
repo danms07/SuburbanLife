@@ -1019,4 +1019,44 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get defaultWelcomeBody =>
       'Hola %name%,\n\nTu cuenta de %role% ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso:\n\n- Correo electrónico: %email%\n- Contraseña inicial: %password%\n- Dirección asignada: %address%\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\nAtentamente,\nAdministración de %appName%';
+
+  @override
+  String get createUserMenu => 'Crear Usuario';
+
+  @override
+  String get createUserTitle => 'Crear Cuenta de Usuario';
+
+  @override
+  String get userTypeLabel => 'Tipo de Usuario';
+
+  @override
+  String get guardInfoBanner =>
+      'Las cuentas de guardia de seguridad tienen permisos para escanear pases QR de visitantes, registrar accesos y verificar identificaciones en caseta.';
+
+  @override
+  String get adminInfoBanner =>
+      'Las cuentas de administrador tienen control total. Este usuario será vinculado automáticamente a la dirección \'Oficina de administración\'.';
+
+  @override
+  String get userCreatedSuccess => '¡Cuenta de usuario creada con éxito!';
+
+  @override
+  String get createUserButton => 'Crear Cuenta de Usuario';
+
+  @override
+  String get generatePasswordButton => 'Generar Contraseña';
+
+  @override
+  String get selectStreetPrompt => 'Seleccionar Calle';
+
+  @override
+  String get selectNumberPrompt => 'Seleccionar Número';
+
+  @override
+  String get noAvailableAddressesError =>
+      'No hay números disponibles sin asignar en esta calle.';
+
+  @override
+  String get addressMustBeSelected =>
+      'Por favor selecciona una calle y número para el residente.';
 }

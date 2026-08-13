@@ -371,6 +371,18 @@
   "availablePlaceholdersLabel": "Available Placeholders (click to insert):",
   "resetDefaultTemplateButton": "Reset to Default Template",
   "defaultWelcomeSubject": "Welcome to %appName%! Login Credentials",
-  "defaultWelcomeBody": "Hello %name%,\n\nYour %role% account has been created successfully. Below are your login credentials:\n\n- Email: %email%\n- Password: %password%\n- Address: %address%\n\nWe recommend logging in and updating your password.\n\nBest regards,\nAdministration of %appName%"
+  "defaultWelcomeBody": "Hello %name%,\n\nYour %role% account has been created successfully. Below are your login credentials:\n\n- Email: %email%\n- Password: %password%\n- Address: %address%\n\nWe recommend logging in and updating your password.\n\nBest regards,\nAdministration of %appName%",
+  "createUserMenu": "Create User",
+  "createUserTitle": "Create User Account",
+  "userTypeLabel": "User Type",
+  "guardInfoBanner": "Security guard accounts have permissions to scan visitor QR passes, log entry access, and verify guest IDs.",
+  "adminInfoBanner": "Administrator accounts have full control. This user will be automatically linked to the 'Admin office' address.",
+  "userCreatedSuccess": "User account created successfully!",
+  "createUserButton": "Create User Account",
+  "generatePasswordButton": "Generate Password",
+  "selectStreetPrompt": "Select Street",
+  "selectNumberPrompt": "Select House Number",
+  "noAvailableAddressesError": "No available unclaimed addresses found on this street.",
+  "addressMustBeSelected": "Please select a street and house number for the resident."
 }
 

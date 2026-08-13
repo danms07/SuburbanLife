@@ -92,10 +92,14 @@ Permite a los administradores crear múltiples cuentas de residentes sin necesid
 * **Verificación de Dirección**: Si se especifica `street` y `number`, el sistema valida que la dirección exista en la base de datos, asigna el campo `residentUid` y actualiza el estado a `paymentStatus: 'paid'`. Si la dirección no existe en la base de datos, la fila es rechazada mostrando un mensaje de error claro.
 * **Exportación de Resultados CSV**: Al finalizar, el administrador puede presionar **Descargar CSV de Resultados** o **Copiar CSV de Resultados** para guardar la lista con el estado de ejecución (`ok`/`error`), contraseñas asignadas y mensajes de error detallados.
 
-### 3.2 Registro Individual de Residentes y Coinquilinos
-* **Navegación**: Panel $\rightarrow$ **Registrar Residente** (`AdminResidentRegistrationScreen`).
-* Permite registrar manualmente residentes primarios o familiares/coinquilinos individualmente.
-* Incluye selectores en cascada de calle y número con advertencias de colisión si la propiedad ya se encuentra asignada.
+### 3.2 Creación Unificada de Cuentas de Usuario
+* **Navegación**: Panel $\rightarrow$ **Crear Usuario** (`AdminCreateUserScreen`).
+* Proporciona una interfaz centralizada y dinámica para que los administradores den de alta cuentas en cualquier nivel del sistema:
+  * **Selector de Tipo de Usuario**: Permite elegir entre **Residente** (por defecto), **Guardia de Seguridad** y **Administrador**.
+  * **Cuentas de Residente**: Captura nombre, correo, contraseña (con generador automático) y selectores desplegables en cascada de calle y número con prevención de colisiones para vincular la vivienda de inmediato con permiso `{ resident: true }` y estado `paymentStatus: 'paid'`.
+  * **Cuentas de Guardia de Seguridad**: Captura credenciales otorgando el permiso `{ guard: true }` para el escaneo de pases QR en casetas de acceso.
+  * **Cuentas de Administrador**: Captura credenciales y vincula automáticamente la cuenta a la dirección comunitaria fija **"Oficina de administración"** (creando el registro de dirección automáticamente si aún no existe).
+  * **Notificación de Bienvenida**: Si el servicio SMTP está activo, envía automáticamente un correo de bienvenida con las credenciales de inicio de sesión directamente al buzón del usuario.
 
 ### 3.3 Aprobación de Solicitudes de Titularidad / Propiedad
 Cuando los residentes se registran por su cuenta en la aplicación móvil, envían fotografías de comprobantes de propiedad y la fecha de entrega de la vivienda.

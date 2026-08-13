@@ -127,10 +127,10 @@ erDiagram
 - `fcmTokens`: array of strings (for push notifications)
 
 ### `addresses` (Collection)
-- `addressId`: string (Document ID, e.g., 'A-101')
+- `addressId`: string (Document ID, e.g., 'A-101' or fixed 'admin_office')
 - `residentUid`: string (UID of primary resident, null if unclaimed)
-- `streetName`: string (Exact name of street)
-- `number`: number (Physical house number)
+- `streetName`: string (Exact name of street, e.g. 'Admin office' for administration)
+- `number`: number (Physical house number, 0 for Admin office)
 - `paymentStatus`: string ('paid', 'pending', 'reviewing', 'restricted')
     - `paid`: All OK
     - `pending`: Required payment within grace period
