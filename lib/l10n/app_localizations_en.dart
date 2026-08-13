@@ -945,6 +945,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get testRecipientHint => 'your-email@example.com';
 
   @override
+  String get smtpHostRequired => 'Please enter the SMTP Host server.';
+
+  @override
+  String get smtpUserRequired =>
+      'Please enter the SMTP Username or Auth Email.';
+
+  @override
+  String get smtpPassRequired => 'Please enter the SMTP Password or API Key.';
+
+  @override
+  String get smtpTestRecipientRequired =>
+      'Please enter a valid test destination email address.';
+
+  @override
   String get testSmtpSuccess =>
       'SMTP connection verified! Test email sent successfully.';
 

@@ -118,10 +118,37 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     final pass = _passController.text.trim();
     final recipient = _testRecipientController.text.trim();
 
-    if (host.isEmpty || user.isEmpty || pass.isEmpty || recipient.isEmpty || !recipient.contains('@')) {
+    if (host.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.testRecipientHint),
+          content: Text(l10n.smtpHostRequired),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    if (user.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.smtpUserRequired),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    if (pass.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.smtpPassRequired),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    if (recipient.isEmpty || !recipient.contains('@') || !recipient.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.smtpTestRecipientRequired),
           backgroundColor: Colors.orange,
         ),
       );
@@ -190,6 +217,31 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
 
   void _saveSettings() async {
     final l10n = AppLocalizations.of(context)!;
+    final host = _hostController.text.trim();
+    final user = _userController.text.trim();
+    final pass = _passController.text.trim();
+
+    if (_smtpEnabled) {
+      if (host.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.smtpHostRequired), backgroundColor: Colors.orange),
+        );
+        return;
+      }
+      if (user.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.smtpUserRequired), backgroundColor: Colors.orange),
+        );
+        return;
+      }
+      if (pass.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.smtpPassRequired), backgroundColor: Colors.orange),
+        );
+        return;
+      }
+    }
+
     setState(() {
       _isSaving = true;
     });

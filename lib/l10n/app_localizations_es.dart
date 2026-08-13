@@ -956,6 +956,21 @@ class AppLocalizationsEs extends AppLocalizations {
   String get testRecipientHint => 'tu-correo@ejemplo.com';
 
   @override
+  String get smtpHostRequired => 'Por favor ingresa el servidor Host SMTP.';
+
+  @override
+  String get smtpUserRequired =>
+      'Por favor ingresa el usuario o correo de autenticación SMTP.';
+
+  @override
+  String get smtpPassRequired =>
+      'Por favor ingresa la contraseña o clave API de SMTP.';
+
+  @override
+  String get smtpTestRecipientRequired =>
+      'Por favor ingresa un correo destinatario de prueba válido.';
+
+  @override
   String get testSmtpSuccess =>
       '¡Conexión SMTP verificada! Correo de prueba enviado con éxito.';
 

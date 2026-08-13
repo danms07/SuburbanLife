@@ -347,6 +347,10 @@
   "testSmtpButton": "Probar Conexión y Enviar Correo",
   "testRecipientLabel": "Correo Destinatario de Prueba",
   "testRecipientHint": "tu-correo@ejemplo.com",
+  "smtpHostRequired": "Por favor ingresa el servidor Host SMTP.",
+  "smtpUserRequired": "Por favor ingresa el usuario o correo de autenticación SMTP.",
+  "smtpPassRequired": "Por favor ingresa la contraseña o clave API de SMTP.",
+  "smtpTestRecipientRequired": "Por favor ingresa un correo destinatario de prueba válido.",
   "testSmtpSuccess": "¡Conexión SMTP verificada! Correo de prueba enviado con éxito.",
   "testSmtpFailure": "Prueba SMTP fallida: {error}",
   "@testSmtpFailure": {

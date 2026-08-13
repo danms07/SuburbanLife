@@ -1886,6 +1886,30 @@ abstract class AppLocalizations {
   /// **'your-email@example.com'**
   String get testRecipientHint;
 
+  /// No description provided for @smtpHostRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the SMTP Host server.'**
+  String get smtpHostRequired;
+
+  /// No description provided for @smtpUserRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the SMTP Username or Auth Email.'**
+  String get smtpUserRequired;
+
+  /// No description provided for @smtpPassRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the SMTP Password or API Key.'**
+  String get smtpPassRequired;
+
+  /// No description provided for @smtpTestRecipientRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid test destination email address.'**
+  String get smtpTestRecipientRequired;
+
   /// No description provided for @testSmtpSuccess.
   ///
   /// In en, this message translates to:

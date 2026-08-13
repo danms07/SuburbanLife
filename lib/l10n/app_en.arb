@@ -347,6 +347,10 @@
   "testSmtpButton": "Test Connection & Send Email",
   "testRecipientLabel": "Test Destination Email",
   "testRecipientHint": "your-email@example.com",
+  "smtpHostRequired": "Please enter the SMTP Host server.",
+  "smtpUserRequired": "Please enter the SMTP Username or Auth Email.",
+  "smtpPassRequired": "Please enter the SMTP Password or API Key.",
+  "smtpTestRecipientRequired": "Please enter a valid test destination email address.",
   "testSmtpSuccess": "SMTP connection verified! Test email sent successfully.",
   "testSmtpFailure": "SMTP test failed: {error}",
   "@testSmtpFailure": {
