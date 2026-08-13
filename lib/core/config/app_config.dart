@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 class AppConfig {
@@ -25,7 +26,19 @@ class AppConfig {
   static String recaptchaSiteKey = '6LejAf4sAAAAAJUNSZm3IJLaOkcYlVcse8HyR2EZ';
 
   // Firebase Emulator Configuration
-  // Run with: flutter run -d chrome --dart-define=USE_FIREBASE_EMULATOR=true
-  static const bool useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR', defaultValue: false);
+  // Auto-connects to local emulators when running on localhost/127.0.0.1 on Web or via flag
+  static bool get useFirebaseEmulator {
+    if (const bool.fromEnvironment('USE_FIREBASE_EMULATOR', defaultValue: false)) {
+      return true;
+    }
+    if (kIsWeb) {
+      final host = Uri.base.host.toLowerCase();
+      if (host == 'localhost' || host == '127.0.0.1' || host == '0.0.0.0' || host.isEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   static const String emulatorHost = String.fromEnvironment('EMULATOR_HOST', defaultValue: '');
 }

@@ -1427,8 +1427,11 @@ exports.adminBulkImportAddresses = onCall({ enforceAppCheck: true }, async (requ
 
       const docRef = db.collection('addresses').doc();
       currentBatch.set(docRef, {
+        id: docRef.id,
         streetName: streetName,
         number: num,
+        residentUid: null,
+        paymentStatus: 'pending',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
       existingSet.add(checkKey);
