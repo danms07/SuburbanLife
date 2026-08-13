@@ -41,20 +41,28 @@ class _AdminBulkAddressImportScreenState
 
   Future<void> _pickAndParseCsv() async {
     final l10n = AppLocalizations.of(context)!;
+    debugPrint('[BulkAddressImport] >>> _pickAndParseCsv invoked');
     try {
+      debugPrint('[BulkAddressImport] Opening file picker dialog...');
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'txt'],
         withData: true,
       );
 
+      debugPrint('[BulkAddressImport] FilePicker returned: $result (files: ${result?.files.length})');
+
       if (result == null || result.files.isEmpty) {
+        debugPrint('[BulkAddressImport] Picker cancelled or 0 files selected.');
         return;
       }
 
       final file = result.files.first;
-      final bytes = file.bytes;
-      if (bytes == null) {
+      debugPrint('[BulkAddressImport] Picked file: name="${file.name}", size=${file.size}, bytes=${file.bytes?.length}, path="${file.path}"');
+
+      Uint8List? bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        debugPrint('[BulkAddressImport] Error: file.bytes is null or empty.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -66,10 +74,15 @@ class _AdminBulkAddressImportScreenState
         return;
       }
 
-      final content = utf8.decode(bytes);
+      final content = utf8.decode(bytes, allowMalformed: true);
+      debugPrint('[BulkAddressImport] Decoded ${content.length} characters from CSV file.');
+      debugPrint('[BulkAddressImport] Content preview:\n${content.substring(0, content.length > 250 ? 250 : content.length)}');
+
       final items = _parseCsvContent(content);
+      debugPrint('[BulkAddressImport] _parseCsvContent completed: ${items.length} items parsed.');
 
       if (items.isEmpty) {
+        debugPrint('[BulkAddressImport] Warning: items list is empty after parsing.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -86,8 +99,9 @@ class _AdminBulkAddressImportScreenState
         _parsedItems = items;
         _importResult = null;
       });
-    } catch (e) {
-      debugPrint('Error picking/parsing CSV: $e');
+      debugPrint('[BulkAddressImport] setState executed: _fileName="${file.name}", _parsedItems.length=${items.length}');
+    } catch (e, stackTrace) {
+      debugPrint('[BulkAddressImport] Exception in _pickAndParseCsv: $e\n$stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -103,11 +117,13 @@ class _AdminBulkAddressImportScreenState
     // Strip UTF-8 BOM if present
     String cleanedContent = content;
     if (cleanedContent.startsWith('\uFEFF')) {
+      debugPrint('[BulkAddressImport] Stripped UTF-8 BOM from start of content.');
       cleanedContent = cleanedContent.substring(1);
     }
 
     final rawLines = const LineSplitter().convert(cleanedContent);
     final lines = rawLines.map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    debugPrint('[BulkAddressImport] Total lines to process: ${lines.length}');
     if (lines.isEmpty) return [];
 
     // Delimiter auto-detection (comma vs semicolon vs tab)
@@ -118,6 +134,7 @@ class _AdminBulkAddressImportScreenState
     } else if (!firstLine.contains(',') && firstLine.contains('\t')) {
       delimiter = '\t';
     }
+    debugPrint('[BulkAddressImport] Delimiter selected: "$delimiter" (first line: "$firstLine")');
 
     int streetCol = -1;
     int initNumCol = -1;
@@ -127,6 +144,7 @@ class _AdminBulkAddressImportScreenState
 
     final firstRowCells = _splitCsvLine(lines[0], delimiter);
     final lowerHeaders = firstRowCells.map((c) => c.toLowerCase().trim()).toList();
+    debugPrint('[BulkAddressImport] Row 0 headers: $lowerHeaders');
 
     for (int i = 0; i < lowerHeaders.length; i++) {
       final h = lowerHeaders[i];
@@ -143,6 +161,8 @@ class _AdminBulkAddressImportScreenState
       }
     }
 
+    debugPrint('[BulkAddressImport] Header detection: streetCol=$streetCol, initNumCol=$initNumCol, finalNumCol=$finalNumCol, numCol=$numCol, exclCol=$exclCol');
+
     int startIndex = 1;
     // Check if header row was detected
     if (streetCol == -1 && initNumCol == -1 && numCol == -1) {
@@ -151,6 +171,7 @@ class _AdminBulkAddressImportScreenState
       initNumCol = 1;
       finalNumCol = 2;
       exclCol = 3;
+      debugPrint('[BulkAddressImport] No header row matched. Using positional columns: street=0, init=1, final=2, excl=3.');
     }
 
     final List<Map<String, dynamic>> items = [];
@@ -190,6 +211,8 @@ class _AdminBulkAddressImportScreenState
       } else if (cells.length >= 4) {
         exclusions = cells[3];
       }
+
+      debugPrint('[BulkAddressImport] Line $i -> Street: "$street", Init: $initialNum, Final: $finalNum, Excl: "$exclusions"');
 
       if (street.isNotEmpty && initialNum > 0 && finalNum > 0) {
         items.add({
@@ -257,17 +280,23 @@ class _AdminBulkAddressImportScreenState
 
   void _processImport() async {
     final l10n = AppLocalizations.of(context)!;
-    if (_parsedItems.isEmpty) return;
+    if (_parsedItems.isEmpty) {
+      debugPrint('[BulkAddressImport] _processImport called with 0 items. Aborting.');
+      return;
+    }
 
+    debugPrint('[BulkAddressImport] >>> _processImport starting with ${_parsedItems.length} items...');
     setState(() {
       _isLoading = true;
     });
 
     try {
+      debugPrint('[BulkAddressImport] Calling Cloud Function "adminBulkImportAddresses"...');
       final res = await FunctionsService().callFunction(
         'adminBulkImportAddresses',
         {'items': _parsedItems},
       );
+      debugPrint('[BulkAddressImport] Cloud Function response received: $res');
 
       final data = Map<String, dynamic>.from(res as Map);
 
@@ -278,6 +307,7 @@ class _AdminBulkAddressImportScreenState
 
         final created = data['createdCount'] ?? 0;
         final skipped = data['skippedCount'] ?? 0;
+        debugPrint('[BulkAddressImport] Import completed: created=$created, skipped=$skipped');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -286,8 +316,8 @@ class _AdminBulkAddressImportScreenState
           ),
         );
       }
-    } catch (e) {
-      debugPrint('Error importing addresses: $e');
+    } catch (e, stackTrace) {
+      debugPrint('[BulkAddressImport] Error importing addresses: $e\n$stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
