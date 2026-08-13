@@ -325,6 +325,42 @@
       }
     }
   },
-  "importAnotherFileButton": "Importar Otro Archivo"
+  "importAnotherFileButton": "Importar Otro Archivo",
+  "paymentSettingsSection": "Pagos y Período de Gracia",
+  "smtpSettingsSection": "Servicio de Correo SMTP",
+  "smtpEnabledLabel": "Habilitar Correos de Bienvenida Automáticos",
+  "smtpEnabledSubtitle": "Enviar credenciales de acceso a nuevos residentes al crearse o importarse",
+  "smtpHostLabel": "Servidor Host SMTP",
+  "smtpHostHint": "ej. smtp.gmail.com o smtp.sendgrid.net",
+  "smtpPortLabel": "Puerto",
+  "smtpPortHint": "587, 465, 25",
+  "smtpSecureLabel": "Usar SSL/TLS (Seguro)",
+  "smtpSecureSubtitle": "Habilitar para puerto 465, deshabilitar para STARTTLS (puerto 587)",
+  "smtpUserLabel": "Usuario / Correo de Autenticación",
+  "smtpUserHint": "ej. notificaciones@tudominio.com",
+  "smtpPassLabel": "Contraseña / Clave API",
+  "smtpPassHint": "Contraseña SMTP o Contraseña de Aplicación",
+  "smtpSenderEmailLabel": "Correo del Remitente (Opcional)",
+  "smtpSenderEmailHint": "ej. no-responder@tudominio.com",
+  "smtpSenderNameLabel": "Nombre del Remitente (Opcional)",
+  "smtpSenderNameHint": "ej. Administración Suburban Life",
+  "testSmtpButton": "Probar Conexión y Enviar Correo",
+  "testRecipientLabel": "Correo Destinatario de Prueba",
+  "testRecipientHint": "tu-correo@ejemplo.com",
+  "testSmtpSuccess": "¡Conexión SMTP verificada! Correo de prueba enviado con éxito.",
+  "testSmtpFailure": "Prueba SMTP fallida: {error}",
+  "@testSmtpFailure": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "smtpBadgeActive": "Correos de Bienvenida SMTP Activos",
+  "smtpBadgeInactive": "SMTP Inactivo (No se enviarán correos)",
+  "saveSettingsButton": "Guardar Configuración",
+  "emailSentStatus": "Correo Enviado",
+  "emailFailedStatus": "Fallo de Correo",
+  "emailSkippedStatus": "Correo Omitido (SMTP Desactivado)"
 }
 

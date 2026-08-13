@@ -2,6 +2,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const admin = require('firebase-admin');
 const { GoogleGenAI } = require('@google/genai');
+const nodemailer = require('nodemailer');
 admin.initializeApp();
 
 const projectId = process.env.GCLOUD_PROJECT || 'suburban-life';
@@ -10,6 +11,107 @@ const ai = new GoogleGenAI({
   project: projectId,
   location: 'us-central1',
 });
+
+// Helper: Retrieve SMTP settings from Firestore
+async function getSmtpConfig() {
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection('config').doc('smtp_settings').get();
+    if (!snap.exists) return null;
+    const data = snap.data();
+    if (!data || data.enabled !== true || !data.host || !data.user || !data.pass) {
+      return null;
+    }
+    return data;
+  } catch (err) {
+    console.error('Error fetching SMTP config:', err);
+    return null;
+  }
+}
+
+// Helper: Build a Nodemailer transporter instance
+function createSmtpTransporter(config) {
+  const port = parseInt(config.port, 10) || (config.secure ? 465 : 587);
+  return nodemailer.createTransport({
+    host: config.host.toString().trim(),
+    port: port,
+    secure: config.secure === true || port === 465,
+    auth: {
+      user: config.user.toString().trim(),
+      pass: config.pass.toString().trim(),
+    },
+    tls: {
+      rejectUnauthorized: config.rejectUnauthorized !== false,
+    },
+  });
+}
+
+// Helper: Send branded HTML and Plain Text welcome email
+async function sendWelcomeEmail(smtpConfig, { email, name, password, addressLinked, appName, role }) {
+  if (!smtpConfig) return { sent: false, reason: 'SMTP not configured or disabled' };
+
+  try {
+    const transporter = createSmtpTransporter(smtpConfig);
+    const branding = appName || smtpConfig.senderName || 'Suburban Life';
+    const fromAddress = smtpConfig.senderEmail && smtpConfig.senderEmail.toString().trim().isNotEmpty
+      ? `"${smtpConfig.senderName || branding}" <${smtpConfig.senderEmail.toString().trim()}>`
+      : `"${smtpConfig.senderName || branding}" <${smtpConfig.user.toString().trim()}>`;
+
+    const userRole = role || 'residente';
+    const addressText = addressLinked ? `<li><strong>Dirección asignada:</strong> ${addressLinked}</li>` : '';
+    const addressPlain = addressLinked ? `\nDirección asignada: ${addressLinked}` : '';
+
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
+        <div style="background-color: #2864be; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">¡Bienvenido(a) a ${branding}!</h1>
+        </div>
+        <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+          <p style="font-size: 16px; color: #1f2937; margin-top: 0;">Hola <strong>${name}</strong>,</p>
+          <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
+            Tu cuenta de <strong>${userRole}</strong> ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso para ingresar a la aplicación:
+          </p>
+          <div style="background-color: #f3f4f6; border-left: 4px solid #2864be; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
+            <ul style="margin: 0; padding-left: 20px; color: #1f2937; font-size: 14px; line-height: 1.8;">
+              <li><strong>Correo electrónico:</strong> ${email}</li>
+              <li><strong>Contraseña inicial:</strong> <code style="background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #1e3a8a;">${password}</code></li>
+              ${addressText}
+            </ul>
+          </div>
+          <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">
+            Te recomendamos iniciar sesión y cambiar tu contraseña por una personalizada en la sección de tu perfil.
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+          <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+            Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const textContent = `¡Bienvenido(a) a ${branding}!\n\n` +
+      `Hola ${name},\n\n` +
+      `Tu cuenta de ${userRole} ha sido creada exitosamente con las siguientes credenciales:\n\n` +
+      `- Correo electrónico: ${email}\n` +
+      `- Contraseña inicial: ${password}` +
+      addressPlain +
+      `\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\n` +
+      `Administración de ${branding}`;
+
+    await transporter.sendMail({
+      from: fromAddress,
+      to: email,
+      subject: `¡Bienvenido a ${branding}! Credenciales de Acceso`,
+      text: textContent,
+      html: htmlContent,
+    });
+
+    return { sent: true };
+  } catch (err) {
+    console.error(`Failed to send welcome email to ${email}:`, err);
+    return { sent: false, error: err.message || 'Failed to send email' };
+  }
+}
 
 // Callable function to set user roles
 exports.setRole = onCall({ enforceAppCheck: true }, async (request) => {
@@ -537,9 +639,86 @@ exports.adminProvisionGuard = onCall({ enforceAppCheck: true }, async (request) 
       'createdAt': Date.now(),
     });
 
+    // Optionally send welcome email if SMTP is configured
+    const smtpConfig = await getSmtpConfig();
+    if (smtpConfig) {
+      sendWelcomeEmail(smtpConfig, {
+        email,
+        name,
+        password,
+        role: 'guardia de seguridad',
+        appName: 'Suburban Life',
+      }).catch(err => console.error('Error sending guard welcome email:', err));
+    }
+
     return { success: true, uid: userRecord.uid };
   } catch (error) {
     throw new HttpsError('internal', error.message);
+  }
+});
+
+exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { host, port, secure, user, pass, senderEmail, senderName, testRecipient } = request.data;
+  if (!host || !user || !pass || !testRecipient) {
+    throw new HttpsError('invalid-argument', 'Must provide host, user, pass, and testRecipient.');
+  }
+
+  try {
+    const config = {
+      host: host.toString().trim(),
+      port: parseInt(port, 10) || 587,
+      secure: secure === true,
+      user: user.toString().trim(),
+      pass: pass.toString().trim(),
+      senderEmail: senderEmail ? senderEmail.toString().trim() : undefined,
+      senderName: senderName ? senderName.toString().trim() : undefined,
+    };
+
+    const transporter = createSmtpTransporter(config);
+    // 1. Verify handshake
+    await transporter.verify();
+
+    // 2. Send test email
+    const fromAddress = config.senderEmail && config.senderEmail.length > 0
+      ? `"${config.senderName || 'Suburban Life'}" <${config.senderEmail}>`
+      : `"${config.senderName || 'Suburban Life'}" <${config.user}>`;
+
+    const info = await transporter.sendMail({
+      from: fromAddress,
+      to: testRecipient.toString().trim(),
+      subject: 'Suburban Life - Test de Configuración SMTP',
+      text: 'Este es un correo de prueba enviado desde la configuración de administración de Suburban Life para verificar el servicio SMTP.',
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
+          <div style="background-color: #25d366; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h2 style="color: #ffffff; margin: 0; font-size: 22px;">¡Conexión SMTP Exitosa!</h2>
+          </div>
+          <div style="background-color: #ffffff; padding: 24px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <p style="font-size: 15px; color: #1f2937;">Tu servidor SMTP ha sido verificado correctamente.</p>
+            <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
+              Los correos automáticos de bienvenida con credenciales para nuevos residentes y guardias están listos para ser enviados.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+              Suburban Life Administration System
+            </p>
+          </div>
+        </div>
+      `,
+    });
+
+    return {
+      success: true,
+      message: 'SMTP handshake and test email sent successfully.',
+      messageId: info.messageId,
+    };
+  } catch (err) {
+    console.error('SMTP test error:', err);
+    throw new HttpsError('internal', err.message || 'SMTP connection failed.');
   }
 });
 
@@ -726,6 +905,7 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
   const results = [];
   let successCount = 0;
   let failureCount = 0;
+  const smtpConfig = await getSmtpConfig();
 
   for (const userRow of users) {
     const name = (userRow.name || userRow.fullName || '').toString().trim();
@@ -739,6 +919,7 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
         email: email || 'unknown',
         name: name || 'unknown',
         status: 'error',
+        emailSent: false,
         error: 'Invalid name or email address.',
       });
       failureCount++;
@@ -800,6 +981,7 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
             number: numberStr,
             status: 'error',
             assignedPassword: password,
+            emailSent: false,
             error: `Address "${streetName} #${numberStr}" not found in database.`,
           });
           failureCount++;
@@ -843,6 +1025,19 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
 
       await db.collection('users').doc(userRecord.uid).set(userDocData);
 
+      // 5. Send welcome email if SMTP service is active
+      let emailResult = { sent: false };
+      if (smtpConfig) {
+        emailResult = await sendWelcomeEmail(smtpConfig, {
+          email,
+          name,
+          password,
+          addressLinked: addressMatched ? `${streetName} #${numberStr}` : null,
+          appName: 'Suburban Life',
+          role: 'residente',
+        });
+      }
+
       results.push({
         name,
         email,
@@ -854,6 +1049,8 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
         isDeterministicPassword: isDeterministic,
         addressLinked: addressMatched ? `${streetName} #${numberStr}` : null,
         uid: userRecord.uid,
+        emailSent: emailResult.sent === true,
+        emailError: emailResult.error || '',
         error: '',
       });
       successCount++;
@@ -867,6 +1064,7 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
         number: numberStr,
         status: 'error',
         assignedPassword: password,
+        emailSent: false,
         error: err.message || 'Failed to create user account.',
       });
       failureCount++;

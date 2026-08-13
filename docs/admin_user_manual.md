@@ -179,6 +179,18 @@ Administrators can enforce booking cooldown periods to ensure fair facility acce
 * **Cutoff Day**: Defines the monthly day of the month (e.g., `5th` of each month) when maintenance fees are due.
 * **Grace Period Days**: Defines grace period duration (e.g., `5 days`) before an address status shifts from `pending` to `restricted`.
 
+### 7.2 SMTP Email Service & Welcome Notifications
+Administrators can configure a dedicated SMTP mail server to automatically email credentials to newly created accounts.
+* **Navigation**: Dashboard $\rightarrow$ **System Settings** (`AdminSettingsScreen`) $\rightarrow$ **SMTP Email Service**.
+* **Configuration Parameters**:
+  * **Enable Automatic Welcome Emails**: Master switch to enable/disable automated emails.
+  * **SMTP Host & Port**: Server hostname (e.g., `smtp.gmail.com`) and port presets (`587` TLS, `465` SSL, `25`).
+  * **SSL/TLS Toggle**: Enable for port 465, disable for STARTTLS port 587.
+  * **Authentication**: Username/email and password (or App Password / API Key).
+  * **Sender Info**: Optional custom sender email address and display name.
+* **Interactive Connection Test**: Input a recipient email and click **Test Connection & Send Email** to execute an instant handshake test and receive a sample verification email.
+* **Automated Welcome Emails**: When enabled, any resident created via **Bulk CSV Import** or guard provisioned via **Manage Guards** receives a branded HTML email with their login email, initial password, and assigned address.
+
 ---
 
 ## 8. Community Announcements & AI Translations

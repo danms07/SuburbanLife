@@ -1759,6 +1759,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Import Another File'**
   String get importAnotherFileButton;
+
+  /// No description provided for @paymentSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment & Grace Period'**
+  String get paymentSettingsSection;
+
+  /// No description provided for @smtpSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Email Service'**
+  String get smtpSettingsSection;
+
+  /// No description provided for @smtpEnabledLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Automatic Welcome Emails'**
+  String get smtpEnabledLabel;
+
+  /// No description provided for @smtpEnabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send account credentials to new residents upon creation or bulk import'**
+  String get smtpEnabledSubtitle;
+
+  /// No description provided for @smtpHostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Host Server'**
+  String get smtpHostLabel;
+
+  /// No description provided for @smtpHostHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. smtp.gmail.com or smtp.sendgrid.net'**
+  String get smtpHostHint;
+
+  /// No description provided for @smtpPortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get smtpPortLabel;
+
+  /// No description provided for @smtpPortHint.
+  ///
+  /// In en, this message translates to:
+  /// **'587, 465, 25'**
+  String get smtpPortHint;
+
+  /// No description provided for @smtpSecureLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Use SSL/TLS (Secure)'**
+  String get smtpSecureLabel;
+
+  /// No description provided for @smtpSecureSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable for port 465, disable for STARTTLS (port 587)'**
+  String get smtpSecureSubtitle;
+
+  /// No description provided for @smtpUserLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Username / Auth Email'**
+  String get smtpUserLabel;
+
+  /// No description provided for @smtpUserHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. notifications@yourdomain.com'**
+  String get smtpUserHint;
+
+  /// No description provided for @smtpPassLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Password / API Key'**
+  String get smtpPassLabel;
+
+  /// No description provided for @smtpPassHint.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP password or App Password'**
+  String get smtpPassHint;
+
+  /// No description provided for @smtpSenderEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender Email (Optional)'**
+  String get smtpSenderEmailLabel;
+
+  /// No description provided for @smtpSenderEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. no-reply@yourdomain.com'**
+  String get smtpSenderEmailHint;
+
+  /// No description provided for @smtpSenderNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sender Display Name (Optional)'**
+  String get smtpSenderNameLabel;
+
+  /// No description provided for @smtpSenderNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Suburban Life Admin'**
+  String get smtpSenderNameHint;
+
+  /// No description provided for @testSmtpButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Connection & Send Email'**
+  String get testSmtpButton;
+
+  /// No description provided for @testRecipientLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Destination Email'**
+  String get testRecipientLabel;
+
+  /// No description provided for @testRecipientHint.
+  ///
+  /// In en, this message translates to:
+  /// **'your-email@example.com'**
+  String get testRecipientHint;
+
+  /// No description provided for @testSmtpSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP connection verified! Test email sent successfully.'**
+  String get testSmtpSuccess;
+
+  /// No description provided for @testSmtpFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP test failed: {error}'**
+  String testSmtpFailure(String error);
+
+  /// No description provided for @smtpBadgeActive.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Welcome Emails Active'**
+  String get smtpBadgeActive;
+
+  /// No description provided for @smtpBadgeInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'SMTP Inactive (No emails will be sent)'**
+  String get smtpBadgeInactive;
+
+  /// No description provided for @saveSettingsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Settings'**
+  String get saveSettingsButton;
+
+  /// No description provided for @emailSentStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Sent'**
+  String get emailSentStatus;
+
+  /// No description provided for @emailFailedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Failed'**
+  String get emailFailedStatus;
+
+  /// No description provided for @emailSkippedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Skipped (SMTP Disabled)'**
+  String get emailSkippedStatus;
 }
 
 class _AppLocalizationsDelegate

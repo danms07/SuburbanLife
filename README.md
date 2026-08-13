@@ -8,6 +8,7 @@ A white-label residential management platform built using **Flutter** and **Fire
 
 - **Secure Multi-Role Access Control**: Integrated with Firebase Auth and Cloud Functions.
 - **Bulk Resident Creation via CSV**: Administrator bulk account creation supporting optional/deterministic temporary password generation and instant resident claims.
+- **Configurable SMTP Email Service**: Automated delivery of welcome emails containing login credentials upon user provisioning and bulk import.
 - **QR-based Visitor Access**: Live validation logs and ID uploads for security personnel.
 - **Facility Booking & Document Viewers**: Seamless management of common spaces and important residential files.
 - **AI-Powered Announcement Translations**: Integrated with Gemini 2.5 Flash for automated Spanish-to-English translations.

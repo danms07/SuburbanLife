@@ -325,6 +325,42 @@
       }
     }
   },
-  "importAnotherFileButton": "Import Another File"
+  "importAnotherFileButton": "Import Another File",
+  "paymentSettingsSection": "Payment & Grace Period",
+  "smtpSettingsSection": "SMTP Email Service",
+  "smtpEnabledLabel": "Enable Automatic Welcome Emails",
+  "smtpEnabledSubtitle": "Send account credentials to new residents upon creation or bulk import",
+  "smtpHostLabel": "SMTP Host Server",
+  "smtpHostHint": "e.g. smtp.gmail.com or smtp.sendgrid.net",
+  "smtpPortLabel": "Port",
+  "smtpPortHint": "587, 465, 25",
+  "smtpSecureLabel": "Use SSL/TLS (Secure)",
+  "smtpSecureSubtitle": "Enable for port 465, disable for STARTTLS (port 587)",
+  "smtpUserLabel": "Username / Auth Email",
+  "smtpUserHint": "e.g. notifications@yourdomain.com",
+  "smtpPassLabel": "Password / API Key",
+  "smtpPassHint": "SMTP password or App Password",
+  "smtpSenderEmailLabel": "Sender Email (Optional)",
+  "smtpSenderEmailHint": "e.g. no-reply@yourdomain.com",
+  "smtpSenderNameLabel": "Sender Display Name (Optional)",
+  "smtpSenderNameHint": "e.g. Suburban Life Admin",
+  "testSmtpButton": "Test Connection & Send Email",
+  "testRecipientLabel": "Test Destination Email",
+  "testRecipientHint": "your-email@example.com",
+  "testSmtpSuccess": "SMTP connection verified! Test email sent successfully.",
+  "testSmtpFailure": "SMTP test failed: {error}",
+  "@testSmtpFailure": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "smtpBadgeActive": "SMTP Welcome Emails Active",
+  "smtpBadgeInactive": "SMTP Inactive (No emails will be sent)",
+  "saveSettingsButton": "Save Settings",
+  "emailSentStatus": "Email Sent",
+  "emailFailedStatus": "Email Failed",
+  "emailSkippedStatus": "Email Skipped (SMTP Disabled)"
 }
 

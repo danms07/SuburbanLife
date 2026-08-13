@@ -93,9 +93,13 @@ erDiagram
         number quantity
     }
     config {
-        string documentId PK "app_settings"
+        string documentId PK "app_settings | smtp_settings"
         number paymentCutoffDay
         number gracePeriodDays
+        boolean smtpEnabled
+        string smtpHost
+        number smtpPort
+        string smtpUser
         timestamp updatedAt
     }
 
@@ -215,6 +219,17 @@ erDiagram
 #### `app_settings` (Document)
 - `paymentCutoffDay`: number (Configured day of the month serving as cutoff date, default 1)
 - `gracePeriodDays`: number (Grace period span before user features restrict automatically, default 10)
+- `updatedAt`: timestamp
+
+#### `smtp_settings` (Document - Admin Only)
+- `enabled`: boolean (Flag enabling automatic welcome email dispatch upon user creation/import)
+- `host`: string (SMTP server host e.g. `smtp.gmail.com`)
+- `port`: number (SMTP server port e.g. `587`, `465`, `25`)
+- `secure`: boolean (True for port 465 SSL, false for 587 STARTTLS)
+- `user`: string (SMTP authentication username / email)
+- `pass`: string (SMTP authentication password / App Password / API Key)
+- `senderEmail`: string (Optional override sender email address)
+- `senderName`: string (Optional override sender display label e.g. "Suburban Life Administration")
 - `updatedAt`: timestamp
 
 ## Firestore Composite Indexes

@@ -97,7 +97,7 @@ service cloud.firestore {
     }
 
     match /config/{configId} {
-      allow read: if isAuthenticated();
+      allow read: if isAdmin() || (isAuthenticated() && configId != 'smtp_settings');
       allow write: if isAdmin();
     }
   }

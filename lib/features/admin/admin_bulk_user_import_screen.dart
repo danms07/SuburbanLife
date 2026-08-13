@@ -22,6 +22,28 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
   List<Map<String, String>> _parsedUsers = [];
   bool _isProcessing = false;
   Map<String, dynamic>? _importResult;
+  bool _isSmtpConfigured = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSmtpStatus();
+  }
+
+  void _checkSmtpStatus() async {
+    try {
+      final doc = await DatabaseService().getDocument('config', 'smtp_settings');
+      if (doc != null && doc['enabled'] == true && (doc['host'] ?? '').toString().isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _isSmtpConfigured = true;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking SMTP status: $e');
+    }
+  }
 
   void _pickCsvFile() async {
     try {
@@ -243,7 +265,7 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     );
 
     final buffer = StringBuffer();
-    buffer.writeln('name,email,password,street,number,status,assigned_password,error');
+    buffer.writeln('name,email,password,street,number,status,assigned_password,email_sent,error');
 
     for (var r in results) {
       final name = (r['name'] ?? '').toString().replaceAll('"', '""');
@@ -253,9 +275,10 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
       final numStr = (r['number'] ?? '').toString().replaceAll('"', '""');
       final status = (r['status'] ?? '').toString().replaceAll('"', '""');
       final assignedPass = (r['assignedPassword'] ?? '').toString().replaceAll('"', '""');
+      final emailSent = (r['emailSent'] == true) ? 'yes' : 'no';
       final error = (r['error'] ?? '').toString().replaceAll('"', '""');
 
-      buffer.writeln('"$name","$email","$inputPass","$street","$numStr","$status","$assignedPass","$error"');
+      buffer.writeln('"$name","$email","$inputPass","$street","$numStr","$status","$assignedPass","$emailSent","$error"');
     }
 
     return buffer.toString();
@@ -383,6 +406,39 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                     Text(
                       l10n.csvColumnsHint,
                       style: const TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _isSmtpConfigured
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : Colors.orange.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _isSmtpConfigured ? Colors.green : Colors.orange,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isSmtpConfigured ? Icons.mark_email_read : Icons.mail_lock_outlined,
+                            size: 16,
+                            color: _isSmtpConfigured ? Colors.green.shade800 : Colors.orange.shade800,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _isSmtpConfigured ? l10n.smtpBadgeActive : l10n.smtpBadgeInactive,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _isSmtpConfigured ? Colors.green.shade800 : Colors.orange.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -595,6 +651,29 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                                     Text('Assigned Password: ${item['assignedPassword']}'),
                                     if (item['addressLinked'] != null)
                                       Text('Linked Address: ${item['addressLinked']}', style: const TextStyle(color: Colors.green)),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          item['emailSent'] == true ? Icons.mark_email_read : Icons.mail_outline,
+                                          size: 14,
+                                          color: item['emailSent'] == true ? Colors.blue.shade700 : Colors.grey.shade700,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          item['emailSent'] == true
+                                              ? l10n.emailSentStatus
+                                              : ((item['emailError'] != null && item['emailError'].toString().isNotEmpty)
+                                                  ? '${l10n.emailFailedStatus}: ${item['emailError']}'
+                                                  : l10n.emailSkippedStatus),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: item['emailSent'] == true ? Colors.blue.shade700 : Colors.grey.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ] else
                                     Text('Error: ${item['error']}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                                 ],

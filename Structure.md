@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-07-30 (Audited and aligned firestore.rules, storage.rules, and added firestore.indexes.json for composite query performance)*
+*Last Verified/Updated: 2026-08-13 (Implemented SMTP Email Service configuration in Admin Settings and automated welcome emails for bulk user import and provisioning)*
 
 Current state of project files and folders:
 
@@ -16,12 +16,12 @@ Current state of project files and folders:
         - `biometric_auth_plan.md`: Plan for persistent biometric gating.
         - `credential_manager_plan.md`: Plan for Passkeys and Credential Manager integration.
 - `firebase.json`: Firebase project deployment configuration mapping Firestore rules, Storage rules, functions, and composite indexes.
-- `firestore.rules`: Security rules for Cloud Firestore collections.
+- `firestore.rules`: Security rules for Cloud Firestore collections (including admin-only gating for config/smtp_settings).
 - `firestore.indexes.json`: Composite index definitions for Firestore queries (bookings, payments, qr_codes, documents).
 - `storage.rules`: Security rules for Firebase Cloud Storage buckets.
 - `flutter_launcher_icons.yaml`: Configuration for generating platform-specific launcher icons.
 - `functions/`: Cloud Functions for Firebase.
-    - `index.js`: Core function logic holding Gemini translations, address-based access restriction, address unbinding, own-account deletion, roommate account linking, admin bulk resident creation, and bulk address CSV creation.
+    - `index.js`: Core function logic holding Gemini translations, address-based access restriction, address unbinding, own-account deletion, roommate account linking, admin bulk resident creation, bulk address CSV creation, SMTP connection testing, and automated welcome email dispatch.
 - `ios/`: Native iOS configuration and build files.
 - `LICENSE`: MIT No Attribution (MIT-0) license file.
 - `PRIVACY_POLICY.md`: Bilingual Privacy Policy (LFPDPPP/ARCO compliant).
@@ -34,13 +34,13 @@ Current state of project files and folders:
     - `features/`: Specific feature modules separated by domain.
         - `admin/`: Core management modules for administrators.
             - `admin_resident_registration_screen.dart`: Direct resident and roommate onboarding view with address collision detection.
-            - `admin_bulk_user_import_screen.dart`: Bulk resident account creation screen via CSV upload with optional/deterministic passwords and automated resident claim granting.
+            - `admin_bulk_user_import_screen.dart`: Bulk resident account creation screen via CSV upload with optional/deterministic passwords, automated resident claim granting, SMTP status indicator, and email dispatch status reporting.
             - `admin_bulk_address_import_screen.dart`: Bulk address creation screen via CSV upload supporting number ranges, exclusions, and collision checks.
             - `admin_payment_approval_screen.dart`: Payment proofs review showing payment period, and triggering status recalculation. Keyed stateful cards prevent redundant downloads/fetches.
             - `admin_upload_payment_screen.dart`: Interface for uploading maintenance receipts on behalf of addresses via cascading street name and house number dropdown filters.
             - `admin_user_management_screen.dart`: User directory mapping client role switching, claim state tables, and admin force-unbind actions.
             - `admin_facilities_screen.dart`: Interface to configure dynamic unique vs multi-item amenities.
-            - `admin_settings_screen.dart`: Global residency maintenance cutoff and grace period adjustments.
+            - `admin_settings_screen.dart`: Global residency maintenance cutoff and grace period adjustments, plus complete SMTP email service configuration with handshake connection test.
             - `admin_payment_report_screen.dart`: CSV payment matrix exporter per physical address.
             - `admin_guard_management_screen.dart`: Dedicated lifecycle module to provision and purge security guard accounts.
         - `announcements/`: Announcements system with translations support.

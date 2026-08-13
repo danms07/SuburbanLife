@@ -889,4 +889,96 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get importAnotherFileButton => 'Importar Otro Archivo';
+
+  @override
+  String get paymentSettingsSection => 'Pagos y Período de Gracia';
+
+  @override
+  String get smtpSettingsSection => 'Servicio de Correo SMTP';
+
+  @override
+  String get smtpEnabledLabel => 'Habilitar Correos de Bienvenida Automáticos';
+
+  @override
+  String get smtpEnabledSubtitle =>
+      'Enviar credenciales de acceso a nuevos residentes al crearse o importarse';
+
+  @override
+  String get smtpHostLabel => 'Servidor Host SMTP';
+
+  @override
+  String get smtpHostHint => 'ej. smtp.gmail.com o smtp.sendgrid.net';
+
+  @override
+  String get smtpPortLabel => 'Puerto';
+
+  @override
+  String get smtpPortHint => '587, 465, 25';
+
+  @override
+  String get smtpSecureLabel => 'Usar SSL/TLS (Seguro)';
+
+  @override
+  String get smtpSecureSubtitle =>
+      'Habilitar para puerto 465, deshabilitar para STARTTLS (puerto 587)';
+
+  @override
+  String get smtpUserLabel => 'Usuario / Correo de Autenticación';
+
+  @override
+  String get smtpUserHint => 'ej. notificaciones@tudominio.com';
+
+  @override
+  String get smtpPassLabel => 'Contraseña / Clave API';
+
+  @override
+  String get smtpPassHint => 'Contraseña SMTP o Contraseña de Aplicación';
+
+  @override
+  String get smtpSenderEmailLabel => 'Correo del Remitente (Opcional)';
+
+  @override
+  String get smtpSenderEmailHint => 'ej. no-responder@tudominio.com';
+
+  @override
+  String get smtpSenderNameLabel => 'Nombre del Remitente (Opcional)';
+
+  @override
+  String get smtpSenderNameHint => 'ej. Administración Suburban Life';
+
+  @override
+  String get testSmtpButton => 'Probar Conexión y Enviar Correo';
+
+  @override
+  String get testRecipientLabel => 'Correo Destinatario de Prueba';
+
+  @override
+  String get testRecipientHint => 'tu-correo@ejemplo.com';
+
+  @override
+  String get testSmtpSuccess =>
+      '¡Conexión SMTP verificada! Correo de prueba enviado con éxito.';
+
+  @override
+  String testSmtpFailure(String error) {
+    return 'Prueba SMTP fallida: $error';
+  }
+
+  @override
+  String get smtpBadgeActive => 'Correos de Bienvenida SMTP Activos';
+
+  @override
+  String get smtpBadgeInactive => 'SMTP Inactivo (No se enviarán correos)';
+
+  @override
+  String get saveSettingsButton => 'Guardar Configuración';
+
+  @override
+  String get emailSentStatus => 'Correo Enviado';
+
+  @override
+  String get emailFailedStatus => 'Fallo de Correo';
+
+  @override
+  String get emailSkippedStatus => 'Correo Omitido (SMTP Desactivado)';
 }

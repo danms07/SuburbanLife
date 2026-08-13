@@ -27,6 +27,8 @@ The following table maps each visual component to its feature domain and source 
 | **Custom Branded QR Access Card** | QR Access | [qr_generator_screen.dart](lib/features/qr_access/qr_generator_screen.dart) |
 | **Roommate QR Code Onboarding & Scanner** | Auth / Roommates | [main.dart](lib/main.dart) & [roommates_screen.dart](lib/features/auth/roommates_screen.dart) |
 | **Bulk User Import CSV Manager** | Admin Management | [admin_bulk_user_import_screen.dart](lib/features/admin/admin_bulk_user_import_screen.dart) |
+| **Bulk Address Import CSV Manager** | Admin Management | [admin_bulk_address_import_screen.dart](lib/features/admin/admin_bulk_address_import_screen.dart) |
+| **Admin Settings & SMTP Configurator** | Admin Settings | [admin_settings_screen.dart](lib/features/admin/admin_settings_screen.dart) |
 
 ---
 
@@ -126,6 +128,11 @@ The following table maps each visual component to its feature domain and source 
 ## 20. Bulk Address Import CSV Manager
 - **Description**: An administrative interface for pre-populating physical neighborhood address records into Firestore from a CSV file. Supports parsing street names, initial house numbers, final house numbers, and optional house number exclusions. Offers a CSV template copy helper, live row preview listing, and collision checks against existing database records.
 - **Usage**: Exposed via `AdminBulkAddressImportScreen`.
+
+## 21. Admin Settings & SMTP Configurator
+- **Description**: A multi-section configuration panel for administrators to adjust payment cutoff days, grace period limits, and configure a custom SMTP mail server. Includes preset chips for standard ports (587, 465, 25), SSL/TLS switch, password visibility toggle, and an interactive connection testing tool that executes an SMTP handshake and sends a test email to verify credentials before saving.
+- **Usage**: Exposed via `AdminSettingsScreen`.
+
 
 
 

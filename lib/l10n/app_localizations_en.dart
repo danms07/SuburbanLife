@@ -878,4 +878,96 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get importAnotherFileButton => 'Import Another File';
+
+  @override
+  String get paymentSettingsSection => 'Payment & Grace Period';
+
+  @override
+  String get smtpSettingsSection => 'SMTP Email Service';
+
+  @override
+  String get smtpEnabledLabel => 'Enable Automatic Welcome Emails';
+
+  @override
+  String get smtpEnabledSubtitle =>
+      'Send account credentials to new residents upon creation or bulk import';
+
+  @override
+  String get smtpHostLabel => 'SMTP Host Server';
+
+  @override
+  String get smtpHostHint => 'e.g. smtp.gmail.com or smtp.sendgrid.net';
+
+  @override
+  String get smtpPortLabel => 'Port';
+
+  @override
+  String get smtpPortHint => '587, 465, 25';
+
+  @override
+  String get smtpSecureLabel => 'Use SSL/TLS (Secure)';
+
+  @override
+  String get smtpSecureSubtitle =>
+      'Enable for port 465, disable for STARTTLS (port 587)';
+
+  @override
+  String get smtpUserLabel => 'Username / Auth Email';
+
+  @override
+  String get smtpUserHint => 'e.g. notifications@yourdomain.com';
+
+  @override
+  String get smtpPassLabel => 'Password / API Key';
+
+  @override
+  String get smtpPassHint => 'SMTP password or App Password';
+
+  @override
+  String get smtpSenderEmailLabel => 'Sender Email (Optional)';
+
+  @override
+  String get smtpSenderEmailHint => 'e.g. no-reply@yourdomain.com';
+
+  @override
+  String get smtpSenderNameLabel => 'Sender Display Name (Optional)';
+
+  @override
+  String get smtpSenderNameHint => 'e.g. Suburban Life Admin';
+
+  @override
+  String get testSmtpButton => 'Test Connection & Send Email';
+
+  @override
+  String get testRecipientLabel => 'Test Destination Email';
+
+  @override
+  String get testRecipientHint => 'your-email@example.com';
+
+  @override
+  String get testSmtpSuccess =>
+      'SMTP connection verified! Test email sent successfully.';
+
+  @override
+  String testSmtpFailure(String error) {
+    return 'SMTP test failed: $error';
+  }
+
+  @override
+  String get smtpBadgeActive => 'SMTP Welcome Emails Active';
+
+  @override
+  String get smtpBadgeInactive => 'SMTP Inactive (No emails will be sent)';
+
+  @override
+  String get saveSettingsButton => 'Save Settings';
+
+  @override
+  String get emailSentStatus => 'Email Sent';
+
+  @override
+  String get emailFailedStatus => 'Email Failed';
+
+  @override
+  String get emailSkippedStatus => 'Email Skipped (SMTP Disabled)';
 }

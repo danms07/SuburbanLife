@@ -179,6 +179,18 @@ Establece límites para asegurar un acceso equitativo a las instalaciones:
 * **Día de Corte**: Día del mes (ej. día `5`) en que vence la cuota de mantenimiento.
 * **Días de Gracia**: Días de tolerancia (ej. `5 días`) antes de que el estado pase de `pendiente` a `restringido`.
 
+### 7.2 Servicio de Correo SMTP y Notificaciones de Bienvenida
+Permite configurar un servidor de correo SMTP propio para enviar credenciales automáticamente a los nuevos usuarios registrados.
+* **Navegación**: Panel $\rightarrow$ **Configuración del Sistema** (`AdminSettingsScreen`) $\rightarrow$ **Servicio de Correo SMTP**.
+* **Parámetros de Configuración**:
+  * **Habilitar Correos de Bienvenida Automáticos**: Interruptor general para activar/desactivar el envío.
+  * **Servidor Host y Puerto**: Dirección del servidor (ej. `smtp.gmail.com`) y presets de puertos (`587` TLS, `465` SSL, `25`).
+  * **Interruptor SSL/TLS**: Activar para puerto 465 (SSL) o desactivar para STARTTLS (puerto 587).
+  * **Autenticación**: Usuario/correo y contraseña (o contraseña de aplicación / API Key).
+  * **Información del Remitente**: Correo remitente y nombre visible opcionales.
+* **Prueba de Conexión Interactiva**: Permite ingresar un correo de destino y presionar **Probar Conexión y Enviar Correo** para validar el handshake y recibir un mensaje de prueba de inmediato.
+* **Envío Automático de Bienvenida**: Al estar habilitado, cada residente creado mediante **Importación Masiva CSV** o guardia dado de alta en **Gestionar Guardias** recibe un correo con su correo de acceso, contraseña inicial y dirección vinculada.
+
 ---
 
 ## 8. Anuncios Comunitarios y Traducción con IA
