@@ -383,6 +383,14 @@
   "selectStreetPrompt": "Seleccionar Calle",
   "selectNumberPrompt": "Seleccionar Número",
   "noAvailableAddressesError": "No hay números disponibles sin asignar en esta calle.",
-  "addressMustBeSelected": "Por favor selecciona una calle y número para el residente."
+  "addressMustBeSelected": "Por favor selecciona una calle y número para el residente.",
+  "fullNameLabel": "Nombre Completo",
+  "fullNameHint": "ej. Juan Pérez",
+  "emailAddressLabel": "Correo Electrónico",
+  "emailAddressHint": "ej. usuario@ejemplo.com",
+  "passwordLabel": "Contraseña",
+  "passwordHint": "Mínimo 6 caracteres",
+  "selectAddressLabel": "Dirección Asignada",
+  "userManagementMenu": "Datos de la Cuenta"
 }
 

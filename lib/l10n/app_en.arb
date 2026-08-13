@@ -383,6 +383,14 @@
   "selectStreetPrompt": "Select Street",
   "selectNumberPrompt": "Select House Number",
   "noAvailableAddressesError": "No available unclaimed addresses found on this street.",
-  "addressMustBeSelected": "Please select a street and house number for the resident."
+  "addressMustBeSelected": "Please select a street and house number for the resident.",
+  "fullNameLabel": "Full Name",
+  "fullNameHint": "e.g. John Doe",
+  "emailAddressLabel": "Email Address",
+  "emailAddressHint": "e.g. user@example.com",
+  "passwordLabel": "Password",
+  "passwordHint": "Min 6 characters",
+  "selectAddressLabel": "Assigned Address",
+  "userManagementMenu": "User Account Details"
 }
 

@@ -2065,6 +2065,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please select a street and house number for the resident.'**
   String get addressMustBeSelected;
+
+  /// No description provided for @fullNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Name'**
+  String get fullNameLabel;
+
+  /// No description provided for @fullNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. John Doe'**
+  String get fullNameHint;
+
+  /// No description provided for @emailAddressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Address'**
+  String get emailAddressLabel;
+
+  /// No description provided for @emailAddressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. user@example.com'**
+  String get emailAddressHint;
+
+  /// No description provided for @passwordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get passwordLabel;
+
+  /// No description provided for @passwordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Min 6 characters'**
+  String get passwordHint;
+
+  /// No description provided for @selectAddressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned Address'**
+  String get selectAddressLabel;
+
+  /// No description provided for @userManagementMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'User Account Details'**
+  String get userManagementMenu;
 }
 
 class _AppLocalizationsDelegate

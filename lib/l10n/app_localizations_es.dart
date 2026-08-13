@@ -1059,4 +1059,28 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get addressMustBeSelected =>
       'Por favor selecciona una calle y número para el residente.';
+
+  @override
+  String get fullNameLabel => 'Nombre Completo';
+
+  @override
+  String get fullNameHint => 'ej. Juan Pérez';
+
+  @override
+  String get emailAddressLabel => 'Correo Electrónico';
+
+  @override
+  String get emailAddressHint => 'ej. usuario@ejemplo.com';
+
+  @override
+  String get passwordLabel => 'Contraseña';
+
+  @override
+  String get passwordHint => 'Mínimo 6 caracteres';
+
+  @override
+  String get selectAddressLabel => 'Dirección Asignada';
+
+  @override
+  String get userManagementMenu => 'Datos de la Cuenta';
 }
