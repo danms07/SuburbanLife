@@ -69,7 +69,7 @@ Current state of project files and folders:
         - `app_en.arb`: English strings.
         - `app_es.arb`: Spanish strings.
 - `scripts/`: Helper scripts holding service accounts.
-    - `create_admin.js`: Claims merge logic handled in console scripts.
+    - `set_role.js`: Claims and role assignment utility supporting both Firebase Emulator (`--emulator`) and production modes with auto user provisioning.
     - `populate_addresses.js`: Batched write logic for address import on csv files.
 - `test/`: Project unit and widget test suites.
     - `import_boundary_test.dart`: Static boundary verification test enforcing zero direct Firebase SDK imports inside `lib/features/`.
