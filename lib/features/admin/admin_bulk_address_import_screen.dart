@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
@@ -41,28 +44,61 @@ class _AdminBulkAddressImportScreenState
 
   Future<void> _pickAndParseCsv() async {
     final l10n = AppLocalizations.of(context)!;
-    debugPrint('[BulkAddressImport] >>> _pickAndParseCsv invoked');
+    debugPrint('[BulkAddressImport] >>> _pickAndParseCsv invoked (kIsWeb=$kIsWeb)');
     try {
-      debugPrint('[BulkAddressImport] Opening file picker dialog...');
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv', 'txt'],
-        withData: true,
-      );
+      String? selectedFileName;
+      Uint8List? rawBytes;
 
-      debugPrint('[BulkAddressImport] FilePicker returned: $result (files: ${result?.files.length})');
+      if (kIsWeb) {
+        debugPrint('[BulkAddressImport] Web platform: launching html.FileUploadInputElement...');
+        final uploadInput = html.FileUploadInputElement()
+          ..accept = '.csv,text/csv,text/plain,.txt';
+        uploadInput.click();
 
-      if (result == null || result.files.isEmpty) {
-        debugPrint('[BulkAddressImport] Picker cancelled or 0 files selected.');
-        return;
+        await uploadInput.onChange.first;
+        if (uploadInput.files == null || uploadInput.files!.isEmpty) {
+          debugPrint('[BulkAddressImport] Web picker: user cancelled or no file selected.');
+          return;
+        }
+
+        final file = uploadInput.files!.first;
+        selectedFileName = file.name;
+        final reader = html.FileReader();
+        reader.readAsArrayBuffer(file);
+        await reader.onLoadEnd.first;
+
+        final result = reader.result;
+        if (result != null) {
+          if (result is Uint8List) {
+            rawBytes = result;
+          } else if (result is ByteBuffer) {
+            rawBytes = result.asUint8List();
+          } else if (result is List<int>) {
+            rawBytes = Uint8List.fromList(result);
+          }
+        }
+        debugPrint('[BulkAddressImport] Web file read: name="$selectedFileName", bytesLength=${rawBytes?.length}');
+      } else {
+        debugPrint('[BulkAddressImport] Native platform: launching FilePicker...');
+        final result = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['csv', 'txt'],
+          withData: true,
+        );
+
+        if (result == null || result.files.isEmpty) {
+          debugPrint('[BulkAddressImport] FilePicker cancelled or empty.');
+          return;
+        }
+
+        final file = result.files.first;
+        selectedFileName = file.name;
+        rawBytes = file.bytes;
+        debugPrint('[BulkAddressImport] Picked file: name="${file.name}", size=${file.size}, bytes=${file.bytes?.length}');
       }
 
-      final file = result.files.first;
-      debugPrint('[BulkAddressImport] Picked file: name="${file.name}", size=${file.size}, bytes=${file.bytes?.length}, path="${file.path}"');
-
-      Uint8List? bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        debugPrint('[BulkAddressImport] Error: file.bytes is null or empty.');
+      if (rawBytes == null || rawBytes.isEmpty) {
+        debugPrint('[BulkAddressImport] Error: rawBytes is null or empty.');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -74,8 +110,8 @@ class _AdminBulkAddressImportScreenState
         return;
       }
 
-      final content = utf8.decode(bytes, allowMalformed: true);
-      debugPrint('[BulkAddressImport] Decoded ${content.length} characters from CSV file.');
+      final content = utf8.decode(rawBytes, allowMalformed: true);
+      debugPrint('[BulkAddressImport] Decoded ${content.length} characters from CSV bytes.');
       debugPrint('[BulkAddressImport] Content preview:\n${content.substring(0, content.length > 250 ? 250 : content.length)}');
 
       final items = _parseCsvContent(content);
@@ -95,11 +131,11 @@ class _AdminBulkAddressImportScreenState
       }
 
       setState(() {
-        _fileName = file.name;
+        _fileName = selectedFileName;
         _parsedItems = items;
         _importResult = null;
       });
-      debugPrint('[BulkAddressImport] setState executed: _fileName="${file.name}", _parsedItems.length=${items.length}');
+      debugPrint('[BulkAddressImport] setState executed: _fileName="$selectedFileName", _parsedItems.length=${items.length}');
     } catch (e, stackTrace) {
       debugPrint('[BulkAddressImport] Exception in _pickAndParseCsv: $e\n$stackTrace');
       if (mounted) {

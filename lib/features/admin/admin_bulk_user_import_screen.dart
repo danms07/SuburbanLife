@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -47,18 +48,54 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
 
   void _pickCsvFile() async {
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-        withData: true,
-      );
+      String? selectedFileName;
+      Uint8List? rawBytes;
 
-      if (result == null || result.files.isEmpty) return;
+      if (kIsWeb) {
+        debugPrint('[BulkUserImport] Web platform: launching html.FileUploadInputElement...');
+        final uploadInput = html.FileUploadInputElement()
+          ..accept = '.csv,text/csv,text/plain,.txt';
+        uploadInput.click();
 
-      final file = result.files.first;
-      final bytes = file.bytes;
+        await uploadInput.onChange.first;
+        if (uploadInput.files == null || uploadInput.files!.isEmpty) {
+          debugPrint('[BulkUserImport] Web picker: user cancelled.');
+          return;
+        }
 
-      if (bytes == null) {
+        final file = uploadInput.files!.first;
+        selectedFileName = file.name;
+        final reader = html.FileReader();
+        reader.readAsArrayBuffer(file);
+        await reader.onLoadEnd.first;
+
+        final result = reader.result;
+        if (result != null) {
+          if (result is Uint8List) {
+            rawBytes = result;
+          } else if (result is ByteBuffer) {
+            rawBytes = result.asUint8List();
+          } else if (result is List<int>) {
+            rawBytes = Uint8List.fromList(result);
+          }
+        }
+        debugPrint('[BulkUserImport] Web file read: name="$selectedFileName", bytes=${rawBytes?.length}');
+      } else {
+        debugPrint('[BulkUserImport] Native platform: launching FilePicker...');
+        final result = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['csv', 'txt'],
+          withData: true,
+        );
+
+        if (result == null || result.files.isEmpty) return;
+
+        final file = result.files.first;
+        selectedFileName = file.name;
+        rawBytes = file.bytes;
+      }
+
+      if (rawBytes == null || rawBytes.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -70,7 +107,7 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
         return;
       }
 
-      final csvContent = utf8.decode(bytes);
+      final csvContent = utf8.decode(rawBytes, allowMalformed: true);
       final parsedRows = _parseCsv(csvContent);
 
       if (parsedRows.isEmpty) {
@@ -86,7 +123,7 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
       }
 
       setState(() {
-        _fileName = file.name;
+        _fileName = selectedFileName;
         _parsedUsers = parsedRows;
         _importResult = null;
       });

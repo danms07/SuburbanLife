@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import 'package:suburban_life/core/config/app_config.dart';
 import 'package:suburban_life/features/announcements/announcement.dart';
-import 'package:suburban_life/features/auth/auth_service.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 
 class AnnouncementsScreen extends StatefulWidget {

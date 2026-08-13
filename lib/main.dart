@@ -21,7 +21,6 @@ import 'package:suburban_life/features/qr_access/qr_generator_screen.dart';
 import 'package:suburban_life/features/qr_access/manage_qr_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_scanner_screen.dart';
 import 'package:suburban_life/features/admin/admin_create_user_screen.dart';
-import 'package:suburban_life/features/admin/admin_resident_registration_screen.dart';
 import 'package:suburban_life/features/admin/admin_payment_approval_screen.dart';
 import 'package:suburban_life/features/admin/admin_upload_payment_screen.dart';
 import 'package:suburban_life/features/admin/admin_user_management_screen.dart';
