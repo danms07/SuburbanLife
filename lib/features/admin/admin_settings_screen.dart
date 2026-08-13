@@ -26,6 +26,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   final TextEditingController _senderEmailController = TextEditingController();
   final TextEditingController _senderNameController = TextEditingController();
   final TextEditingController _testRecipientController = TextEditingController();
+  final TextEditingController _customSubjectController = TextEditingController();
+  final TextEditingController _customBodyController = TextEditingController();
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -48,6 +50,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     _senderEmailController.dispose();
     _senderNameController.dispose();
     _testRecipientController.dispose();
+    _customSubjectController.dispose();
+    _customBodyController.dispose();
     super.dispose();
   }
 
@@ -71,6 +75,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         _passController.text = smtpData['pass'] ?? '';
         _senderEmailController.text = smtpData['senderEmail'] ?? '';
         _senderNameController.text = smtpData['senderName'] ?? '';
+        _customSubjectController.text = smtpData['customSubject'] ?? '';
+        _customBodyController.text = smtpData['customBody'] ?? '';
       }
     } catch (e) {
       debugPrint('Error loading settings: $e');
@@ -81,6 +87,28 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         });
       }
     }
+  }
+
+  void _insertPlaceholder(String placeholder) {
+    final text = _customBodyController.text;
+    final selection = _customBodyController.selection;
+    if (selection.start >= 0) {
+      final newText = text.replaceRange(selection.start, selection.end, placeholder);
+      _customBodyController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: selection.start + placeholder.length),
+      );
+    } else {
+      _customBodyController.text = '$text$placeholder';
+    }
+  }
+
+  void _resetDefaultTemplate() {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() {
+      _customSubjectController.text = l10n.defaultWelcomeSubject;
+      _customBodyController.text = l10n.defaultWelcomeBody;
+    });
   }
 
   void _testSmtpConnection() async {
@@ -115,6 +143,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         'pass': pass,
         'senderEmail': _senderEmailController.text.trim(),
         'senderName': _senderNameController.text.trim(),
+        'customSubject': _customSubjectController.text.trim(),
+        'customBody': _customBodyController.text.trim(),
         'testRecipient': recipient,
       });
 
@@ -183,6 +213,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         'pass': _passController.text.trim(),
         'senderEmail': _senderEmailController.text.trim(),
         'senderName': _senderNameController.text.trim(),
+        'customSubject': _customSubjectController.text.trim(),
+        'customBody': _customBodyController.text.trim(),
         'updatedAt': DbFieldValue.serverTimestamp(),
       });
 
@@ -481,6 +513,111 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                               prefixIcon: const Icon(Icons.badge_outlined),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                               isDense: true,
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+                          const Divider(),
+                          const SizedBox(height: 12),
+
+                          // Custom Welcome Message Section
+                          Row(
+                            children: [
+                              const Icon(Icons.edit_note, color: AppConfig.primaryColor, size: 24),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  l10n.customWelcomeEmailSection,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppConfig.primaryColor,
+                                    fontFamily: AppConfig.fontFamily,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _resetDefaultTemplate,
+                                icon: const Icon(Icons.restore, size: 16),
+                                label: Text(l10n.resetDefaultTemplateButton, style: const TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            l10n.customWelcomeEmailSubtitle,
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Subject field
+                          TextFormField(
+                            controller: _customSubjectController,
+                            decoration: InputDecoration(
+                              labelText: l10n.emailSubjectLabel,
+                              hintText: l10n.emailSubjectHint,
+                              prefixIcon: const Icon(Icons.title),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              isDense: true,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // Available Placeholders
+                          Text(
+                            l10n.availablePlaceholdersLabel,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              ActionChip(
+                                avatar: const Icon(Icons.person, size: 14),
+                                label: const Text('%name%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                onPressed: () => _insertPlaceholder('%name%'),
+                              ),
+                              ActionChip(
+                                avatar: const Icon(Icons.email, size: 14),
+                                label: const Text('%email%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                onPressed: () => _insertPlaceholder('%email%'),
+                              ),
+                              ActionChip(
+                                avatar: const Icon(Icons.lock, size: 14),
+                                label: const Text('%password%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                backgroundColor: Colors.amber.withValues(alpha: 0.2),
+                                onPressed: () => _insertPlaceholder('%password%'),
+                              ),
+                              ActionChip(
+                                avatar: const Icon(Icons.home, size: 14),
+                                label: const Text('%address%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                onPressed: () => _insertPlaceholder('%address%'),
+                              ),
+                              ActionChip(
+                                avatar: const Icon(Icons.badge, size: 14),
+                                label: const Text('%role%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                onPressed: () => _insertPlaceholder('%role%'),
+                              ),
+                              ActionChip(
+                                avatar: const Icon(Icons.apps, size: 14),
+                                label: const Text('%appName%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                onPressed: () => _insertPlaceholder('%appName%'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Body field
+                          TextFormField(
+                            controller: _customBodyController,
+                            maxLines: 7,
+                            keyboardType: TextInputType.multiline,
+                            decoration: InputDecoration(
+                              labelText: l10n.emailBodyLabel,
+                              hintText: l10n.emailBodyHint,
+                              alignLabelWithHint: true,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
 

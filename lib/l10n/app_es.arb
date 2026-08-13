@@ -361,6 +361,16 @@
   "saveSettingsButton": "Guardar Configuración",
   "emailSentStatus": "Correo Enviado",
   "emailFailedStatus": "Fallo de Correo",
-  "emailSkippedStatus": "Correo Omitido (SMTP Desactivado)"
+  "emailSkippedStatus": "Correo Omitido (SMTP Desactivado)",
+  "customWelcomeEmailSection": "Plantilla de Mensaje de Bienvenida Personalizado",
+  "customWelcomeEmailSubtitle": "Personaliza el correo de bienvenida enviado a las nuevas cuentas. Usa marcadores para insertar datos de la cuenta dinámicamente.",
+  "emailSubjectLabel": "Asunto del Correo",
+  "emailSubjectHint": "ej. ¡Bienvenido(a) a %appName%! Credenciales de Acceso",
+  "emailBodyLabel": "Cuerpo del Mensaje de Correo",
+  "emailBodyHint": "Escribe aquí la plantilla de tu mensaje de bienvenida...",
+  "availablePlaceholdersLabel": "Marcadores Disponibles (clic para insertar):",
+  "resetDefaultTemplateButton": "Restablecer Plantilla Predeterminada",
+  "defaultWelcomeSubject": "¡Bienvenido(a) a %appName%! Credenciales de Acceso",
+  "defaultWelcomeBody": "Hola %name%,\n\nTu cuenta de %role% ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso:\n\n- Correo electrónico: %email%\n- Contraseña inicial: %password%\n- Dirección asignada: %address%\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\nAtentamente,\nAdministración de %appName%"
 }
 

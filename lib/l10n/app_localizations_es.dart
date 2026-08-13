@@ -981,4 +981,42 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get emailSkippedStatus => 'Correo Omitido (SMTP Desactivado)';
+
+  @override
+  String get customWelcomeEmailSection =>
+      'Plantilla de Mensaje de Bienvenida Personalizado';
+
+  @override
+  String get customWelcomeEmailSubtitle =>
+      'Personaliza el correo de bienvenida enviado a las nuevas cuentas. Usa marcadores para insertar datos de la cuenta dinámicamente.';
+
+  @override
+  String get emailSubjectLabel => 'Asunto del Correo';
+
+  @override
+  String get emailSubjectHint =>
+      'ej. ¡Bienvenido(a) a %appName%! Credenciales de Acceso';
+
+  @override
+  String get emailBodyLabel => 'Cuerpo del Mensaje de Correo';
+
+  @override
+  String get emailBodyHint =>
+      'Escribe aquí la plantilla de tu mensaje de bienvenida...';
+
+  @override
+  String get availablePlaceholdersLabel =>
+      'Marcadores Disponibles (clic para insertar):';
+
+  @override
+  String get resetDefaultTemplateButton =>
+      'Restablecer Plantilla Predeterminada';
+
+  @override
+  String get defaultWelcomeSubject =>
+      '¡Bienvenido(a) a %appName%! Credenciales de Acceso';
+
+  @override
+  String get defaultWelcomeBody =>
+      'Hola %name%,\n\nTu cuenta de %role% ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso:\n\n- Correo electrónico: %email%\n- Contraseña inicial: %password%\n- Dirección asignada: %address%\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\nAtentamente,\nAdministración de %appName%';
 }

@@ -188,8 +188,18 @@ Administrators can configure a dedicated SMTP mail server to automatically email
   * **SSL/TLS Toggle**: Enable for port 465, disable for STARTTLS port 587.
   * **Authentication**: Username/email and password (or App Password / API Key).
   * **Sender Info**: Optional custom sender email address and display name.
-* **Interactive Connection Test**: Input a recipient email and click **Test Connection & Send Email** to execute an instant handshake test and receive a sample verification email.
-* **Automated Welcome Emails**: When enabled, any resident created via **Bulk CSV Import** or guard provisioned via **Manage Guards** receives a branded HTML email with their login email, initial password, and assigned address.
+* **Interactive Connection Test**: Input a recipient email and click **Test Connection & Send Email** to execute an instant handshake test and receive a sample verification email showcasing your custom template.
+* **Customizable Welcome Message Template**:
+  * **Email Subject**: Custom subject line supporting `%appName%`.
+  * **Message Body**: Multi-line custom message editor. Tap any placeholder chip to insert dynamic tags:
+    * `%name%`: Full name of the resident or guard.
+    * `%email%`: Login email address.
+    * `%password%`: Assigned initial temporary or specified password.
+    * `%address%`: Assigned physical address (or N/A).
+    * `%role%`: Role designation (e.g., Resident or Security Guard).
+    * `%appName%`: Application / Community name.
+  * **Reset to Default**: Restores the recommended default template.
+* **Automated Welcome Emails**: When enabled, any resident created via **Bulk CSV Import** or guard provisioned via **Manage Guards** receives a formatted email with their login credentials and personalized message.
 
 ---
 

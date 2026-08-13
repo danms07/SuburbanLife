@@ -230,6 +230,8 @@ erDiagram
 - `pass`: string (SMTP authentication password / App Password / API Key)
 - `senderEmail`: string (Optional override sender email address)
 - `senderName`: string (Optional override sender display label e.g. "Suburban Life Administration")
+- `customSubject`: string (Optional customized welcome email subject with placeholders like %appName%)
+- `customBody`: string (Optional customized multiline message body supporting %name%, %email%, %password%, %address%, %role%, %appName%)
 - `updatedAt`: timestamp
 
 ## Firestore Composite Indexes

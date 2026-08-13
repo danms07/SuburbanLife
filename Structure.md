@@ -40,7 +40,7 @@ Current state of project files and folders:
             - `admin_upload_payment_screen.dart`: Interface for uploading maintenance receipts on behalf of addresses via cascading street name and house number dropdown filters.
             - `admin_user_management_screen.dart`: User directory mapping client role switching, claim state tables, and admin force-unbind actions.
             - `admin_facilities_screen.dart`: Interface to configure dynamic unique vs multi-item amenities.
-            - `admin_settings_screen.dart`: Global residency maintenance cutoff and grace period adjustments, plus complete SMTP email service configuration with handshake connection test.
+            - `admin_settings_screen.dart`: Global residency maintenance cutoff and grace period adjustments, plus complete SMTP email service configuration with customizable welcome email templates, placeholder chips (%password%, %email%, %name%, etc.), and handshake connection test.
             - `admin_payment_report_screen.dart`: CSV payment matrix exporter per physical address.
             - `admin_guard_management_screen.dart`: Dedicated lifecycle module to provision and purge security guard accounts.
         - `announcements/`: Announcements system with translations support.

@@ -361,6 +361,16 @@
   "saveSettingsButton": "Save Settings",
   "emailSentStatus": "Email Sent",
   "emailFailedStatus": "Email Failed",
-  "emailSkippedStatus": "Email Skipped (SMTP Disabled)"
+  "emailSkippedStatus": "Email Skipped (SMTP Disabled)",
+  "customWelcomeEmailSection": "Custom Welcome Message Template",
+  "customWelcomeEmailSubtitle": "Customize the welcome email sent to new accounts. Use placeholders to insert account details dynamically.",
+  "emailSubjectLabel": "Email Subject",
+  "emailSubjectHint": "e.g. Welcome to %appName%! Login Credentials",
+  "emailBodyLabel": "Email Message Body",
+  "emailBodyHint": "Enter your welcome message template here...",
+  "availablePlaceholdersLabel": "Available Placeholders (click to insert):",
+  "resetDefaultTemplateButton": "Reset to Default Template",
+  "defaultWelcomeSubject": "Welcome to %appName%! Login Credentials",
+  "defaultWelcomeBody": "Hello %name%,\n\nYour %role% account has been created successfully. Below are your login credentials:\n\n- Email: %email%\n- Password: %password%\n- Address: %address%\n\nWe recommend logging in and updating your password.\n\nBest regards,\nAdministration of %appName%"
 }
 

@@ -46,6 +46,18 @@ function createSmtpTransporter(config) {
   });
 }
 
+// Helper: Replace %placeholder% tags in strings
+function replacePlaceholders(template, data) {
+  if (!template) return '';
+  return template
+    .replace(/%name%/gi, data.name || '')
+    .replace(/%email%/gi, data.email || '')
+    .replace(/%password%/gi, data.password || '')
+    .replace(/%address%/gi, data.address || 'N/A')
+    .replace(/%role%/gi, data.role || 'Residente')
+    .replace(/%appName%/gi, data.appName || 'Suburban Life');
+}
+
 // Helper: Send branded HTML and Plain Text welcome email
 async function sendWelcomeEmail(smtpConfig, { email, name, password, addressLinked, appName, role }) {
   if (!smtpConfig) return { sent: false, reason: 'SMTP not configured or disabled' };
@@ -53,55 +65,98 @@ async function sendWelcomeEmail(smtpConfig, { email, name, password, addressLink
   try {
     const transporter = createSmtpTransporter(smtpConfig);
     const branding = appName || smtpConfig.senderName || 'Suburban Life';
-    const fromAddress = smtpConfig.senderEmail && smtpConfig.senderEmail.toString().trim().isNotEmpty
+    const fromAddress = smtpConfig.senderEmail && smtpConfig.senderEmail.toString().trim().length > 0
       ? `"${smtpConfig.senderName || branding}" <${smtpConfig.senderEmail.toString().trim()}>`
       : `"${smtpConfig.senderName || branding}" <${smtpConfig.user.toString().trim()}>`;
 
     const userRole = role || 'residente';
-    const addressText = addressLinked ? `<li><strong>Dirección asignada:</strong> ${addressLinked}</li>` : '';
-    const addressPlain = addressLinked ? `\nDirección asignada: ${addressLinked}` : '';
+    const placeholderData = {
+      name: name || '',
+      email: email || '',
+      password: password || '',
+      address: addressLinked || 'N/A',
+      role: userRole,
+      appName: branding,
+    };
 
-    const htmlContent = `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
-        <div style="background-color: #2864be; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
-          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">¡Bienvenido(a) a ${branding}!</h1>
-        </div>
-        <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-          <p style="font-size: 16px; color: #1f2937; margin-top: 0;">Hola <strong>${name}</strong>,</p>
-          <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
-            Tu cuenta de <strong>${userRole}</strong> ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso para ingresar a la aplicación:
-          </p>
-          <div style="background-color: #f3f4f6; border-left: 4px solid #2864be; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
-            <ul style="margin: 0; padding-left: 20px; color: #1f2937; font-size: 14px; line-height: 1.8;">
-              <li><strong>Correo electrónico:</strong> ${email}</li>
-              <li><strong>Contraseña inicial:</strong> <code style="background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #1e3a8a;">${password}</code></li>
-              ${addressText}
-            </ul>
+    let subject = `¡Bienvenido(a) a ${branding}! Credenciales de Acceso`;
+    if (smtpConfig.customSubject && smtpConfig.customSubject.toString().trim().length > 0) {
+      subject = replacePlaceholders(smtpConfig.customSubject.toString().trim(), placeholderData);
+    }
+
+    let htmlContent;
+    let textContent;
+
+    if (smtpConfig.customBody && smtpConfig.customBody.toString().trim().length > 0) {
+      const rawCustomBody = replacePlaceholders(smtpConfig.customBody.toString().trim(), placeholderData);
+      textContent = rawCustomBody;
+
+      const escapedBody = rawCustomBody
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br/>');
+
+      htmlContent = `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
+          <div style="background-color: #2864be; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">${branding}</h1>
           </div>
-          <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">
-            Te recomendamos iniciar sesión y cambiar tu contraseña por una personalizada en la sección de tu perfil.
-          </p>
-          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-          <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-            Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
-          </p>
+          <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #1f2937; line-height: 1.6; font-size: 14px;">
+            ${escapedBody}
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+              Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
+            </p>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      const addressText = addressLinked ? `<li><strong>Dirección asignada:</strong> ${addressLinked}</li>` : '';
+      const addressPlain = addressLinked ? `\nDirección asignada: ${addressLinked}` : '';
 
-    const textContent = `¡Bienvenido(a) a ${branding}!\n\n` +
-      `Hola ${name},\n\n` +
-      `Tu cuenta de ${userRole} ha sido creada exitosamente con las siguientes credenciales:\n\n` +
-      `- Correo electrónico: ${email}\n` +
-      `- Contraseña inicial: ${password}` +
-      addressPlain +
-      `\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\n` +
-      `Administración de ${branding}`;
+      htmlContent = `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
+          <div style="background-color: #2864be; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">¡Bienvenido(a) a ${branding}!</h1>
+          </div>
+          <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <p style="font-size: 16px; color: #1f2937; margin-top: 0;">Hola <strong>${name}</strong>,</p>
+            <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
+              Tu cuenta de <strong>${userRole}</strong> ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso para ingresar a la aplicación:
+            </p>
+            <div style="background-color: #f3f4f6; border-left: 4px solid #2864be; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
+              <ul style="margin: 0; padding-left: 20px; color: #1f2937; font-size: 14px; line-height: 1.8;">
+                <li><strong>Correo electrónico:</strong> ${email}</li>
+                <li><strong>Contraseña inicial:</strong> <code style="background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #1e3a8a;">${password}</code></li>
+                ${addressText}
+              </ul>
+            </div>
+            <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">
+              Te recomendamos iniciar sesión y cambiar tu contraseña por una personalizada en la sección de tu perfil.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+              Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
+            </p>
+          </div>
+        </div>
+      `;
+
+      textContent = `¡Bienvenido(a) a ${branding}!\n\n` +
+        `Hola ${name},\n\n` +
+        `Tu cuenta de ${userRole} ha sido creada exitosamente con las siguientes credenciales:\n\n` +
+        `- Correo electrónico: ${email}\n` +
+        `- Contraseña inicial: ${password}` +
+        addressPlain +
+        `\n\nTe recomendamos iniciar sesión y actualizar tu contraseña.\n\n` +
+        `Administración de ${branding}`;
+    }
 
     await transporter.sendMail({
       from: fromAddress,
       to: email,
-      subject: `¡Bienvenido a ${branding}! Credenciales de Acceso`,
+      subject: subject,
       text: textContent,
       html: htmlContent,
     });
@@ -662,7 +717,7 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
 
-  const { host, port, secure, user, pass, senderEmail, senderName, testRecipient } = request.data;
+  const { host, port, secure, user, pass, senderEmail, senderName, testRecipient, customSubject, customBody } = request.data;
   if (!host || !user || !pass || !testRecipient) {
     throw new HttpsError('invalid-argument', 'Must provide host, user, pass, and testRecipient.');
   }
@@ -676,6 +731,8 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
       pass: pass.toString().trim(),
       senderEmail: senderEmail ? senderEmail.toString().trim() : undefined,
       senderName: senderName ? senderName.toString().trim() : undefined,
+      customSubject: customSubject ? customSubject.toString() : undefined,
+      customBody: customBody ? customBody.toString() : undefined,
     };
 
     const transporter = createSmtpTransporter(config);
@@ -687,28 +744,75 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
       ? `"${config.senderName || 'Suburban Life'}" <${config.senderEmail}>`
       : `"${config.senderName || 'Suburban Life'}" <${config.user}>`;
 
-    const info = await transporter.sendMail({
-      from: fromAddress,
-      to: testRecipient.toString().trim(),
-      subject: 'Suburban Life - Test de Configuración SMTP',
-      text: 'Este es un correo de prueba enviado desde la configuración de administración de Suburban Life para verificar el servicio SMTP.',
-      html: `
+    const sampleData = {
+      name: 'Usuario de Prueba',
+      email: testRecipient.toString().trim(),
+      password: 'SamplePass#2026',
+      address: 'Calle Ejemplo #101',
+      role: 'Residente',
+      appName: config.senderName || 'Suburban Life',
+    };
+
+    let subject = 'Suburban Life - Test de Configuración SMTP';
+    if (config.customSubject && config.customSubject.trim().length > 0) {
+      subject = `[Test] ${replacePlaceholders(config.customSubject, sampleData)}`;
+    }
+
+    let textBody = 'Este es un correo de prueba enviado desde la configuración de administración de Suburban Life para verificar el servicio SMTP.';
+    let htmlBody = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
+        <div style="background-color: #25d366; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+          <h2 style="color: #ffffff; margin: 0; font-size: 22px;">¡Conexión SMTP Exitosa!</h2>
+        </div>
+        <div style="background-color: #ffffff; padding: 24px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+          <p style="font-size: 15px; color: #1f2937;">Tu servidor SMTP ha sido verificado correctamente.</p>
+          <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
+            Los correos automáticos de bienvenida con credenciales para nuevos residentes y guardias están listos para ser enviados.
+          </p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+            Suburban Life Administration System
+          </p>
+        </div>
+      </div>
+    `;
+
+    if (config.customBody && config.customBody.trim().length > 0) {
+      const renderedBody = replacePlaceholders(config.customBody, sampleData);
+      textBody = `[Email de Prueba con Mensaje Personalizado]\n\n${renderedBody}`;
+      const escapedBody = renderedBody
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br/>');
+
+      htmlBody = `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
-          <div style="background-color: #25d366; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-            <h2 style="color: #ffffff; margin: 0; font-size: 22px;">¡Conexión SMTP Exitosa!</h2>
+          <div style="background-color: #25d366; padding: 16px 20px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h2 style="color: #ffffff; margin: 0; font-size: 20px;">¡Conexión SMTP Exitosa & Vista Previa!</h2>
           </div>
-          <div style="background-color: #ffffff; padding: 24px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <p style="font-size: 15px; color: #1f2937;">Tu servidor SMTP ha sido verificado correctamente.</p>
-            <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
-              Los correos automáticos de bienvenida con credenciales para nuevos residentes y guardias están listos para ser enviados.
+          <div style="background-color: #ffffff; padding: 24px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #1f2937; line-height: 1.6; font-size: 14px;">
+            <p style="font-size: 13px; color: #059669; font-weight: bold; margin-top: 0;">
+              ✓ Tu mensaje personalizado se visualiza así con datos de muestra:
             </p>
+            <div style="background-color: #f9fafb; border: 1px dashed #d1d5db; border-radius: 6px; padding: 16px; margin: 16px 0;">
+              ${escapedBody}
+            </div>
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
             <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
               Suburban Life Administration System
             </p>
           </div>
         </div>
-      `,
+      `;
+    }
+
+    const info = await transporter.sendMail({
+      from: fromAddress,
+      to: testRecipient.toString().trim(),
+      subject: subject,
+      text: textBody,
+      html: htmlBody,
     });
 
     return {

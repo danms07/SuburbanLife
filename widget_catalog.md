@@ -130,7 +130,7 @@ The following table maps each visual component to its feature domain and source 
 - **Usage**: Exposed via `AdminBulkAddressImportScreen`.
 
 ## 21. Admin Settings & SMTP Configurator
-- **Description**: A multi-section configuration panel for administrators to adjust payment cutoff days, grace period limits, and configure a custom SMTP mail server. Includes preset chips for standard ports (587, 465, 25), SSL/TLS switch, password visibility toggle, and an interactive connection testing tool that executes an SMTP handshake and sends a test email to verify credentials before saving.
+- **Description**: A multi-section configuration panel for administrators to adjust payment cutoff days, grace period limits, and configure a custom SMTP mail server. Includes preset chips for standard ports (587, 465, 25), SSL/TLS switch, password visibility toggle, a rich customizable welcome message template editor with placeholder chips (`%password%`, `%name%`, `%email%`, `%address%`, `%role%`, `%appName%`) and reset defaults action, and an interactive connection testing tool that executes an SMTP handshake and sends a test email to verify credentials before saving.
 - **Usage**: Exposed via `AdminSettingsScreen`.
 
 

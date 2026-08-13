@@ -188,8 +188,18 @@ Permite configurar un servidor de correo SMTP propio para enviar credenciales au
   * **Interruptor SSL/TLS**: Activar para puerto 465 (SSL) o desactivar para STARTTLS (puerto 587).
   * **Autenticación**: Usuario/correo y contraseña (o contraseña de aplicación / API Key).
   * **Información del Remitente**: Correo remitente y nombre visible opcionales.
-* **Prueba de Conexión Interactiva**: Permite ingresar un correo de destino y presionar **Probar Conexión y Enviar Correo** para validar el handshake y recibir un mensaje de prueba de inmediato.
-* **Envío Automático de Bienvenida**: Al estar habilitado, cada residente creado mediante **Importación Masiva CSV** o guardia dado de alta en **Gestionar Guardias** recibe un correo con su correo de acceso, contraseña inicial y dirección vinculada.
+* **Prueba de Conexión Interactiva**: Permite ingresar un correo de destino y presionar **Probar Conexión y Enviar Correo** para validar el handshake y recibir un correo de prueba visualizando la plantilla personalizada.
+* **Plantilla de Mensaje de Bienvenida Personalizada**:
+  * **Asunto del Correo**: Línea de asunto personalizada compatible con `%appName%`.
+  * **Cuerpo del Mensaje**: Editor de mensaje multilínea. Presione los chips de marcadores para insertar datos dinámicos:
+    * `%name%`: Nombre completo del residente o guardia.
+    * `%email%`: Correo de inicio de sesión.
+    * `%password%`: Contraseña inicial asignada.
+    * `%address%`: Dirección física vinculada (o N/A).
+    * `%role%`: Rol asignado (ej. Residente o Guardia de Seguridad).
+    * `%appName%`: Nombre de la aplicación / comunidad.
+  * **Restablecer Plantilla**: Restaura la plantilla recomendada por defecto.
+* **Envío Automático de Bienvenida**: Al estar habilitado, cada residente creado mediante **Importación Masiva CSV** o guardia dado de alta en **Gestionar Guardias** recibe un correo con su diseño personalizado y sus credenciales de acceso.
 
 ---
 

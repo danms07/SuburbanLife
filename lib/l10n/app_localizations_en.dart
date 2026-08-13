@@ -970,4 +970,37 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get emailSkippedStatus => 'Email Skipped (SMTP Disabled)';
+
+  @override
+  String get customWelcomeEmailSection => 'Custom Welcome Message Template';
+
+  @override
+  String get customWelcomeEmailSubtitle =>
+      'Customize the welcome email sent to new accounts. Use placeholders to insert account details dynamically.';
+
+  @override
+  String get emailSubjectLabel => 'Email Subject';
+
+  @override
+  String get emailSubjectHint => 'e.g. Welcome to %appName%! Login Credentials';
+
+  @override
+  String get emailBodyLabel => 'Email Message Body';
+
+  @override
+  String get emailBodyHint => 'Enter your welcome message template here...';
+
+  @override
+  String get availablePlaceholdersLabel =>
+      'Available Placeholders (click to insert):';
+
+  @override
+  String get resetDefaultTemplateButton => 'Reset to Default Template';
+
+  @override
+  String get defaultWelcomeSubject => 'Welcome to %appName%! Login Credentials';
+
+  @override
+  String get defaultWelcomeBody =>
+      'Hello %name%,\n\nYour %role% account has been created successfully. Below are your login credentials:\n\n- Email: %email%\n- Password: %password%\n- Address: %address%\n\nWe recommend logging in and updating your password.\n\nBest regards,\nAdministration of %appName%';
 }

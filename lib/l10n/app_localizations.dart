@@ -1933,6 +1933,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Email Skipped (SMTP Disabled)'**
   String get emailSkippedStatus;
+
+  /// No description provided for @customWelcomeEmailSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Welcome Message Template'**
+  String get customWelcomeEmailSection;
+
+  /// No description provided for @customWelcomeEmailSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize the welcome email sent to new accounts. Use placeholders to insert account details dynamically.'**
+  String get customWelcomeEmailSubtitle;
+
+  /// No description provided for @emailSubjectLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Subject'**
+  String get emailSubjectLabel;
+
+  /// No description provided for @emailSubjectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Welcome to %appName%! Login Credentials'**
+  String get emailSubjectHint;
+
+  /// No description provided for @emailBodyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Message Body'**
+  String get emailBodyLabel;
+
+  /// No description provided for @emailBodyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your welcome message template here...'**
+  String get emailBodyHint;
+
+  /// No description provided for @availablePlaceholdersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Placeholders (click to insert):'**
+  String get availablePlaceholdersLabel;
+
+  /// No description provided for @resetDefaultTemplateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to Default Template'**
+  String get resetDefaultTemplateButton;
+
+  /// No description provided for @defaultWelcomeSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to %appName%! Login Credentials'**
+  String get defaultWelcomeSubject;
+
+  /// No description provided for @defaultWelcomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Hello %name%,\n\nYour %role% account has been created successfully. Below are your login credentials:\n\n- Email: %email%\n- Password: %password%\n- Address: %address%\n\nWe recommend logging in and updating your password.\n\nBest regards,\nAdministration of %appName%'**
+  String get defaultWelcomeBody;
 }
 
 class _AppLocalizationsDelegate
