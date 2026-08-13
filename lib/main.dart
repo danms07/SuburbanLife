@@ -40,24 +40,30 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  try {
-    await FirebaseAppCheck.instance.activate(
-      providerAndroid: kDebugMode
-          ? const AndroidDebugProvider()
-          : const AndroidPlayIntegrityProvider(),
-      providerApple: kDebugMode
-          ? const AppleDebugProvider()
-          : const AppleAppAttestProvider(),
-      providerWeb: ReCaptchaEnterpriseProvider(AppConfig.recaptchaSiteKey),
+  if (AppConfig.useFirebaseEmulator) {
+    await FirebaseBackend.useEmulator(
+      host: AppConfig.emulatorHost.isNotEmpty ? AppConfig.emulatorHost : null,
     );
-  } catch (e) {
-    debugPrint('App Check activation error (Enterprise): $e');
+  } else {
     try {
       await FirebaseAppCheck.instance.activate(
-        providerWeb: ReCaptchaV3Provider(AppConfig.recaptchaSiteKey),
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleAppAttestProvider(),
+        providerWeb: ReCaptchaEnterpriseProvider(AppConfig.recaptchaSiteKey),
       );
-    } catch (e2) {
-      debugPrint('App Check activation error (V3): $e2');
+    } catch (e) {
+      debugPrint('App Check activation error (Enterprise): $e');
+      try {
+        await FirebaseAppCheck.instance.activate(
+          providerWeb: ReCaptchaV3Provider(AppConfig.recaptchaSiteKey),
+        );
+      } catch (e2) {
+        debugPrint('App Check activation error (V3): $e2');
+      }
     }
   }
 

@@ -22,5 +22,10 @@ class AppConfig {
   // Typography
   static const String fontFamily = 'Plus Jakarta Sans';
 
-  static String recaptchaSiteKey='6LejAf4sAAAAAJUNSZm3IJLaOkcYlVcse8HyR2EZ';
+  static String recaptchaSiteKey = '6LejAf4sAAAAAJUNSZm3IJLaOkcYlVcse8HyR2EZ';
+
+  // Firebase Emulator Configuration
+  // Run with: flutter run -d chrome --dart-define=USE_FIREBASE_EMULATOR=true
+  static const bool useFirebaseEmulator = bool.fromEnvironment('USE_FIREBASE_EMULATOR', defaultValue: false);
+  static const String emulatorHost = String.fromEnvironment('EMULATOR_HOST', defaultValue: '');
 }

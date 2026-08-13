@@ -380,3 +380,54 @@ class FirebaseFunctionsService implements FunctionsService {
     return result.data;
   }
 }
+
+class FirebaseBackend {
+  static Future<void> useEmulator({String? host}) async {
+    String targetHost = host ?? '';
+    if (targetHost.isEmpty) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        targetHost = '10.0.2.2';
+      } else {
+        targetHost = '127.0.0.1';
+      }
+    }
+
+    debugPrint('>>> [FirebaseBackend] Connecting to Local Emulators on host: $targetHost <<<');
+
+    try {
+      // 1. Auth Emulator (:9099)
+      await fb_auth.FirebaseAuth.instance.useAuthEmulator(targetHost, 9099);
+      debugPrint('  ✓ Auth emulator configured (:9099)');
+    } catch (e) {
+      debugPrint('  ! Auth emulator configuration note: $e');
+    }
+
+    try {
+      // 2. Firestore Emulator (:8080)
+      FirebaseFirestore.instance.useFirestoreEmulator(targetHost, 8080);
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: false,
+        sslEnabled: false,
+      );
+      debugPrint('  ✓ Firestore emulator configured (:8080)');
+    } catch (e) {
+      debugPrint('  ! Firestore emulator configuration note: $e');
+    }
+
+    try {
+      // 3. Storage Emulator (:9199)
+      await FirebaseStorage.instance.useStorageEmulator(targetHost, 9199);
+      debugPrint('  ✓ Storage emulator configured (:9199)');
+    } catch (e) {
+      debugPrint('  ! Storage emulator configuration note: $e');
+    }
+
+    try {
+      // 4. Cloud Functions Emulator (:5001)
+      FirebaseFunctions.instance.useFunctionsEmulator(targetHost, 5001);
+      debugPrint('  ✓ Functions emulator configured (:5001)');
+    } catch (e) {
+      debugPrint('  ! Functions emulator configuration note: $e');
+    }
+  }
+}
