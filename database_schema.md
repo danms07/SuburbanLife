@@ -50,7 +50,8 @@ erDiagram
         string announcementId PK
         string title
         string content
-        string imageUrl "Optional announcement image URL"
+        string imageUrl "Optional full-resolution image URL"
+        string thumbnailUrl "Optional optimized thumbnail URL"
         map translatedTitles "Languages map (en/es)"
         map translatedContents "Languages map (en/es)"
         string creatorUid FK
@@ -167,7 +168,8 @@ erDiagram
 - `announcementId`: string (Document ID)
 - `title`: string (Original)
 - `content`: string (Original)
-- `imageUrl`: string (Optional Firebase Storage URL of attached banner image)
+- `imageUrl`: string (Optional Firebase Storage URL of full-resolution image)
+- `thumbnailUrl`: string (Optional Firebase Storage URL of proportional thumbnail)
 - `translatedTitles`: map (e.g., `{ "en": "...", "es": "..." }`) - Populated by Gemini Cloud Function
 - `translatedContents`: map (e.g., `{ "en": "...", "es": "..." }`) - Populated by Gemini Cloud Function
 - `creatorUid`: string

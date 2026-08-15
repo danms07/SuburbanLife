@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/backend/backend.dart';
@@ -66,6 +67,48 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     }
   }
 
+  /// Generates a proportionally scaled thumbnail supporting both horizontal and vertical orientations
+  Future<Uint8List> _generateThumbnail(Uint8List originalBytes, {int maxDimension = 600}) async {
+    try {
+      final codec = await ui.instantiateImageCodec(originalBytes);
+      final frameInfo = await codec.getNextFrame();
+      final image = frameInfo.image;
+      final int width = image.width;
+      final int height = image.height;
+
+      if (width <= maxDimension && height <= maxDimension) {
+        return originalBytes;
+      }
+
+      int targetWidth;
+      int targetHeight;
+
+      if (width >= height) {
+        // Horizontal (landscape) or square
+        targetWidth = maxDimension;
+        targetHeight = ((height * maxDimension) / width).round();
+      } else {
+        // Vertical (portrait)
+        targetHeight = maxDimension;
+        targetWidth = ((width * maxDimension) / height).round();
+      }
+
+      final scaledCodec = await ui.instantiateImageCodec(
+        originalBytes,
+        targetWidth: targetWidth,
+        targetHeight: targetHeight,
+      );
+      final scaledFrame = await scaledCodec.getNextFrame();
+      final byteData = await scaledFrame.image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData != null) {
+        return byteData.buffer.asUint8List();
+      }
+    } catch (e) {
+      debugPrint('Thumbnail generation error: $e');
+    }
+    return originalBytes;
+  }
+
   void _showFullImage(String imageUrl, String title) {
     showDialog(
       context: context,
@@ -105,9 +148,90 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     );
   }
 
+  Widget _buildAnnouncementBody(
+    Announcement announcement,
+    String title,
+    String content,
+    String audienceText,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header: Audience Badge + Date
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: announcement.targetAudience == 'residents'
+                    ? AppConfig.primaryColor.withValues(alpha: 0.1)
+                    : AppConfig.secondaryColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    announcement.targetAudience == 'residents'
+                        ? Icons.home_outlined
+                        : Icons.public,
+                    size: 14,
+                    color: announcement.targetAudience == 'residents'
+                        ? AppConfig.primaryColor
+                        : AppConfig.secondaryColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    audienceText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: announcement.targetAudience == 'residents'
+                          ? AppConfig.primaryColor
+                          : AppConfig.secondaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              announcement.timestamp.toString().substring(0, 10),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // Title with emoji support
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            fontFamily: AppConfig.fontFamily,
+            color: AppConfig.primaryColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Content with emoji and multiline support
+        Text(
+          content,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black87,
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 600;
 
     if (_isLoading) {
       return Scaffold(
@@ -187,126 +311,113 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                 content = announcement.translatedContents[_currentLang] ?? announcement.content;
               }
 
-              final hasImage = announcement.imageUrl != null && announcement.imageUrl!.trim().isNotEmpty;
+              final displayImageUrl = (announcement.thumbnailUrl ?? announcement.imageUrl)?.trim();
+              final fullImageUrl = (announcement.imageUrl ?? announcement.thumbnailUrl)?.trim();
+              final hasImage = displayImageUrl != null && displayImageUrl.isNotEmpty;
               final audienceText = announcement.targetAudience == 'residents'
                   ? l10n.audienceResidents
                   : l10n.audienceAll;
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-                ),
-                elevation: 2,
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Image Banner if attached
-                    if (hasImage)
-                      GestureDetector(
-                        onTap: () => _showFullImage(announcement.imageUrl!, title),
-                        child: Stack(
-                          children: [
-                            StorageNetworkImage(
-                              imageUrl: announcement.imageUrl!,
-                              height: 200,
-                              width: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.fullscreen, color: Colors.white, size: 20),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Header: Audience Badge + Date
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 900),
+                  child: Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                    ),
+                    elevation: 2,
+                    clipBehavior: Clip.antiAlias,
+                    child: isDesktop && hasImage
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: announcement.targetAudience == 'residents'
-                                      ? AppConfig.primaryColor.withValues(alpha: 0.1)
-                                      : AppConfig.secondaryColor.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      announcement.targetAudience == 'residents'
-                                          ? Icons.home_outlined
-                                          : Icons.public,
-                                      size: 14,
-                                      color: announcement.targetAudience == 'residents'
-                                          ? AppConfig.primaryColor
-                                          : AppConfig.secondaryColor,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      audienceText,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: announcement.targetAudience == 'residents'
-                                            ? AppConfig.primaryColor
-                                            : AppConfig.secondaryColor,
+                              // Left Column: Thumbnail on Desktop
+                              GestureDetector(
+                                onTap: () => _showFullImage(fullImageUrl!, title),
+                                child: Container(
+                                  width: 220,
+                                  height: 180,
+                                  color: Colors.grey.withValues(alpha: 0.08),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      StorageNetworkImage(
+                                        imageUrl: displayImageUrl,
+                                        width: 220,
+                                        height: 180,
+                                        fit: BoxFit.contain,
                                       ),
-                                    ),
-                                  ],
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withValues(alpha: 0.5),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.fullscreen, color: Colors.white, size: 16),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              Text(
-                                announcement.timestamp.toString().substring(0, 10),
-                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              // Right Column: Content on Desktop
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: _buildAnnouncementBody(announcement, title, content, audienceText),
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Top: Thumbnail on Mobile
+                              if (hasImage)
+                                GestureDetector(
+                                  onTap: () => _showFullImage(fullImageUrl!, title),
+                                  child: Container(
+                                    width: double.infinity,
+                                    constraints: const BoxConstraints(maxHeight: 240),
+                                    color: Colors.grey.withValues(alpha: 0.08),
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        StorageNetworkImage(
+                                          imageUrl: displayImageUrl,
+                                          width: double.infinity,
+                                          height: 220,
+                                          fit: BoxFit.contain,
+                                        ),
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withValues(alpha: 0.5),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.fullscreen, color: Colors.white, size: 18),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: _buildAnnouncementBody(announcement, title, content, audienceText),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-
-                          // Title with emoji support
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: AppConfig.fontFamily,
-                              color: AppConfig.primaryColor,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Content with emoji and multiline support
-                          Text(
-                            content,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.black87,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -608,15 +719,31 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                           });
 
                           String? uploadedImageUrl;
+                          String? uploadedThumbnailUrl;
 
                           try {
-                            // Upload image if attached
+                            // Upload image and generated thumbnail if attached
                             if (selectedImageBytes != null) {
-                              final path = 'announcements/${DateTime.now().millisecondsSinceEpoch}.jpg';
+                              final timestamp = DateTime.now().millisecondsSinceEpoch;
+                              
+                              // 1. Generate proportional thumbnail (horizontal or vertical)
+                              final thumbBytes = await _generateThumbnail(selectedImageBytes!);
+
+                              // 2. Upload full resolution image
+                              final fullPath = 'announcements/${timestamp}_full.jpg';
                               uploadedImageUrl = await StorageService().uploadFile(
-                                path,
+                                fullPath,
                                 selectedImageBytes!,
                                 contentType: 'image/jpeg',
+                                metadata: {'uploaderUid': user.uid},
+                              );
+
+                              // 3. Upload thumbnail
+                              final thumbPath = 'announcements/${timestamp}_thumb.png';
+                              uploadedThumbnailUrl = await StorageService().uploadFile(
+                                thumbPath,
+                                thumbBytes,
+                                contentType: 'image/png',
                                 metadata: {'uploaderUid': user.uid},
                               );
                             }
@@ -626,6 +753,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                               'title': title,
                               'content': content,
                               'imageUrl': uploadedImageUrl,
+                              'thumbnailUrl': uploadedThumbnailUrl,
                               'creatorUid': user.uid,
                               'timestamp': DbFieldValue.serverTimestamp(),
                               'translatedTitles': {},

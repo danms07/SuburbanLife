@@ -3,7 +3,8 @@ class Announcement {
   final String id;
   final String title; // Original title (usually Spanish)
   final String content; // Original content (usually Spanish)
-  final String? imageUrl; // Optional image URL for visual announcements
+  final String? imageUrl; // Full-resolution image URL
+  final String? thumbnailUrl; // Optimized thumbnail URL
   final Map<String, String> translatedTitles; // e.g., {'en': 'Hello'}
   final Map<String, String> translatedContents; // e.g., {'en': 'Content in English'}
   final String creatorUid;
@@ -16,6 +17,7 @@ class Announcement {
     required this.title,
     required this.content,
     this.imageUrl,
+    this.thumbnailUrl,
     this.translatedTitles = const {},
     this.translatedContents = const {},
     required this.creatorUid,
@@ -29,6 +31,7 @@ class Announcement {
       'title': title,
       'content': content,
       'imageUrl': imageUrl,
+      'thumbnailUrl': thumbnailUrl,
       'translatedTitles': translatedTitles,
       'translatedContents': translatedContents,
       'creatorUid': creatorUid,
@@ -49,11 +52,15 @@ class Announcement {
       } catch (_) {}
     }
 
+    final imageUrl = map['imageUrl'] as String?;
+    final thumbnailUrl = map['thumbnailUrl'] as String? ?? imageUrl;
+
     return Announcement(
       id: id,
       title: map['title'] ?? '',
       content: map['content'] ?? '',
-      imageUrl: map['imageUrl'] as String?,
+      imageUrl: imageUrl,
+      thumbnailUrl: thumbnailUrl,
       translatedTitles: Map<String, String>.from(map['translatedTitles'] ?? {}),
       translatedContents: Map<String, String>.from(map['translatedContents'] ?? {}),
       creatorUid: map['creatorUid'] ?? '',
