@@ -132,6 +132,36 @@ class AppLocalizationsEs extends AppLocalizations {
   String get noAnnouncements => 'Aún no hay anuncios';
 
   @override
+  String get attachImage => 'Adjuntar Imagen';
+
+  @override
+  String get changeImage => 'Cambiar Imagen';
+
+  @override
+  String get removeImage => 'Eliminar Imagen';
+
+  @override
+  String get emojisLabel => 'Emojis Rápidos:';
+
+  @override
+  String get insertEmojiHint => 'Toca un emoji para insertarlo en el mensaje';
+
+  @override
+  String get viewFullImage => 'Ver Imagen';
+
+  @override
+  String imageUploadError(String error) {
+    return 'Error al subir la imagen: $error';
+  }
+
+  @override
+  String get announcementCreatedSuccess => '¡Anuncio publicado con éxito!';
+
+  @override
+  String get fillRequiredFields =>
+      'Por favor completa tanto el título como el contenido.';
+
+  @override
   String get multipurposeRoom => 'Salón de Usos Múltiples';
 
   @override

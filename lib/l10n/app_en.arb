@@ -46,6 +46,22 @@
   "create": "Create",
   "errorAnnouncements": "Error loading announcements",
   "noAnnouncements": "No announcements yet",
+  "attachImage": "Attach Image",
+  "changeImage": "Change Image",
+  "removeImage": "Remove Image",
+  "emojisLabel": "Quick Emojis:",
+  "insertEmojiHint": "Tap an emoji to insert it into the message",
+  "viewFullImage": "View Image",
+  "imageUploadError": "Failed to upload image: {error}",
+  "@imageUploadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "announcementCreatedSuccess": "Announcement published successfully!",
+  "fillRequiredFields": "Please fill in both title and content.",
   "multipurposeRoom": "Multipurpose Room",
   "bicycle1": "Bicycle 1",
   "roofGarden": "Roof Garden",

@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-08-13 (Implemented SMTP Email Service configuration in Admin Settings and automated welcome emails for bulk user import and provisioning)*
+*Last Verified/Updated: 2026-08-14 (Updated firestore.indexes.json with composite indexes for bookings cooldown checks and facility status filtering)*
 
 Current state of project files and folders:
 
@@ -44,7 +44,9 @@ Current state of project files and folders:
             - `admin_settings_screen.dart`: Global residency maintenance cutoff and grace period adjustments, plus complete SMTP email service configuration with customizable welcome email templates, placeholder chips (%password%, %email%, %name%, etc.), and handshake connection test.
             - `admin_payment_report_screen.dart`: CSV payment matrix exporter per physical address.
             - `admin_guard_management_screen.dart`: Dedicated lifecycle module to provision and purge security guard accounts.
-        - `announcements/`: Announcements system with translations support.
+        - `announcements/`: Announcements system with AI auto-translations, image banner attachments, full-screen image viewing, and quick emoji bar.
+            - `announcement.dart`: Announcement data model with optional image attachment URL (`imageUrl`), audience targeting, and translations.
+            - `announcements_screen.dart`: Visual feed and administrative announcement publishing dialog with gallery image upload, interactive image viewer, and quick-access announcement emojis.
         - `auth/`: Login and role detection logic.
             - `login_screen.dart`: Main login interface with navigation.
             - `signup_screen.dart`: Resident onboarding and address selection list.

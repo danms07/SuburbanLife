@@ -46,6 +46,22 @@
   "create": "Crear",
   "errorAnnouncements": "Error al cargar los anuncios",
   "noAnnouncements": "Aún no hay anuncios",
+  "attachImage": "Adjuntar Imagen",
+  "changeImage": "Cambiar Imagen",
+  "removeImage": "Eliminar Imagen",
+  "emojisLabel": "Emojis Rápidos:",
+  "insertEmojiHint": "Toca un emoji para insertarlo en el mensaje",
+  "viewFullImage": "Ver Imagen",
+  "imageUploadError": "Error al subir la imagen: {error}",
+  "@imageUploadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "announcementCreatedSuccess": "¡Anuncio publicado con éxito!",
+  "fillRequiredFields": "Por favor completa tanto el título como el contenido.",
   "multipurposeRoom": "Salón de Usos Múltiples",
   "bicycle1": "Bicicleta 1",
   "roofGarden": "Roof Garden",

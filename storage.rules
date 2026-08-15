@@ -18,6 +18,11 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
+    match /announcements/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     match /payments/{allPaths=**} {
       allow read: if isAdmin() || (isAuthenticated() && (request.auth.uid == resource.metadata.uploaderUid || request.auth.uid == resource.metadata.uploader));
       allow write: if isAuthenticated();

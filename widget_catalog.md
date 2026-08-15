@@ -30,6 +30,7 @@ The following table maps each visual component to its feature domain and source 
 | **Bulk Address Import CSV Manager** | Admin Management | [admin_bulk_address_import_screen.dart](lib/features/admin/admin_bulk_address_import_screen.dart) |
 | **Admin Settings & SMTP Configurator** | Admin Settings | [admin_settings_screen.dart](lib/features/admin/admin_settings_screen.dart) |
 | **Unified User Creation Manager** | Admin Management | [admin_create_user_screen.dart](lib/features/admin/admin_create_user_screen.dart) |
+| **Rich Media & Emoji Announcements Feed** | Announcements | [announcements_screen.dart](lib/features/announcements/announcements_screen.dart) |
 
 ---
 
@@ -137,6 +138,10 @@ The following table maps each visual component to its feature domain and source 
 ## 22. Unified User Creation Manager
 - **Description**: A centralized administrative interface for provisioning new accounts across all user tiers: Resident, Security Guard, and Administrator. Features a dynamic form switcher driven by a user type selector (defaulting to Resident), password visibility toggles, automated secure password generator, and reactive cascading street-and-number selectors ensuring collision-free address assignment. For Administrator accounts, automatically ensures linkage to the fixed "Admin office" address.
 - **Usage**: Exposed via `AdminCreateUserScreen`.
+
+## 23. Rich Media & Emoji Announcements Feed
+- **Description**: A feed interface rendering community notices and administrative broadcasts. Supports optional high-resolution banner image attachments with rounded corners (`ClipRRect`), tap-to-zoom full-screen interactive image viewer (`InteractiveViewer`), audience badges (All vs. Residents), and full native emoji support across titles and message bodies. In administrative mode, an enhanced creation modal features a quick-tap horizontal emoji bar (`📢`, `🚨`, `⚠️`, `ℹ️`, `🔔`, etc.) and cross-platform gallery image picker with live thumbnail preview and upload progress indicator.
+- **Usage**: Exposed via `AnnouncementsScreen`.
 
 
 

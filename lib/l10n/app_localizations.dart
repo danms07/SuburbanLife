@@ -338,6 +338,60 @@ abstract class AppLocalizations {
   /// **'No announcements yet'**
   String get noAnnouncements;
 
+  /// No description provided for @attachImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach Image'**
+  String get attachImage;
+
+  /// No description provided for @changeImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Image'**
+  String get changeImage;
+
+  /// No description provided for @removeImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Image'**
+  String get removeImage;
+
+  /// No description provided for @emojisLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Emojis:'**
+  String get emojisLabel;
+
+  /// No description provided for @insertEmojiHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap an emoji to insert it into the message'**
+  String get insertEmojiHint;
+
+  /// No description provided for @viewFullImage.
+  ///
+  /// In en, this message translates to:
+  /// **'View Image'**
+  String get viewFullImage;
+
+  /// No description provided for @imageUploadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload image: {error}'**
+  String imageUploadError(String error);
+
+  /// No description provided for @announcementCreatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcement published successfully!'**
+  String get announcementCreatedSuccess;
+
+  /// No description provided for @fillRequiredFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill in both title and content.'**
+  String get fillRequiredFields;
+
   /// No description provided for @multipurposeRoom.
   ///
   /// In en, this message translates to:

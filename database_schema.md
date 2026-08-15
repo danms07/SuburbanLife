@@ -50,12 +50,13 @@ erDiagram
         string announcementId PK
         string title
         string content
+        string imageUrl "Optional announcement image URL"
         map translatedTitles "Languages map (en/es)"
         map translatedContents "Languages map (en/es)"
         string creatorUid FK
         timestamp timestamp
         string targetAudience "'all' | 'residents' | 'specific_uid'"
-        array unreadBy "Array of user UIDs"
+        array readBy "Array of user UIDs who have read"
     }
     access_logs {
         string logId PK
@@ -166,12 +167,13 @@ erDiagram
 - `announcementId`: string (Document ID)
 - `title`: string (Original)
 - `content`: string (Original)
+- `imageUrl`: string (Optional Firebase Storage URL of attached banner image)
 - `translatedTitles`: map (e.g., `{ "en": "...", "es": "..." }`) - Populated by Gemini Cloud Function
 - `translatedContents`: map (e.g., `{ "en": "...", "es": "..." }`) - Populated by Gemini Cloud Function
 - `creatorUid`: string
 - `timestamp`: timestamp
 - `targetAudience`: string ('all', 'residents', 'specific_uid')
-- `unreadBy`: array of uids (or subcollection for tracking)
+- `readBy`: array of user UIDs who have read the announcement
 
 ### `documents` (Collection)
 - `docId`: string (Document ID)
@@ -239,16 +241,47 @@ erDiagram
 The application requires specific composite indexes to execute queries without database errors. Ensure the following indexes are generated in Firebase:
 
 ### `bookings` Collection
-- **Index 1**:
+- **Index 1 (Cooldown & User Facility Check)**:
+  - `facilityId` (Ascending)
+  - `userUid` (Ascending)
+  - `startTime` (Ascending)
+- **Index 2 (Cooldown Multi-field Status Validation)**:
+  - `facilityId` (Ascending)
+  - `userUid` (Ascending)
+  - `startTime` (Ascending)
+  - `status` (Ascending)
+- **Index 3 (Active Facility Clashes Filter)**:
+  - `facilityId` (Ascending)
+  - `status` (Ascending)
+- **Index 4 (Facility Schedule Stream)**:
   - `facilityId` (Ascending)
   - `startTime` (Ascending)
+- **Index 5 (User Bookings History)**:
+  - `userUid` (Ascending)
+  - `startTime` (Descending)
+- **Index 6 (User Bookings by Date)**:
+  - `userUid` (Ascending)
+  - `date` (Descending)
 
 ### `payments` Collection
 - **Index 1**:
   - `addressRef` (Ascending)
   - `period` (Descending)
+- **Index 2**:
+  - `uploaderUid` (Ascending)
+  - `createdAt` (Descending)
 
 ### `ownership_claims` Collection
 - **Index 1**:
   - `status` (Ascending)
   - `timestamp` (Descending)
+
+### `qr_codes` Collection
+- **Index 1**:
+  - `creatorUid` (Ascending)
+  - `createdAt` (Descending)
+
+### `documents` Collection
+- **Index 1**:
+  - `category` (Ascending)
+  - `createdAt` (Descending)
