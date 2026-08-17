@@ -47,8 +47,12 @@
   "errorAnnouncements": "Error loading announcements",
   "noAnnouncements": "No announcements yet",
   "attachImage": "Attach Image",
+  "pasteFromClipboard": "Paste from Clipboard",
   "changeImage": "Change Image",
   "removeImage": "Remove Image",
+  "imagePastedSuccess": "Image attached from clipboard!",
+  "noImageInClipboard": "No image found in clipboard. Please copy an image first.",
+  "pasteImageHint": "Or press Ctrl+V / Cmd+V to paste an image",
   "emojisLabel": "Quick Emojis:",
   "insertEmojiHint": "Tap an emoji to insert it into the message",
   "viewFullImage": "View Image",
@@ -411,6 +415,13 @@
   "passwordLabel": "Password",
   "passwordHint": "Min 6 characters",
   "selectAddressLabel": "Assigned Address",
-  "userManagementMenu": "User Account Details"
+  "userManagementMenu": "User Account Details",
+  "shareQrAccessMessage": "Here is your access QR code!",
+  "supplierSingleDayValidity": "Valid today only (Single use)",
+  "cardGuestName": "Guest Name",
+  "cardAuthorizedAddress": "Authorized Address",
+  "cardAccessCategory": "Access Category",
+  "cardValidity": "Validity",
+  "cardVehicleDetails": "Vehicle Details"
 }
 

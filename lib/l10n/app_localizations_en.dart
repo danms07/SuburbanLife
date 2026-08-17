@@ -135,10 +135,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get attachImage => 'Attach Image';
 
   @override
+  String get pasteFromClipboard => 'Paste from Clipboard';
+
+  @override
   String get changeImage => 'Change Image';
 
   @override
   String get removeImage => 'Remove Image';
+
+  @override
+  String get imagePastedSuccess => 'Image attached from clipboard!';
+
+  @override
+  String get noImageInClipboard =>
+      'No image found in clipboard. Please copy an image first.';
+
+  @override
+  String get pasteImageHint => 'Or press Ctrl+V / Cmd+V to paste an image';
 
   @override
   String get emojisLabel => 'Quick Emojis:';
@@ -828,9 +841,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Waiting for a resident to scan or link your account...';
 
   @override
-  String get pasteFromClipboard => 'Paste from Clipboard';
-
-  @override
   String get bulkUserImportMenu => 'Bulk User Creation (CSV)';
 
   @override
@@ -1111,4 +1121,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get userManagementMenu => 'User Account Details';
+
+  @override
+  String get shareQrAccessMessage => 'Here is your access QR code!';
+
+  @override
+  String get supplierSingleDayValidity => 'Valid today only (Single use)';
+
+  @override
+  String get cardGuestName => 'Guest Name';
+
+  @override
+  String get cardAuthorizedAddress => 'Authorized Address';
+
+  @override
+  String get cardAccessCategory => 'Access Category';
+
+  @override
+  String get cardValidity => 'Validity';
+
+  @override
+  String get cardVehicleDetails => 'Vehicle Details';
 }

@@ -135,10 +135,24 @@ class AppLocalizationsEs extends AppLocalizations {
   String get attachImage => 'Adjuntar Imagen';
 
   @override
+  String get pasteFromClipboard => 'Pegar del portapapeles';
+
+  @override
   String get changeImage => 'Cambiar Imagen';
 
   @override
   String get removeImage => 'Eliminar Imagen';
+
+  @override
+  String get imagePastedSuccess => '¡Imagen adjuntada desde el portapapeles!';
+
+  @override
+  String get noImageInClipboard =>
+      'No se encontró ninguna imagen en el portapapeles. Copia una imagen primero.';
+
+  @override
+  String get pasteImageHint =>
+      'O presiona Ctrl+V / Cmd+V para pegar una imagen';
 
   @override
   String get emojisLabel => 'Emojis Rápidos:';
@@ -836,9 +850,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Esperando a que un residente escanee o vincule tu cuenta...';
 
   @override
-  String get pasteFromClipboard => 'Pegar del portapapeles';
-
-  @override
   String get bulkUserImportMenu => 'Creación Masiva de Usuarios (CSV)';
 
   @override
@@ -1128,4 +1139,25 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get userManagementMenu => 'Datos de la Cuenta';
+
+  @override
+  String get shareQrAccessMessage => '¡Aquí está tu código QR de acceso!';
+
+  @override
+  String get supplierSingleDayValidity => 'Válido solo hoy (Un solo uso)';
+
+  @override
+  String get cardGuestName => 'Nombre del Invitado';
+
+  @override
+  String get cardAuthorizedAddress => 'Dirección Autorizada';
+
+  @override
+  String get cardAccessCategory => 'Categoría de Acceso';
+
+  @override
+  String get cardValidity => 'Vigencia';
+
+  @override
+  String get cardVehicleDetails => 'Detalles del Vehículo';
 }

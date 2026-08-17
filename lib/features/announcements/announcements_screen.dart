@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:js_util' as js_util;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import 'package:suburban_life/core/config/app_config.dart';
 import 'package:suburban_life/core/widgets/storage_network_image.dart';
@@ -107,6 +112,42 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       debugPrint('Thumbnail generation error: $e');
     }
     return originalBytes;
+  }
+
+  /// Reads image bytes from system clipboard (Web and cross-platform)
+  Future<Uint8List?> _getClipboardImageBytes() async {
+    if (kIsWeb) {
+      try {
+        final nav = html.window.navigator;
+        final clipboard = js_util.getProperty(nav, 'clipboard');
+        if (clipboard != null) {
+          final promise = js_util.callMethod(clipboard, 'read', []);
+          final dynamic items = await js_util.promiseToFuture(promise);
+          final dynamic rawLen = js_util.getProperty(items, 'length');
+          final int length = (rawLen is num) ? rawLen.toInt() : 0;
+          for (int i = 0; i < length; i++) {
+            final item = js_util.callMethod(items, 'item', [i]) ?? js_util.getProperty(items, i.toString());
+            final dynamic types = js_util.getProperty(item, 'types');
+            final dynamic rawTypesLen = js_util.getProperty(types, 'length');
+            final int typesLength = (rawTypesLen is num) ? rawTypesLen.toInt() : 0;
+            for (int j = 0; j < typesLength; j++) {
+              final String type = (js_util.callMethod(types, 'item', [j]) ?? js_util.getProperty(types, j.toString())).toString();
+              if (type.startsWith('image/')) {
+                final dynamic blobPromise = js_util.callMethod(item, 'getType', [type]);
+                final html.Blob blob = await js_util.promiseToFuture(blobPromise);
+                final reader = html.FileReader();
+                reader.readAsArrayBuffer(blob);
+                await reader.onLoadEnd.first;
+                return Uint8List.fromList(reader.result as List<int>);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Clipboard read error: $e');
+      }
+    }
+    return null;
   }
 
   void _showFullImage(String imageUrl, String title) {
@@ -448,6 +489,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     String? selectedImageName;
     bool isUploading = false;
     TextEditingController activeController = contentController;
+    StreamSubscription? pasteSubscription;
 
     // Track active text controller for emoji insertion
     titleFocusNode.addListener(() {
@@ -472,334 +514,448 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       setStateDialog(() {});
     }
 
+    void handlePastedBytes(Uint8List bytes, void Function(void Function()) setStateDialog) {
+      setStateDialog(() {
+        selectedImageBytes = bytes;
+        selectedImageName = 'clipboard_${DateTime.now().millisecondsSinceEpoch}.png';
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.imagePastedSuccess),
+            backgroundColor: AppConfig.secondaryColor,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+
+    Future<void> pasteFromClipboard(void Function(void Function()) setStateDialog) async {
+      try {
+        final bytes = await _getClipboardImageBytes();
+        if (bytes != null && bytes.isNotEmpty) {
+          handlePastedBytes(bytes, setStateDialog);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n.noImageInClipboard),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Error pasting image: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.noImageInClipboard),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    }
+
     showDialog(
       context: context,
       barrierDismissible: !isUploading,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
-            return AlertDialog(
-              title: Row(
-                children: [
-                  const Icon(Icons.campaign, color: AppConfig.primaryColor),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      l10n.createAnnouncement,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 480,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            // Attach document paste listener on Web
+            if (kIsWeb && pasteSubscription == null) {
+              pasteSubscription = html.document.onPaste.listen((html.ClipboardEvent event) async {
+                final items = event.clipboardData?.items;
+                if (items != null) {
+                  final int count = items.length ?? 0;
+                  for (int i = 0; i < count; i++) {
+                    final item = items[i];
+                    if (item.type?.startsWith('image/') == true) {
+                      final file = item.getAsFile();
+                      if (file != null) {
+                        final reader = html.FileReader();
+                        reader.readAsArrayBuffer(file);
+                        await reader.onLoadEnd.first;
+                        final bytes = Uint8List.fromList(reader.result as List<int>);
+                        handlePastedBytes(bytes, setStateDialog);
+                        break;
+                      }
+                    }
+                  }
+                }
+              });
+            }
+
+            return CallbackShortcuts(
+              bindings: <ShortcutActivator, VoidCallback>{
+                const SingleActivator(LogicalKeyboardKey.keyV, meta: true): () => pasteFromClipboard(setStateDialog),
+                const SingleActivator(LogicalKeyboardKey.keyV, control: true): () => pasteFromClipboard(setStateDialog),
+              },
+              child: Focus(
+                autofocus: true,
+                child: AlertDialog(
+                  title: Row(
                     children: [
-                      // Title TextField
-                      TextField(
-                        controller: titleController,
-                        focusNode: titleFocusNode,
-                        decoration: InputDecoration(
-                          labelText: l10n.titleSpanish,
-                          prefixIcon: const Icon(Icons.title, size: 20),
-                          border: const OutlineInputBorder(),
+                      const Icon(Icons.campaign, color: AppConfig.primaryColor),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.createAnnouncement,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      const SizedBox(height: 12),
-
-                      // Content TextField
-                      TextField(
-                        controller: contentController,
-                        focusNode: contentFocusNode,
-                        decoration: InputDecoration(
-                          labelText: l10n.contentSpanish,
-                          alignLabelWithHint: true,
-                          prefixIcon: const Padding(
-                            padding: EdgeInsets.only(bottom: 50),
-                            child: Icon(Icons.article_outlined, size: 20),
-                          ),
-                          border: const OutlineInputBorder(),
-                        ),
-                        maxLines: 4,
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Quick Emoji Bar
-                      Row(
+                    ],
+                  ),
+                  content: SizedBox(
+                    width: 480,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.emoji_emotions_outlined, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            l10n.emojisLabel,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+                          // Title TextField
+                          TextField(
+                            controller: titleController,
+                            focusNode: titleFocusNode,
+                            decoration: InputDecoration(
+                              labelText: l10n.titleSpanish,
+                              prefixIcon: const Icon(Icons.title, size: 20),
+                              border: const OutlineInputBorder(),
+                            ),
                           ),
-                          const Spacer(),
-                          Text(
-                            l10n.insertEmojiHint,
-                            style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 38,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _quickEmojis.length,
-                          itemBuilder: (context, index) {
-                            final emoji = _quickEmojis[index];
-                            return InkWell(
-                              onTap: () => insertEmoji(emoji, setStateDialog),
-                              borderRadius: BorderRadius.circular(6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                child: Center(
-                                  child: Text(
-                                    emoji,
-                                    style: const TextStyle(fontSize: 20),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                          const SizedBox(height: 12),
 
-                      // Image Attachment Preview / Selector
-                      if (selectedImageBytes != null)
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppConfig.secondaryColor.withValues(alpha: 0.5)),
-                            borderRadius: BorderRadius.circular(10),
-                            color: AppConfig.secondaryColor.withValues(alpha: 0.05),
+                          // Content TextField
+                          TextField(
+                            controller: contentController,
+                            focusNode: contentFocusNode,
+                            decoration: InputDecoration(
+                              labelText: l10n.contentSpanish,
+                              alignLabelWithHint: true,
+                              prefixIcon: const Padding(
+                                padding: EdgeInsets.only(bottom: 50),
+                                child: Icon(Icons.article_outlined, size: 20),
+                              ),
+                              border: const OutlineInputBorder(),
+                            ),
+                            maxLines: 4,
                           ),
-                          child: Row(
+                          const SizedBox(height: 12),
+
+                          // Quick Emoji Bar
+                          Row(
                             children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Image.memory(
-                                  selectedImageBytes!,
-                                  width: 56,
-                                  height: 56,
-                                  fit: BoxFit.cover,
-                                ),
+                              const Icon(Icons.emoji_emotions_outlined, size: 16, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Text(
+                                l10n.emojisLabel,
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      selectedImageName ?? 'image.jpg',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                    ),
-                                    Text(
-                                      '${(selectedImageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB',
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.close, color: Colors.redAccent),
-                                tooltip: l10n.removeImage,
-                                onPressed: () {
-                                  setStateDialog(() {
-                                    selectedImageBytes = null;
-                                    selectedImageName = null;
-                                  });
-                                },
+                              const Spacer(),
+                              Text(
+                                l10n.insertEmojiHint,
+                                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
                               ),
                             ],
                           ),
-                        )
-                      else
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            try {
-                              final picked = await _picker.pickImage(
-                                source: ImageSource.gallery,
-                                imageQuality: 85,
-                              );
-                              if (picked != null) {
-                                final bytes = await picked.readAsBytes();
+                          const SizedBox(height: 6),
+                          Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _quickEmojis.length,
+                              itemBuilder: (context, index) {
+                                final emoji = _quickEmojis[index];
+                                return InkWell(
+                                  onTap: () => insertEmoji(emoji, setStateDialog),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                    child: Center(
+                                      child: Text(
+                                        emoji,
+                                        style: const TextStyle(fontSize: 20),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Image Attachment Preview / Selector Actions
+                          if (selectedImageBytes != null)
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: AppConfig.secondaryColor.withValues(alpha: 0.5)),
+                                borderRadius: BorderRadius.circular(10),
+                                color: AppConfig.secondaryColor.withValues(alpha: 0.05),
+                              ),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Image.memory(
+                                      selectedImageBytes!,
+                                      width: 56,
+                                      height: 56,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          selectedImageName ?? 'image.png',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                        ),
+                                        Text(
+                                          '${(selectedImageBytes!.lengthInBytes / 1024).toStringAsFixed(1)} KB',
+                                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.close, color: Colors.redAccent),
+                                    tooltip: l10n.removeImage,
+                                    onPressed: () {
+                                      setStateDialog(() {
+                                        selectedImageBytes = null;
+                                        selectedImageName = null;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () async {
+                                        try {
+                                          final picked = await _picker.pickImage(
+                                            source: ImageSource.gallery,
+                                            imageQuality: 85,
+                                          );
+                                          if (picked != null) {
+                                            final bytes = await picked.readAsBytes();
+                                            setStateDialog(() {
+                                              selectedImageBytes = bytes;
+                                              selectedImageName = picked.name;
+                                            });
+                                          }
+                                        } catch (e) {
+                                          debugPrint('Image pick error: $e');
+                                        }
+                                      },
+                                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                                      label: Text(l10n.attachImage),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppConfig.primaryColor,
+                                        side: const BorderSide(color: AppConfig.primaryColor),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                    OutlinedButton.icon(
+                                      onPressed: () => pasteFromClipboard(setStateDialog),
+                                      icon: const Icon(Icons.content_paste_go_outlined),
+                                      label: Text(l10n.pasteFromClipboard),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppConfig.secondaryColor,
+                                        side: const BorderSide(color: AppConfig.secondaryColor),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  l10n.pasteImageHint,
+                                  style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic),
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 16),
+
+                          // Target Audience Dropdown
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedAudience,
+                            decoration: InputDecoration(
+                              labelText: l10n.targetAudienceLabel,
+                              prefixIcon: const Icon(Icons.people_outline, size: 20),
+                              border: const OutlineInputBorder(),
+                            ),
+                            items: [
+                              DropdownMenuItem(
+                                value: 'all',
+                                child: Text(l10n.audienceAll),
+                              ),
+                              DropdownMenuItem(
+                                value: 'residents',
+                                child: Text(l10n.audienceResidents),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
                                 setStateDialog(() {
-                                  selectedImageBytes = bytes;
-                                  selectedImageName = picked.name;
+                                  selectedAudience = val;
                                 });
                               }
-                            } catch (e) {
-                              debugPrint('Image pick error: $e');
-                            }
-                          },
-                          icon: const Icon(Icons.add_photo_alternate_outlined),
-                          label: Text(l10n.attachImage),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppConfig.primaryColor,
-                            side: const BorderSide(color: AppConfig.primaryColor),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            },
                           ),
-                        ),
-                      const SizedBox(height: 16),
 
-                      // Target Audience Dropdown
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedAudience,
-                        decoration: InputDecoration(
-                          labelText: l10n.targetAudienceLabel,
-                          prefixIcon: const Icon(Icons.people_outline, size: 20),
-                          border: const OutlineInputBorder(),
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                            value: 'all',
-                            child: Text(l10n.audienceAll),
-                          ),
-                          DropdownMenuItem(
-                            value: 'residents',
-                            child: Text(l10n.audienceResidents),
-                          ),
+                          if (isUploading) ...[
+                            const SizedBox(height: 16),
+                            const LinearProgressIndicator(),
+                          ],
                         ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setStateDialog(() {
-                              selectedAudience = val;
-                            });
-                          }
-                        },
                       ),
-
-                      if (isUploading) ...[
-                        const SizedBox(height: 16),
-                        const LinearProgressIndicator(),
-                      ],
-                    ],
+                    ),
                   ),
+                  actions: [
+                    TextButton(
+                      onPressed: isUploading
+                          ? null
+                          : () {
+                              pasteSubscription?.cancel();
+                              Navigator.pop(dialogContext);
+                            },
+                      child: Text(l10n.cancel),
+                    ),
+                    ElevatedButton(
+                      onPressed: isUploading
+                          ? null
+                          : () async {
+                              final title = titleController.text.trim();
+                              final content = contentController.text.trim();
+
+                              if (title.isEmpty || content.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(l10n.fillRequiredFields),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final user = AuthService().currentUser;
+                              if (user == null) return;
+
+                              setStateDialog(() {
+                                isUploading = true;
+                              });
+
+                              String? uploadedImageUrl;
+                              String? uploadedThumbnailUrl;
+
+                              try {
+                                // Upload image and generated thumbnail if attached
+                                if (selectedImageBytes != null) {
+                                  final timestamp = DateTime.now().millisecondsSinceEpoch;
+                                  
+                                  // 1. Generate proportional thumbnail (horizontal or vertical)
+                                  final thumbBytes = await _generateThumbnail(selectedImageBytes!);
+
+                                  // 2. Upload full resolution image
+                                  final fullPath = 'announcements/${timestamp}_full.jpg';
+                                  uploadedImageUrl = await StorageService().uploadFile(
+                                    fullPath,
+                                    selectedImageBytes!,
+                                    contentType: 'image/jpeg',
+                                    metadata: {'uploaderUid': user.uid},
+                                  );
+
+                                  // 3. Upload thumbnail
+                                  final thumbPath = 'announcements/${timestamp}_thumb.png';
+                                  uploadedThumbnailUrl = await StorageService().uploadFile(
+                                    thumbPath,
+                                    thumbBytes,
+                                    contentType: 'image/png',
+                                    metadata: {'uploaderUid': user.uid},
+                                  );
+                                }
+
+                                // Save announcement to Firestore
+                                await DatabaseService().addDocument('announcements', {
+                                  'title': title,
+                                  'content': content,
+                                  'imageUrl': uploadedImageUrl,
+                                  'thumbnailUrl': uploadedThumbnailUrl,
+                                  'creatorUid': user.uid,
+                                  'timestamp': DbFieldValue.serverTimestamp(),
+                                  'translatedTitles': {},
+                                  'translatedContents': {},
+                                  'targetAudience': selectedAudience,
+                                  'readBy': [],
+                                });
+
+                                pasteSubscription?.cancel();
+
+                                if (dialogContext.mounted) {
+                                  Navigator.pop(dialogContext);
+                                }
+
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(l10n.announcementCreatedSuccess),
+                                      backgroundColor: AppConfig.secondaryColor,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                debugPrint('Error publishing announcement: $e');
+                                setStateDialog(() {
+                                  isUploading = false;
+                                });
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(l10n.imageUploadError(e.toString())),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConfig.primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(l10n.create),
+                    ),
+                  ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: isUploading ? null : () => Navigator.pop(dialogContext),
-                  child: Text(l10n.cancel),
-                ),
-                ElevatedButton(
-                  onPressed: isUploading
-                      ? null
-                      : () async {
-                          final title = titleController.text.trim();
-                          final content = contentController.text.trim();
-
-                          if (title.isEmpty || content.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(l10n.fillRequiredFields),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                            return;
-                          }
-
-                          final user = AuthService().currentUser;
-                          if (user == null) return;
-
-                          setStateDialog(() {
-                            isUploading = true;
-                          });
-
-                          String? uploadedImageUrl;
-                          String? uploadedThumbnailUrl;
-
-                          try {
-                            // Upload image and generated thumbnail if attached
-                            if (selectedImageBytes != null) {
-                              final timestamp = DateTime.now().millisecondsSinceEpoch;
-                              
-                              // 1. Generate proportional thumbnail (horizontal or vertical)
-                              final thumbBytes = await _generateThumbnail(selectedImageBytes!);
-
-                              // 2. Upload full resolution image
-                              final fullPath = 'announcements/${timestamp}_full.jpg';
-                              uploadedImageUrl = await StorageService().uploadFile(
-                                fullPath,
-                                selectedImageBytes!,
-                                contentType: 'image/jpeg',
-                                metadata: {'uploaderUid': user.uid},
-                              );
-
-                              // 3. Upload thumbnail
-                              final thumbPath = 'announcements/${timestamp}_thumb.png';
-                              uploadedThumbnailUrl = await StorageService().uploadFile(
-                                thumbPath,
-                                thumbBytes,
-                                contentType: 'image/png',
-                                metadata: {'uploaderUid': user.uid},
-                              );
-                            }
-
-                            // Save announcement to Firestore
-                            await DatabaseService().addDocument('announcements', {
-                              'title': title,
-                              'content': content,
-                              'imageUrl': uploadedImageUrl,
-                              'thumbnailUrl': uploadedThumbnailUrl,
-                              'creatorUid': user.uid,
-                              'timestamp': DbFieldValue.serverTimestamp(),
-                              'translatedTitles': {},
-                              'translatedContents': {},
-                              'targetAudience': selectedAudience,
-                              'readBy': [],
-                            });
-
-                            if (dialogContext.mounted) {
-                              Navigator.pop(dialogContext);
-                            }
-
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(l10n.announcementCreatedSuccess),
-                                  backgroundColor: AppConfig.secondaryColor,
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            debugPrint('Error publishing announcement: $e');
-                            setStateDialog(() {
-                              isUploading = false;
-                            });
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(l10n.imageUploadError(e.toString())),
-                                  backgroundColor: Colors.redAccent,
-                                ),
-                              );
-                            }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConfig.primaryColor,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text(l10n.create),
-                ),
-              ],
             );
           },
         );
       },
-    );
+    ).then((_) {
+      pasteSubscription?.cancel();
+    });
   }
 }

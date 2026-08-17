@@ -462,18 +462,18 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       
       String validityText = '';
       if (_accessCategory == 'supplier') {
-        validityText = 'Válido solo hoy (Un solo uso)';
+        validityText = l10n.supplierSingleDayValidity;
       } else if (_selectedType == QrType.permanent) {
         validityText = l10n.qrTypePermanent;
       } else {
         validityText = DateFormat('MMM dd, yyyy hh:mm a').format(_expiryTime);
       }
       
-      _drawTextRow(canvas, 'Guest Name', guestName, 770);
-      _drawTextRow(canvas, 'Authorized Address', addressLabel, 850);
-      _drawTextRow(canvas, 'Access Category', categoryText, 930);
-      _drawTextRow(canvas, 'Validity', validityText, 1010);
-      _drawTextRow(canvas, 'Vehicle Details', vehicleDetails, 1090);
+      _drawTextRow(canvas, l10n.cardGuestName, guestName, 770);
+      _drawTextRow(canvas, l10n.cardAuthorizedAddress, addressLabel, 850);
+      _drawTextRow(canvas, l10n.cardAccessCategory, categoryText, 930);
+      _drawTextRow(canvas, l10n.cardValidity, validityText, 1010);
+      _drawTextRow(canvas, l10n.cardVehicleDetails, vehicleDetails, 1090);
       
       final picture = recorder.endRecording();
       final img = await picture.toImage(800, 1200);
@@ -495,7 +495,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         final params = ShareParams(
           files: [file],
           fileNameOverrides: [fileName],
-          text: 'Here is your access QR code!',
+          text: l10n.shareQrAccessMessage,
           title: AppConfig.appName,
         );
 

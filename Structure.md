@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-08-14 (Updated firestore.indexes.json with composite indexes for bookings cooldown checks and facility status filtering)*
+*Last Verified/Updated: 2026-08-16 (Added Spanish translations and l10n localization keys for QR code sharing message and card labels)*
 
 Current state of project files and folders:
 
@@ -44,9 +44,9 @@ Current state of project files and folders:
             - `admin_settings_screen.dart`: Global residency maintenance cutoff and grace period adjustments, plus complete SMTP email service configuration with customizable welcome email templates, placeholder chips (%password%, %email%, %name%, etc.), and handshake connection test.
             - `admin_payment_report_screen.dart`: CSV payment matrix exporter per physical address.
             - `admin_guard_management_screen.dart`: Dedicated lifecycle module to provision and purge security guard accounts.
-        - `announcements/`: Announcements system with AI auto-translations, image banner attachments, full-screen image viewing, and quick emoji bar.
-            - `announcement.dart`: Announcement data model with optional image attachment URL (`imageUrl`), audience targeting, and translations.
-            - `announcements_screen.dart`: Visual feed and administrative announcement publishing dialog with gallery image upload, interactive image viewer, and quick-access announcement emojis.
+        - `announcements/`: Announcements system with AI auto-translations, orientation-aware thumbnail generation, responsive desktop/mobile layouts, clipboard image pasting, full-screen interactive image viewing, and quick emoji bar.
+            - `announcement.dart`: Announcement data model with full-res image URL (`imageUrl`), proportional thumbnail URL (`thumbnailUrl`), audience targeting, and translations.
+            - `announcements_screen.dart`: Visual responsive feed (side-by-side card on desktop, linear stack on mobile) and administrative announcement publishing dialog with gallery picker, clipboard image pasting, live thumbnail preview, interactive pinch-to-zoom viewer, and quick-access emojis.
         - `auth/`: Login and role detection logic.
             - `login_screen.dart`: Main login interface with navigation.
             - `signup_screen.dart`: Resident onboarding and address selection list.

@@ -344,6 +344,12 @@ abstract class AppLocalizations {
   /// **'Attach Image'**
   String get attachImage;
 
+  /// No description provided for @pasteFromClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste from Clipboard'**
+  String get pasteFromClipboard;
+
   /// No description provided for @changeImage.
   ///
   /// In en, this message translates to:
@@ -355,6 +361,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove Image'**
   String get removeImage;
+
+  /// No description provided for @imagePastedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Image attached from clipboard!'**
+  String get imagePastedSuccess;
+
+  /// No description provided for @noImageInClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'No image found in clipboard. Please copy an image first.'**
+  String get noImageInClipboard;
+
+  /// No description provided for @pasteImageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Or press Ctrl+V / Cmd+V to paste an image'**
+  String get pasteImageHint;
 
   /// No description provided for @emojisLabel.
   ///
@@ -1670,12 +1694,6 @@ abstract class AppLocalizations {
   /// **'Waiting for a resident to scan or link your account...'**
   String get waitingToBeLinked;
 
-  /// No description provided for @pasteFromClipboard.
-  ///
-  /// In en, this message translates to:
-  /// **'Paste from Clipboard'**
-  String get pasteFromClipboard;
-
   /// No description provided for @bulkUserImportMenu.
   ///
   /// In en, this message translates to:
@@ -2191,6 +2209,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'User Account Details'**
   String get userManagementMenu;
+
+  /// No description provided for @shareQrAccessMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Here is your access QR code!'**
+  String get shareQrAccessMessage;
+
+  /// No description provided for @supplierSingleDayValidity.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid today only (Single use)'**
+  String get supplierSingleDayValidity;
+
+  /// No description provided for @cardGuestName.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest Name'**
+  String get cardGuestName;
+
+  /// No description provided for @cardAuthorizedAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorized Address'**
+  String get cardAuthorizedAddress;
+
+  /// No description provided for @cardAccessCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Access Category'**
+  String get cardAccessCategory;
+
+  /// No description provided for @cardValidity.
+  ///
+  /// In en, this message translates to:
+  /// **'Validity'**
+  String get cardValidity;
+
+  /// No description provided for @cardVehicleDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle Details'**
+  String get cardVehicleDetails;
 }
 
 class _AppLocalizationsDelegate
