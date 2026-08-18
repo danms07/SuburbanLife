@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import 'package:suburban_life/core/config/app_config.dart';
+import 'package:suburban_life/core/widgets/interactive_image_dialog.dart';
 import 'package:suburban_life/core/widgets/storage_network_image.dart';
 import 'package:suburban_life/features/announcements/announcement.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
@@ -148,45 +149,6 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       }
     }
     return null;
-  }
-
-  void _showFullImage(String imageUrl, String title) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(12),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            InteractiveViewer(
-              panEnabled: true,
-              boundaryMargin: const EdgeInsets.all(20),
-              minScale: 0.5,
-              maxScale: 4.0,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: StorageNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: CircleAvatar(
-                backgroundColor: Colors.black.withValues(alpha: 0.6),
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildAnnouncementBody(
@@ -370,94 +332,63 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                     ),
                     elevation: 2,
                     clipBehavior: Clip.antiAlias,
-                    child: isDesktop && hasImage
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Left Column: Thumbnail on Desktop
-                              GestureDetector(
-                                onTap: () => _showFullImage(fullImageUrl!, title),
-                                child: Container(
+                    child: InkWell(
+                      onTap: hasImage
+                          ? () => showInteractiveImageDialog(context, fullImageUrl!, title: title)
+                          : null,
+                      child: isDesktop && hasImage
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Left Column: Thumbnail on Desktop
+                                Container(
                                   width: 220,
                                   height: 180,
                                   color: Colors.grey.withValues(alpha: 0.08),
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      StorageNetworkImage(
-                                        imageUrl: displayImageUrl,
-                                        width: 220,
-                                        height: 180,
-                                        fit: BoxFit.contain,
-                                      ),
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.5),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(Icons.fullscreen, color: Colors.white, size: 16),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Right Column: Content on Desktop
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: _buildAnnouncementBody(announcement, title, content, audienceText),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Top: Thumbnail on Mobile
-                              if (hasImage)
-                                GestureDetector(
-                                  onTap: () => _showFullImage(fullImageUrl!, title),
-                                  child: Container(
-                                    width: double.infinity,
-                                    constraints: const BoxConstraints(maxHeight: 240),
-                                    color: Colors.grey.withValues(alpha: 0.08),
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        StorageNetworkImage(
-                                          imageUrl: displayImageUrl,
-                                          width: double.infinity,
-                                          height: 220,
-                                          fit: BoxFit.contain,
-                                        ),
-                                        Positioned(
-                                          top: 8,
-                                          right: 8,
-                                          child: Container(
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withValues(alpha: 0.5),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(Icons.fullscreen, color: Colors.white, size: 18),
-                                          ),
-                                        ),
-                                      ],
+                                  child: Center(
+                                    child: StorageNetworkImage(
+                                      imageUrl: displayImageUrl,
+                                      width: 220,
+                                      height: 180,
+                                      fit: BoxFit.contain,
                                     ),
                                   ),
                                 ),
+                                // Right Column: Content on Desktop
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: _buildAnnouncementBody(announcement, title, content, audienceText),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Top: Thumbnail on Mobile
+                                if (hasImage)
+                                  Container(
+                                    width: double.infinity,
+                                    constraints: const BoxConstraints(maxHeight: 240),
+                                    color: Colors.grey.withValues(alpha: 0.08),
+                                    child: Center(
+                                      child: StorageNetworkImage(
+                                        imageUrl: displayImageUrl,
+                                        width: double.infinity,
+                                        height: 220,
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
 
-                              Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: _buildAnnouncementBody(announcement, title, content, audienceText),
-                              ),
-                            ],
-                          ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: _buildAnnouncementBody(announcement, title, content, audienceText),
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
                 ),
               );

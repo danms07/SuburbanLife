@@ -176,6 +176,11 @@ If the app icon asset changes, regenerate native icons:
 dart run flutter_launcher_icons
 ```
 
+### Web Hosting & Automatic Upgrades
+When deployed to Firebase Hosting, the web application includes an automated background update mechanism (`AppUpdateService`):
+- **Cache-Busting Headers**: `firebase.json` specifies `no-cache, no-store, must-revalidate` for `index.html`, `flutter_bootstrap.js`, `flutter_service_worker.js`, and `/version.json`.
+- **Seamless Inactivity / Tab-Switch Reload**: The app periodically polls `/version.json` in the background. When a new deployment version is detected, it automatically purges browser `CacheStorage` and refreshes the application seamlessly when the user switches tabs or becomes idle.
+
 ---
 
 ## Address Population

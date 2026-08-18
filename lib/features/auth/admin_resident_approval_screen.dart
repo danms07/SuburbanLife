@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import 'package:suburban_life/core/config/app_config.dart';
+import 'package:suburban_life/core/widgets/interactive_image_dialog.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import 'package:suburban_life/core/widgets/storage_network_image.dart';
 import 'package:intl/intl.dart';
@@ -114,27 +115,7 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
   }
 
   void _showImagePreview(String url) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: StorageNetworkImage(imageUrl: url, fit: BoxFit.contain),
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.black, size: 30),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    showInteractiveImageDialog(context, url);
   }
 
   @override
@@ -285,73 +266,81 @@ class _ResidentApprovalCardState extends State<_ResidentApprovalCard> {
       elevation: 3,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Fetch Address Details
-            FutureBuilder<Map<String, dynamic>?>(
-              future: _addressFuture,
-              builder: (context, addrSnapshot) {
-                if (addrSnapshot.connectionState == ConnectionState.waiting) {
-                  return const SizedBox(
-                    height: 20,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 1.5),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: proofUrl.isNotEmpty ? () => widget.onShowPreview(proofUrl) : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Fetch Address Details
+                  FutureBuilder<Map<String, dynamic>?>(
+                    future: _addressFuture,
+                    builder: (context, addrSnapshot) {
+                      if (addrSnapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox(
+                          height: 20,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 1.5),
+                            ),
+                          ),
+                        );
+                      }
+                      final addrData = addrSnapshot.data;
+                      final street = addrData?['streetName'] ?? 'Unknown Street';
+                      final number = addrData?['number'] ?? '';
+                      return Text(
+                        '$street $number',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppConfig.primaryColor,
+                        ),
+                      );
+                    },
+                  ),
+                  if (deliveryDate != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${l10n.deliveryDateLabel}: ${DateFormat('yyyy-MM-dd').format(deliveryDate)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppConfig.textColor,
+                            fontFamily: AppConfig.fontFamily,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  if (proofUrl.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: StorageNetworkImage(
+                        imageUrl: proofUrl,
+                        height: 150,
+                        fit: BoxFit.cover,
                       ),
                     ),
-                  );
-                }
-                final addrData = addrSnapshot.data;
-                final street = addrData?['streetName'] ?? 'Unknown Street';
-                final number = addrData?['number'] ?? '';
-                return Text(
-                  '$street $number',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppConfig.primaryColor,
-                  ),
-                );
-              },
-            ),
-            if (deliveryDate != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${l10n.deliveryDateLabel}: ${DateFormat('yyyy-MM-dd').format(deliveryDate)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppConfig.textColor,
-                      fontFamily: AppConfig.fontFamily,
-                    ),
-                  ),
                 ],
               ),
-            ],
-            const SizedBox(height: 12),
-            if (proofUrl.isNotEmpty)
-              InkWell(
-                onTap: () => widget.onShowPreview(proofUrl),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: StorageNetworkImage(
-                    imageUrl: proofUrl,
-                    height: 150,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
-            Row(
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
@@ -378,8 +367,8 @@ class _ResidentApprovalCardState extends State<_ResidentApprovalCard> {
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

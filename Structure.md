@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-08-16 (Added Spanish translations and l10n localization keys for QR code sharing message and card labels)*
+*Last Verified/Updated: 2026-08-17 (Added web automatic seamless upgrade service with background polling, idle/tab-switch detection, and CacheStorage eviction)*
 
 Current state of project files and folders:
 
@@ -15,7 +15,7 @@ Current state of project files and folders:
     - `plans/`: Future implementation plans.
         - `biometric_auth_plan.md`: Plan for persistent biometric gating.
         - `credential_manager_plan.md`: Plan for Passkeys and Credential Manager integration.
-- `firebase.json`: Firebase project deployment configuration mapping Firestore rules, Storage rules, functions, and composite indexes.
+- `firebase.json`: Firebase project deployment configuration mapping Firestore rules, Storage rules, functions, composite indexes, and Hosting Cache-Control headers.
 - `firestore.rules`: Security rules for Cloud Firestore collections (including admin-only gating for config/smtp_settings).
 - `firestore.indexes.json`: Composite index definitions for Firestore queries (bookings, payments, qr_codes, documents).
 - `storage.rules`: Security rules for Firebase Cloud Storage buckets.
@@ -31,6 +31,11 @@ Current state of project files and folders:
             - `backend.dart`: Base interfaces for Auth, Database, Storage, and Cloud Functions.
             - `firebase_backend.dart`: Firebase concrete implementations of the backend interfaces.
         - `config/app_config.dart`: Theming, palette, and app name strings.
+        - `services/`: Core platform and application services.
+            - `app_update_service.dart`: Automatic background version checker, idle/tab-switch detector, and seamless CacheStorage-cleared browser reload service for web.
+        - `widgets/`: Shared reusable UI components.
+            - `storage_network_image.dart`: Cross-platform cached image loader with web CORS and memory fallbacks.
+            - `interactive_image_dialog.dart`: Centralized full-screen interactive image viewer with pinch-to-zoom, pan, and dismiss controls.
     - `features/`: Specific feature modules separated by domain.
         - `admin/`: Core management modules for administrators.
             - `admin_create_user_screen.dart`: Unified user creation interface supporting dynamic form switching for Resident (with street/number cascading selection), Security Guard, and Administrator accounts (linked to fixed Admin office address).
@@ -75,6 +80,7 @@ Current state of project files and folders:
     - `populate_addresses.js`: Batched write logic for address import on csv files.
 - `test/`: Project unit and widget test suites.
     - `import_boundary_test.dart`: Static boundary verification test enforcing zero direct Firebase SDK imports inside `lib/features/`.
+- `web/`: Web entry point and assets including `index.html`, `manifest.json`, and base `version.json`.
 - `resident_import_template.csv`: Sample CSV template for administrator bulk user account import.
 - `Structure.md`: This inventory map file.
 

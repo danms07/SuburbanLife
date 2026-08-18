@@ -34,6 +34,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'l10n/app_localizations.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/core/backend/firebase_backend.dart';
+import 'package:suburban_life/core/services/app_update_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,11 @@ void main() async {
     storage: FirebaseStorageService(),
     functions: FirebaseFunctionsService(),
   );
+
+  // Initialize auto-upgrade service for web
+  if (kIsWeb) {
+    AppUpdateService.instance.initialize();
+  }
 
   //FirebaseFirestore.setLoggingEnabled(true);
   runApp(const MyApp());

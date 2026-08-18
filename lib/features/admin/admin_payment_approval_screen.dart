@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/widgets/interactive_image_dialog.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/widgets/storage_network_image.dart';
 import 'package:intl/intl.dart';
@@ -83,27 +84,7 @@ class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen>
   }
 
   void _showImagePreview(String url) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: StorageNetworkImage(imageUrl: url, fit: BoxFit.contain),
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.black, size: 30),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    showInteractiveImageDialog(context, url);
   }
 
   @override
@@ -225,119 +206,131 @@ class _PaymentApprovalCardState extends State<_PaymentApprovalCard> {
       elevation: 3,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Fetch Resident Information
-            FutureBuilder<Map<String, dynamic>?>(
-              future: _userFuture,
-              builder: (context, userSnapshot) {
-                if (userSnapshot.connectionState == ConnectionState.waiting) {
-                  return const SizedBox(
-                    height: 40,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  );
-                }
-                final userData = userSnapshot.data;
-                final name = userData?['name'] ?? 'Unknown Resident';
-                final email = userData?['email'] ?? '';
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppConfig.primaryColor,
-                      ),
-                    ),
-                    Text(email, style: const TextStyle(color: Colors.grey)),
-                    if (period.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(Icons.event, size: 16, color: Colors.grey),
-                          const SizedBox(width: 6),
-                          Text(
-                            formattedPeriod,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppConfig.textColor,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: receiptUrl.isNotEmpty ? () => widget.onShowPreview(receiptUrl) : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Fetch Resident Information
+                  FutureBuilder<Map<String, dynamic>?>(
+                    future: _userFuture,
+                    builder: (context, userSnapshot) {
+                      if (userSnapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox(
+                          height: 40,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
+                        );
+                      }
+                      final userData = userSnapshot.data;
+                      final name = userData?['name'] ?? 'Unknown Resident';
+                      final email = userData?['email'] ?? '';
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppConfig.primaryColor,
+                            ),
+                          ),
+                          Text(email, style: const TextStyle(color: Colors.grey)),
+                          if (period.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                const Icon(Icons.event, size: 16, color: Colors.grey),
+                                const SizedBox(width: 6),
+                                Text(
+                                  formattedPeriod,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppConfig.textColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (receiptUrl.isNotEmpty)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: StorageNetworkImage(
+                        imageUrl: receiptUrl,
+                        height: 150,
+                        fit: BoxFit.cover,
                       ),
-                    ],
-                  ],
-                );
-              },
+                    ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            if (receiptUrl.isNotEmpty)
-              InkWell(
-                onTap: () => widget.onShowPreview(receiptUrl),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: StorageNetworkImage(
-                    imageUrl: receiptUrl,
-                    height: 150,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
-            
-            if (isSelfUploaded)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: Text(
-                  l10n.selfApprovalBlockedError,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontStyle: FontStyle.italic),
-                ),
-              ),
-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextButton(
-                  onPressed: widget.isProcessing ? null : () => widget.onReject(widget.doc, residentUid),
-                  child: Text(
-                    l10n.rejectResidentButton,
-                    style: const TextStyle(color: Colors.redAccent),
+                if (isSelfUploaded)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      l10n.selfApprovalBlockedError,
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontStyle: FontStyle.italic),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: widget.isProcessing || isSelfUploaded
-                      ? null
-                      : () => widget.onApprove(widget.doc['id'] as String, residentUid),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConfig.secondaryColor,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: widget.isProcessing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text('Approve Payment'),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: widget.isProcessing ? null : () => widget.onReject(widget.doc, residentUid),
+                      child: Text(
+                        l10n.rejectResidentButton,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: widget.isProcessing || isSelfUploaded
+                          ? null
+                          : () => widget.onApprove(widget.doc['id'] as String, residentUid),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConfig.secondaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: widget.isProcessing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Text('Approve Payment'),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
