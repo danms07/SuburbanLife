@@ -1160,4 +1160,16 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get cardVehicleDetails => 'Detalles del Vehículo';
+
+  @override
+  String get passwordComplexityRequirements =>
+      'La contraseña debe tener al menos 8 caracteres y contener al menos 1 letra mayúscula, 1 minúscula y 1 número.';
+
+  @override
+  String get passwordComplexityHelper =>
+      'Mín. 8 caracteres (1 mayúscula, 1 minúscula, 1 número)';
+
+  @override
+  String get passwordComplexityError =>
+      'La contraseña no cumple con los requisitos de seguridad.';
 }

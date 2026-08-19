@@ -422,6 +422,9 @@
   "cardAuthorizedAddress": "Dirección Autorizada",
   "cardAccessCategory": "Categoría de Acceso",
   "cardValidity": "Vigencia",
-  "cardVehicleDetails": "Detalles del Vehículo"
+  "cardVehicleDetails": "Detalles del Vehículo",
+  "passwordComplexityRequirements": "La contraseña debe tener al menos 8 caracteres y contener al menos 1 letra mayúscula, 1 minúscula y 1 número.",
+  "passwordComplexityHelper": "Mín. 8 caracteres (1 mayúscula, 1 minúscula, 1 número)",
+  "passwordComplexityError": "La contraseña no cumple con los requisitos de seguridad."
 }
 

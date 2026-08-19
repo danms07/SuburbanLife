@@ -2251,6 +2251,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vehicle Details'**
   String get cardVehicleDetails;
+
+  /// No description provided for @passwordComplexityRequirements.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.'**
+  String get passwordComplexityRequirements;
+
+  /// No description provided for @passwordComplexityHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Min. 8 characters (1 uppercase, 1 lowercase, 1 number)'**
+  String get passwordComplexityHelper;
+
+  /// No description provided for @passwordComplexityError.
+  ///
+  /// In en, this message translates to:
+  /// **'The password does not meet the security requirements.'**
+  String get passwordComplexityError;
 }
 
 class _AppLocalizationsDelegate

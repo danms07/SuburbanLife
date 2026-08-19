@@ -46,9 +46,22 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
   }
 
   void _generateRandomPassword() {
-    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#%*';
-    final rand = Random();
-    final generated = 'Suburban#' + List.generate(6, (index) => chars[rand.nextInt(chars.length)]).join();
+    const uppers = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lowers = 'abcdefghijkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = r'!@#$%&*+';
+    final rand = Random.secure();
+    final required = [
+      uppers[rand.nextInt(uppers.length)],
+      lowers[rand.nextInt(lowers.length)],
+      digits[rand.nextInt(digits.length)],
+      symbols[rand.nextInt(symbols.length)],
+    ];
+    final allChars = uppers + lowers + digits + symbols;
+    final remaining = List.generate(8, (_) => allChars[rand.nextInt(allChars.length)]);
+    final combined = required + remaining;
+    combined.shuffle(rand);
+    final generated = combined.join();
     setState(() {
       _passwordController.text = generated;
       _obscurePassword = false;
@@ -331,8 +344,14 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
                           isDense: true,
                         ),
                         validator: (value) {
-                          if (value == null || value.trim().length < 6) {
-                            return l10n.passwordHint;
+                          if (value == null || value.trim().length < 8) {
+                            return l10n.passwordComplexityRequirements;
+                          }
+                          final pass = value.trim();
+                          if (!pass.contains(RegExp(r'[A-Z]')) ||
+                              !pass.contains(RegExp(r'[a-z]')) ||
+                              !pass.contains(RegExp(r'[0-9]'))) {
+                            return l10n.passwordComplexityRequirements;
                           }
                           return null;
                         },

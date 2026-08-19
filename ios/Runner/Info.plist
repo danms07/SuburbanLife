@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Suburban Life requires camera access to scan QR access passes, photograph visitor IDs, and upload maintenance payment receipts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Suburban Life requires photo library access to upload payment vouchers, ownership documents, and announcement media.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Suburban Life requires permission to save QR codes to your photo library.</string>
 </dict>
 </plist>

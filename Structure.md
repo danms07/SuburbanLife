@@ -54,7 +54,7 @@ Current state of project files and folders:
             - `announcements_screen.dart`: Visual responsive feed (side-by-side card on desktop, linear stack on mobile) and administrative announcement publishing dialog with gallery picker, clipboard image pasting, live thumbnail preview, interactive pinch-to-zoom viewer, and quick-access emojis.
         - `auth/`: Login and role detection logic.
             - `login_screen.dart`: Main login interface with navigation.
-            - `signup_screen.dart`: Resident onboarding and address selection list.
+            - `signup_screen.dart`: Resident onboarding with password complexity enforcement (min 8 chars, uppercase, lowercase, digit) and address selection list.
             - `ownership_proof_screen.dart`: Mandatory proof of ownership capture with property handover date picker, and upload interface.
             - `admin_resident_approval_screen.dart`: Dedicated admin list view for validating property ownership proofs and propagating delivery date to address upon approval. Keyed stateful cards prevent redundant downloads/fetches.
             - `forgot_password_screen.dart`: Password recovery request interface.
@@ -69,7 +69,7 @@ Current state of project files and folders:
         - `qr_access/`: Access generation and scanning modules.
             - `qr_generator_screen.dart`: Generator interface.
             - `manage_qr_screen.dart`: History and management of QR codes.
-            - `qr_scanner_screen.dart`: Security guard QR capture, ID/plate photo verification, and entry logging interface.
+            - `qr_scanner_screen.dart`: Security guard QR capture, ID/plate photo verification, and server-side atomic validation/access logging via `validateAndRegisterQrAccess`.
             - `qr_service.dart`: Service for QR operations.
         - `transparency/`: Transparency documents module.
     - `l10n/`: Localization definitions in Spanish and English.

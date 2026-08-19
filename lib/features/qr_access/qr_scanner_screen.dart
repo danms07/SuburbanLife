@@ -70,34 +70,41 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   void _validateQr(String qrId) async {
     final l10n = AppLocalizations.of(context)!;
     try {
-      final data = await DatabaseService().getDocument('qr_codes', qrId);
+      final res = await FunctionsService().callFunction('validateAndRegisterQrAccess', {
+        'qrId': qrId,
+        'mode': 'validate_only',
+      });
 
-      if (data == null) {
+      final isGranted = res?['granted'] == true;
+      final qrData = res?['qrData'] as Map<String, dynamic>?;
+      final serverReason = res?['reason']?.toString();
+
+      if (!isGranted || qrData == null) {
         setState(() {
-          _statusMessage = l10n.invalidQrNotFound;
+          _statusMessage = serverReason ?? l10n.invalidQrNotFound;
           _isValidQr = false;
+          if (qrData != null) {
+            _currentQrCode = QrCode(
+              id: qrData['id'] ?? qrId,
+              creatorUid: qrData['creatorUid'] ?? '',
+              guestName: qrData['visitorName'] ?? qrData['guestName'] ?? 'Guest',
+              vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
+              type: QrType.temporary,
+              isValid: false,
+            );
+          }
         });
         return;
       }
-      final qrCode = QrCode.fromMap(qrId, data);
 
-      if (!qrCode.isValid) {
-        setState(() {
-          _statusMessage = l10n.qrInvalidated;
-          _isValidQr = false;
-        });
-        return;
-      }
-
-      if (qrCode.type == QrType.temporary && qrCode.expiryTime != null) {
-        if (DateTime.now().isAfter(qrCode.expiryTime!)) {
-          setState(() {
-            _statusMessage = l10n.qrExpired;
-            _isValidQr = false;
-          });
-          return;
-        }
-      }
+      final qrCode = QrCode(
+        id: qrData['id'] ?? qrId,
+        creatorUid: qrData['creatorUid'] ?? '',
+        guestName: qrData['visitorName'] ?? qrData['guestName'] ?? 'Guest',
+        vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
+        type: QrType.temporary,
+        isValid: true,
+      );
 
       setState(() {
         _statusMessage = l10n.accessGrantedHeader;
@@ -105,6 +112,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         _currentQrCode = qrCode;
       });
     } catch (e) {
+      debugPrint('QR validation error: $e');
       setState(() {
         _statusMessage = l10n.invalidQrNotFound;
         _isValidQr = false;
@@ -141,7 +149,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
-    final currentUser = AuthService().currentUser;
     String visitorIdPhotoUrl = '';
     String visitorPlatePhotoUrl = '';
 
@@ -160,16 +167,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         visitorPlatePhotoUrl = await StorageService().uploadFile(path, fileData);
       }
 
-      // Populate access log following schema precisely
-      await DatabaseService().addDocument('access_logs', {
-        'qrCodeId': _currentQrCode!.id,
-        'guardUid': currentUser?.uid ?? 'unknown',
-        'creatorUid': _currentQrCode!.creatorUid,
-        'timestamp': DbFieldValue.serverTimestamp(),
+      // Call server-side atomic validation and logging Cloud Function
+      await FunctionsService().callFunction('validateAndRegisterQrAccess', {
+        'qrId': _currentQrCode!.id,
+        'isAllowed': isAllowed,
         'visitorIdPhotoUrl': visitorIdPhotoUrl,
         'visitorPlatePhotoUrl': visitorPlatePhotoUrl,
-        'status': isAllowed ? 'allowed' : 'denied',
         'reason': _reasonController.text.trim(),
+        'mode': 'validate_and_register',
       });
 
       messenger.showSnackBar(

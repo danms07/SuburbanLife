@@ -48,6 +48,14 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
+  bool _isPasswordValid(String password) {
+    if (password.length < 8) return false;
+    if (!password.contains(RegExp(r'[A-Z]'))) return false;
+    if (!password.contains(RegExp(r'[a-z]'))) return false;
+    if (!password.contains(RegExp(r'[0-9]'))) return false;
+    return true;
+  }
+
   void _createAccount() async {
     final l10n = AppLocalizations.of(context)!;
     final name = _nameController.text.trim();
@@ -55,6 +63,16 @@ class _SignupScreenState extends State<SignupScreen> {
     final password = _passwordController.text.trim();
 
     if (name.isEmpty || email.isEmpty || password.isEmpty) return;
+
+    if (!_isPasswordValid(password)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.passwordComplexityRequirements),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -236,6 +254,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   controller: _passwordController,
                   decoration: InputDecoration(
                     labelText: l10n.password,
+                    helperText: l10n.passwordComplexityHelper,
+                    helperMaxLines: 2,
                     prefixIcon: const Icon(Icons.lock, color: AppConfig.primaryColor),
                     suffixIcon: IconButton(
                       icon: Icon(
