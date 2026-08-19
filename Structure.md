@@ -48,6 +48,7 @@ Current state of project files and folders:
             - `admin_facilities_screen.dart`: Interface to configure dynamic unique vs multi-item amenities.
             - `admin_settings_screen.dart`: Global residency maintenance cutoff and grace period adjustments, plus complete SMTP email service configuration with customizable welcome email templates, placeholder chips (%password%, %email%, %name%, etc.), and handshake connection test.
             - `admin_payment_report_screen.dart`: CSV payment matrix exporter per physical address.
+            - `admin_access_logs_screen.dart`: Comprehensive access history & audit screen with multi-criteria filtering (address, date range, visitor type: guest vs supplier), keyword search, real-time KPI overview cards, and pinch-to-zoom visitor photo dialog inspection.
             - `admin_guard_management_screen.dart`: Dedicated lifecycle module to provision and purge security guard accounts.
         - `announcements/`: Announcements system with AI auto-translations, orientation-aware thumbnail generation, responsive desktop/mobile layouts, clipboard image pasting, full-screen interactive image viewing, and quick emoji bar.
             - `announcement.dart`: Announcement data model with full-res image URL (`imageUrl`), proportional thumbnail URL (`thumbnailUrl`), audience targeting, and translations.
@@ -79,7 +80,22 @@ Current state of project files and folders:
     - `set_role.js`: Claims and role assignment utility supporting both Firebase Emulator (`--emulator`) and production modes with auto user provisioning.
     - `populate_addresses.js`: Batched write logic for address import on csv files.
 - `test/`: Project unit and widget test suites.
-    - `import_boundary_test.dart`: Static boundary verification test enforcing zero direct Firebase SDK imports inside `lib/features/`.
+    - `core/backend/backend_models_test.dart`: Model tests for AppUser, AuthResult, DbFieldValue, StringDbReference, QueryFilter, and QuerySort.
+    - `features/`:
+        - `admin/`:
+            - `bulk_address_csv_parser_test.dart`: CSV delimiter auto-detection, UTF-8 BOM removal, and address range count calculation tests.
+            - `bulk_user_csv_parser_test.dart`: Header alias mapping, quoted field parsing, and result CSV compilation tests.
+            - `payment_report_matrix_test.dart`: Month boundary generation and financial status matrix tests.
+        - `announcements/announcement_model_test.dart`: Announcement serialization and timestamp parsing tests.
+        - `auth/password_validation_test.dart`: Password complexity constraint validation tests.
+        - `booking/booking_service_test.dart`: Booking filters, user booking sorting, and cloud function invocation tests.
+        - `payments/payment_service_test.dart`: Period generation, payment status state machine, and status stream tests.
+        - `qr_access/`:
+            - `qr_code_model_test.dart`: QrCode model serialization and default parsing tests.
+            - `qr_service_test.dart`: QR stream sorting and code invalidation tests.
+    - `helpers/fake_backend.dart`: In-memory BaaS fake service locator for testing services in isolation.
+    - `import_boundary_test.dart`: Static boundary verification test enforcing zero direct Firebase SDK imports in `lib/features/` and zero raw `print()` calls in `lib/`.
+    - `widget_test.dart`: Smoke test placeholder.
 - `web/`: Web entry point and assets including `index.html`, `manifest.json`, and base `version.json`.
 - `resident_import_template.csv`: Sample CSV template for administrator bulk user account import.
 - `Structure.md`: This inventory map file.

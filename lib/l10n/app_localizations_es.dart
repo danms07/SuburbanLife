@@ -1333,4 +1333,97 @@ class AppLocalizationsEs extends AppLocalizations {
   String addressExclusionsLabel(String exclusions) {
     return 'Exclusiones: $exclusions';
   }
+
+  @override
+  String get accessLogsMenu => 'Historial de Accesos';
+
+  @override
+  String get accessLogsTitle => 'Registro de Accesos';
+
+  @override
+  String get filterByAddress => 'Filtrar por Dirección';
+
+  @override
+  String get allAddresses => 'Todas las Direcciones';
+
+  @override
+  String get filterByDate => 'Filtrar por Fecha';
+
+  @override
+  String get allDates => 'Todas las Fechas';
+
+  @override
+  String get today => 'Hoy';
+
+  @override
+  String get thisWeek => 'Esta Semana';
+
+  @override
+  String get thisMonth => 'Este Mes';
+
+  @override
+  String get customDateRange => 'Rango Personalizado';
+
+  @override
+  String get filterByType => 'Tipo de Visitante';
+
+  @override
+  String get allTypes => 'Todos los Tipos';
+
+  @override
+  String get visitorTypeGuest => 'Invitado';
+
+  @override
+  String get visitorTypeSupplier => 'Proveedor';
+
+  @override
+  String get searchVisitorOrPlate => 'Buscar visitante, placas o motivo...';
+
+  @override
+  String get totalAccesses => 'Total de Accesos';
+
+  @override
+  String get allowedAccesses => 'Permitidos';
+
+  @override
+  String get deniedAccesses => 'Denegados';
+
+  @override
+  String get providerAccesses => 'Proveedores';
+
+  @override
+  String get noAccessLogsFound =>
+      'No se encontraron registros de acceso con los filtros seleccionados.';
+
+  @override
+  String get verifiedByGuard => 'Guardia';
+
+  @override
+  String get invitedByResident => 'Residente';
+
+  @override
+  String get destinationAddress => 'Destino';
+
+  @override
+  String get vehicleDetails => 'Vehículo';
+
+  @override
+  String get viewVisitorIdPhoto => 'Foto de Identificación';
+
+  @override
+  String get viewPlatePhoto => 'Foto de Placas';
+
+  @override
+  String get reasonOrNotes => 'Notas / Motivo';
+
+  @override
+  String get accessAllowed => 'Permitido';
+
+  @override
+  String get accessDenied => 'Denegado';
+
+  @override
+  String logPassengersCount(int count) {
+    return 'Pasajeros: $count';
+  }
 }

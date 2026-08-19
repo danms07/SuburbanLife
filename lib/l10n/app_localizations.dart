@@ -2515,6 +2515,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Exclusions: {exclusions}'**
   String addressExclusionsLabel(String exclusions);
+
+  /// No description provided for @accessLogsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Access History & Logs'**
+  String get accessLogsMenu;
+
+  /// No description provided for @accessLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Access Logs'**
+  String get accessLogsTitle;
+
+  /// No description provided for @filterByAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Address'**
+  String get filterByAddress;
+
+  /// No description provided for @allAddresses.
+  ///
+  /// In en, this message translates to:
+  /// **'All Addresses'**
+  String get allAddresses;
+
+  /// No description provided for @filterByDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date Filter'**
+  String get filterByDate;
+
+  /// No description provided for @allDates.
+  ///
+  /// In en, this message translates to:
+  /// **'All Dates'**
+  String get allDates;
+
+  /// No description provided for @today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get today;
+
+  /// No description provided for @thisWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'This Week'**
+  String get thisWeek;
+
+  /// No description provided for @thisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'This Month'**
+  String get thisMonth;
+
+  /// No description provided for @customDateRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Date Range'**
+  String get customDateRange;
+
+  /// No description provided for @filterByType.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor Type'**
+  String get filterByType;
+
+  /// No description provided for @allTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'All Types'**
+  String get allTypes;
+
+  /// No description provided for @visitorTypeGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest'**
+  String get visitorTypeGuest;
+
+  /// No description provided for @visitorTypeSupplier.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get visitorTypeSupplier;
+
+  /// No description provided for @searchVisitorOrPlate.
+  ///
+  /// In en, this message translates to:
+  /// **'Search visitor name, plate or reason...'**
+  String get searchVisitorOrPlate;
+
+  /// No description provided for @totalAccesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Events'**
+  String get totalAccesses;
+
+  /// No description provided for @allowedAccesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed'**
+  String get allowedAccesses;
+
+  /// No description provided for @deniedAccesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get deniedAccesses;
+
+  /// No description provided for @providerAccesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers'**
+  String get providerAccesses;
+
+  /// No description provided for @noAccessLogsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No access logs match the selected filters.'**
+  String get noAccessLogsFound;
+
+  /// No description provided for @verifiedByGuard.
+  ///
+  /// In en, this message translates to:
+  /// **'Guard'**
+  String get verifiedByGuard;
+
+  /// No description provided for @invitedByResident.
+  ///
+  /// In en, this message translates to:
+  /// **'Resident'**
+  String get invitedByResident;
+
+  /// No description provided for @destinationAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Destination'**
+  String get destinationAddress;
+
+  /// No description provided for @vehicleDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle'**
+  String get vehicleDetails;
+
+  /// No description provided for @viewVisitorIdPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor ID Photo'**
+  String get viewVisitorIdPhoto;
+
+  /// No description provided for @viewPlatePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Vehicle Plate Photo'**
+  String get viewPlatePhoto;
+
+  /// No description provided for @reasonOrNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes / Reason'**
+  String get reasonOrNotes;
+
+  /// No description provided for @accessAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed'**
+  String get accessAllowed;
+
+  /// No description provided for @accessDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get accessDenied;
+
+  /// No description provided for @logPassengersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Passengers: {count}'**
+  String logPassengersCount(int count);
 }
 
 class _AppLocalizationsDelegate

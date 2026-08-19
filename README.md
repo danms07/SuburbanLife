@@ -161,6 +161,19 @@ Run the application on your target device:
 flutter run
 ```
 
+### Running Unit Tests
+
+To run the complete suite of Flutter unit and architectural tests:
+```bash
+flutter test
+```
+
+To run Cloud Functions unit tests:
+```bash
+cd functions
+npm test
+```
+
 ### Adding Translations (l18n)
 All user-facing UI copy must have Spanish translations.
 1. Add new keys and English text to [app_en.arb](lib/l10n/app_en.arb).

@@ -579,6 +579,43 @@
         "type": "String"
       }
     }
+  },
+  "accessLogsMenu": "Access History & Logs",
+  "accessLogsTitle": "Access Logs",
+  "filterByAddress": "Filter by Address",
+  "allAddresses": "All Addresses",
+  "filterByDate": "Date Filter",
+  "allDates": "All Dates",
+  "today": "Today",
+  "thisWeek": "This Week",
+  "thisMonth": "This Month",
+  "customDateRange": "Custom Date Range",
+  "filterByType": "Visitor Type",
+  "allTypes": "All Types",
+  "visitorTypeGuest": "Guest",
+  "visitorTypeSupplier": "Provider",
+  "searchVisitorOrPlate": "Search visitor name, plate or reason...",
+  "totalAccesses": "Total Events",
+  "allowedAccesses": "Allowed",
+  "deniedAccesses": "Denied",
+  "providerAccesses": "Providers",
+  "noAccessLogsFound": "No access logs match the selected filters.",
+  "verifiedByGuard": "Guard",
+  "invitedByResident": "Resident",
+  "destinationAddress": "Destination",
+  "vehicleDetails": "Vehicle",
+  "viewVisitorIdPhoto": "Visitor ID Photo",
+  "viewPlatePhoto": "Vehicle Plate Photo",
+  "reasonOrNotes": "Notes / Reason",
+  "accessAllowed": "Allowed",
+  "accessDenied": "Denied",
+  "logPassengersCount": "Passengers: {count}",
+  "@logPassengersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }
 

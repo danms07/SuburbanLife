@@ -1550,6 +1550,10 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
   const qrRef = db.collection('qr_codes').doc(qrId);
 
   return await db.runTransaction(async (transaction) => {
+    // 0. Fetch guard record for audit attribution
+    const guardSnap = await transaction.get(db.collection('users').doc(guardUid));
+    const guardName = (guardSnap.exists && guardSnap.data()?.name) ? guardSnap.data().name : 'Security Guard';
+
     const qrSnap = await transaction.get(qrRef);
     if (!qrSnap.exists) {
       return {
@@ -1563,6 +1567,45 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
     const qrData = qrSnap.data();
     const now = admin.firestore.Timestamp.now();
 
+    // Resolve Resident and Address data
+    let residentName = '';
+    let addressDisplay = '';
+    let streetName = '';
+    let houseNumber = '';
+    let addressRef = null;
+    let isPaymentRestricted = false;
+
+    if (qrData.creatorUid) {
+      const userRef = db.collection('users').doc(qrData.creatorUid);
+      const userSnap = await transaction.get(userRef);
+      if (userSnap.exists) {
+        const userData = userSnap.data();
+        residentName = userData.name || '';
+        if (userData.addressRef) {
+          addressRef = userData.addressRef;
+          const addrRef = typeof userData.addressRef === 'string'
+            ? db.doc(userData.addressRef)
+            : userData.addressRef;
+          const addrSnap = await transaction.get(addrRef);
+          if (addrSnap.exists) {
+            const addrData = addrSnap.data();
+            streetName = addrData.streetName || '';
+            houseNumber = addrData.number != null ? addrData.number.toString() : '';
+            addressDisplay = `${streetName} #${houseNumber}`.trim();
+            if (addrData.paymentStatus && addrData.paymentStatus !== 'paid') {
+              isPaymentRestricted = true;
+            }
+          }
+        }
+      }
+    }
+
+    const guestName = qrData.guestName || qrData.visitorName || 'Guest';
+    const accessCategory = qrData.accessCategory || (qrData.type === 'one_time' || qrData.isOneTime ? 'supplier' : 'visitor');
+    const vehicleType = qrData.vehicleType || 'walking';
+    const vehiclePlates = qrData.vehiclePlates || qrData.vehiclePlate || '';
+    const passengers = qrData.passengers || 0;
+
     // 1. Check validity status
     const isValidFlag = qrData.isValid !== false && qrData.status !== 'used' && qrData.status !== 'revoked';
     if (!isValidFlag) {
@@ -1575,7 +1618,18 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
         transaction.set(logRef, {
           qrCodeId: qrId,
           guardUid: guardUid,
+          guardName: guardName,
           creatorUid: qrData.creatorUid || 'unknown',
+          residentName: residentName,
+          guestName: guestName,
+          accessCategory: accessCategory,
+          vehicleType: vehicleType,
+          vehiclePlates: vehiclePlates,
+          passengers: passengers,
+          streetName: streetName,
+          number: houseNumber,
+          addressDisplay: addressDisplay,
+          addressRef: addressRef,
           timestamp: FieldValue.serverTimestamp(),
           visitorIdPhotoUrl: visitorIdPhotoUrl || '',
           visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
@@ -1590,10 +1644,15 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
         reason: statusReason,
         qrData: {
           id: qrId,
-          visitorName: qrData.visitorName || '',
-          vehiclePlate: qrData.vehiclePlate || '',
+          visitorName: guestName,
+          guestName: guestName,
+          vehiclePlate: vehiclePlates,
+          vehiclePlates: vehiclePlates,
           type: qrData.type || 'temporary',
+          accessCategory: accessCategory,
           creatorUid: qrData.creatorUid || '',
+          residentName: residentName,
+          addressDisplay: addressDisplay,
         },
       };
     }
@@ -1611,7 +1670,18 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
           transaction.set(logRef, {
             qrCodeId: qrId,
             guardUid: guardUid,
+            guardName: guardName,
             creatorUid: qrData.creatorUid || 'unknown',
+            residentName: residentName,
+            guestName: guestName,
+            accessCategory: accessCategory,
+            vehicleType: vehicleType,
+            vehiclePlates: vehiclePlates,
+            passengers: passengers,
+            streetName: streetName,
+            number: houseNumber,
+            addressDisplay: addressDisplay,
+            addressRef: addressRef,
             timestamp: FieldValue.serverTimestamp(),
             visitorIdPhotoUrl: visitorIdPhotoUrl || '',
             visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
@@ -1626,59 +1696,64 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
           reason: 'QR Code has expired.',
           qrData: {
             id: qrId,
-            visitorName: qrData.visitorName || '',
-            vehiclePlate: qrData.vehiclePlate || '',
+            visitorName: guestName,
+            guestName: guestName,
+            vehiclePlate: vehiclePlates,
+            vehiclePlates: vehiclePlates,
             type: qrData.type || 'temporary',
+            accessCategory: accessCategory,
             creatorUid: qrData.creatorUid || '',
+            residentName: residentName,
+            addressDisplay: addressDisplay,
           },
         };
       }
     }
 
     // 3. Verify creator resident address payment standing
-    if (qrData.creatorUid) {
-      const userRef = db.collection('users').doc(qrData.creatorUid);
-      const userSnap = await transaction.get(userRef);
-      if (userSnap.exists) {
-        const userData = userSnap.data();
-        if (userData.addressRef) {
-          const addrRef = typeof userData.addressRef === 'string'
-            ? db.doc(userData.addressRef)
-            : userData.addressRef;
-          const addrSnap = await transaction.get(addrRef);
-          if (addrSnap.exists) {
-            const addrData = addrSnap.data();
-            if (addrData.paymentStatus && addrData.paymentStatus !== 'paid') {
-              if (mode === 'validate_and_register') {
-                const logRef = db.collection('access_logs').doc();
-                transaction.set(logRef, {
-                  qrCodeId: qrId,
-                  guardUid: guardUid,
-                  creatorUid: qrData.creatorUid,
-                  timestamp: FieldValue.serverTimestamp(),
-                  visitorIdPhotoUrl: visitorIdPhotoUrl || '',
-                  visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
-                  status: 'denied',
-                  reason: 'Resident address payment status is restricted or unpaid.',
-                });
-              }
-
-              return {
-                success: true,
-                granted: false,
-                reason: 'Resident address payment status is restricted or unpaid.',
-                qrData: {
-                  id: qrId,
-                  visitorName: qrData.visitorName || '',
-                  vehiclePlate: qrData.vehiclePlate || '',
-                  type: qrData.type || 'temporary',
-                  creatorUid: qrData.creatorUid || '',
-                },
-              };
-            }
-          }
-        }
+    if (isPaymentRestricted) {
+      if (mode === 'validate_and_register') {
+        const logRef = db.collection('access_logs').doc();
+        transaction.set(logRef, {
+          qrCodeId: qrId,
+          guardUid: guardUid,
+          guardName: guardName,
+          creatorUid: qrData.creatorUid,
+          residentName: residentName,
+          guestName: guestName,
+          accessCategory: accessCategory,
+          vehicleType: vehicleType,
+          vehiclePlates: vehiclePlates,
+          passengers: passengers,
+          streetName: streetName,
+          number: houseNumber,
+          addressDisplay: addressDisplay,
+          addressRef: addressRef,
+          timestamp: FieldValue.serverTimestamp(),
+          visitorIdPhotoUrl: visitorIdPhotoUrl || '',
+          visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
+          status: 'denied',
+          reason: 'Resident address payment status is restricted or unpaid.',
+        });
       }
+
+      return {
+        success: true,
+        granted: false,
+        reason: 'Resident address payment status is restricted or unpaid.',
+        qrData: {
+          id: qrId,
+          visitorName: guestName,
+          guestName: guestName,
+          vehiclePlate: vehiclePlates,
+          vehiclePlates: vehiclePlates,
+          type: qrData.type || 'temporary',
+          accessCategory: accessCategory,
+          creatorUid: qrData.creatorUid || '',
+          residentName: residentName,
+          addressDisplay: addressDisplay,
+        },
+      };
     }
 
     // 4. If mode is validate_only, return validity preview without registering
@@ -1689,10 +1764,15 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
         reason: 'Access granted.',
         qrData: {
           id: qrId,
-          visitorName: qrData.visitorName || '',
-          vehiclePlate: qrData.vehiclePlate || '',
+          visitorName: guestName,
+          guestName: guestName,
+          vehiclePlate: vehiclePlates,
+          vehiclePlates: vehiclePlates,
           type: qrData.type || 'temporary',
+          accessCategory: accessCategory,
           creatorUid: qrData.creatorUid || '',
+          residentName: residentName,
+          addressDisplay: addressDisplay,
           isOneTime: qrData.isOneTime === true || qrData.type === 'one_time',
         },
       };
@@ -1713,7 +1793,18 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
     transaction.set(logRef, {
       qrCodeId: qrId,
       guardUid: guardUid,
+      guardName: guardName,
       creatorUid: qrData.creatorUid || 'unknown',
+      residentName: residentName,
+      guestName: guestName,
+      accessCategory: accessCategory,
+      vehicleType: vehicleType,
+      vehiclePlates: vehiclePlates,
+      passengers: passengers,
+      streetName: streetName,
+      number: houseNumber,
+      addressDisplay: addressDisplay,
+      addressRef: addressRef,
       timestamp: FieldValue.serverTimestamp(),
       visitorIdPhotoUrl: visitorIdPhotoUrl || '',
       visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
@@ -1727,14 +1818,22 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
       reason: isAllowed ? 'Access granted.' : (reason || 'Denied by guard'),
       qrData: {
         id: qrId,
-        visitorName: qrData.visitorName || '',
-        vehiclePlate: qrData.vehiclePlate || '',
+        visitorName: guestName,
+        guestName: guestName,
+        vehiclePlate: vehiclePlates,
+        vehiclePlates: vehiclePlates,
         type: qrData.type || 'temporary',
+        accessCategory: accessCategory,
         creatorUid: qrData.creatorUid || '',
+        residentName: residentName,
+        addressDisplay: addressDisplay,
       },
     };
   });
 });
 
-
-
+// Export internal helper functions for unit testing
+exports._test = {
+  generateSecurePassword,
+  replacePlaceholders,
+};

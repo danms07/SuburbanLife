@@ -30,6 +30,7 @@ import 'package:suburban_life/features/admin/admin_payment_report_screen.dart';
 import 'package:suburban_life/features/admin/admin_guard_management_screen.dart';
 import 'package:suburban_life/features/admin/admin_bulk_user_import_screen.dart';
 import 'package:suburban_life/features/admin/admin_bulk_address_import_screen.dart';
+import 'package:suburban_life/features/admin/admin_access_logs_screen.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'l10n/app_localizations.dart';
 import 'package:suburban_life/core/backend/backend.dart';
@@ -1404,6 +1405,19 @@ class _MyHomePageState extends State<MyHomePage> {
               context,
               MaterialPageRoute(
                 builder: (context) => const AdminPaymentReportScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _buildAdminMenuButton(
+            label: l10n.accessLogsMenu,
+            icon: Icons.history,
+            color: Colors.blueGrey[800]!,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminAccessLogsScreen(),
               ),
             ),
           ),

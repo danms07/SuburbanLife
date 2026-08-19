@@ -1312,4 +1312,96 @@ class AppLocalizationsEn extends AppLocalizations {
   String addressExclusionsLabel(String exclusions) {
     return 'Exclusions: $exclusions';
   }
+
+  @override
+  String get accessLogsMenu => 'Access History & Logs';
+
+  @override
+  String get accessLogsTitle => 'Access Logs';
+
+  @override
+  String get filterByAddress => 'Filter by Address';
+
+  @override
+  String get allAddresses => 'All Addresses';
+
+  @override
+  String get filterByDate => 'Date Filter';
+
+  @override
+  String get allDates => 'All Dates';
+
+  @override
+  String get today => 'Today';
+
+  @override
+  String get thisWeek => 'This Week';
+
+  @override
+  String get thisMonth => 'This Month';
+
+  @override
+  String get customDateRange => 'Custom Date Range';
+
+  @override
+  String get filterByType => 'Visitor Type';
+
+  @override
+  String get allTypes => 'All Types';
+
+  @override
+  String get visitorTypeGuest => 'Guest';
+
+  @override
+  String get visitorTypeSupplier => 'Provider';
+
+  @override
+  String get searchVisitorOrPlate => 'Search visitor name, plate or reason...';
+
+  @override
+  String get totalAccesses => 'Total Events';
+
+  @override
+  String get allowedAccesses => 'Allowed';
+
+  @override
+  String get deniedAccesses => 'Denied';
+
+  @override
+  String get providerAccesses => 'Providers';
+
+  @override
+  String get noAccessLogsFound => 'No access logs match the selected filters.';
+
+  @override
+  String get verifiedByGuard => 'Guard';
+
+  @override
+  String get invitedByResident => 'Resident';
+
+  @override
+  String get destinationAddress => 'Destination';
+
+  @override
+  String get vehicleDetails => 'Vehicle';
+
+  @override
+  String get viewVisitorIdPhoto => 'Visitor ID Photo';
+
+  @override
+  String get viewPlatePhoto => 'Vehicle Plate Photo';
+
+  @override
+  String get reasonOrNotes => 'Notes / Reason';
+
+  @override
+  String get accessAllowed => 'Allowed';
+
+  @override
+  String get accessDenied => 'Denied';
+
+  @override
+  String logPassengersCount(int count) {
+    return 'Passengers: $count';
+  }
 }

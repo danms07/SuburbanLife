@@ -31,6 +31,7 @@ The following table maps each visual component to its feature domain and source 
 | **Admin Settings & SMTP Configurator** | Admin Settings | [admin_settings_screen.dart](lib/features/admin/admin_settings_screen.dart) |
 | **Unified User Creation Manager** | Admin Management | [admin_create_user_screen.dart](lib/features/admin/admin_create_user_screen.dart) |
 | **Rich Media & Emoji Announcements Feed** | Announcements | [announcements_screen.dart](lib/features/announcements/announcements_screen.dart) |
+| **Admin Access Logs & History Viewer** | Admin Reports | [admin_access_logs_screen.dart](lib/features/admin/admin_access_logs_screen.dart) |
 
 ---
 
