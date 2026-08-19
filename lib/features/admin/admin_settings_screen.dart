@@ -279,7 +279,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       debugPrint('Error saving settings: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
         );
       }
     } finally {

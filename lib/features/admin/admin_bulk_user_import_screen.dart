@@ -130,9 +130,10 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     } catch (e) {
       debugPrint('Error picking or parsing CSV file: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error reading file: $e'),
+            content: Text(l10n.errorReadingFile(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -279,9 +280,10 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     } catch (e) {
       debugPrint('Error processing bulk user import: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Import error: $e'),
+            content: Text(l10n.importError(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -356,8 +358,9 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     } catch (e) {
       debugPrint('Error saving result CSV: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving file: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(l10n.errorSavingFile(e.toString())), backgroundColor: Colors.redAccent),
         );
       }
     }
@@ -564,11 +567,11 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Email: ${user['email']}'),
+                          Text(l10n.userSummaryEmail(user['email']!)),
                           Text(
                             hasPass
-                                ? 'Password: ${user['password']}'
-                                : 'Password: Deterministic Temp Pass (Suburban#${user['email']!.split('@')[0]}2026)',
+                                ? '${l10n.passwordLabel}: ${user['password']}'
+                                : '${l10n.passwordLabel}: ${l10n.generatePasswordButton}',
                             style: TextStyle(
                               fontSize: 12,
                               color: hasPass ? Colors.blue : Colors.deepOrange,
@@ -576,7 +579,7 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                           ),
                           if (hasAddr)
                             Text(
-                              'Address: ${user['streetName']} #${user['number']}',
+                              '${l10n.selectAddressLabel}: ${user['streetName']} #${user['number']}',
                               style: const TextStyle(fontSize: 12, color: Colors.green),
                             ),
                         ],
@@ -682,12 +685,12 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Email: ${item['email']}'),
-                                  Text('Status: ${isSuccess ? "ok" : "error"}', style: TextStyle(fontWeight: FontWeight.bold, color: isSuccess ? Colors.green : Colors.red)),
+                                  Text(l10n.userSummaryEmail(item['email']?.toString() ?? '')),
+                                  Text(l10n.userSummaryStatus(isSuccess ? 'ok' : 'error'), style: TextStyle(fontWeight: FontWeight.bold, color: isSuccess ? Colors.green : Colors.red)),
                                   if (isSuccess) ...[
-                                    Text('Assigned Password: ${item['assignedPassword']}'),
+                                    Text(l10n.userSummaryAssignedPassword(item['assignedPassword']?.toString() ?? '')),
                                     if (item['addressLinked'] != null)
-                                      Text('Linked Address: ${item['addressLinked']}', style: const TextStyle(color: Colors.green)),
+                                      Text(l10n.userSummaryLinkedAddress(item['addressLinked']?.toString() ?? ''), style: const TextStyle(color: Colors.green)),
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
@@ -712,7 +715,7 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                                       ],
                                     ),
                                   ] else
-                                    Text('Error: ${item['error']}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                    Text(l10n.errorPrefix(item['error']?.toString() ?? ''), style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),

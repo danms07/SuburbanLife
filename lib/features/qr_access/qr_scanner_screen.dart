@@ -87,7 +87,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             _currentQrCode = QrCode(
               id: qrData['id'] ?? qrId,
               creatorUid: qrData['creatorUid'] ?? '',
-              guestName: qrData['visitorName'] ?? qrData['guestName'] ?? 'Guest',
+              guestName: qrData['visitorName'] ?? qrData['guestName'] ?? l10n.guestFallback,
               vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
               type: QrType.temporary,
               isValid: false,
@@ -100,7 +100,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       final qrCode = QrCode(
         id: qrData['id'] ?? qrId,
         creatorUid: qrData['creatorUid'] ?? '',
-        guestName: qrData['visitorName'] ?? qrData['guestName'] ?? 'Guest',
+        guestName: qrData['visitorName'] ?? qrData['guestName'] ?? l10n.guestFallback,
         vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
         type: QrType.temporary,
         isValid: true,
@@ -195,7 +195,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       _controller.start();
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
       );
       setState(() {
         _isProcessing = false;

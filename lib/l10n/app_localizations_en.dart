@@ -1154,4 +1154,162 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get passwordComplexityError =>
       'The password does not meet the security requirements.';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String errorPrefix(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get userNotLoggedIn => 'User not logged in';
+
+  @override
+  String get guestFallback => 'Guest';
+
+  @override
+  String get switchToResidentViewTooltip => 'Switch to Resident View';
+
+  @override
+  String get switchToAdminViewTooltip => 'Switch to Admin View';
+
+  @override
+  String get notificationHistoryTitle => 'Notification History';
+
+  @override
+  String get notificationHistoryPlaceholder =>
+      'History will be displayed here (FCM).';
+
+  @override
+  String qrItemCreated(String date) {
+    return 'Created: $date';
+  }
+
+  @override
+  String qrItemPlates(String plates) {
+    return 'Plates: $plates';
+  }
+
+  @override
+  String get qrInvalidatedSuccess => 'QR Code invalidated.';
+
+  @override
+  String get enterGuestNamePrompt => 'Please enter the guest name';
+
+  @override
+  String get qrGenerationFailed => 'Failed to generate QR code';
+
+  @override
+  String qrSharingError(String error) {
+    return 'Error sharing/downloading: $error';
+  }
+
+  @override
+  String get bookingCreatedSuccess => 'Booking successfully created!';
+
+  @override
+  String bookingStatusLabel(String status) {
+    return 'Status: $status';
+  }
+
+  @override
+  String get bookingCancelledSuccess => 'Booking cancelled.';
+
+  @override
+  String get editRejectedBookingTitle => 'Edit Rejected Booking';
+
+  @override
+  String get bookingResubmittedSuccess => 'Booking resubmitted for review.';
+
+  @override
+  String get resubmitButton => 'Resubmit';
+
+  @override
+  String get addressDetailsNotFound => 'Address details not found.';
+
+  @override
+  String get passwordMinLengthValidation =>
+      'Password must be at least 6 characters.';
+
+  @override
+  String get addressUnlinkedSuccess => 'Address unlinked successfully.';
+
+  @override
+  String get resetPasswordButton => 'Reset Pwd';
+
+  @override
+  String get guardFormValidation =>
+      'Please provide a valid name, email, and password (min 6 chars).';
+
+  @override
+  String errorProvisioningGuard(String error) {
+    return 'Error provisioning guard: $error';
+  }
+
+  @override
+  String errorRemovingGuard(String error) {
+    return 'Error removing guard: $error';
+  }
+
+  @override
+  String get noGuardsProvisioned => 'No security guards provisioned yet.';
+
+  @override
+  String errorDeletingFacility(String error) {
+    return 'Error deleting: $error';
+  }
+
+  @override
+  String get noAmenitiesRegistered => 'No amenities registered yet.';
+
+  @override
+  String get approvePaymentButton => 'Approve Payment';
+
+  @override
+  String errorReadingFile(String error) {
+    return 'Error reading file: $error';
+  }
+
+  @override
+  String importError(String error) {
+    return 'Import error: $error';
+  }
+
+  @override
+  String errorSavingFile(String error) {
+    return 'Error saving file: $error';
+  }
+
+  @override
+  String userSummaryEmail(String email) {
+    return 'Email: $email';
+  }
+
+  @override
+  String userSummaryStatus(String status) {
+    return 'Status: $status';
+  }
+
+  @override
+  String userSummaryAssignedPassword(String password) {
+    return 'Assigned Password: $password';
+  }
+
+  @override
+  String userSummaryLinkedAddress(String address) {
+    return 'Linked Address: $address';
+  }
+
+  @override
+  String addressExclusionsLabel(String exclusions) {
+    return 'Exclusions: $exclusions';
+  }
 }

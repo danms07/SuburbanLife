@@ -19,12 +19,6 @@ class _BookingScreenState extends State<BookingScreen> {
   TimeOfDay _startTime = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 12, minute: 0);
 
-  final List<Map<String, String>> _facilities = [
-    {'id': 'multipurpose_room', 'name': 'Multipurpose Room'},
-    {'id': 'bicycle_1', 'name': 'Bicycle 1'},
-    {'id': 'roof_garden', 'name': 'Roof Garden'},
-  ];
-
   void _submitBooking() async {
     try {
       final startDateTime = DateTime(
@@ -44,32 +38,25 @@ class _BookingScreenState extends State<BookingScreen> {
 
       await _bookingService.createBooking(_selectedFacility, startDateTime, endDateTime);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Booking successfully created!'),
-          backgroundColor: AppConfig.secondaryColor,
-        ),
-      );
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.bookingCreatedSuccess),
+            backgroundColor: AppConfig.secondaryColor,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
-
-  String _getFacilityName(AppLocalizations l10n, String id) {
-    switch (id) {
-      case 'multipurpose_room':
-        return l10n.multipurposeRoom;
-      case 'bicycle_1':
-        return l10n.bicycle1;
-      case 'roof_garden':
-        return l10n.roofGarden;
-      default:
-        return id;
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -86,7 +73,7 @@ class _BookingScreenState extends State<BookingScreen> {
         foregroundColor: Colors.white,
       ),
       body: user == null
-          ? const Center(child: Text('User not logged in'))
+          ? Center(child: Text(l10n.userNotLoggedIn))
           : StreamBuilder<Map<String, dynamic>?>(
               stream: DatabaseService().streamDocument('users', user.uid),
               builder: (context, userSnapshot) {
@@ -98,7 +85,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 final addressRef = userData?['addressRef'] as DbReference?;
 
                 if (addressRef == null) {
-                  return const Center(child: Text('No active address linked.'));
+                  return Center(child: Text(l10n.noActiveAddressLinked));
                 }
 
                 return StreamBuilder<Map<String, dynamic>?>(
@@ -192,7 +179,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         children: [
                           const SizedBox(height: 0),
                           DropdownButtonFormField<String>(
-                            value: activeFacId,
+                            initialValue: activeFacId,
                             decoration: InputDecoration(
                               labelText: l10n.selectFacility,
                               border: const OutlineInputBorder(),
@@ -337,14 +324,16 @@ class _BookingScreenState extends State<BookingScreen> {
                                     margin: const EdgeInsets.symmetric(vertical: 8),
                                     child: ListTile(
                                       title: Text('${DateFormat('MMM dd, yyyy').format(start)} from ${DateFormat('hh:mm a').format(start)} to ${DateFormat('hh:mm a').format(end)}'),
-                                      subtitle: Text('Status: ${b['status']}'),
+                                      subtitle: Text(l10n.bookingStatusLabel(b['status']?.toString() ?? '')),
                                       trailing: IconButton(
                                         icon: const Icon(Icons.cancel, color: Colors.redAccent),
                                         onPressed: () async {
                                           await _bookingService.cancelBooking(b['id']);
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Booking cancelled.')),
-                                          );
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text(l10n.bookingCancelledSuccess)),
+                                            );
+                                          }
                                         },
                                       ),
                                     ),

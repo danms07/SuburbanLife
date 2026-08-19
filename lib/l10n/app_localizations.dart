@@ -2269,6 +2269,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The password does not meet the security requirements.'**
   String get passwordComplexityError;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @errorPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String errorPrefix(String error);
+
+  /// No description provided for @userNotLoggedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'User not logged in'**
+  String get userNotLoggedIn;
+
+  /// No description provided for @guestFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Guest'**
+  String get guestFallback;
+
+  /// No description provided for @switchToResidentViewTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Resident View'**
+  String get switchToResidentViewTooltip;
+
+  /// No description provided for @switchToAdminViewTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to Admin View'**
+  String get switchToAdminViewTooltip;
+
+  /// No description provided for @notificationHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification History'**
+  String get notificationHistoryTitle;
+
+  /// No description provided for @notificationHistoryPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'History will be displayed here (FCM).'**
+  String get notificationHistoryPlaceholder;
+
+  /// No description provided for @qrItemCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created: {date}'**
+  String qrItemCreated(String date);
+
+  /// No description provided for @qrItemPlates.
+  ///
+  /// In en, this message translates to:
+  /// **'Plates: {plates}'**
+  String qrItemPlates(String plates);
+
+  /// No description provided for @qrInvalidatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'QR Code invalidated.'**
+  String get qrInvalidatedSuccess;
+
+  /// No description provided for @enterGuestNamePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the guest name'**
+  String get enterGuestNamePrompt;
+
+  /// No description provided for @qrGenerationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to generate QR code'**
+  String get qrGenerationFailed;
+
+  /// No description provided for @qrSharingError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error sharing/downloading: {error}'**
+  String qrSharingError(String error);
+
+  /// No description provided for @bookingCreatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking successfully created!'**
+  String get bookingCreatedSuccess;
+
+  /// No description provided for @bookingStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: {status}'**
+  String bookingStatusLabel(String status);
+
+  /// No description provided for @bookingCancelledSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking cancelled.'**
+  String get bookingCancelledSuccess;
+
+  /// No description provided for @editRejectedBookingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Rejected Booking'**
+  String get editRejectedBookingTitle;
+
+  /// No description provided for @bookingResubmittedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking resubmitted for review.'**
+  String get bookingResubmittedSuccess;
+
+  /// No description provided for @resubmitButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Resubmit'**
+  String get resubmitButton;
+
+  /// No description provided for @addressDetailsNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Address details not found.'**
+  String get addressDetailsNotFound;
+
+  /// No description provided for @passwordMinLengthValidation.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters.'**
+  String get passwordMinLengthValidation;
+
+  /// No description provided for @addressUnlinkedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Address unlinked successfully.'**
+  String get addressUnlinkedSuccess;
+
+  /// No description provided for @resetPasswordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Pwd'**
+  String get resetPasswordButton;
+
+  /// No description provided for @guardFormValidation.
+  ///
+  /// In en, this message translates to:
+  /// **'Please provide a valid name, email, and password (min 6 chars).'**
+  String get guardFormValidation;
+
+  /// No description provided for @errorProvisioningGuard.
+  ///
+  /// In en, this message translates to:
+  /// **'Error provisioning guard: {error}'**
+  String errorProvisioningGuard(String error);
+
+  /// No description provided for @errorRemovingGuard.
+  ///
+  /// In en, this message translates to:
+  /// **'Error removing guard: {error}'**
+  String errorRemovingGuard(String error);
+
+  /// No description provided for @noGuardsProvisioned.
+  ///
+  /// In en, this message translates to:
+  /// **'No security guards provisioned yet.'**
+  String get noGuardsProvisioned;
+
+  /// No description provided for @errorDeletingFacility.
+  ///
+  /// In en, this message translates to:
+  /// **'Error deleting: {error}'**
+  String errorDeletingFacility(String error);
+
+  /// No description provided for @noAmenitiesRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'No amenities registered yet.'**
+  String get noAmenitiesRegistered;
+
+  /// No description provided for @approvePaymentButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve Payment'**
+  String get approvePaymentButton;
+
+  /// No description provided for @errorReadingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading file: {error}'**
+  String errorReadingFile(String error);
+
+  /// No description provided for @importError.
+  ///
+  /// In en, this message translates to:
+  /// **'Import error: {error}'**
+  String importError(String error);
+
+  /// No description provided for @errorSavingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving file: {error}'**
+  String errorSavingFile(String error);
+
+  /// No description provided for @userSummaryEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email: {email}'**
+  String userSummaryEmail(String email);
+
+  /// No description provided for @userSummaryStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status: {status}'**
+  String userSummaryStatus(String status);
+
+  /// No description provided for @userSummaryAssignedPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Assigned Password: {password}'**
+  String userSummaryAssignedPassword(String password);
+
+  /// No description provided for @userSummaryLinkedAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked Address: {address}'**
+  String userSummaryLinkedAddress(String address);
+
+  /// No description provided for @addressExclusionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusions: {exclusions}'**
+  String addressExclusionsLabel(String exclusions);
 }
 
 class _AppLocalizationsDelegate

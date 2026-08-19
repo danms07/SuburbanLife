@@ -126,9 +126,10 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
     } catch (e) {
       debugPrint('Error creating user: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(l10n.errorPrefix(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );

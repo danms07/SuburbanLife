@@ -355,9 +355,10 @@ class _AdminBulkAddressImportScreenState
     } catch (e, stackTrace) {
       debugPrint('[BulkAddressImport] Error importing addresses: $e\n$stackTrace');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(l10n.errorPrefix(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -545,7 +546,7 @@ class _AdminBulkAddressImportScreenState
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       subtitle: excl.toString().isNotEmpty
-                          ? Text('Exclusions: $excl')
+                          ? Text(l10n.addressExclusionsLabel(excl.toString()))
                           : null,
                     );
                   },
@@ -610,7 +611,10 @@ class _AdminBulkAddressImportScreenState
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Created: ${_importResult!['createdCount']} addresses\nSkipped / Duplicates: ${_importResult!['skippedCount']} addresses',
+                        l10n.addressesImportedSuccess(
+                          (_importResult!['createdCount'] as num?)?.toInt() ?? 0,
+                          (_importResult!['skippedCount'] as num?)?.toInt() ?? 0,
+                        ),
                         style: const TextStyle(fontSize: 14, height: 1.5),
                       ),
                       const SizedBox(height: 16),

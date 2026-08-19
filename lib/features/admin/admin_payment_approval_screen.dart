@@ -36,8 +36,9 @@ class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen>
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -71,7 +72,7 @@ class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -103,7 +104,7 @@ class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen>
         stream: DatabaseService().streamCollection('payments', filters: [QueryFilter('status', FilterOperator.equal, 'pending')]),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text(l10n.errorPrefix(snapshot.error.toString())));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -323,7 +324,7 @@ class _PaymentApprovalCardState extends State<_PaymentApprovalCard> {
                               height: 16,
                               child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                             )
-                          : const Text('Approve Payment'),
+                          : Text(l10n.approvePaymentButton),
                     ),
                   ],
                 ),

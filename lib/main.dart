@@ -270,7 +270,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 if (_isAdmin && _isResident)
                   IconButton(
                     icon: const Icon(Icons.person),
-                    tooltip: "Switch to Resident View",
+                    tooltip: l10n.switchToResidentViewTooltip,
                     onPressed: () {
                       setState(() {
                         _showAdminView = false;
@@ -540,7 +540,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          value: _claimStreet,
+                          initialValue: _claimStreet,
                           items: streets.map((street) {
                             return DropdownMenuItem<String>(
                               value: street,
@@ -929,7 +929,7 @@ class _MyHomePageState extends State<MyHomePage> {
       });
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );
       setState(() {
         _isClaimSubmitting = false;
@@ -1047,7 +1047,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                         Icons.admin_panel_settings,
                                         color: Colors.white,
                                       ),
-                                      tooltip: "Switch to Admin View",
+                                      tooltip: l10n.switchToAdminViewTooltip,
                                       onPressed: () {
                                         setState(() {
                                           _showAdminView = true;
@@ -1674,7 +1674,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: AppConfig.primaryColor.withOpacity(0.1),
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1883,7 +1883,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                               TextButton(
                                 onPressed: () => Navigator.pop(context, true),
-                                child: const Text('OK', style: TextStyle(color: Colors.redAccent)),
+                                child: Text(l10n.ok, style: const TextStyle(color: Colors.redAccent)),
                               ),
                             ],
                           ),
@@ -1900,7 +1900,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+                                SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
                               );
                             }
                           }
@@ -1928,7 +1928,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                               TextButton(
                                 onPressed: () => Navigator.pop(context, true),
-                                child: const Text('OK', style: TextStyle(color: Colors.redAccent)),
+                                child: Text(l10n.ok, style: const TextStyle(color: Colors.redAccent)),
                               ),
                             ],
                           ),
@@ -1941,7 +1941,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           } catch (e) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+                                SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
                               );
                             }
                           }
@@ -1967,16 +1967,17 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _showNotificationHistoryDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Notification History"),
-          content: const Text("History will be displayed here (FCM)."),
+          title: Text(l10n.notificationHistoryTitle),
+          content: Text(l10n.notificationHistoryPlaceholder),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Close"),
+              child: Text(l10n.close),
             ),
           ],
         );

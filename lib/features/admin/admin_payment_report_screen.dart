@@ -107,7 +107,7 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
+                child: Text(l10n.ok),
               ),
             ],
           ),
@@ -214,7 +214,7 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) {

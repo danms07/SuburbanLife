@@ -93,7 +93,7 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) {

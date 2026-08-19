@@ -21,6 +21,8 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
+    final uid = _uid;
+
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
       appBar: AppBar(
@@ -28,10 +30,10 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
         backgroundColor: AppConfig.primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: _uid == null
-          ? const Center(child: Text("User not logged in"))
+      body: uid == null
+          ? Center(child: Text(l10n.userNotLoggedIn))
           : StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _qrService.getUserQrCodes(_uid!),
+              stream: _qrService.getUserQrCodes(uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -80,11 +82,11 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
                             Text('${l10n.accessCategory}: ${_getTranslatedCategory(l10n, accessCategory)}${isOneTimeUse ? ' (1x)' : ''}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                             if (guestName != null && guestName.isNotEmpty)
                               Text('${l10n.type}: ${type.toUpperCase()}', style: const TextStyle(fontSize: 12)),
-                            Text('Created: ${DateFormat('MMM dd, yyyy hh:mm a').format(timestamp)}', style: const TextStyle(fontSize: 12)),
+                            Text(l10n.qrItemCreated(DateFormat('MMM dd, yyyy hh:mm a').format(timestamp)), style: const TextStyle(fontSize: 12)),
                             if (vehicleType != null)
                               Text('${l10n.vehicleType}: ${_getTranslatedVehicleType(l10n, vehicleType)}', style: const TextStyle(fontSize: 12)),
                             if (vehiclePlates != null && vehiclePlates.isNotEmpty)
-                              Text('Plates: $vehiclePlates', style: const TextStyle(fontSize: 12, color: AppConfig.primaryColor, fontWeight: FontWeight.w500)),
+                              Text(l10n.qrItemPlates(vehiclePlates), style: const TextStyle(fontSize: 12, color: AppConfig.primaryColor, fontWeight: FontWeight.w500)),
                             if (passengers != null)
                               Text('${l10n.passengersCount}: $passengers', style: const TextStyle(fontSize: 12)),
                             const SizedBox(height: 4),
@@ -97,7 +99,7 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
                                 onPressed: () async {
                                   await _qrService.invalidateQrCode(qrId);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('QR Code invalidated.')),
+                                    SnackBar(content: Text(l10n.qrInvalidatedSuccess)),
                                   );
                                 },
                               )
@@ -150,7 +152,7 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Text(

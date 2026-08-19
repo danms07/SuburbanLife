@@ -52,9 +52,12 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
         _cooldownUnit = 'unrestricted';
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -68,9 +71,12 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
     try {
       await DatabaseService().deleteDocument('facilities', id);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting: $e'), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorDeletingFacility(e.toString())), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 
@@ -201,7 +207,7 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
                 }
                 final docs = snapshot.data ?? [];
                 if (docs.isEmpty) {
-                  return const Center(child: Text('No amenities registered yet.', style: TextStyle(color: Colors.grey)));
+                  return Center(child: Text(l10n.noAmenitiesRegistered, style: const TextStyle(color: Colors.grey)));
                 }
                 return ListView.builder(
                   itemCount: docs.length,

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:js_util' as js_util;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -27,7 +26,6 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
   bool _isAdmin = false;
   bool _isResident = false;
-  bool _isGuard = false;
   bool _isLoading = true;
   String _currentLang = 'es'; // Default to Spanish
 
@@ -46,12 +44,10 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   void _checkAdmin() async {
     final isAdmin = await _authService.isAdmin();
     final isResident = await _authService.isResident();
-    final isGuard = await _authService.isGuard();
     if (mounted) {
       setState(() {
         _isAdmin = isAdmin;
         _isResident = isResident;
-        _isGuard = isGuard;
         _isLoading = false;
       });
     }

@@ -75,7 +75,7 @@ class _OwnershipProofScreenState extends State<OwnershipProofScreen> {
         });
         debugPrint(e.toString());
         messenger.showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
         );
         return;
       }
@@ -101,7 +101,7 @@ class _OwnershipProofScreenState extends State<OwnershipProofScreen> {
       navigator.popUntil((route) => route.isFirst);
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );
       setState(() {
         _isLoading = false;

@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-08-17 (Added web automatic seamless upgrade service with background polling, idle/tab-switch detection, and CacheStorage eviction)*
+*Last Verified/Updated: 2026-08-18 (Complete UI localization rollout across all screens with zero hardcoded strings and updated ARB dictionaries)*
 
 Current state of project files and folders:
 

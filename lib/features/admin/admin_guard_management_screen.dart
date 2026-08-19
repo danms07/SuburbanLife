@@ -23,8 +23,9 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
     final password = _passwordController.text.trim();
 
     if (name.isEmpty || email.isEmpty || password.length < 6) {
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide a valid name, email, and password (min 6 chars).')),
+        SnackBar(content: Text(l10n.guardFormValidation)),
       );
       return;
     }
@@ -51,7 +52,7 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
       _passwordController.clear();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error provisioning guard: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorProvisioningGuard(e.toString())), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) {
@@ -78,7 +79,7 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error removing guard: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorRemovingGuard(e.toString())), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) {
@@ -173,7 +174,7 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
                 }
                 final docs = snapshot.data ?? [];
                 if (docs.isEmpty) {
-                  return const Center(child: Text('No security guards provisioned yet.', style: TextStyle(color: Colors.grey)));
+                  return Center(child: Text(l10n.noGuardsProvisioned, style: const TextStyle(color: Colors.grey)));
                 }
                 return ListView.builder(
                   itemCount: docs.length,

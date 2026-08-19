@@ -1172,4 +1172,165 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get passwordComplexityError =>
       'La contraseña no cumple con los requisitos de seguridad.';
+
+  @override
+  String get ok => 'Aceptar';
+
+  @override
+  String get close => 'Cerrar';
+
+  @override
+  String get save => 'Guardar';
+
+  @override
+  String errorPrefix(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get userNotLoggedIn => 'Usuario no autenticado';
+
+  @override
+  String get guestFallback => 'Invitado';
+
+  @override
+  String get switchToResidentViewTooltip => 'Cambiar a vista de residente';
+
+  @override
+  String get switchToAdminViewTooltip => 'Cambiar a vista de administrador';
+
+  @override
+  String get notificationHistoryTitle => 'Historial de Notificaciones';
+
+  @override
+  String get notificationHistoryPlaceholder =>
+      'El historial se mostrará aquí (FCM).';
+
+  @override
+  String qrItemCreated(String date) {
+    return 'Creado: $date';
+  }
+
+  @override
+  String qrItemPlates(String plates) {
+    return 'Placas: $plates';
+  }
+
+  @override
+  String get qrInvalidatedSuccess => 'Código QR invalidado.';
+
+  @override
+  String get enterGuestNamePrompt => 'Por favor ingresa el nombre del invitado';
+
+  @override
+  String get qrGenerationFailed => 'Error al generar el código QR';
+
+  @override
+  String qrSharingError(String error) {
+    return 'Error al compartir/descargar: $error';
+  }
+
+  @override
+  String get bookingCreatedSuccess => '¡Reservación creada exitosamente!';
+
+  @override
+  String bookingStatusLabel(String status) {
+    return 'Estado: $status';
+  }
+
+  @override
+  String get bookingCancelledSuccess => 'Reservación cancelada.';
+
+  @override
+  String get editRejectedBookingTitle => 'Editar Reservación Rechazada';
+
+  @override
+  String get bookingResubmittedSuccess =>
+      'Reservación reenviada para revisión.';
+
+  @override
+  String get resubmitButton => 'Reenviar';
+
+  @override
+  String get addressDetailsNotFound =>
+      'No se encontraron los detalles de la dirección.';
+
+  @override
+  String get passwordMinLengthValidation =>
+      'La contraseña debe tener al menos 6 caracteres.';
+
+  @override
+  String get addressUnlinkedSuccess => 'Dirección desvinculada exitosamente.';
+
+  @override
+  String get resetPasswordButton => 'Restablecer Contraseña';
+
+  @override
+  String get guardFormValidation =>
+      'Por favor proporciona un nombre, correo y contraseña válidos (mín. 6 caracteres).';
+
+  @override
+  String errorProvisioningGuard(String error) {
+    return 'Error al registrar guardia: $error';
+  }
+
+  @override
+  String errorRemovingGuard(String error) {
+    return 'Error al eliminar guardia: $error';
+  }
+
+  @override
+  String get noGuardsProvisioned =>
+      'No hay guardias de seguridad registrados todavía.';
+
+  @override
+  String errorDeletingFacility(String error) {
+    return 'Error al eliminar: $error';
+  }
+
+  @override
+  String get noAmenitiesRegistered => 'No hay amenidades registradas todavía.';
+
+  @override
+  String get approvePaymentButton => 'Aprobar Pago';
+
+  @override
+  String errorReadingFile(String error) {
+    return 'Error al leer el archivo: $error';
+  }
+
+  @override
+  String importError(String error) {
+    return 'Error de importación: $error';
+  }
+
+  @override
+  String errorSavingFile(String error) {
+    return 'Error al guardar el archivo: $error';
+  }
+
+  @override
+  String userSummaryEmail(String email) {
+    return 'Correo: $email';
+  }
+
+  @override
+  String userSummaryStatus(String status) {
+    return 'Estado: $status';
+  }
+
+  @override
+  String userSummaryAssignedPassword(String password) {
+    return 'Contraseña asignada: $password';
+  }
+
+  @override
+  String userSummaryLinkedAddress(String address) {
+    return 'Dirección vinculada: $address';
+  }
+
+  @override
+  String addressExclusionsLabel(String exclusions) {
+    return 'Exclusiones: $exclusions';
+  }
 }

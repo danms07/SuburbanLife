@@ -21,6 +21,8 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
+    final uid = _uid;
+
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
       appBar: AppBar(
@@ -28,10 +30,10 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
         backgroundColor: AppConfig.primaryColor,
         foregroundColor: Colors.white,
       ),
-      body: _uid == null
-          ? const Center(child: Text("User not logged in"))
+      body: uid == null
+          ? Center(child: Text(l10n.userNotLoggedIn))
           : StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _bookingService.getUserBookings(_uid!),
+              stream: _bookingService.getUserBookings(uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -150,7 +152,7 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Text(
@@ -171,7 +173,7 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: const Text("Edit Rejected Booking"),
+            title: Text(l10n.editRejectedBookingTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -258,17 +260,21 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                       'endTime': endDateTime.millisecondsSinceEpoch,
                       'status': 'pending review',
                     });
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Booking resubmitted for review.')),
-                    );
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(l10n.bookingResubmittedSuccess)),
+                      );
+                    }
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                      );
+                    }
                   }
                 },
-                child: const Text("Resubmit"),
+                child: Text(l10n.resubmitButton),
               ),
             ],
           );

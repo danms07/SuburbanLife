@@ -3,7 +3,6 @@ import 'package:file_picker/file_picker.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
-import '../auth/auth_service.dart';
 
 class TransparencyScreen extends StatefulWidget {
   const TransparencyScreen({Key? key}) : super(key: key);
@@ -136,7 +135,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: uploadCategory,
+                initialValue: uploadCategory,
                 decoration: InputDecoration(labelText: l10n.categoryLabel),
                 items: _categories.where((c) => c['id'] != 'all').map((cat) {
                   return DropdownMenuItem<String>(
@@ -183,7 +182,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
+                    SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
                   );
                 }
               },
@@ -229,7 +228,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 const SizedBox(width: 15),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     items: _categories.map((cat) {
                       return DropdownMenuItem<String>(
                         value: cat['id'],

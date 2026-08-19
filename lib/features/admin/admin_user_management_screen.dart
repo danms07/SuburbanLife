@@ -32,7 +32,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) {
@@ -63,7 +63,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) {
@@ -111,7 +111,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               final pwd = controller.text.trim();
               if (pwd.length < 6) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password must be at least 6 characters.')),
+                  SnackBar(content: Text(l10n.passwordMinLengthValidation)),
                 );
                 return;
               }
@@ -127,13 +127,13 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+                  SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
                 );
               } finally {
                 if (mounted) setState(() { _isProcessing = false; });
               }
             },
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -155,7 +155,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         stream: DatabaseService().streamCollection('users'),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(child: Text(l10n.errorPrefix(snapshot.error.toString())));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -258,8 +258,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: status == 'paid' 
-                                                    ? AppConfig.successColor.withOpacity(0.15) 
-                                                    : AppConfig.warningColor.withOpacity(0.15),
+                                                    ? AppConfig.successColor.withValues(alpha: 0.15) 
+                                                    : AppConfig.warningColor.withValues(alpha: 0.15),
                                                 borderRadius: BorderRadius.circular(4),
                                               ),
                                               child: Text(
@@ -320,7 +320,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                                   ),
                                   TextButton(
                                     onPressed: () => Navigator.pop(context, true),
-                                    child: const Text('OK', style: TextStyle(color: Colors.redAccent)),
+                                    child: Text(l10n.ok, style: const TextStyle(color: Colors.redAccent)),
                                   ),
                                 ],
                               ),
@@ -335,13 +335,13 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                                 });
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Address unlinked successfully.'), backgroundColor: AppConfig.successColor),
+                                    SnackBar(content: Text(l10n.addressUnlinkedSuccess), backgroundColor: AppConfig.successColor),
                                   );
                                 }
                               } catch (e) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+                                    SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
                                   );
                                 }
                               } finally {
@@ -370,7 +370,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                           OutlinedButton.icon(
                             onPressed: () => _changePassword(doc['id']),
                             icon: const Icon(Icons.lock_reset, size: 18),
-                            label: const Text('Reset Pwd'),
+                            label: Text(l10n.resetPasswordButton),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppConfig.primaryColor,
                               side: const BorderSide(color: AppConfig.primaryColor),

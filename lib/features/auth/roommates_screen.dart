@@ -60,9 +60,10 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
     } catch (e) {
       debugPrint('Error adding roommate: $e');
       if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text(l10n.errorPrefix(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -159,7 +160,7 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
         foregroundColor: Colors.white,
       ),
       body: user == null
-          ? const Center(child: Text('User not logged in'))
+          ? Center(child: Text(l10n.userNotLoggedIn))
           : StreamBuilder<Map<String, dynamic>?>(
               stream: DatabaseService().streamDocument('users', user.uid),
               builder: (context, snapshot) {
@@ -322,7 +323,7 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                                                     if (mounted) {
                                                       ScaffoldMessenger.of(context).showSnackBar(
                                                         SnackBar(
-                                                          content: Text('Error: $e'),
+                                                          content: Text(l10n.errorPrefix(e.toString())),
                                                           backgroundColor: Colors.redAccent,
                                                         ),
                                                       );

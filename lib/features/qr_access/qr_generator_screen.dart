@@ -30,10 +30,11 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
   bool _isLoading = false;
 
   void _generateQr() async {
+    final l10n = AppLocalizations.of(context)!;
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the guest name')),
+        SnackBar(content: Text(l10n.enterGuestNamePrompt)),
       );
       return;
     }
@@ -78,7 +79,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
     } catch (e) {
       debugPrint('Error generating QR: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to generate QR code')),
+        SnackBar(content: Text(l10n.qrGenerationFailed)),
       );
     } finally {
       setState(() {
@@ -99,7 +100,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         foregroundColor: Colors.white,
       ),
       body: user == null
-          ? const Center(child: Text('User not logged in'))
+          ? Center(child: Text(l10n.userNotLoggedIn))
           : StreamBuilder<Map<String, dynamic>?>(
               stream: DatabaseService().streamDocument('users', user.uid),
               builder: (context, userSnapshot) {
@@ -191,7 +192,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _accessCategory,
+            initialValue: _accessCategory,
             decoration: InputDecoration(labelText: l10n.accessCategory),
             items: [
               DropdownMenuItem(value: 'visitor', child: Text(l10n.categoryVisitor)),
@@ -207,7 +208,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _selectedVehicleType,
+            initialValue: _selectedVehicleType,
             decoration: InputDecoration(labelText: l10n.vehicleType),
             items: [
               DropdownMenuItem(value: 'car', child: Text(l10n.vehicleCar)),
@@ -257,7 +258,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
             const SizedBox(height: 16),
           ] else ...[
             DropdownButtonFormField<QrType>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: InputDecoration(labelText: l10n.type),
               items: QrType.values.map((type) {
                 return DropdownMenuItem(
@@ -512,8 +513,9 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         }
       }
     } catch (e) {
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error sharing/downloading: $e')),
+        SnackBar(content: Text(l10n.qrSharingError(e.toString()))),
       );
     } finally {
       setState(() { _isLoading = false; });

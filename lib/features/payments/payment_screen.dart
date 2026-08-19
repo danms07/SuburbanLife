@@ -22,19 +22,23 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final l10n = AppLocalizations.of(context)!;
     try {
       await _paymentService.uploadPaymentReceipt(widget.currentUid, _selectedPeriod!);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.proofUploadedSuccess),
-          backgroundColor: AppConfig.secondaryColor,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.proofUploadedSuccess),
+            backgroundColor: AppConfig.secondaryColor,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -74,7 +78,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               }
               final addressData = addressSnap.data;
               if (addressData == null) {
-                return const Center(child: Text('Address details not found.'));
+                return Center(child: Text(l10n.addressDetailsNotFound));
               }
 
               final paymentStatus = addressData['paymentStatus'] as String? ?? 'restricted';
@@ -198,7 +202,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               const SizedBox(height: 40),
             ] else ...[
               DropdownButtonFormField<String>(
-                value: _selectedPeriod,
+                initialValue: _selectedPeriod,
                 decoration: InputDecoration(
                   labelText: l10n.selectPeriodLabel,
                   border: OutlineInputBorder(

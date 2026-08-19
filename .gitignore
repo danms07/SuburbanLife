@@ -60,4 +60,13 @@ app.*.map.json
 # Code Snippets
 snippets/
 
+# Agent & Skills cache
+.agents/
+skills-lock.json
+
+# External Analysis & Temp Reports
+External analysis.md
+*analysis.md
+
+
 

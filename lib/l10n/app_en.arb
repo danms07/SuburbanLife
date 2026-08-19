@@ -425,6 +425,160 @@
   "cardVehicleDetails": "Vehicle Details",
   "passwordComplexityRequirements": "Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.",
   "passwordComplexityHelper": "Min. 8 characters (1 uppercase, 1 lowercase, 1 number)",
-  "passwordComplexityError": "The password does not meet the security requirements."
+  "passwordComplexityError": "The password does not meet the security requirements.",
+  "ok": "OK",
+  "close": "Close",
+  "save": "Save",
+  "errorPrefix": "Error: {error}",
+  "@errorPrefix": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "userNotLoggedIn": "User not logged in",
+  "guestFallback": "Guest",
+  "switchToResidentViewTooltip": "Switch to Resident View",
+  "switchToAdminViewTooltip": "Switch to Admin View",
+  "notificationHistoryTitle": "Notification History",
+  "notificationHistoryPlaceholder": "History will be displayed here (FCM).",
+  "qrItemCreated": "Created: {date}",
+  "@qrItemCreated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "qrItemPlates": "Plates: {plates}",
+  "@qrItemPlates": {
+    "placeholders": {
+      "plates": {
+        "type": "String"
+      }
+    }
+  },
+  "qrInvalidatedSuccess": "QR Code invalidated.",
+  "enterGuestNamePrompt": "Please enter the guest name",
+  "qrGenerationFailed": "Failed to generate QR code",
+  "qrSharingError": "Error sharing/downloading: {error}",
+  "@qrSharingError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingCreatedSuccess": "Booking successfully created!",
+  "noActiveAddressLinked": "No active address linked.",
+  "bookingStatusLabel": "Status: {status}",
+  "@bookingStatusLabel": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingCancelledSuccess": "Booking cancelled.",
+  "editRejectedBookingTitle": "Edit Rejected Booking",
+  "bookingResubmittedSuccess": "Booking resubmitted for review.",
+  "resubmitButton": "Resubmit",
+  "addressDetailsNotFound": "Address details not found.",
+  "passwordMinLengthValidation": "Password must be at least 6 characters.",
+  "addressUnlinkedSuccess": "Address unlinked successfully.",
+  "resetPasswordButton": "Reset Pwd",
+  "guardFormValidation": "Please provide a valid name, email, and password (min 6 chars).",
+  "errorProvisioningGuard": "Error provisioning guard: {error}",
+  "@errorProvisioningGuard": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "errorRemovingGuard": "Error removing guard: {error}",
+  "@errorRemovingGuard": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noGuardsProvisioned": "No security guards provisioned yet.",
+  "errorDeletingFacility": "Error deleting: {error}",
+  "@errorDeletingFacility": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noAmenitiesRegistered": "No amenities registered yet.",
+  "approvePaymentButton": "Approve Payment",
+  "errorReadingFile": "Error reading file: {error}",
+  "@errorReadingFile": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "importError": "Import error: {error}",
+  "@importError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "errorSavingFile": "Error saving file: {error}",
+  "@errorSavingFile": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "userSummaryEmail": "Email: {email}",
+  "@userSummaryEmail": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "userSummaryStatus": "Status: {status}",
+  "@userSummaryStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "userSummaryAssignedPassword": "Assigned Password: {password}",
+  "@userSummaryAssignedPassword": {
+    "placeholders": {
+      "password": {
+        "type": "String"
+      }
+    }
+  },
+  "userSummaryLinkedAddress": "Linked Address: {address}",
+  "@userSummaryLinkedAddress": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      }
+    }
+  },
+  "addressExclusionsLabel": "Exclusions: {exclusions}",
+  "@addressExclusionsLabel": {
+    "placeholders": {
+      "exclusions": {
+        "type": "String"
+      }
+    }
+  }
 }
 

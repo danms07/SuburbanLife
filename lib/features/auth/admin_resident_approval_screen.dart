@@ -76,7 +76,7 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
     } catch (e) {
       debugPrint('Error approving claim: $e');
       messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
       );
     } finally {
       if (mounted) {
@@ -168,7 +168,7 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
               stream: DatabaseService().streamCollection('ownership_claims'),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
+                  return Center(child: Text(l10n.errorPrefix(snapshot.error.toString())));
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
