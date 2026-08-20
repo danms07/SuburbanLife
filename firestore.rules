@@ -70,12 +70,17 @@ service cloud.firestore {
     }
 
     match /documents/{documentId} {
-      allow read: if isAuthenticated();
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
+      allow write: if isAdmin();
+    }
+
+    match /document_folders/{folderId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
       allow write: if isAdmin();
     }
 
     match /document_categories/{catId} {
-      allow read: if isAuthenticated();
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
       allow write: if isAdmin();
     }
 

@@ -32,6 +32,11 @@ The following table maps each visual component to its feature domain and source 
 | **Unified User Creation Manager** | Admin Management | [admin_create_user_screen.dart](lib/features/admin/admin_create_user_screen.dart) |
 | **Rich Media & Emoji Announcements Feed** | Announcements | [announcements_screen.dart](lib/features/announcements/announcements_screen.dart) |
 | **Admin Access Logs & History Viewer** | Admin Reports | [admin_access_logs_screen.dart](lib/features/admin/admin_access_logs_screen.dart) |
+| **Release Error Fallback Screen** | Core / UI | [error_fallback_screen.dart](lib/core/widgets/error_fallback_screen.dart) |
+| **File Explorer Breadcrumb** | Transparency | [file_explorer_breadcrumb.dart](lib/features/transparency/widgets/file_explorer_breadcrumb.dart) |
+| **Explorer Folder Card** | Transparency | [folder_card.dart](lib/features/transparency/widgets/folder_card.dart) |
+| **Explorer Document Card** | Transparency | [document_card.dart](lib/features/transparency/widgets/document_card.dart) |
+| **Native Document Viewer** | Transparency | [document_viewer_screen.dart](lib/features/transparency/document_viewer_screen.dart) |
 
 ---
 
@@ -143,6 +148,10 @@ The following table maps each visual component to its feature domain and source 
 ## 23. Rich Media, Clipboard Pasting & Emoji Announcements Feed
 - **Description**: A responsive feed interface rendering community notices and administrative broadcasts. Features orientation-aware client-side proportional thumbnail generation for landscape and portrait images, responsive desktop (horizontal side-by-side card) and mobile (linear vertical card) layouts, tap-to-zoom full-screen interactive image viewer (`InteractiveViewer`), audience badges (All vs. Residents), and full native emoji support across titles and message bodies. In administrative mode, an enhanced creation modal features a quick-tap horizontal emoji bar (`📢`, `🚨`, `⚠️`, `ℹ️`, `🔔`, etc.), cross-platform gallery image picker, direct clipboard image pasting button, automatic system clipboard image capture (`Ctrl+V` / `Cmd+V` & browser `onPaste` event stream), live thumbnail preview, and upload progress indicator.
 - **Usage**: Exposed via `AnnouncementsScreen`.
+
+## 24. Release Error Fallback Screen
+- **Description**: A user-friendly, beautifully styled fallback error screen displayed during fatal framework rendering or widget build crashes in release builds (intercepted via `ErrorWidget.builder`). Prevents standard red/grey crash screens by presenting a clean alert card with bilingual support (`AppLocalizations`) explaining that an automatic incident report has been dispatched to Firebase Crashlytics.
+- **Usage**: Configured globally in `main.dart` via `ErrorWidget.builder` and defined in `lib/core/widgets/error_fallback_screen.dart`.
 
 
 

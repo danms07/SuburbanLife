@@ -14,7 +14,7 @@ service firebase.storage {
     }
 
     match /documents/{allPaths=**} {
-      allow read: if isAuthenticated();
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
       allow write: if isAdmin();
     }
 

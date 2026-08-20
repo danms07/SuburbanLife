@@ -177,12 +177,26 @@ erDiagram
 - `targetAudience`: string ('all', 'residents', 'specific_uid')
 - `readBy`: array of user UIDs who have read the announcement
 
+### `document_folders` (Collection)
+- `folderId`: string (Document ID)
+- `name`: string (Folder display name)
+- `parentId`: string (Parent folder ID or 'root' for root directory)
+- `createdAt`: timestamp
+- `createdBy`: string (Admin UID)
+
 ### `documents` (Collection)
 - `docId`: string (Document ID)
-- `title`: string
+- `title`: string (Display title)
+- `fileName`: string (Original file name with extension, e.g. "Presupuesto_2026.pdf")
+- `fileType`: string (Lowercase file extension: 'pdf', 'md', 'txt', 'docx', 'xlsx', 'png', etc.)
+- `fileSize`: number (File size in bytes)
 - `url`: string (Firebase Storage URL)
-- `category`: string ('normative', 'contract', 'government')
-- `uploadedAt`: timestamp
+- `storagePath`: string (Cloud Storage object path)
+- `category`: string ('normatives', 'contracts', 'financial', 'communiques', etc.)
+- `publicationDate`: timestamp (Official publication/issue date of document)
+- `uploadedAt`: timestamp (Creation timestamp)
+- `folderId`: string (Folder ID or 'root' for root directory)
+- `uploaderUid`: string (Admin UID)
 
 ### `access_logs` (Collection)
 - `logId`: string (Document ID)

@@ -2695,6 +2695,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Passengers: {count}'**
   String logPassengersCount(int count);
+
+  /// No description provided for @errorFallbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong'**
+  String get errorFallbackTitle;
+
+  /// No description provided for @errorFallbackMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'An unexpected error occurred. An error report has been automatically recorded.'**
+  String get errorFallbackMessage;
+
+  /// No description provided for @errorFallbackRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart App'**
+  String get errorFallbackRestart;
+
+  /// No description provided for @fileExplorer.
+  ///
+  /// In en, this message translates to:
+  /// **'File Explorer'**
+  String get fileExplorer;
+
+  /// No description provided for @rootFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Root'**
+  String get rootFolder;
+
+  /// No description provided for @newFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'New Folder'**
+  String get newFolder;
+
+  /// No description provided for @folderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder Name'**
+  String get folderName;
+
+  /// No description provided for @folderCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder created successfully'**
+  String get folderCreated;
+
+  /// No description provided for @folderDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder deleted successfully'**
+  String get folderDeleted;
+
+  /// No description provided for @deleteFolderConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this folder and its documents?'**
+  String get deleteFolderConfirmation;
+
+  /// No description provided for @emptyFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is empty'**
+  String get emptyFolder;
+
+  /// No description provided for @itemsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 items} =1{1 item} other{{count} items}}'**
+  String itemsCount(int count);
+
+  /// No description provided for @publicationDateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Publication Date'**
+  String get publicationDateLabel;
+
+  /// No description provided for @selectPublicationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Publication Date'**
+  String get selectPublicationDate;
+
+  /// No description provided for @fileTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'File Type'**
+  String get fileTypeLabel;
+
+  /// No description provided for @fileSizeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get fileSizeLabel;
+
+  /// No description provided for @moveDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Move Document'**
+  String get moveDocument;
+
+  /// No description provided for @selectDestinationFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Destination Folder'**
+  String get selectDestinationFolder;
+
+  /// No description provided for @documentMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Document moved successfully'**
+  String get documentMoved;
+
+  /// No description provided for @documentDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Document deleted successfully'**
+  String get documentDeleted;
+
+  /// No description provided for @deleteDocumentConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this document?'**
+  String get deleteDocumentConfirmation;
+
+  /// No description provided for @openingExternalDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening document in external app...'**
+  String get openingExternalDocument;
+
+  /// No description provided for @noAppToOpenFile.
+  ///
+  /// In en, this message translates to:
+  /// **'No application found to open this file type'**
+  String get noAppToOpenFile;
+
+  /// No description provided for @cachedLocally.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached'**
+  String get cachedLocally;
+
+  /// No description provided for @loadingDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading document...'**
+  String get loadingDocument;
+
+  /// No description provided for @errorLoadingDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading document'**
+  String get errorLoadingDocument;
+
+  /// No description provided for @increaseFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase font size'**
+  String get increaseFontSize;
+
+  /// No description provided for @decreaseFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease font size'**
+  String get decreaseFontSize;
+
+  /// No description provided for @copyText.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy text'**
+  String get copyText;
+
+  /// No description provided for @copiedToClipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied to clipboard'**
+  String get copiedToClipboard;
+
+  /// No description provided for @shareDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Share document'**
+  String get shareDocument;
+
+  /// No description provided for @searchDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Search documents...'**
+  String get searchDocuments;
+
+  /// No description provided for @allFolders.
+  ///
+  /// In en, this message translates to:
+  /// **'All Folders'**
+  String get allFolders;
+
+  /// No description provided for @currentFolderOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Folder'**
+  String get currentFolderOnly;
+
+  /// No description provided for @viewImage.
+  ///
+  /// In en, this message translates to:
+  /// **'View Image'**
+  String get viewImage;
+
+  /// No description provided for @readDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Read Document'**
+  String get readDocument;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
 }
 
 class _AppLocalizationsDelegate

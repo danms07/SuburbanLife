@@ -1426,4 +1426,132 @@ class AppLocalizationsEs extends AppLocalizations {
   String logPassengersCount(int count) {
     return 'Pasajeros: $count';
   }
+
+  @override
+  String get errorFallbackTitle => 'Algo salió mal';
+
+  @override
+  String get errorFallbackMessage =>
+      'Ocurrió un error inesperado. Se ha registrado un reporte de error automáticamente.';
+
+  @override
+  String get errorFallbackRestart => 'Reiniciar Aplicación';
+
+  @override
+  String get fileExplorer => 'Explorador de archivos';
+
+  @override
+  String get rootFolder => 'Principal';
+
+  @override
+  String get newFolder => 'Nueva carpeta';
+
+  @override
+  String get folderName => 'Nombre de la carpeta';
+
+  @override
+  String get folderCreated => 'Carpeta creada exitosamente';
+
+  @override
+  String get folderDeleted => 'Carpeta eliminada exitosamente';
+
+  @override
+  String get deleteFolderConfirmation =>
+      '¿Estás seguro de eliminar esta carpeta y sus documentos?';
+
+  @override
+  String get emptyFolder => 'Esta carpeta está vacía';
+
+  @override
+  String itemsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count elementos',
+      one: '1 elemento',
+      zero: '0 elementos',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get publicationDateLabel => 'Fecha de publicación';
+
+  @override
+  String get selectPublicationDate => 'Seleccionar fecha de publicación';
+
+  @override
+  String get fileTypeLabel => 'Tipo de archivo';
+
+  @override
+  String get fileSizeLabel => 'Tamaño';
+
+  @override
+  String get moveDocument => 'Mover documento';
+
+  @override
+  String get selectDestinationFolder => 'Seleccionar carpeta de destino';
+
+  @override
+  String get documentMoved => 'Documento movido exitosamente';
+
+  @override
+  String get documentDeleted => 'Documento eliminado exitosamente';
+
+  @override
+  String get deleteDocumentConfirmation =>
+      '¿Estás seguro de eliminar este documento?';
+
+  @override
+  String get openingExternalDocument =>
+      'Abriendo documento en visor externo...';
+
+  @override
+  String get noAppToOpenFile =>
+      'No se encontró una aplicación para abrir este tipo de archivo';
+
+  @override
+  String get cachedLocally => 'En caché';
+
+  @override
+  String get loadingDocument => 'Cargando documento...';
+
+  @override
+  String get errorLoadingDocument => 'Error al cargar documento';
+
+  @override
+  String get increaseFontSize => 'Aumentar tamaño de fuente';
+
+  @override
+  String get decreaseFontSize => 'Disminuir tamaño de fuente';
+
+  @override
+  String get copyText => 'Copiar texto';
+
+  @override
+  String get copiedToClipboard => 'Copiado al portapapeles';
+
+  @override
+  String get shareDocument => 'Compartir documento';
+
+  @override
+  String get searchDocuments => 'Buscar documentos...';
+
+  @override
+  String get allFolders => 'Todas las carpetas';
+
+  @override
+  String get currentFolderOnly => 'Carpeta actual';
+
+  @override
+  String get viewImage => 'Ver imagen';
+
+  @override
+  String get readDocument => 'Leer documento';
+
+  @override
+  String get delete => 'Eliminar';
+
+  @override
+  String get retry => 'Reintentar';
 }

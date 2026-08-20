@@ -56,6 +56,13 @@ App Check protects your backend resources from abuse by verifying that incoming 
 #### iOS (DeviceCheck / App Attest)
 1. In the **Firebase Console** under **App Check** > **Apps**, register DeviceCheck or App Attest for your iOS App.
 
+### 4. Firebase Crashlytics & Error Reporting
+The app includes automated global exception trapping and error reporting via `CrashlyticsService`:
+- **Global Error Hooks**: `FlutterError.onError` intercepts framework build and layout errors, while `PlatformDispatcher.instance.onError` intercepts unhandled asynchronous errors (Futures, timers).
+- **Graceful Web Fallback**: On Web (where Crashlytics is currently unsupported or limited), calls are absorbed seamlessly with structured `debugPrint` logs, preventing runtime crashes while keeping the codebase ready for Web Crashlytics support.
+- **Collection Gating**: Error reporting is disabled automatically in debug and Firebase Emulator environments (`kDebugMode` or `useFirebaseEmulator: true`).
+- **User Association**: Crashlytics user identifiers (`setUserIdentifier`) are synced with Firebase Auth state transitions.
+
 ---
 
 ## Architecture & State Management

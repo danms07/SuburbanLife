@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'backend.dart';
 
 class FirebaseDbReference implements DbReference {
@@ -115,7 +116,11 @@ class FirebaseAuthService implements AuthService {
   final fb_auth.FirebaseAuth _auth = fb_auth.FirebaseAuth.instance;
 
   AppUser? _mapUser(fb_auth.User? fbUser) {
-    if (fbUser == null) return null;
+    if (fbUser == null) {
+      Backend.crashlytics.setUserIdentifier('');
+      return null;
+    }
+    Backend.crashlytics.setUserIdentifier(fbUser.uid);
     return AppUser(
       uid: fbUser.uid,
       email: fbUser.email,
@@ -428,6 +433,94 @@ class FirebaseBackend {
       debugPrint('  ✓ Functions emulator configured (:5001)');
     } catch (e) {
       debugPrint('  ! Functions emulator configuration note: $e');
+    }
+  }
+}
+
+class FirebaseCrashlyticsService implements CrashlyticsService {
+  bool get _isSupportedPlatform => !kIsWeb;
+
+  @override
+  Future<void> recordError(
+    dynamic exception,
+    StackTrace? stack, {
+    dynamic reason,
+    Iterable<Object> information = const [],
+    bool fatal = false,
+  }) async {
+    if (_isSupportedPlatform) {
+      try {
+        await FirebaseCrashlytics.instance.recordError(
+          exception,
+          stack,
+          reason: reason,
+          information: information,
+          fatal: fatal,
+        );
+      } catch (e) {
+        debugPrint('[Crashlytics Native Error] Failed to record error: $e');
+      }
+    } else {
+      debugPrint('[Crashlytics-Web Fallback] $exception (fatal: $fatal, reason: $reason)\n$stack');
+    }
+  }
+
+  @override
+  Future<void> recordFlutterError(FlutterErrorDetails details, {bool fatal = false}) async {
+    if (_isSupportedPlatform) {
+      try {
+        await FirebaseCrashlytics.instance.recordFlutterError(details, fatal: fatal);
+      } catch (e) {
+        debugPrint('[Crashlytics Native Error] Failed to record Flutter error: $e');
+      }
+    } else {
+      debugPrint('[Crashlytics-Web FlutterError] ${details.exceptionAsString()}\n${details.stack}');
+    }
+  }
+
+  @override
+  Future<void> log(String message) async {
+    if (_isSupportedPlatform) {
+      try {
+        await FirebaseCrashlytics.instance.log(message);
+      } catch (e) {
+        debugPrint('[Crashlytics Native Error] Failed to log message: $e');
+      }
+    } else {
+      debugPrint('[Crashlytics-Web Log] $message');
+    }
+  }
+
+  @override
+  Future<void> setUserIdentifier(String identifier) async {
+    if (_isSupportedPlatform) {
+      try {
+        await FirebaseCrashlytics.instance.setUserIdentifier(identifier);
+      } catch (e) {
+        debugPrint('[Crashlytics Native Error] Failed to set user identifier: $e');
+      }
+    }
+  }
+
+  @override
+  Future<void> setCustomKey(String key, Object value) async {
+    if (_isSupportedPlatform) {
+      try {
+        await FirebaseCrashlytics.instance.setCustomKey(key, value);
+      } catch (e) {
+        debugPrint('[Crashlytics Native Error] Failed to set custom key: $e');
+      }
+    }
+  }
+
+  @override
+  Future<void> setCrashlyticsCollectionEnabled(bool enabled) async {
+    if (_isSupportedPlatform) {
+      try {
+        await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(enabled);
+      } catch (e) {
+        debugPrint('[Crashlytics Native Error] Failed to set collection enabled: $e');
+      }
     }
   }
 }

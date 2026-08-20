@@ -1404,4 +1404,130 @@ class AppLocalizationsEn extends AppLocalizations {
   String logPassengersCount(int count) {
     return 'Passengers: $count';
   }
+
+  @override
+  String get errorFallbackTitle => 'Something went wrong';
+
+  @override
+  String get errorFallbackMessage =>
+      'An unexpected error occurred. An error report has been automatically recorded.';
+
+  @override
+  String get errorFallbackRestart => 'Restart App';
+
+  @override
+  String get fileExplorer => 'File Explorer';
+
+  @override
+  String get rootFolder => 'Root';
+
+  @override
+  String get newFolder => 'New Folder';
+
+  @override
+  String get folderName => 'Folder Name';
+
+  @override
+  String get folderCreated => 'Folder created successfully';
+
+  @override
+  String get folderDeleted => 'Folder deleted successfully';
+
+  @override
+  String get deleteFolderConfirmation =>
+      'Are you sure you want to delete this folder and its documents?';
+
+  @override
+  String get emptyFolder => 'This folder is empty';
+
+  @override
+  String itemsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+      zero: '0 items',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get publicationDateLabel => 'Publication Date';
+
+  @override
+  String get selectPublicationDate => 'Select Publication Date';
+
+  @override
+  String get fileTypeLabel => 'File Type';
+
+  @override
+  String get fileSizeLabel => 'Size';
+
+  @override
+  String get moveDocument => 'Move Document';
+
+  @override
+  String get selectDestinationFolder => 'Select Destination Folder';
+
+  @override
+  String get documentMoved => 'Document moved successfully';
+
+  @override
+  String get documentDeleted => 'Document deleted successfully';
+
+  @override
+  String get deleteDocumentConfirmation =>
+      'Are you sure you want to delete this document?';
+
+  @override
+  String get openingExternalDocument => 'Opening document in external app...';
+
+  @override
+  String get noAppToOpenFile => 'No application found to open this file type';
+
+  @override
+  String get cachedLocally => 'Cached';
+
+  @override
+  String get loadingDocument => 'Loading document...';
+
+  @override
+  String get errorLoadingDocument => 'Error loading document';
+
+  @override
+  String get increaseFontSize => 'Increase font size';
+
+  @override
+  String get decreaseFontSize => 'Decrease font size';
+
+  @override
+  String get copyText => 'Copy text';
+
+  @override
+  String get copiedToClipboard => 'Copied to clipboard';
+
+  @override
+  String get shareDocument => 'Share document';
+
+  @override
+  String get searchDocuments => 'Search documents...';
+
+  @override
+  String get allFolders => 'All Folders';
+
+  @override
+  String get currentFolderOnly => 'Current Folder';
+
+  @override
+  String get viewImage => 'View Image';
+
+  @override
+  String get readDocument => 'Read Document';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get retry => 'Retry';
 }

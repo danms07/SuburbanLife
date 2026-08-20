@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 
 /// In-memory implementation of [DbBatch] for testing.
@@ -375,24 +376,79 @@ class FakeFunctionsService implements FunctionsService {
   }
 }
 
+class FakeCrashlyticsService implements CrashlyticsService {
+  final List<String> recordedErrors = [];
+  final List<String> logs = [];
+  String currentUserId = '';
+  final Map<String, Object> customKeys = {};
+  bool isCollectionEnabled = false;
+
+  void clear() {
+    recordedErrors.clear();
+    logs.clear();
+    currentUserId = '';
+    customKeys.clear();
+    isCollectionEnabled = false;
+  }
+
+  @override
+  Future<void> recordError(
+    dynamic exception,
+    StackTrace? stack, {
+    dynamic reason,
+    Iterable<Object> information = const [],
+    bool fatal = false,
+  }) async {
+    recordedErrors.add('$exception (fatal: $fatal, reason: $reason)');
+  }
+
+  @override
+  Future<void> recordFlutterError(FlutterErrorDetails details, {bool fatal = false}) async {
+    recordedErrors.add('${details.exceptionAsString()} (fatal: $fatal)');
+  }
+
+  @override
+  Future<void> log(String message) async {
+    logs.add(message);
+  }
+
+  @override
+  Future<void> setUserIdentifier(String identifier) async {
+    currentUserId = identifier;
+  }
+
+  @override
+  Future<void> setCustomKey(String key, Object value) async {
+    customKeys[key] = value;
+  }
+
+  @override
+  Future<void> setCrashlyticsCollectionEnabled(bool enabled) async {
+    isCollectionEnabled = enabled;
+  }
+}
+
 /// Global testing helper to initialize and reset the [Backend] instance.
 class FakeBackendHelper {
   static final FakeAuthService auth = FakeAuthService();
   static final FakeDatabaseService db = FakeDatabaseService();
   static final FakeStorageService storage = FakeStorageService();
   static final FakeFunctionsService functions = FakeFunctionsService();
+  static final FakeCrashlyticsService crashlytics = FakeCrashlyticsService();
 
   static void setUp() {
     auth.clear();
     db.clear();
     storage.clear();
     functions.clear();
+    crashlytics.clear();
 
     Backend.initialize(
       auth: auth,
       db: db,
       storage: storage,
       functions: functions,
+      crashlytics: crashlytics,
     );
   }
 }

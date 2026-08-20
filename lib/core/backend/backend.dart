@@ -146,26 +146,48 @@ abstract class FunctionsService {
   Future<dynamic> callFunction(String name, [Map<String, dynamic>? parameters]);
 }
 
+abstract class CrashlyticsService {
+  factory CrashlyticsService() => Backend.crashlytics;
+
+  Future<void> recordError(
+    dynamic exception,
+    StackTrace? stack, {
+    dynamic reason,
+    Iterable<Object> information = const [],
+    bool fatal = false,
+  });
+
+  Future<void> recordFlutterError(FlutterErrorDetails details, {bool fatal = false});
+  Future<void> log(String message);
+  Future<void> setUserIdentifier(String identifier);
+  Future<void> setCustomKey(String key, Object value);
+  Future<void> setCrashlyticsCollectionEnabled(bool enabled);
+}
+
 class Backend {
   static AuthService get auth => _auth;
   static DatabaseService get db => _db;
   static StorageService get storage => _storage;
   static FunctionsService get functions => _functions;
+  static CrashlyticsService get crashlytics => _crashlytics;
 
   static late AuthService _auth;
   static late DatabaseService _db;
   static late StorageService _storage;
   static late FunctionsService _functions;
+  static late CrashlyticsService _crashlytics;
 
   static void initialize({
     required AuthService auth,
     required DatabaseService db,
     required StorageService storage,
     required FunctionsService functions,
+    required CrashlyticsService crashlytics,
   }) {
     _auth = auth;
     _db = db;
     _storage = storage;
     _functions = functions;
+    _crashlytics = crashlytics;
   }
 }

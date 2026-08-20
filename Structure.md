@@ -1,10 +1,10 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-08-18 (Complete UI localization rollout across all screens with zero hardcoded strings and updated ARB dictionaries)*
+*Last Verified/Updated: 2026-08-19 (Integrated Firebase Crashlytics with BaaS abstraction, global exception hooks for framework and async errors, graceful Web fallback, and release ErrorFallbackScreen)*
 
 Current state of project files and folders:
 
-- `android/`: Native Android configuration and build files.
+- `android/`: Native Android configuration and build files (including Google Services & Crashlytics Gradle plugins).
 - `assets/`: Application asset directories.
     - `icon/`: Launcher and branding icon assets.
         - `app_icon.png`: Original high-resolution premium app icon.
@@ -28,14 +28,17 @@ Current state of project files and folders:
 - `lib/`: Main Flutter source code.
     - `core/`: Core configuration and themes.
         - `backend/`: Agnostic BaaS service abstractions and service locator.
-            - `backend.dart`: Base interfaces for Auth, Database, Storage, and Cloud Functions.
-            - `firebase_backend.dart`: Firebase concrete implementations of the backend interfaces.
+            - `backend.dart`: Base interfaces for Auth, Database, Storage, Cloud Functions, and Crashlytics (`CrashlyticsService`).
+            - `firebase_backend.dart`: Firebase concrete implementations of backend interfaces (including `FirebaseCrashlyticsService` with `kIsWeb` safety guard).
         - `config/app_config.dart`: Theming, palette, and app name strings.
         - `services/`: Core platform and application services.
             - `app_update_service.dart`: Automatic background version checker, idle/tab-switch detector, and seamless CacheStorage-cleared browser reload service for web.
+            - `document_cache_service.dart`: Local document downloading, caching, and retrieval service preventing repeated network transfers.
+            - `cache_io_helper.dart`: Cross-platform filesystem & memory storage bridge (`cache_io_helper_io.dart`, `cache_io_helper_web.dart`, `cache_io_helper_stub.dart`).
         - `widgets/`: Shared reusable UI components.
             - `storage_network_image.dart`: Cross-platform cached image loader with web CORS and memory fallbacks.
             - `interactive_image_dialog.dart`: Centralized full-screen interactive image viewer with pinch-to-zoom, pan, and dismiss controls.
+            - `error_fallback_screen.dart`: User-friendly release-mode error screen presented on fatal framework rendering or build exceptions.
     - `features/`: Specific feature modules separated by domain.
         - `admin/`: Core management modules for administrators.
             - `admin_create_user_screen.dart`: Unified user creation interface supporting dynamic form switching for Resident (with street/number cascading selection), Security Guard, and Administrator accounts (linked to fixed Admin office address).
@@ -71,8 +74,13 @@ Current state of project files and folders:
             - `qr_generator_screen.dart`: Generator interface.
             - `manage_qr_screen.dart`: History and management of QR codes.
             - `qr_scanner_screen.dart`: Security guard QR capture, ID/plate photo verification, and server-side atomic validation/access logging via `validateAndRegisterQrAccess`.
-            - `qr_service.dart`: Service for QR operations.
-        - `transparency/`: Transparency documents module.
+        - `transparency/`: Transparency documents module emulating a file explorer with virtual directory tree, local caching, and native rendering.
+            - `transparency_screen.dart`: Main File Explorer screen with folder hierarchy navigation, breadcrumbs, search, category filter, document open delegation, and admin folder/file management.
+            - `document_viewer_screen.dart`: Native in-app viewer for Markdown (`.md`) and plain text (`.txt`) documents with font resizing and sharing.
+            - `widgets/`:
+                - `file_explorer_breadcrumb.dart`: Interactive breadcrumb navigation widget.
+                - `folder_card.dart`: Virtual folder card with child item counter and admin actions.
+                - `document_card.dart`: Document tile with type-specific iconography, metadata chips (category, publication date, size), cached status badge, and move/delete actions.
     - `l10n/`: Localization definitions in Spanish and English.
         - `app_en.arb`: English strings.
         - `app_es.arb`: Spanish strings.
@@ -86,6 +94,7 @@ Current state of project files and folders:
             - `bulk_address_csv_parser_test.dart`: CSV delimiter auto-detection, UTF-8 BOM removal, and address range count calculation tests.
             - `bulk_user_csv_parser_test.dart`: Header alias mapping, quoted field parsing, and result CSV compilation tests.
             - `payment_report_matrix_test.dart`: Month boundary generation and financial status matrix tests.
+            - `access_logs_filter_test.dart`: Access logs filtering logic tests.
         - `announcements/announcement_model_test.dart`: Announcement serialization and timestamp parsing tests.
         - `auth/password_validation_test.dart`: Password complexity constraint validation tests.
         - `booking/booking_service_test.dart`: Booking filters, user booking sorting, and cloud function invocation tests.
@@ -93,6 +102,7 @@ Current state of project files and folders:
         - `qr_access/`:
             - `qr_code_model_test.dart`: QrCode model serialization and default parsing tests.
             - `qr_service_test.dart`: QR stream sorting and code invalidation tests.
+        - `transparency/transparency_explorer_test.dart`: Virtual folder hierarchy, document filtering, move operations, and in-app file type identification tests.
     - `helpers/fake_backend.dart`: In-memory BaaS fake service locator for testing services in isolation.
     - `import_boundary_test.dart`: Static boundary verification test enforcing zero direct Firebase SDK imports in `lib/features/` and zero raw `print()` calls in `lib/`.
     - `widget_test.dart`: Smoke test placeholder.

@@ -36,10 +36,13 @@ import 'l10n/app_localizations.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/core/backend/firebase_backend.dart';
 import 'package:suburban_life/core/services/app_update_service.dart';
+import 'package:suburban_life/core/widgets/error_fallback_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  final crashlyticsService = FirebaseCrashlyticsService();
 
   if (AppConfig.useFirebaseEmulator) {
     await FirebaseBackend.useEmulator(
@@ -73,7 +76,30 @@ void main() async {
     db: FirebaseDatabaseService(),
     storage: FirebaseStorageService(),
     functions: FirebaseFunctionsService(),
+    crashlytics: crashlyticsService,
   );
+
+  // Configure Crashlytics collection (disable in debug/emulator unless forced)
+  await crashlyticsService.setCrashlyticsCollectionEnabled(
+    !kDebugMode && !AppConfig.useFirebaseEmulator,
+  );
+
+  // Intercept Flutter framework errors (widget build, layout, RenderFlex)
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    crashlyticsService.recordFlutterError(details, fatal: true);
+  };
+
+  // Intercept unhandled asynchronous errors (Futures, timers, microtasks)
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    crashlyticsService.recordError(error, stack, fatal: true);
+    return true;
+  };
+
+  // User-friendly error widget for release mode
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return ErrorFallbackScreen(details: details);
+  };
 
   // Initialize auto-upgrade service for web
   if (kIsWeb) {

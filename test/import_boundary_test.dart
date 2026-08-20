@@ -12,6 +12,7 @@ void main() {
         'package:firebase_auth/firebase_auth.dart',
         'package:firebase_storage/firebase_storage.dart',
         'package:cloud_functions/cloud_functions.dart',
+        'package:firebase_crashlytics/firebase_crashlytics.dart',
       ];
 
       final dartFiles = featuresDir
