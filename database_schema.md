@@ -177,6 +177,12 @@ erDiagram
 - `targetAudience`: string ('all', 'residents', 'specific_uid')
 - `readBy`: array of user UIDs who have read the announcement
 
+### `document_categories` (Collection)
+- `catId`: string (Document ID / slug, e.g. 'normatives', 'contracts')
+- `name`: string (Category display label)
+- `createdAt`: timestamp
+- `updatedAt`: timestamp (Optional)
+
 ### `document_folders` (Collection)
 - `folderId`: string (Document ID)
 - `name`: string (Folder display name)

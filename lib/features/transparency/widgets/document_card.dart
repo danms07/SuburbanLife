@@ -13,6 +13,7 @@ class DocumentCard extends StatelessWidget {
   final bool isCached;
   final bool isAdmin;
   final VoidCallback onTap;
+  final VoidCallback? onChangeCategory;
   final VoidCallback? onMove;
   final VoidCallback? onDelete;
 
@@ -28,6 +29,7 @@ class DocumentCard extends StatelessWidget {
     this.isCached = false,
     required this.isAdmin,
     required this.onTap,
+    this.onChangeCategory,
     this.onMove,
     this.onDelete,
   }) : super(key: key);
@@ -222,17 +224,30 @@ class DocumentCard extends StatelessWidget {
               ),
 
               // Trailing action menu / open button
-              if (isAdmin && (onMove != null || onDelete != null))
+              if (isAdmin && (onMove != null || onDelete != null || onChangeCategory != null))
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
                   onSelected: (value) {
-                    if (value == 'move' && onMove != null) {
+                    if (value == 'change_category' && onChangeCategory != null) {
+                      onChangeCategory!();
+                    } else if (value == 'move' && onMove != null) {
                       onMove!();
                     } else if (value == 'delete' && onDelete != null) {
                       onDelete!();
                     }
                   },
                   itemBuilder: (context) => [
+                    if (onChangeCategory != null)
+                      PopupMenuItem(
+                        value: 'change_category',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.category_outlined, size: 18, color: AppConfig.primaryColor),
+                            const SizedBox(width: 8),
+                            Text(l10n.changeCategory),
+                          ],
+                        ),
+                      ),
                     if (onMove != null)
                       PopupMenuItem(
                         value: 'move',

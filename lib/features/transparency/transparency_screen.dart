@@ -32,10 +32,6 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   String _selectedCategory = 'all';
   List<Map<String, String>> _categories = [
     {'id': 'all', 'name': 'ALL'},
-    {'id': 'normatives', 'name': 'NORMATIVES'},
-    {'id': 'contracts', 'name': 'CONTRACTS'},
-    {'id': 'financial', 'name': 'FINANCIAL'},
-    {'id': 'communiques', 'name': 'COMMUNIQUES'},
   ];
 
   final TextEditingController _searchController = TextEditingController();
@@ -76,14 +72,21 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         {'id': 'all', 'name': 'ALL'}
       ];
       for (var doc in docs) {
-        loaded.add({
-          'id': doc['id']?.toString() ?? '',
-          'name': doc['name']?.toString() ?? '',
-        });
+        final id = doc['id']?.toString() ?? '';
+        final name = doc['name']?.toString() ?? id;
+        if (id.isNotEmpty) {
+          loaded.add({
+            'id': id,
+            'name': name,
+          });
+        }
       }
       if (mounted) {
         setState(() {
           _categories = loaded;
+          if (!_categories.any((c) => c['id'] == _selectedCategory)) {
+            _selectedCategory = 'all';
+          }
         });
       }
     });
@@ -98,7 +101,10 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     };
     await DatabaseService().runBatch((batch) async {
       for (var entry in defaults.entries) {
-        batch.set('document_categories', entry.key, {'name': entry.value});
+        batch.set('document_categories', entry.key, {
+          'name': entry.value,
+          'createdAt': DbFieldValue.serverTimestamp(),
+        });
       }
     });
   }
@@ -139,15 +145,46 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   // --- Document Opening ---
 
+  void _checkCachedDocuments(List<Map<String, dynamic>> docs) async {
+    for (var doc in docs) {
+      final docId = doc['id']?.toString() ?? '';
+      if (docId.isEmpty || _cachedDocIds.contains(docId)) continue;
+
+      final title = doc['title']?.toString() ?? doc['fileName']?.toString() ?? '';
+      final rawFileName = doc['fileName']?.toString() ?? '$title.bin';
+      final fileType = (doc['fileType']?.toString() ?? (rawFileName.contains('.') ? rawFileName.split('.').last : '')).toLowerCase();
+      String fileName = rawFileName;
+      if (!fileName.contains('.') && fileType.isNotEmpty) {
+        fileName = '$fileName.$fileType';
+      }
+
+      final cached = await _cacheService.isCached(docId, fileName);
+      if (cached && mounted && !_cachedDocIds.contains(docId)) {
+        setState(() {
+          _cachedDocIds.add(docId);
+        });
+      }
+    }
+  }
+
   void _openDocument(BuildContext context, Map<String, dynamic> doc) async {
     final l10n = AppLocalizations.of(context)!;
     final docId = doc['id']?.toString() ?? '';
     final title = doc['title']?.toString() ?? doc['fileName']?.toString() ?? l10n.untitledDocument;
-    final fileName = doc['fileName']?.toString() ?? '$title.bin';
-    final fileType = (doc['fileType']?.toString() ?? fileName.split('.').last).toLowerCase();
+    final rawFileName = doc['fileName']?.toString() ?? '$title.bin';
+    final fileType = (doc['fileType']?.toString() ?? (rawFileName.contains('.') ? rawFileName.split('.').last : '')).toLowerCase();
+    
+    // Ensure fileName has proper extension if known
+    String fileName = rawFileName;
+    if (!fileName.contains('.') && fileType.isNotEmpty) {
+      fileName = '$fileName.$fileType';
+    }
+
     final url = doc['url']?.toString() ?? '';
     final category = doc['category']?.toString();
     final fileSize = doc['fileSize'] as int?;
+
+    debugPrint('>>> [_openDocument] Document clicked: docId="$docId", title="$title", fileName="$fileName", fileType="$fileType", url="$url"');
 
     DateTime? publicationDate;
     final rawDate = doc['publicationDate'] ?? doc['uploadedAt'] ?? doc['timestamp'];
@@ -162,6 +199,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     }
 
     if (url.isEmpty) {
+      debugPrint('>>> [_openDocument] ERROR: Document URL is empty.');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.errorLoadingDocument)),
       );
@@ -170,6 +208,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
     // 1. Text / Markdown Files -> Native In-App Document Viewer Screen
     if (fileType == 'md' || fileType == 'txt' || fileName.endsWith('.md') || fileName.endsWith('.txt')) {
+      debugPrint('>>> [_openDocument] Opening text/markdown file in DocumentViewerScreen');
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -190,6 +229,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
     // 2. Images -> In-App Interactive Viewer Dialog
     if (['png', 'jpg', 'jpeg', 'webp', 'gif'].contains(fileType)) {
+      debugPrint('>>> [_openDocument] Opening image in interactive viewer dialog');
       showInteractiveImageDialog(
         context,
         url,
@@ -199,37 +239,124 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     }
 
     // 3. Binary Files (PDF, DOCX, XLSX, etc.) -> Cache locally & Open via Intent Resolver / Default App
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.openingExternalDocument), duration: const Duration(seconds: 2)),
-    );
+    debugPrint('>>> [_openDocument] Handling binary/external document: "$fileName" ($fileType)');
 
+    // Web Platform: Download and/or Open via blob to support offline in-memory cache and bypass popup blockers
     if (kIsWeb) {
-      html.window.open(url, '_blank');
+      try {
+        final isCached = await _cacheService.isCached(docId, fileName);
+        debugPrint('>>> [_openDocument] Web: isCached=$isCached');
+
+        if (!isCached) {
+          debugPrint('>>> [_openDocument] Web: downloading bytes for "$fileName"...');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(l10n.downloadingDocument),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          debugPrint('>>> [_openDocument] Web: reusing cached bytes for "$fileName" without re-downloading.');
+        }
+
+        final bytes = await _cacheService.getOrDownloadBytes(docId, url, fileName);
+        if (mounted) {
+          setState(() {
+            _cachedDocIds.add(docId);
+          });
+        }
+
+        debugPrint('>>> [_openDocument] Web: creating blob from ${bytes.length} bytes for "$fileName"');
+        final blob = html.Blob([bytes]);
+        final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: blobUrl)
+          ..setAttribute('download', fileName)
+          ..target = '_blank';
+        html.document.body?.append(anchor);
+        anchor.click();
+        anchor.remove();
+        html.Url.revokeObjectUrl(blobUrl);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isCached ? l10n.openingExternalDocument : l10n.downloadCodeSuccess),
+              backgroundColor: AppConfig.secondaryColor,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e, stack) {
+        debugPrint('>>> [_openDocument] Web download/open error: $e\n$stack');
+        html.window.open(url, '_blank');
+      }
       return;
     }
 
+    // Native Platforms (Android, iOS, macOS, Windows, Linux)
     try {
-      final filePath = await _cacheService.getOrDownloadFilePath(docId, url, fileName);
-      if (filePath != null && filePath.isNotEmpty) {
-        setState(() {
-          _cachedDocIds.add(docId);
-        });
+      final isAlreadyCached = await _cacheService.isCached(docId, fileName);
+      debugPrint('>>> [_openDocument] Native platform: isAlreadyCached=$isAlreadyCached for "$fileName"');
 
+      if (!isAlreadyCached) {
+        debugPrint('>>> [_openDocument] Native: Document not cached. Notifying user and starting download...');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.downloadingDocument),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        debugPrint('>>> [_openDocument] Native: Document ALREADY cached. Opening directly from disk without re-downloading.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.openingExternalDocument),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      }
+
+      final filePath = await _cacheService.getOrDownloadFilePath(docId, url, fileName);
+      debugPrint('>>> [_openDocument] Native: Resolved local file path: "$filePath"');
+
+      if (filePath != null && filePath.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _cachedDocIds.add(docId);
+          });
+        }
+
+        debugPrint('>>> [_openDocument] Invoking OpenFilex.open on "$filePath"...');
         final result = await OpenFilex.open(filePath);
+        debugPrint('>>> [_openDocument] OpenFilex response: type=${result.type}, message="${result.message}"');
+
         if (result.type != ResultType.done) {
-          debugPrint('OpenFilex result: ${result.message}');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('${l10n.noAppToOpenFile}: ${result.message}'),
                 backgroundColor: Colors.orange.shade800,
+                duration: const Duration(seconds: 4),
               ),
             );
           }
         }
+      } else {
+        debugPrint('>>> [_openDocument] ERROR: filePath was null or empty after cache resolution.');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.errorLoadingDocument)),
+          );
+        }
       }
-    } catch (e) {
-      debugPrint('Error opening document: $e');
+    } catch (e, stack) {
+      debugPrint('>>> [_openDocument] Exception opening document: $e\n$stack');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
@@ -393,7 +520,11 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     }
 
     final titleController = TextEditingController(text: selectedFileName);
-    final initialCategory = _categories.firstWhere((c) => c['id'] != 'all', orElse: () => {'id': 'normatives'})['id']!;
+    final availableCategories = _categories.where((c) => c['id'] != 'all').toList();
+    if (availableCategories.isEmpty) {
+      availableCategories.add({'id': 'general', 'name': 'General'});
+    }
+    final initialCategory = availableCategories.first['id']!;
     String uploadCategory = initialCategory;
     DateTime publicationDate = DateTime.now();
 
@@ -440,7 +571,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         labelText: l10n.categoryLabel,
                         border: const OutlineInputBorder(),
                       ),
-                      items: _categories.where((c) => c['id'] != 'all').map((cat) {
+                      items: availableCategories.map((cat) {
                         return DropdownMenuItem<String>(
                           value: cat['id'],
                           child: Text(cat['name']!.toUpperCase()),
@@ -563,6 +694,113 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     }
                   },
                   child: Text(l10n.uploadButton),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showChangeDocumentCategoryDialog(Map<String, dynamic> doc) {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final docId = doc['id']?.toString() ?? '';
+    final currentDocCategory = doc['category']?.toString() ?? '';
+    final availableCategories = _categories.where((c) => c['id'] != 'all').toList();
+
+    if (availableCategories.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.noCategoriesFound)),
+      );
+      return;
+    }
+
+    String selectedCategory = availableCategories.any((c) => c['id']?.toLowerCase() == currentDocCategory.toLowerCase())
+        ? availableCategories.firstWhere((c) => c['id']?.toLowerCase() == currentDocCategory.toLowerCase())['id']!
+        : availableCategories.first['id']!;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.category_outlined, color: AppConfig.primaryColor),
+                  const SizedBox(width: 8),
+                  Text(l10n.changeCategory),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    doc['title']?.toString() ?? doc['fileName']?.toString() ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${l10n.selectNewCategory}:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedCategory,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                    items: availableCategories.map((cat) {
+                      return DropdownMenuItem<String>(
+                        value: cat['id'],
+                        child: Text(cat['name']!.toUpperCase()),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          selectedCategory = val;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(l10n.cancel),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogCtx);
+                    try {
+                      await DatabaseService().updateDocument('documents', docId, {
+                        'category': selectedCategory,
+                        'updatedAt': DbFieldValue.serverTimestamp(),
+                      });
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.documentCategoryChanged),
+                            backgroundColor: AppConfig.secondaryColor,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                        );
+                      }
+                    }
+                  },
+                  child: Text(l10n.save),
                 ),
               ],
             );
@@ -759,6 +997,298 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     );
   }
 
+  // --- Admin Category Management ---
+
+  void _showManageCategoriesDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: DatabaseService().streamCollection('document_categories'),
+          builder: (context, catSnapshot) {
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: DatabaseService().streamCollection('documents'),
+              builder: (context, docSnapshot) {
+                final categories = catSnapshot.data ?? [];
+                final documents = docSnapshot.data ?? [];
+
+                return AlertDialog(
+                  title: Row(
+                    children: [
+                      const Icon(Icons.category, color: AppConfig.primaryColor),
+                      const SizedBox(width: 8),
+                      Text(l10n.manageCategories),
+                    ],
+                  ),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddOrEditCategoryDialog(context),
+                          icon: const Icon(Icons.add),
+                          label: Text(l10n.addCategory),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppConfig.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (categories.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24.0),
+                            child: Center(
+                              child: Text(
+                                l10n.noCategoriesFound,
+                                style: TextStyle(color: Colors.grey.shade600),
+                              ),
+                            ),
+                          )
+                        else
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 300),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: categories.length,
+                              separatorBuilder: (context, index) => const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final cat = categories[index];
+                                final catId = cat['id']?.toString() ?? '';
+                                final catName = cat['name']?.toString() ?? catId;
+                                final docCount = documents.where((d) => (d['category']?.toString().toLowerCase() ?? '') == catId.toLowerCase()).length;
+
+                                return ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  title: Text(
+                                    catName,
+                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                  ),
+                                  subtitle: Text(
+                                    l10n.itemsCount(docCount),
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined, size: 20, color: AppConfig.primaryColor),
+                                        tooltip: l10n.editCategory,
+                                        onPressed: () => _showAddOrEditCategoryDialog(context, category: cat),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(
+                                          docCount > 0 ? Icons.delete_forever : Icons.delete_outline,
+                                          size: 20,
+                                          color: docCount > 0 ? Colors.grey.shade400 : Colors.redAccent,
+                                        ),
+                                        tooltip: docCount > 0 ? l10n.cannotDeleteCategoryInUseTooltip(docCount) : l10n.deleteCategory,
+                                        onPressed: () => _confirmDeleteCategory(context, cat, docCount),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogCtx),
+                      child: Text(l10n.cancel),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAddOrEditCategoryDialog(BuildContext context, {Map<String, dynamic>? category}) {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final isEditing = category != null;
+    final nameController = TextEditingController(text: isEditing ? (category['name']?.toString() ?? '') : '');
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(isEditing ? Icons.edit : Icons.add_circle_outline, color: AppConfig.primaryColor),
+            const SizedBox(width: 8),
+            Text(isEditing ? l10n.editCategory : l10n.addCategory),
+          ],
+        ),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            labelText: l10n.categoryName,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) return;
+
+              Navigator.pop(dialogCtx);
+
+              try {
+                if (isEditing) {
+                  final catId = category['id']?.toString() ?? '';
+                  await DatabaseService().updateDocument('document_categories', catId, {
+                    'name': name,
+                    'updatedAt': DbFieldValue.serverTimestamp(),
+                  });
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.categoryUpdated),
+                        backgroundColor: AppConfig.secondaryColor,
+                      ),
+                    );
+                  }
+                } else {
+                  final catId = name.toLowerCase().replaceAll(RegExp(r'[^\w]'), '_');
+                  await DatabaseService().setDocument('document_categories', catId, {
+                    'name': name,
+                    'createdAt': DbFieldValue.serverTimestamp(),
+                  });
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.categoryCreated),
+                        backgroundColor: AppConfig.secondaryColor,
+                      ),
+                    );
+                  }
+                }
+              } catch (e) {
+                debugPrint('Error saving category: $e');
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                  );
+                }
+              }
+            },
+            child: Text(isEditing ? l10n.save : l10n.create),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteCategory(BuildContext context, Map<String, dynamic> category, int docsCount) {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final catId = category['id']?.toString() ?? '';
+    final catName = category['name']?.toString() ?? catId;
+
+    if (docsCount > 0) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.block, color: Colors.red.shade700),
+              const SizedBox(width: 8),
+              Text(l10n.deleteCategory),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(catName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        l10n.categoryInUseBlocked(docsCount),
+                        style: TextStyle(fontSize: 13, color: Colors.red.shade900, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(l10n.understood),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(l10n.deleteCategoryConfirmation),
+        content: Text(catName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              try {
+                await DatabaseService().deleteDocument('document_categories', catId);
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(l10n.categoryDeleted)),
+                  );
+                }
+              } catch (e) {
+                debugPrint('Error deleting category: $e');
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                  );
+                }
+              }
+            },
+            child: Text(l10n.delete),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- UI Building ---
 
   @override
@@ -880,6 +1410,14 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   ),
                 ),
               ),
+              if (_isAdmin) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined, color: AppConfig.primaryColor),
+                  tooltip: l10n.manageCategories,
+                  onPressed: () => _showManageCategoriesDialog(context),
+                ),
+              ],
             ],
           ),
         ],
@@ -901,6 +1439,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
             final allFolders = folderSnapshot.data ?? [];
             final allDocs = docSnapshot.data ?? [];
+            _checkCachedDocuments(allDocs);
 
             // Filter folders for current level
             final currentFolders = allFolders.where((f) {
@@ -1021,7 +1560,13 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   final fileName = doc['fileName']?.toString() ?? '';
                   final fileType = doc['fileType']?.toString() ?? '';
                   final fileSize = doc['fileSize'] as int?;
-                  final category = doc['category']?.toString();
+                  final categoryId = doc['category']?.toString();
+                  final categoryName = categoryId != null && categoryId.isNotEmpty
+                      ? (_categories.firstWhere(
+                          (c) => c['id']?.toLowerCase() == categoryId.toLowerCase(),
+                          orElse: () => {'id': categoryId, 'name': categoryId},
+                        )['name'])
+                      : null;
 
                   DateTime? pubDate;
                   final raw = doc['publicationDate'] ?? doc['uploadedAt'] ?? doc['timestamp'];
@@ -1041,11 +1586,12 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     fileName: fileName,
                     fileType: fileType,
                     fileSize: fileSize,
-                    category: category,
+                    category: categoryName,
                     publicationDate: pubDate,
                     isCached: _cachedDocIds.contains(docId),
                     isAdmin: _isAdmin,
                     onTap: () => _openDocument(context, doc),
+                    onChangeCategory: _isAdmin ? () => _showChangeDocumentCategoryDialog(doc) : null,
                     onMove: _isAdmin ? () => _showMoveDocumentDialog(doc) : null,
                     onDelete: _isAdmin ? () => _confirmDeleteDocument(doc) : null,
                   );
@@ -1063,6 +1609,18 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        FloatingActionButton.extended(
+          heroTag: 'fab_manage_categories',
+          onPressed: () {
+            debugPrint('>>> [TransparencyScreen] Manage Categories FAB tapped');
+            _showManageCategoriesDialog(context);
+          },
+          icon: const Icon(Icons.category),
+          label: Text(l10n.manageCategories),
+          backgroundColor: Colors.teal.shade700,
+          foregroundColor: Colors.white,
+        ),
+        const SizedBox(height: 10),
         FloatingActionButton.extended(
           heroTag: 'fab_create_folder',
           onPressed: () {

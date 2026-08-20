@@ -19,9 +19,13 @@ class NativeCacheIoHelper implements CacheIoHelper {
     try {
       final cacheDir = await _getCacheDirectory();
       final file = File('${cacheDir.path}/$key');
-      return await file.exists() && (await file.length()) > 0;
+      final exists = await file.exists();
+      final length = exists ? await file.length() : 0;
+      final cached = exists && length > 0;
+      debugPrint('>>> [NativeCacheIoHelper] isCached(key="$key"): exists=$exists, size=$length bytes => $cached');
+      return cached;
     } catch (e) {
-      debugPrint('Error checking cache: $e');
+      debugPrint('>>> [NativeCacheIoHelper] Error checking cache: $e');
       return false;
     }
   }
@@ -32,10 +36,11 @@ class NativeCacheIoHelper implements CacheIoHelper {
       final cacheDir = await _getCacheDirectory();
       final file = File('${cacheDir.path}/$key');
       if (await file.exists() && (await file.length()) > 0) {
+        debugPrint('>>> [NativeCacheIoHelper] getCachedBytes: reading from ${file.path}');
         return await file.readAsBytes();
       }
     } catch (e) {
-      debugPrint('Error reading cached bytes: $e');
+      debugPrint('>>> [NativeCacheIoHelper] Error reading cached bytes: $e');
     }
     return null;
   }
@@ -46,8 +51,9 @@ class NativeCacheIoHelper implements CacheIoHelper {
       final cacheDir = await _getCacheDirectory();
       final file = File('${cacheDir.path}/$key');
       await file.writeAsBytes(bytes, flush: true);
+      debugPrint('>>> [NativeCacheIoHelper] saveCachedBytes: wrote ${bytes.length} bytes to ${file.path}');
     } catch (e) {
-      debugPrint('Error saving cached bytes: $e');
+      debugPrint('>>> [NativeCacheIoHelper] Error saving cached bytes: $e');
     }
   }
 
@@ -57,10 +63,11 @@ class NativeCacheIoHelper implements CacheIoHelper {
       final cacheDir = await _getCacheDirectory();
       final file = File('${cacheDir.path}/$key');
       if (await file.exists() && (await file.length()) > 0) {
+        debugPrint('>>> [NativeCacheIoHelper] getCachedFilePath: found valid cached file at ${file.path}');
         return file.path;
       }
     } catch (e) {
-      debugPrint('Error getting cached file path: $e');
+      debugPrint('>>> [NativeCacheIoHelper] Error getting cached file path: $e');
     }
     return null;
   }
@@ -72,9 +79,10 @@ class NativeCacheIoHelper implements CacheIoHelper {
       final file = File('${cacheDir.path}/$key');
       if (await file.exists()) {
         await file.delete();
+        debugPrint('>>> [NativeCacheIoHelper] removeCachedFile: deleted ${file.path}');
       }
     } catch (e) {
-      debugPrint('Error removing cached file: $e');
+      debugPrint('>>> [NativeCacheIoHelper] Error removing cached file: $e');
     }
   }
 
@@ -84,9 +92,10 @@ class NativeCacheIoHelper implements CacheIoHelper {
       final cacheDir = await _getCacheDirectory();
       if (await cacheDir.exists()) {
         await cacheDir.delete(recursive: true);
+        debugPrint('>>> [NativeCacheIoHelper] clearAllCache: deleted cache directory at ${cacheDir.path}');
       }
     } catch (e) {
-      debugPrint('Error clearing cache: $e');
+      debugPrint('>>> [NativeCacheIoHelper] Error clearing cache: $e');
     }
   }
 
@@ -95,10 +104,11 @@ class NativeCacheIoHelper implements CacheIoHelper {
     try {
       final file = File(filePath);
       if (await file.exists()) {
+        debugPrint('>>> [NativeCacheIoHelper] readFileBytesFromDisk: reading ${file.path}');
         return await file.readAsBytes();
       }
     } catch (e) {
-      debugPrint('Error reading file bytes from disk: $e');
+      debugPrint('>>> [NativeCacheIoHelper] Error reading file bytes from disk: $e');
     }
     return null;
   }

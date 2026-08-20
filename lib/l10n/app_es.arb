@@ -535,6 +535,38 @@
   "viewImage": "Ver imagen",
   "readDocument": "Leer documento",
   "delete": "Eliminar",
-  "retry": "Reintentar"
+  "retry": "Reintentar",
+  "manageCategories": "Administrar Categorías",
+  "addCategory": "Agregar Categoría",
+  "editCategory": "Editar Categoría",
+  "deleteCategory": "Eliminar Categoría",
+  "categoryName": "Nombre de la Categoría",
+  "categoryCreated": "Categoría creada exitosamente",
+  "categoryUpdated": "Categoría actualizada exitosamente",
+  "categoryDeleted": "Categoría eliminada exitosamente",
+  "deleteCategoryConfirmation": "¿Estás seguro de que deseas eliminar esta categoría?",
+  "categoryInUseWarning": "Esta categoría está asignada a {count} documento(s). ¿Estás seguro de que deseas eliminarla?",
+  "noCategoriesFound": "No hay categorías registradas",
+  "allCategories": "TODAS",
+  "changeCategory": "Cambiar Categoría",
+  "selectNewCategory": "Seleccionar nueva categoría",
+  "documentCategoryChanged": "Categoría del documento actualizada exitosamente",
+  "categoryInUseBlocked": "Esta categoría está asignada actualmente a {count, plural, =1{1 documento} other{{count} documentos}}. Debe reasignar o eliminar los documentos antes de poder borrar esta categoría.",
+  "@categoryInUseBlocked": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cannotDeleteCategoryInUseTooltip": "No se puede eliminar: asignada a {count, plural, =1{1 documento} other{{count} documentos}}",
+  "@cannotDeleteCategoryInUseTooltip": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "understood": "Entendido"
 }
 

@@ -661,6 +661,45 @@
   "viewImage": "View Image",
   "readDocument": "Read Document",
   "delete": "Delete",
-  "retry": "Retry"
+  "retry": "Retry",
+  "manageCategories": "Manage Categories",
+  "addCategory": "Add Category",
+  "editCategory": "Edit Category",
+  "deleteCategory": "Delete Category",
+  "categoryName": "Category Name",
+  "categoryCreated": "Category created successfully",
+  "categoryUpdated": "Category updated successfully",
+  "categoryDeleted": "Category deleted successfully",
+  "deleteCategoryConfirmation": "Are you sure you want to delete this category?",
+  "categoryInUseWarning": "This category is assigned to {count} document(s). Are you sure you want to delete it?",
+  "@categoryInUseWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noCategoriesFound": "No categories registered",
+  "allCategories": "ALL",
+  "changeCategory": "Change Category",
+  "selectNewCategory": "Select New Category",
+  "documentCategoryChanged": "Document category updated successfully",
+  "categoryInUseBlocked": "This category is currently assigned to {count, plural, =1{1 document} other{{count} documents}}. You must reassign or delete the documents before this category can be removed.",
+  "@categoryInUseBlocked": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cannotDeleteCategoryInUseTooltip": "Cannot delete: assigned to {count, plural, =1{1 document} other{{count} documents}}",
+  "@cannotDeleteCategoryInUseTooltip": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "understood": "Understood"
 }
 

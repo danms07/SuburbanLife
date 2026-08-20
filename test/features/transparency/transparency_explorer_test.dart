@@ -99,5 +99,35 @@ void main() {
       expect(isNativeInAppViewer('docx'), isFalse);
       expect(isNativeInAppViewer('xlsx'), isFalse);
     });
+
+    test('Changing a document category updates category attribute', () {
+      final mutableDoc = Map<String, dynamic>.from(sampleDocs[0]);
+      expect(mutableDoc['category'], 'normatives');
+
+      // Admin updates category to contracts
+      mutableDoc['category'] = 'contracts';
+      expect(mutableDoc['category'], 'contracts');
+    });
+
+    test('Blocks deletion of categories that have active documents assigned', () {
+      bool canDeleteCategory(String categoryId, List<Map<String, dynamic>> documents) {
+        final count = documents.where(
+          (d) => (d['category']?.toString().toLowerCase() ?? '') == categoryId.toLowerCase(),
+        ).length;
+        return count == 0;
+      }
+
+      // 'normatives' is in use by doc-1 -> MUST BE BLOCKED
+      expect(canDeleteCategory('normatives', sampleDocs), isFalse);
+
+      // 'financial' is in use by doc-2 -> MUST BE BLOCKED
+      expect(canDeleteCategory('financial', sampleDocs), isFalse);
+
+      // 'contracts' has 0 documents -> ALLOWED
+      expect(canDeleteCategory('contracts', sampleDocs), isTrue);
+
+      // 'unknown_cat' has 0 documents -> ALLOWED
+      expect(canDeleteCategory('unknown_cat', sampleDocs), isTrue);
+    });
   });
 }

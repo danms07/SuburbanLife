@@ -1554,4 +1554,78 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get retry => 'Reintentar';
+
+  @override
+  String get manageCategories => 'Administrar Categorías';
+
+  @override
+  String get addCategory => 'Agregar Categoría';
+
+  @override
+  String get editCategory => 'Editar Categoría';
+
+  @override
+  String get deleteCategory => 'Eliminar Categoría';
+
+  @override
+  String get categoryName => 'Nombre de la Categoría';
+
+  @override
+  String get categoryCreated => 'Categoría creada exitosamente';
+
+  @override
+  String get categoryUpdated => 'Categoría actualizada exitosamente';
+
+  @override
+  String get categoryDeleted => 'Categoría eliminada exitosamente';
+
+  @override
+  String get deleteCategoryConfirmation =>
+      '¿Estás seguro de que deseas eliminar esta categoría?';
+
+  @override
+  String categoryInUseWarning(int count) {
+    return 'Esta categoría está asignada a $count documento(s). ¿Estás seguro de que deseas eliminarla?';
+  }
+
+  @override
+  String get noCategoriesFound => 'No hay categorías registradas';
+
+  @override
+  String get allCategories => 'TODAS';
+
+  @override
+  String get changeCategory => 'Cambiar Categoría';
+
+  @override
+  String get selectNewCategory => 'Seleccionar nueva categoría';
+
+  @override
+  String get documentCategoryChanged =>
+      'Categoría del documento actualizada exitosamente';
+
+  @override
+  String categoryInUseBlocked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count documentos',
+      one: '1 documento',
+    );
+    return 'Esta categoría está asignada actualmente a $_temp0. Debe reasignar o eliminar los documentos antes de poder borrar esta categoría.';
+  }
+
+  @override
+  String cannotDeleteCategoryInUseTooltip(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count documentos',
+      one: '1 documento',
+    );
+    return 'No se puede eliminar: asignada a $_temp0';
+  }
+
+  @override
+  String get understood => 'Entendido';
 }

@@ -1530,4 +1530,78 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get retry => 'Retry';
+
+  @override
+  String get manageCategories => 'Manage Categories';
+
+  @override
+  String get addCategory => 'Add Category';
+
+  @override
+  String get editCategory => 'Edit Category';
+
+  @override
+  String get deleteCategory => 'Delete Category';
+
+  @override
+  String get categoryName => 'Category Name';
+
+  @override
+  String get categoryCreated => 'Category created successfully';
+
+  @override
+  String get categoryUpdated => 'Category updated successfully';
+
+  @override
+  String get categoryDeleted => 'Category deleted successfully';
+
+  @override
+  String get deleteCategoryConfirmation =>
+      'Are you sure you want to delete this category?';
+
+  @override
+  String categoryInUseWarning(int count) {
+    return 'This category is assigned to $count document(s). Are you sure you want to delete it?';
+  }
+
+  @override
+  String get noCategoriesFound => 'No categories registered';
+
+  @override
+  String get allCategories => 'ALL';
+
+  @override
+  String get changeCategory => 'Change Category';
+
+  @override
+  String get selectNewCategory => 'Select New Category';
+
+  @override
+  String get documentCategoryChanged =>
+      'Document category updated successfully';
+
+  @override
+  String categoryInUseBlocked(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count documents',
+      one: '1 document',
+    );
+    return 'This category is currently assigned to $_temp0. You must reassign or delete the documents before this category can be removed.';
+  }
+
+  @override
+  String cannotDeleteCategoryInUseTooltip(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count documents',
+      one: '1 document',
+    );
+    return 'Cannot delete: assigned to $_temp0';
+  }
+
+  @override
+  String get understood => 'Understood';
 }

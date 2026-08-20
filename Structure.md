@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-08-19 (Integrated Firebase Crashlytics with BaaS abstraction, global exception hooks for framework and async errors, graceful Web fallback, and release ErrorFallbackScreen)*
+*Last Verified/Updated: 2026-08-19 (Made transparency document categories fully dynamic in Firestore with admin CRUD dialog, in-use safeguards, and localization)*
 
 Current state of project files and folders:
 
@@ -74,13 +74,13 @@ Current state of project files and folders:
             - `qr_generator_screen.dart`: Generator interface.
             - `manage_qr_screen.dart`: History and management of QR codes.
             - `qr_scanner_screen.dart`: Security guard QR capture, ID/plate photo verification, and server-side atomic validation/access logging via `validateAndRegisterQrAccess`.
-        - `transparency/`: Transparency documents module emulating a file explorer with virtual directory tree, local caching, and native rendering.
-            - `transparency_screen.dart`: Main File Explorer screen with folder hierarchy navigation, breadcrumbs, search, category filter, document open delegation, and admin folder/file management.
+        - `transparency/`: Transparency documents module emulating a file explorer with virtual directory tree, local caching, native rendering, document category re-assignment, and category management with in-use deletion protection.
+            - `transparency_screen.dart`: Main File Explorer screen with folder hierarchy navigation, breadcrumbs, search, category filter, document open delegation, category management, and admin folder/file management.
             - `document_viewer_screen.dart`: Native in-app viewer for Markdown (`.md`) and plain text (`.txt`) documents with font resizing and sharing.
             - `widgets/`:
                 - `file_explorer_breadcrumb.dart`: Interactive breadcrumb navigation widget.
                 - `folder_card.dart`: Virtual folder card with child item counter and admin actions.
-                - `document_card.dart`: Document tile with type-specific iconography, metadata chips (category, publication date, size), cached status badge, and move/delete actions.
+                - `document_card.dart`: Document tile with type-specific iconography, metadata chips (category, publication date, size), cached status badge, and change category/move/delete actions.
     - `l10n/`: Localization definitions in Spanish and English.
         - `app_en.arb`: English strings.
         - `app_es.arb`: Spanish strings.

@@ -2923,6 +2923,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get retry;
+
+  /// No description provided for @manageCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Categories'**
+  String get manageCategories;
+
+  /// No description provided for @addCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Category'**
+  String get addCategory;
+
+  /// No description provided for @editCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Category'**
+  String get editCategory;
+
+  /// No description provided for @deleteCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Category'**
+  String get deleteCategory;
+
+  /// No description provided for @categoryName.
+  ///
+  /// In en, this message translates to:
+  /// **'Category Name'**
+  String get categoryName;
+
+  /// No description provided for @categoryCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Category created successfully'**
+  String get categoryCreated;
+
+  /// No description provided for @categoryUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Category updated successfully'**
+  String get categoryUpdated;
+
+  /// No description provided for @categoryDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Category deleted successfully'**
+  String get categoryDeleted;
+
+  /// No description provided for @deleteCategoryConfirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this category?'**
+  String get deleteCategoryConfirmation;
+
+  /// No description provided for @categoryInUseWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This category is assigned to {count} document(s). Are you sure you want to delete it?'**
+  String categoryInUseWarning(int count);
+
+  /// No description provided for @noCategoriesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No categories registered'**
+  String get noCategoriesFound;
+
+  /// No description provided for @allCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'ALL'**
+  String get allCategories;
+
+  /// No description provided for @changeCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Category'**
+  String get changeCategory;
+
+  /// No description provided for @selectNewCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Select New Category'**
+  String get selectNewCategory;
+
+  /// No description provided for @documentCategoryChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Document category updated successfully'**
+  String get documentCategoryChanged;
+
+  /// No description provided for @categoryInUseBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'This category is currently assigned to {count, plural, =1{1 document} other{{count} documents}}. You must reassign or delete the documents before this category can be removed.'**
+  String categoryInUseBlocked(int count);
+
+  /// No description provided for @cannotDeleteCategoryInUseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot delete: assigned to {count, plural, =1{1 document} other{{count} documents}}'**
+  String cannotDeleteCategoryInUseTooltip(int count);
+
+  /// No description provided for @understood.
+  ///
+  /// In en, this message translates to:
+  /// **'Understood'**
+  String get understood;
 }
 
 class _AppLocalizationsDelegate
