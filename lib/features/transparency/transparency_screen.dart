@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -300,17 +301,69 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   void _uploadDocument() async {
     final l10n = AppLocalizations.of(context)!;
-    debugPrint('>>> [_uploadDocument] Triggered. Launching FilePicker...');
+    debugPrint('>>> [_uploadDocument] Triggered. Determining platform file picker...');
 
-    FilePickerResult? result;
+    String? selectedFileName;
+    Uint8List? rawBytes;
+    int? fileSize;
+
     try {
-      result = await FilePicker.pickFiles(
-        type: FileType.any,
-        withData: true,
-      );
-      debugPrint('>>> [_uploadDocument] FilePicker result: $result (files: ${result?.files.length})');
+      if (kIsWeb) {
+        debugPrint('>>> [_uploadDocument] Web platform: launching html.FileUploadInputElement...');
+        final uploadInput = html.FileUploadInputElement()..accept = '*/*';
+        uploadInput.click();
+
+        await uploadInput.onChange.first;
+        if (uploadInput.files == null || uploadInput.files!.isEmpty) {
+          debugPrint('>>> [_uploadDocument] Web picker: user cancelled or empty.');
+          return;
+        }
+
+        final file = uploadInput.files!.first;
+        selectedFileName = file.name;
+        fileSize = file.size;
+
+        final reader = html.FileReader();
+        reader.readAsArrayBuffer(file);
+        await reader.onLoadEnd.first;
+
+        final result = reader.result;
+        if (result != null) {
+          if (result is Uint8List) {
+            rawBytes = result;
+          } else if (result is ByteBuffer) {
+            rawBytes = result.asUint8List();
+          } else if (result is List<int>) {
+            rawBytes = Uint8List.fromList(result);
+          }
+        }
+        debugPrint('>>> [_uploadDocument] Web file read: name="$selectedFileName", bytes=${rawBytes?.length}, size=$fileSize');
+      } else {
+        debugPrint('>>> [_uploadDocument] Native platform: launching FilePicker...');
+        final result = await FilePicker.pickFiles(
+          type: FileType.any,
+          withData: true,
+        );
+        debugPrint('>>> [_uploadDocument] FilePicker result: $result (files: ${result?.files.length})');
+
+        if (result == null || result.files.isEmpty) {
+          debugPrint('>>> [_uploadDocument] No file selected or picker cancelled.');
+          return;
+        }
+
+        final file = result.files.first;
+        selectedFileName = file.name;
+        fileSize = file.size;
+        rawBytes = file.bytes;
+
+        if ((rawBytes == null || rawBytes.isEmpty) && file.path != null) {
+          debugPrint('>>> [_uploadDocument] Reading bytes from path: ${file.path}');
+          rawBytes = await _cacheService.readFileBytesFromDisk(file.path!);
+          debugPrint('>>> [_uploadDocument] Read bytes length: ${rawBytes?.length}');
+        }
+      }
     } catch (e, stack) {
-      debugPrint('>>> [_uploadDocument] Exception during FilePicker: $e\n$stack');
+      debugPrint('>>> [_uploadDocument] Exception during file picking: $e\n$stack');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
@@ -319,23 +372,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       return;
     }
 
-    if (result == null || result.files.isEmpty) {
-      debugPrint('>>> [_uploadDocument] No file selected or picker cancelled.');
-      return;
-    }
-
-    final file = result.files.first;
-    debugPrint('>>> [_uploadDocument] Selected file: ${file.name}, size: ${file.size}, hasBytes: ${file.bytes != null}, path: ${file.path}');
-
-    Uint8List? fileBytes = file.bytes;
-    if ((fileBytes == null || fileBytes.isEmpty) && file.path != null) {
-      debugPrint('>>> [_uploadDocument] file.bytes was null/empty. Reading from path: ${file.path}');
-      fileBytes = await _cacheService.readFileBytesFromDisk(file.path!);
-      debugPrint('>>> [_uploadDocument] Read bytes length: ${fileBytes?.length}');
-    }
-
-    if (fileBytes == null || fileBytes.isEmpty) {
-      debugPrint('>>> [_uploadDocument] ERROR: Could not read file bytes.');
+    if (rawBytes == null || rawBytes.isEmpty || selectedFileName == null) {
+      debugPrint('>>> [_uploadDocument] ERROR: File bytes or filename empty.');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.errorLoadingDocument)),
@@ -344,7 +382,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       return;
     }
 
-    final titleController = TextEditingController(text: file.name);
+    final titleController = TextEditingController(text: selectedFileName);
     final initialCategory = _categories.firstWhere((c) => c['id'] != 'all', orElse: () => {'id': 'normatives'})['id']!;
     String uploadCategory = initialCategory;
     DateTime publicationDate = DateTime.now();
@@ -471,19 +509,19 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     );
 
                     try {
-                      final ext = file.extension ?? file.name.split('.').last;
-                      final storagePath = 'documents/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+                      final ext = selectedFileName!.contains('.') ? selectedFileName.split('.').last : 'bin';
+                      final storagePath = 'documents/${DateTime.now().millisecondsSinceEpoch}_$selectedFileName';
                       debugPrint('>>> [_uploadDocument] Uploading bytes to Cloud Storage path: $storagePath');
-                      final downloadUrl = await StorageService().uploadFile(storagePath, fileBytes);
+                      final downloadUrl = await StorageService().uploadFile(storagePath, rawBytes!);
                       debugPrint('>>> [_uploadDocument] Storage upload success. URL: $downloadUrl');
 
                       final user = _authService.currentUser;
                       debugPrint('>>> [_uploadDocument] Saving document in Firestore under folderId: $_currentFolderId');
                       final docId = await DatabaseService().addDocument('documents', {
                         'title': titleController.text.trim(),
-                        'fileName': file.name,
+                        'fileName': selectedFileName,
                         'fileType': ext.toLowerCase(),
-                        'fileSize': file.size,
+                        'fileSize': fileSize ?? rawBytes.length,
                         'category': uploadCategory,
                         'url': downloadUrl,
                         'storagePath': storagePath,
