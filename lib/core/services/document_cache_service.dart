@@ -91,4 +91,9 @@ class DocumentCacheService {
   Future<void> clearAllCache() async {
     await _helper.clearAllCache();
   }
+
+  /// Reads bytes directly from a native disk file path if on mobile/desktop
+  Future<Uint8List?> readFileBytesFromDisk(String filePath) async {
+    return await _helper.readFileBytesFromDisk(filePath);
+  }
 }

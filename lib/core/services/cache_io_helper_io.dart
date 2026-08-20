@@ -89,6 +89,19 @@ class NativeCacheIoHelper implements CacheIoHelper {
       debugPrint('Error clearing cache: $e');
     }
   }
+
+  @override
+  Future<Uint8List?> readFileBytesFromDisk(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        return await file.readAsBytes();
+      }
+    } catch (e) {
+      debugPrint('Error reading file bytes from disk: $e');
+    }
+    return null;
+  }
 }
 
 CacheIoHelper createCacheIoHelper() => NativeCacheIoHelper();

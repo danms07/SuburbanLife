@@ -55,7 +55,9 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   }
 
   void _checkAdmin() async {
+    debugPrint('>>> [TransparencyScreen] Checking if current user is admin...');
     final isAdmin = await _authService.isAdmin();
+    debugPrint('>>> [TransparencyScreen] User admin status: $isAdmin');
     if (mounted) {
       setState(() {
         _isAdmin = isAdmin;
@@ -298,21 +300,61 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   void _uploadDocument() async {
     final l10n = AppLocalizations.of(context)!;
-    final result = await FilePicker.pickFiles(
-      type: FileType.any,
-      withData: true,
-    );
+    debugPrint('>>> [_uploadDocument] Triggered. Launching FilePicker...');
 
-    if (result == null || result.files.isEmpty) return;
+    FilePickerResult? result;
+    try {
+      result = await FilePicker.pickFiles(
+        type: FileType.any,
+        withData: true,
+      );
+      debugPrint('>>> [_uploadDocument] FilePicker result: $result (files: ${result?.files.length})');
+    } catch (e, stack) {
+      debugPrint('>>> [_uploadDocument] Exception during FilePicker: $e\n$stack');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+        );
+      }
+      return;
+    }
+
+    if (result == null || result.files.isEmpty) {
+      debugPrint('>>> [_uploadDocument] No file selected or picker cancelled.');
+      return;
+    }
 
     final file = result.files.first;
+    debugPrint('>>> [_uploadDocument] Selected file: ${file.name}, size: ${file.size}, hasBytes: ${file.bytes != null}, path: ${file.path}');
+
+    Uint8List? fileBytes = file.bytes;
+    if ((fileBytes == null || fileBytes.isEmpty) && file.path != null) {
+      debugPrint('>>> [_uploadDocument] file.bytes was null/empty. Reading from path: ${file.path}');
+      fileBytes = await _cacheService.readFileBytesFromDisk(file.path!);
+      debugPrint('>>> [_uploadDocument] Read bytes length: ${fileBytes?.length}');
+    }
+
+    if (fileBytes == null || fileBytes.isEmpty) {
+      debugPrint('>>> [_uploadDocument] ERROR: Could not read file bytes.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorLoadingDocument)),
+        );
+      }
+      return;
+    }
+
     final titleController = TextEditingController(text: file.name);
     final initialCategory = _categories.firstWhere((c) => c['id'] != 'all', orElse: () => {'id': 'normatives'})['id']!;
     String uploadCategory = initialCategory;
     DateTime publicationDate = DateTime.now();
 
-    if (!mounted) return;
+    if (!mounted) {
+      debugPrint('>>> [_uploadDocument] Screen not mounted, aborting modal.');
+      return;
+    }
 
+    debugPrint('>>> [_uploadDocument] Presenting upload metadata dialog...');
     showDialog(
       context: context,
       builder: (context) {
@@ -414,11 +456,15 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    debugPrint('>>> [_uploadDocument] Upload cancelled by user.');
+                    Navigator.pop(context);
+                  },
                   child: Text(l10n.cancel),
                 ),
                 ElevatedButton(
                   onPressed: () async {
+                    debugPrint('>>> [_uploadDocument] Confirm upload clicked.');
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(l10n.uploadingDocument)),
@@ -427,10 +473,13 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     try {
                       final ext = file.extension ?? file.name.split('.').last;
                       final storagePath = 'documents/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-                      final downloadUrl = await StorageService().uploadFile(storagePath, file.bytes!);
-                      final user = _authService.currentUser;
+                      debugPrint('>>> [_uploadDocument] Uploading bytes to Cloud Storage path: $storagePath');
+                      final downloadUrl = await StorageService().uploadFile(storagePath, fileBytes);
+                      debugPrint('>>> [_uploadDocument] Storage upload success. URL: $downloadUrl');
 
-                      await DatabaseService().addDocument('documents', {
+                      final user = _authService.currentUser;
+                      debugPrint('>>> [_uploadDocument] Saving document in Firestore under folderId: $_currentFolderId');
+                      final docId = await DatabaseService().addDocument('documents', {
                         'title': titleController.text.trim(),
                         'fileName': file.name,
                         'fileType': ext.toLowerCase(),
@@ -443,6 +492,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         'uploadedAt': DbFieldValue.serverTimestamp(),
                         'uploaderUid': user?.uid ?? '',
                       });
+                      debugPrint('>>> [_uploadDocument] Firestore document saved with ID: $docId');
 
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -452,7 +502,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                           ),
                         );
                       }
-                    } catch (e) {
+                    } catch (e, stack) {
+                      debugPrint('>>> [_uploadDocument] Error saving/uploading document: $e\n$stack');
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
@@ -952,7 +1003,10 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       children: [
         FloatingActionButton.extended(
           heroTag: 'fab_create_folder',
-          onPressed: _showCreateFolderDialog,
+          onPressed: () {
+            debugPrint('>>> [TransparencyScreen] Create Folder FAB tapped');
+            _showCreateFolderDialog();
+          },
           icon: const Icon(Icons.create_new_folder),
           label: Text(l10n.newFolder),
           backgroundColor: Colors.amber.shade800,
@@ -961,7 +1015,10 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         const SizedBox(height: 10),
         FloatingActionButton.extended(
           heroTag: 'fab_upload_document',
-          onPressed: _uploadDocument,
+          onPressed: () {
+            debugPrint('>>> [TransparencyScreen] Upload Document FAB tapped');
+            _uploadDocument();
+          },
           icon: const Icon(Icons.upload_file),
           label: Text(l10n.uploadButton),
           backgroundColor: AppConfig.secondaryColor,

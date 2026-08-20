@@ -7,6 +7,7 @@ abstract class CacheIoHelper {
   Future<String?> getCachedFilePath(String key);
   Future<void> removeCachedFile(String key);
   Future<void> clearAllCache();
+  Future<Uint8List?> readFileBytesFromDisk(String filePath);
 }
 
 CacheIoHelper createCacheIoHelper() => throw UnsupportedError('Cannot create CacheIoHelper');

@@ -27,6 +27,9 @@ class WebCacheIoHelper implements CacheIoHelper {
   Future<void> clearAllCache() async {
     _mem.clear();
   }
+
+  @override
+  Future<Uint8List?> readFileBytesFromDisk(String filePath) async => null;
 }
 
 CacheIoHelper createCacheIoHelper() => WebCacheIoHelper();
