@@ -242,11 +242,12 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   void _showCreateFolderDialog() {
     final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
     final nameController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return AlertDialog(
           title: Row(
             children: [
@@ -265,7 +266,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogCtx),
               child: Text(l10n.cancel),
             ),
             ElevatedButton(
@@ -273,22 +274,31 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 final name = nameController.text.trim();
                 if (name.isEmpty) return;
 
-                final user = _authService.currentUser;
-                await DatabaseService().addDocument('document_folders', {
-                  'name': name,
-                  'parentId': _currentFolderId,
-                  'createdAt': DbFieldValue.serverTimestamp(),
-                  'createdBy': user?.uid ?? '',
-                });
+                Navigator.pop(dialogCtx);
 
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l10n.folderCreated),
-                      backgroundColor: AppConfig.secondaryColor,
-                    ),
-                  );
+                try {
+                  final user = _authService.currentUser;
+                  await DatabaseService().addDocument('document_folders', {
+                    'name': name,
+                    'parentId': _currentFolderId,
+                    'createdAt': DbFieldValue.serverTimestamp(),
+                    'createdBy': user?.uid ?? '',
+                  });
+
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.folderCreated),
+                        backgroundColor: AppConfig.secondaryColor,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                    );
+                  }
                 }
               },
               child: Text(l10n.create),
@@ -392,12 +402,13 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       return;
     }
 
+    final messenger = ScaffoldMessenger.of(context);
     debugPrint('>>> [_uploadDocument] Presenting upload metadata dialog...');
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogCtx, setDialogState) {
             final pubDateStr = '${publicationDate.year}-${publicationDate.month.toString().padLeft(2, '0')}-${publicationDate.day.toString().padLeft(2, '0')}';
 
             return AlertDialog(
@@ -449,7 +460,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
-                          context: context,
+                          context: dialogCtx,
                           initialDate: publicationDate,
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
@@ -496,17 +507,19 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 TextButton(
                   onPressed: () {
                     debugPrint('>>> [_uploadDocument] Upload cancelled by user.');
-                    Navigator.pop(context);
+                    Navigator.pop(dialogCtx);
                   },
                   child: Text(l10n.cancel),
                 ),
                 ElevatedButton(
                   onPressed: () async {
                     debugPrint('>>> [_uploadDocument] Confirm upload clicked.');
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(l10n.uploadingDocument)),
-                    );
+                    Navigator.pop(dialogCtx);
+                    if (mounted) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text(l10n.uploadingDocument)),
+                      );
+                    }
 
                     try {
                       final ext = selectedFileName!.contains('.') ? selectedFileName.split('.').last : 'bin';
@@ -533,7 +546,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                       debugPrint('>>> [_uploadDocument] Firestore document saved with ID: $docId');
 
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           SnackBar(
                             content: Text(l10n.documentUploadedSuccess),
                             backgroundColor: AppConfig.secondaryColor,
@@ -543,7 +556,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     } catch (e, stack) {
                       debugPrint('>>> [_uploadDocument] Error saving/uploading document: $e\n$stack');
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
                         );
                       }
@@ -561,6 +574,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   void _showMoveDocumentDialog(Map<String, dynamic> doc) async {
     final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
     final docId = doc['id']?.toString() ?? '';
     final allFolders = await DatabaseService().getCollection('document_folders');
 
@@ -568,11 +582,11 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogCtx) {
         String targetFolderId = 'root';
 
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (dialogCtx, setDialogState) {
             return AlertDialog(
               title: Row(
                 children: [
@@ -617,22 +631,30 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(dialogCtx),
                   child: Text(l10n.cancel),
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    await DatabaseService().updateDocument('documents', docId, {
-                      'folderId': targetFolderId,
-                    });
-                    if (mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.documentMoved),
-                          backgroundColor: AppConfig.secondaryColor,
-                        ),
-                      );
+                    Navigator.pop(dialogCtx);
+                    try {
+                      await DatabaseService().updateDocument('documents', docId, {
+                        'folderId': targetFolderId,
+                      });
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.documentMoved),
+                            backgroundColor: AppConfig.secondaryColor,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                        );
+                      }
                     }
                   },
                   child: Text(l10n.save),
@@ -647,6 +669,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   void _confirmDeleteDocument(Map<String, dynamic> doc) {
     final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
     final docId = doc['id']?.toString() ?? '';
     final title = doc['title']?.toString() ?? doc['fileName']?.toString() ?? '';
     final url = doc['url']?.toString() ?? '';
@@ -654,18 +677,18 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: Text(l10n.deleteDocumentConfirmation),
         content: Text(title),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogCtx);
               try {
                 await DatabaseService().deleteDocument('documents', docId);
                 if (url.isNotEmpty) {
@@ -677,13 +700,13 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 }
                 await _cacheService.removeCachedFile(docId, fileName);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(l10n.documentDeleted)),
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
                   );
                 }
@@ -698,31 +721,32 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   void _confirmDeleteFolder(String folderId, String folderName) {
     final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: Text(l10n.deleteFolderConfirmation),
         content: Text(folderName),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: Text(l10n.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogCtx);
               try {
                 await DatabaseService().deleteDocument('document_folders', folderId);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(l10n.folderDeleted)),
                   );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
                   );
                 }
