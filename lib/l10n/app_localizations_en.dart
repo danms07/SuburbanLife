@@ -753,7 +753,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roommateOnboardingInstructions =>
-      'Ask family members to show their Household QR Code or share their User ID/email so you can add them to your family group.';
+      'Ask your family member to register in the app, and on the address selection screen tap the \'Family Group\' tab to show their QR code or share their User ID/email.';
 
   @override
   String get deliveryDateLabel => 'Property Handover Date';
@@ -1604,4 +1604,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get understood => 'Understood';
+
+  @override
+  String get reviewBookingsMenu => 'Review Bookings';
+
+  @override
+  String get adminBookingApprovalTitle => 'Booking Approvals';
+
+  @override
+  String get noPendingBookings => 'No pending bookings to review.';
+
+  @override
+  String get bookingApprovedSuccess => 'Booking approved successfully.';
+
+  @override
+  String get bookingRejectedSuccess => 'Booking rejected.';
+
+  @override
+  String get approveBookingConfirm =>
+      'Are you sure you want to approve this booking?';
+
+  @override
+  String get rejectBookingConfirm =>
+      'Are you sure you want to reject this booking?';
+
+  @override
+  String get rejectionReasonOptional => 'Notes or rejection reason (optional)';
+
+  @override
+  String get applicant => 'Applicant';
+
+  @override
+  String get timeSlot => 'Time Slot';
+
+  @override
+  String get bookingDetails => 'Booking Details';
+
+  @override
+  String get rejectBookingTitle => 'Reject Booking';
+
+  @override
+  String get approveBookingTitle => 'Approve Booking';
+
+  @override
+  String get approveBookingButton => 'Approve Booking';
+
+  @override
+  String get rejectBookingButton => 'Reject Booking';
+
+  @override
+  String get approve => 'Approve';
+
+  @override
+  String get reject => 'Reject';
+
+  @override
+  String get howToAddFamilyMemberTitle =>
+      'How to add a family member or roommate?';
+
+  @override
+  String get familyOnboardingStep1Title => '1. Register in the App';
+
+  @override
+  String get familyOnboardingStep1Desc =>
+      'Ask your family member to download the application and create an account.';
+
+  @override
+  String get familyOnboardingStep2Title => '2. Select \'Family Group\'';
+
+  @override
+  String get familyOnboardingStep2Desc =>
+      'On the address selection screen, tell them to tap the \'Family Group\' option to display their QR code.';
+
+  @override
+  String get familyOnboardingStep3Title => '3. Scan QR or Enter Email/ID';
+
+  @override
+  String get familyOnboardingStep3Desc =>
+      'Scan their QR code using the button below, or enter their registered email / User ID.';
 }

@@ -37,6 +37,7 @@ The following table maps each visual component to its feature domain and source 
 | **Explorer Folder Card** | Transparency | [folder_card.dart](lib/features/transparency/widgets/folder_card.dart) |
 | **Explorer Document Card** | Transparency | [document_card.dart](lib/features/transparency/widgets/document_card.dart) |
 | **Native Document Viewer** | Transparency | [document_viewer_screen.dart](lib/features/transparency/document_viewer_screen.dart) |
+| **Admin Booking Approval Card** | Admin Bookings | [admin_booking_approval_screen.dart](lib/features/admin/admin_booking_approval_screen.dart) |
 
 ---
 
@@ -118,7 +119,7 @@ The following table maps each visual component to its feature domain and source 
 - **Usage**: Main screen feature navigation dashboard and navigation drawer widgets.
 
 ## 16. Branding Navigation Drawer Header
-- **Description**: A customized drawer header container (`DrawerHeader`) styling the main application drawer menu. Replaces standard text name strings with a centered, high-resolution branding app icon image (`assets/icon/app_icon.png`) fitted inside a premium brand color header box.
+- **Description**: A customized drawer header container (`DrawerHeader`) styling the main application drawer menu. Replaces standard text name strings with a centered, high-resolution in-app branding logo image (`AppConfig.appLogoAsset` / `assets/icon/app_logo.png`) fitted inside a premium brand color header box.
 - **Usage**: Displayed at the top of the app navigation drawer widget.
 
 ## 17. Custom Branded QR Access Card

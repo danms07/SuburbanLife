@@ -260,7 +260,7 @@
   "cooldownMonths": "Months",
   "cooldownYears": "Years",
   "addressClaimInstructions": "You can claim a property as a primary resident or show your Household QR Code to be linked by a primary resident.",
-  "roommateOnboardingInstructions": "Ask family members to show their Household QR Code or share their User ID/email so you can add them to your family group.",
+  "roommateOnboardingInstructions": "Ask your family member to register in the app, and on the address selection screen tap the 'Family Group' tab to show their QR code or share their User ID/email.",
   "deliveryDateLabel": "Property Handover Date",
   "selectDeliveryDate": "Select delivery date",
   "selectPeriodLabel": "Select maintenance period",
@@ -700,6 +700,30 @@
       }
     }
   },
-  "understood": "Understood"
+  "understood": "Understood",
+  "reviewBookingsMenu": "Review Bookings",
+  "adminBookingApprovalTitle": "Booking Approvals",
+  "noPendingBookings": "No pending bookings to review.",
+  "bookingApprovedSuccess": "Booking approved successfully.",
+  "bookingRejectedSuccess": "Booking rejected.",
+  "approveBookingConfirm": "Are you sure you want to approve this booking?",
+  "rejectBookingConfirm": "Are you sure you want to reject this booking?",
+  "rejectionReasonOptional": "Notes or rejection reason (optional)",
+  "applicant": "Applicant",
+  "timeSlot": "Time Slot",
+  "bookingDetails": "Booking Details",
+  "rejectBookingTitle": "Reject Booking",
+  "approveBookingTitle": "Approve Booking",
+  "approveBookingButton": "Approve Booking",
+  "rejectBookingButton": "Reject Booking",
+  "approve": "Approve",
+  "reject": "Reject",
+  "howToAddFamilyMemberTitle": "How to add a family member or roommate?",
+  "familyOnboardingStep1Title": "1. Register in the App",
+  "familyOnboardingStep1Desc": "Ask your family member to download the application and create an account.",
+  "familyOnboardingStep2Title": "2. Select 'Family Group'",
+  "familyOnboardingStep2Desc": "On the address selection screen, tell them to tap the 'Family Group' option to display their QR code.",
+  "familyOnboardingStep3Title": "3. Scan QR or Enter Email/ID",
+  "familyOnboardingStep3Desc": "Scan their QR code using the button below, or enter their registered email / User ID."
 }
 

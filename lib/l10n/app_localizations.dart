@@ -1529,7 +1529,7 @@ abstract class AppLocalizations {
   /// No description provided for @roommateOnboardingInstructions.
   ///
   /// In en, this message translates to:
-  /// **'Ask family members to show their Household QR Code or share their User ID/email so you can add them to your family group.'**
+  /// **'Ask your family member to register in the app, and on the address selection screen tap the \'Family Group\' tab to show their QR code or share their User ID/email.'**
   String get roommateOnboardingInstructions;
 
   /// No description provided for @deliveryDateLabel.
@@ -3031,6 +3031,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Understood'**
   String get understood;
+
+  /// No description provided for @reviewBookingsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Review Bookings'**
+  String get reviewBookingsMenu;
+
+  /// No description provided for @adminBookingApprovalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking Approvals'**
+  String get adminBookingApprovalTitle;
+
+  /// No description provided for @noPendingBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'No pending bookings to review.'**
+  String get noPendingBookings;
+
+  /// No description provided for @bookingApprovedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking approved successfully.'**
+  String get bookingApprovedSuccess;
+
+  /// No description provided for @bookingRejectedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking rejected.'**
+  String get bookingRejectedSuccess;
+
+  /// No description provided for @approveBookingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to approve this booking?'**
+  String get approveBookingConfirm;
+
+  /// No description provided for @rejectBookingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to reject this booking?'**
+  String get rejectBookingConfirm;
+
+  /// No description provided for @rejectionReasonOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes or rejection reason (optional)'**
+  String get rejectionReasonOptional;
+
+  /// No description provided for @applicant.
+  ///
+  /// In en, this message translates to:
+  /// **'Applicant'**
+  String get applicant;
+
+  /// No description provided for @timeSlot.
+  ///
+  /// In en, this message translates to:
+  /// **'Time Slot'**
+  String get timeSlot;
+
+  /// No description provided for @bookingDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking Details'**
+  String get bookingDetails;
+
+  /// No description provided for @rejectBookingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject Booking'**
+  String get rejectBookingTitle;
+
+  /// No description provided for @approveBookingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve Booking'**
+  String get approveBookingTitle;
+
+  /// No description provided for @approveBookingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve Booking'**
+  String get approveBookingButton;
+
+  /// No description provided for @rejectBookingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject Booking'**
+  String get rejectBookingButton;
+
+  /// No description provided for @approve.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get approve;
+
+  /// No description provided for @reject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get reject;
+
+  /// No description provided for @howToAddFamilyMemberTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to add a family member or roommate?'**
+  String get howToAddFamilyMemberTitle;
+
+  /// No description provided for @familyOnboardingStep1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'1. Register in the App'**
+  String get familyOnboardingStep1Title;
+
+  /// No description provided for @familyOnboardingStep1Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask your family member to download the application and create an account.'**
+  String get familyOnboardingStep1Desc;
+
+  /// No description provided for @familyOnboardingStep2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'2. Select \'Family Group\''**
+  String get familyOnboardingStep2Title;
+
+  /// No description provided for @familyOnboardingStep2Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'On the address selection screen, tell them to tap the \'Family Group\' option to display their QR code.'**
+  String get familyOnboardingStep2Desc;
+
+  /// No description provided for @familyOnboardingStep3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'3. Scan QR or Enter Email/ID'**
+  String get familyOnboardingStep3Title;
+
+  /// No description provided for @familyOnboardingStep3Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan their QR code using the button below, or enter their registered email / User ID.'**
+  String get familyOnboardingStep3Desc;
 }
 
 class _AppLocalizationsDelegate

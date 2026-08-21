@@ -147,6 +147,47 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
     return details;
   }
 
+  Widget _buildInstructionStep({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppConfig.primaryColor.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 14, color: AppConfig.primaryColor),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: Colors.black87,
+                height: 1.35,
+                fontFamily: AppConfig.fontFamily,
+              ),
+              children: [
+                TextSpan(
+                  text: '$title: ',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                TextSpan(text: description),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -174,30 +215,56 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                 return Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppConfig.primaryColor.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
+                      padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
+                      child: Card(
+                        elevation: 0,
+                        color: AppConfig.primaryColor.withValues(alpha: 0.05),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
                         ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline, color: AppConfig.primaryColor),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                l10n.roommateOnboardingInstructions,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black87,
-                                  height: 1.4,
-                                  fontFamily: AppConfig.fontFamily,
-                                ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.info_outline, color: AppConfig.primaryColor, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      l10n.howToAddFamilyMemberTitle,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: AppConfig.primaryColor,
+                                        fontFamily: AppConfig.fontFamily,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 10),
+                              _buildInstructionStep(
+                                icon: Icons.person_add_outlined,
+                                title: l10n.familyOnboardingStep1Title,
+                                description: l10n.familyOnboardingStep1Desc,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildInstructionStep(
+                                icon: Icons.qr_code,
+                                title: l10n.familyOnboardingStep2Title,
+                                description: l10n.familyOnboardingStep2Desc,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildInstructionStep(
+                                icon: Icons.qr_code_scanner,
+                                title: l10n.familyOnboardingStep3Title,
+                                description: l10n.familyOnboardingStep3Desc,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

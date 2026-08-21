@@ -53,18 +53,29 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     }
   }
 
-  void _markAnnouncementsAsRead(List<Map<String, dynamic>> docs) {
+  void _markAnnouncementsAsRead(List<Map<String, dynamic>> docs) async {
     final user = AuthService().currentUser;
-    if (user == null) return;
+    if (user == null) {
+      debugPrint('>>> [_markAnnouncementsAsRead] No user authenticated, skipping.');
+      return;
+    }
     final uid = user.uid;
 
     for (var doc in docs) {
+      final docId = doc['id']?.toString() ?? '';
+      if (docId.isEmpty) continue;
+
       final readBy = List<String>.from(doc['readBy'] ?? []);
       if (!readBy.contains(uid)) {
-        final docId = doc['id'] as String;
-        DatabaseService().updateDocument('announcements', docId, {
-          'readBy': DbFieldValue.arrayUnion([uid])
-        });
+        debugPrint('>>> [_markAnnouncementsAsRead] Marking announcement $docId as read for user $uid...');
+        try {
+          await DatabaseService().updateDocument('announcements', docId, {
+            'readBy': DbFieldValue.arrayUnion([uid])
+          });
+          debugPrint('>>> [_markAnnouncementsAsRead] Successfully marked announcement $docId as read in Firestore.');
+        } catch (e, stack) {
+          debugPrint('>>> [_markAnnouncementsAsRead] Error updating readBy on announcement $docId: $e\n$stack');
+        }
       }
     }
   }

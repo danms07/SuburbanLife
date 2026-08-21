@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 class AppConfig {
   static const String appName = 'Suburban Life'; // Default name
 
+  // App Assets & Branding Icons
+  static const String launcherIconAsset = 'assets/icon/app_launcher_icon.png';
+  static const String appLogoAsset = 'assets/icon/app_logo.png';
+
   // Color Palette
   static const Color primaryColor = Color(0xFF2864BE); 
   static const Color gradientEndColor = Color(0xFF2965BE); 

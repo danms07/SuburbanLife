@@ -66,7 +66,11 @@ service cloud.firestore {
 
     match /announcements/{announcementId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+      );
     }
 
     match /documents/{documentId} {

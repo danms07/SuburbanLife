@@ -22,6 +22,7 @@ import 'package:suburban_life/features/qr_access/manage_qr_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_scanner_screen.dart';
 import 'package:suburban_life/features/admin/admin_create_user_screen.dart';
 import 'package:suburban_life/features/admin/admin_payment_approval_screen.dart';
+import 'package:suburban_life/features/admin/admin_booking_approval_screen.dart';
 import 'package:suburban_life/features/admin/admin_upload_payment_screen.dart';
 import 'package:suburban_life/features/admin/admin_user_management_screen.dart';
 import 'package:suburban_life/features/admin/admin_facilities_screen.dart';
@@ -1423,6 +1424,29 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
           const SizedBox(height: 16),
 
+          // Pending Bookings Review Option with Badge
+          StreamBuilder<List<Map<String, dynamic>>>(
+            stream: Backend.db.streamCollection('bookings', filters: [
+              QueryFilter('status', FilterOperator.equal, 'pending review'),
+            ]),
+            builder: (context, snapshot) {
+              final count = snapshot.data?.length ?? 0;
+              return _buildAdminMenuButton(
+                label: l10n.reviewBookingsMenu,
+                icon: Icons.event_available,
+                color: Colors.teal.shade700,
+                badgeCount: count,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AdminBookingApprovalScreen(),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
           _buildAdminMenuButton(
             label: l10n.downloadReportMenu,
             icon: Icons.table_chart,
@@ -1814,7 +1838,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                           child: Center(
                             child: Image.asset(
-                              'assets/icon/app_icon.png',
+                              AppConfig.appLogoAsset,
                               height: 80,
                               fit: BoxFit.contain,
                             ),

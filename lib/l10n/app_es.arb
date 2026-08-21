@@ -260,7 +260,7 @@
   "cooldownMonths": "Meses",
   "cooldownYears": "Años",
   "addressClaimInstructions": "Puedes reclamar una propiedad como residente principal o mostrar tu Código QR de Hogar para ser vinculado por un residente principal.",
-  "roommateOnboardingInstructions": "Pide a los miembros de tu familia que muestren su Código QR de Hogar o compartan su ID de usuario/correo para agregarlos a tu grupo familiar.",
+  "roommateOnboardingInstructions": "Pide a tu familiar que se registre en la aplicación, y en la pantalla de selección de dirección toque la pestaña o ícono de 'Grupo Familiar' para mostrar su código QR o compartir su ID/correo.",
   "deliveryDateLabel": "Fecha de entrega de la propiedad",
   "selectDeliveryDate": "Selecciona la fecha de entrega",
   "selectPeriodLabel": "Seleccionar período de mantenimiento",
@@ -567,6 +567,30 @@
       }
     }
   },
-  "understood": "Entendido"
+  "understood": "Entendido",
+  "reviewBookingsMenu": "Revisar Reservaciones",
+  "adminBookingApprovalTitle": "Aprobación de Reservaciones",
+  "noPendingBookings": "No hay reservaciones pendientes de revisión.",
+  "bookingApprovedSuccess": "Reservación aprobada exitosamente.",
+  "bookingRejectedSuccess": "Reservación rechazada.",
+  "approveBookingConfirm": "¿Estás seguro de que deseas aprobar esta reservación?",
+  "rejectBookingConfirm": "¿Estás seguro de que deseas rechazar esta reservación?",
+  "rejectionReasonOptional": "Notas o motivo de rechazo (opcional)",
+  "applicant": "Solicitante",
+  "timeSlot": "Horario",
+  "bookingDetails": "Detalles de la Reservación",
+  "rejectBookingTitle": "Rechazar Reservación",
+  "approveBookingTitle": "Aprobar Reservación",
+  "approveBookingButton": "Aprobar Reservación",
+  "rejectBookingButton": "Rechazar Reservación",
+  "approve": "Aprobar",
+  "reject": "Rechazar",
+  "howToAddFamilyMemberTitle": "¿Cómo agregar a un familiar o coinquilino?",
+  "familyOnboardingStep1Title": "1. Registro en la App",
+  "familyOnboardingStep1Desc": "Pide a tu familiar que descargue la aplicación y cree su cuenta.",
+  "familyOnboardingStep2Title": "2. Seleccionar 'Grupo Familiar'",
+  "familyOnboardingStep2Desc": "En la pantalla de selección de dirección, indícale tocar la opción 'Grupo Familiar' para ver su código QR.",
+  "familyOnboardingStep3Title": "3. Escanear o Ingresar Datos",
+  "familyOnboardingStep3Desc": "Escanea su código QR con el botón de abajo, o ingresa su correo electrónico / ID registrado."
 }
 

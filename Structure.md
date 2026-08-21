@@ -1,13 +1,15 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-08-19 (Made transparency document categories fully dynamic in Firestore with admin CRUD dialog, in-use safeguards, and localization)*
+*Last Verified/Updated: 2026-08-21 (Enhanced Family Group screen with structured step-by-step onboarding instructions for residents and roommates)*
 
 Current state of project files and folders:
 
 - `android/`: Native Android configuration and build files (including Google Services & Crashlytics Gradle plugins).
 - `assets/`: Application asset directories.
     - `icon/`: Launcher and branding icon assets.
-        - `app_icon.png`: Original high-resolution premium app icon.
+        - `app_launcher_icon.png`: Dedicated icon asset for mobile app launchers (Android, iOS) and web favicon generation.
+        - `app_logo.png`: Dedicated branding logo asset used across in-app UI surfaces (navigation drawer header, branded QR code share cards).
+        - `app_icon.png`: Legacy master high-resolution icon asset.
 - `docs/`: Technical plans and documentation archives.
     - `admin_user_manual.md`: Comprehensive operational User Manual for system administrators (English).
     - `admin_user_manual_es.md`: Comprehensive operational User Manual for system administrators (Spanish).
@@ -15,7 +17,7 @@ Current state of project files and folders:
     - `plans/`: Future implementation plans.
         - `biometric_auth_plan.md`: Plan for persistent biometric gating.
         - `credential_manager_plan.md`: Plan for Passkeys and Credential Manager integration.
-- `firebase.json`: Firebase project deployment configuration mapping Firestore rules, Storage rules, functions, composite indexes, and Hosting Cache-Control headers.
+- `firebase.json.template`: Baseline Firebase project deployment configuration template mapping Firestore rules, Storage rules, functions, composite indexes, emulators, and Hosting Cache-Control headers (untracked `firebase.json` holds local and FlutterFire project bindings).
 - `firestore.rules`: Security rules for Cloud Firestore collections (including admin-only gating for config/smtp_settings).
 - `firestore.indexes.json`: Composite index definitions for Firestore queries (bookings, payments, qr_codes, documents).
 - `storage.rules`: Security rules for Firebase Cloud Storage buckets.
@@ -46,6 +48,7 @@ Current state of project files and folders:
             - `admin_bulk_user_import_screen.dart`: Bulk resident account creation screen via CSV upload with optional/deterministic passwords, automated resident claim granting, SMTP status indicator, and email dispatch status reporting.
             - `admin_bulk_address_import_screen.dart`: Bulk address creation screen via CSV upload supporting number ranges, exclusions, and collision checks.
             - `admin_payment_approval_screen.dart`: Payment proofs review showing payment period, and triggering status recalculation. Keyed stateful cards prevent redundant downloads/fetches.
+            - `admin_booking_approval_screen.dart`: Admin interface to review pending amenity booking requests with resident info, time slots, facility streaming, and approve/reject actions.
             - `admin_upload_payment_screen.dart`: Interface for uploading maintenance receipts on behalf of addresses via cascading street name and house number dropdown filters.
             - `admin_user_management_screen.dart`: User directory mapping client role switching, claim state tables, and admin force-unbind actions.
             - `admin_facilities_screen.dart`: Interface to configure dynamic unique vs multi-item amenities.
@@ -62,7 +65,7 @@ Current state of project files and folders:
             - `ownership_proof_screen.dart`: Mandatory proof of ownership capture with property handover date picker, and upload interface.
             - `admin_resident_approval_screen.dart`: Dedicated admin list view for validating property ownership proofs and propagating delivery date to address upon approval. Keyed stateful cards prevent redundant downloads/fetches.
             - `forgot_password_screen.dart`: Password recovery request interface.
-            - `roommates_screen.dart`: Family group management interface with camera QR scanner and UID/email roommate addition options.
+            - `roommates_screen.dart`: Family group management interface with clear step-by-step onboarding guide, camera QR scanner, and UID/email roommate addition options.
         - `booking/`: Facility booking screens and service logic.
             - `booking_screen.dart`: Main booking interface.
             - `manage_bookings_screen.dart`: History and management of bookings.

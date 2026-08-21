@@ -761,7 +761,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get roommateOnboardingInstructions =>
-      'Pide a los miembros de tu familia que muestren su Código QR de Hogar o compartan su ID de usuario/correo para agregarlos a tu grupo familiar.';
+      'Pide a tu familiar que se registre en la aplicación, y en la pantalla de selección de dirección toque la pestaña o ícono de \'Grupo Familiar\' para mostrar su código QR o compartir su ID/correo.';
 
   @override
   String get deliveryDateLabel => 'Fecha de entrega de la propiedad';
@@ -1628,4 +1628,83 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get understood => 'Entendido';
+
+  @override
+  String get reviewBookingsMenu => 'Revisar Reservaciones';
+
+  @override
+  String get adminBookingApprovalTitle => 'Aprobación de Reservaciones';
+
+  @override
+  String get noPendingBookings =>
+      'No hay reservaciones pendientes de revisión.';
+
+  @override
+  String get bookingApprovedSuccess => 'Reservación aprobada exitosamente.';
+
+  @override
+  String get bookingRejectedSuccess => 'Reservación rechazada.';
+
+  @override
+  String get approveBookingConfirm =>
+      '¿Estás seguro de que deseas aprobar esta reservación?';
+
+  @override
+  String get rejectBookingConfirm =>
+      '¿Estás seguro de que deseas rechazar esta reservación?';
+
+  @override
+  String get rejectionReasonOptional => 'Notas o motivo de rechazo (opcional)';
+
+  @override
+  String get applicant => 'Solicitante';
+
+  @override
+  String get timeSlot => 'Horario';
+
+  @override
+  String get bookingDetails => 'Detalles de la Reservación';
+
+  @override
+  String get rejectBookingTitle => 'Rechazar Reservación';
+
+  @override
+  String get approveBookingTitle => 'Aprobar Reservación';
+
+  @override
+  String get approveBookingButton => 'Aprobar Reservación';
+
+  @override
+  String get rejectBookingButton => 'Rechazar Reservación';
+
+  @override
+  String get approve => 'Aprobar';
+
+  @override
+  String get reject => 'Rechazar';
+
+  @override
+  String get howToAddFamilyMemberTitle =>
+      '¿Cómo agregar a un familiar o coinquilino?';
+
+  @override
+  String get familyOnboardingStep1Title => '1. Registro en la App';
+
+  @override
+  String get familyOnboardingStep1Desc =>
+      'Pide a tu familiar que descargue la aplicación y cree su cuenta.';
+
+  @override
+  String get familyOnboardingStep2Title => '2. Seleccionar \'Grupo Familiar\'';
+
+  @override
+  String get familyOnboardingStep2Desc =>
+      'En la pantalla de selección de dirección, indícale tocar la opción \'Grupo Familiar\' para ver su código QR.';
+
+  @override
+  String get familyOnboardingStep3Title => '3. Escanear o Ingresar Datos';
+
+  @override
+  String get familyOnboardingStep3Desc =>
+      'Escanea su código QR con el botón de abajo, o ingresa su correo electrónico / ID registrado.';
 }

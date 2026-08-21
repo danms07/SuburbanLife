@@ -409,7 +409,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       final paintHeader = Paint()..color = AppConfig.primaryColor;
       canvas.drawRect(const Rect.fromLTWH(0, 0, 800, 240), paintHeader);
       
-      final logoImage = await _loadAssetImage('assets/icon/app_icon.png');
+      final logoImage = await _loadAssetImage(AppConfig.appLogoAsset);
       canvas.drawImageRect(
         logoImage,
         Rect.fromLTWH(0, 0, logoImage.width.toDouble(), logoImage.height.toDouble()),
