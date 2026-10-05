@@ -45,6 +45,7 @@ erDiagram
         timestamp endTime
         string status "'pending review' | 'rejected' | 'approved' | 'closed'"
         string notes
+        string rejectionReason "Optional rejection rationale from admin"
     }
     announcements {
         string announcementId PK
@@ -75,8 +76,9 @@ erDiagram
         reference addressRef FK
         timestamp timestamp
         number amount
-        string status "'paid' | 'pending' | 'approved'"
-        string period "Format: 'YYYY-MM'"
+        string status "'paid' | 'pending' | 'approved' | 'rejected'"
+        array periods "Array of 'YYYY-MM' strings"
+        string period "Legacy / display format: 'YYYY-MM'"
         string receiptUrl
     }
     ownership_claims {
@@ -93,6 +95,8 @@ erDiagram
         string name
         boolean isUnique
         number quantity
+        string cooldownUnit "'unrestricted' | 'days' | 'months' | 'years'"
+        number cooldownValue
     }
     config {
         string documentId PK "app_settings | smtp_settings"
@@ -133,11 +137,14 @@ erDiagram
 - `residentUid`: string (UID of primary resident, null if unclaimed)
 - `streetName`: string (Exact name of street, e.g. 'Admin office' for administration)
 - `number`: number (Physical house number, 0 for Admin office)
-- `paymentStatus`: string ('paid', 'pending', 'reviewing', 'restricted')
-    - `paid`: All OK
-    - `pending`: Required payment within grace period
-    - `reviewing`: Proof of payment is being reviewed by an admin
-    - `restricted`: Account restricted for missing payment after grace period
+- `paymentStatus`: string ('paid', 'pending', 'restricted', 'reviewing')
+    - `paid`: All OK / all periods approved
+    - `pending`: Required payment due or proof of payment submitted pending admin approval. When `isWithinGracePeriod` is true, resident is considered 'paid' and has unrestricted access.
+    - `restricted`: Account restricted for missing payment after grace period expired or overdue historical debt
+    - `reviewing`: Legacy synonym for 'pending'
+- `isWithinGracePeriod`: boolean (Indicates whether the address is currently within the active payment grace period with no overdue past debt)
+- `hasActiveSanctions`: boolean (True if the address has at least one active unpaid sanction, restricting access)
+- `activeSanctionsCount`: number (Count of currently active unpaid sanctions)
 - `deliveryDate`: timestamp (Date the property was handed over to the resident)
 - `lastPaymentApproval`: timestamp
 
@@ -162,7 +169,10 @@ erDiagram
 - `startTime`: timestamp
 - `endTime`: timestamp
 - `status`: string ("pending review", "rejected", "approved (upcoming)", "approved (in use)", "closed")
+- `isConfirmed`: boolean (True for approved/closed bookings; allows public calendar availability query)
 - `notes`: string
+- `rejectionReason`: string (Optional rationale provided by administrator upon rejection)
+- `approvalMessage`: string (Custom instructions/next steps provided by administrator or populated from facility preset)
 
 ### `announcements` (Collection)
 - `announcementId`: string (Document ID)
@@ -218,11 +228,37 @@ erDiagram
 ### `payments` (Collection)
 - `paymentId`: string (Document ID)
 - `addressRef`: document_reference (to `addresses` collection)
-- `timestamp`: timestamp
-- `amount`: number
-- `status`: string ('paid', 'pending', 'approved')
-- `period`: string (Format: 'YYYY-MM', e.g., '2026-05')
+- `residentUid`: string (UID of resident associated with the payment)
+- `uploaderUid`: string (UID of user/admin who uploaded receipt)
+- `timestamp`: timestamp (or integer milliseconds)
+- `amount`: number (Monetary amount captured from transfer receipt)
+- `status`: string ('paid' | 'pending' | 'approved' | 'rejected')
+- `folio`: string (Receipt tracking/folio number reported by resident)
+- `concept`: string ('monthly quota' | 'sanction')
+- `paymentDate`: timestamp (Date the bank transfer / transaction took place)
+- `sanctionId`: string (Optional ID of linked sanction when paying a sanction)
+- `rejectionReason`: string (Rationale provided by administrator upon rejection)
+- `periods`: array of string (List of periods covered by the receipt e.g. `['2026-09', '2026-10']`)
+- `period`: string (Format: 'YYYY-MM' or comma-joined periods for backward compatibility)
 - `receiptUrl`: string (Optional)
+
+### `sanctions` (Collection)
+- `id`: string (Document ID)
+- `addressRef`: document_reference (to `addresses` collection)
+- `addressId`: string (Address ID, e.g. 'A-101')
+- `residentUid`: string (UID of primary resident linked to the address)
+- `authorizedUids`: array of string (UIDs of primary resident and linked roommates)
+- `streetName`: string (Denormalized address display street)
+- `number`: number (Denormalized physical house number)
+- `reason`: string (Infraction description)
+- `evidenceUrl`: string (Firebase Storage URL of photographic evidence)
+- `amount`: number (Monetary fine amount)
+- `status`: string ('active' | 'pending_review' | 'paid' | 'cancelled')
+- `rejectionReason`: string (Optional rationale if sanction payment proof was rejected)
+- `paymentId`: string (Optional ID of linked payment document in `payments`)
+- `createdAt`: timestamp (Creation timestamp)
+- `createdBy`: string (Admin UID who issued sanction)
+- `resolvedAt`: timestamp (Timestamp when paid or cancelled)
 
 ### `ownership_claims` (Collection)
 - `claimId`: string (Document ID)
@@ -230,7 +266,7 @@ erDiagram
 - `addressRef`: document_reference (to `addresses` collection)
 - `proofUrl`: string (Firebase Storage URL of uploaded deed/receipt)
 - `deliveryDate`: timestamp (Target delivery date selected by the resident)
-- `status`: string ('pending', 'approved', 'rejected')
+- `status`: string ('pending' | 'pending review' | 'approved' | 'rejected')
 - `timestamp`: timestamp
 
 ### `facilities` (Collection)
@@ -238,11 +274,20 @@ erDiagram
 - `name`: string (Localized or descriptive display label)
 - `isUnique`: boolean (True if single capacity unique amenity, False for multi-item amenities)
 - `quantity`: number (Available inventorial capacity, locked to 1 if isUnique is true)
+- `cooldownUnit`: string ('unrestricted', 'days', 'months', 'years')
+- `cooldownValue`: number (Cooldown duration before a resident can book the facility again, 0 if unrestricted)
+- `anticipationUnit`: string ('unrestricted', 'hours', 'days', 'weeks')
+- `anticipationValue`: number (Minimum advance notice required prior to reservation time)
+- `openingTime`: string (Daily opening hour in 24-hour HH:mm format, e.g. '08:00', default '00:00')
+- `closingTime`: string (Daily closing hour in 24-hour HH:mm format, e.g. '21:00', default '23:59')
+- `presetApprovalMessage`: string (Optional default instructions/next steps for approved bookings)
 
 ### `config` (Collection)
 #### `app_settings` (Document)
 - `paymentCutoffDay`: number (Configured day of the month serving as cutoff date, default 1)
 - `gracePeriodDays`: number (Grace period span before user features restrict automatically, default 10)
+- `timeZone`: string (Configured IANA timezone for cutoff and grace period calculations, default 'America/Mexico_City')
+- `paymentRejectionReasons`: array of string (Customizable pool of rejection reason templates for payment reviews)
 - `updatedAt`: timestamp
 
 #### `smtp_settings` (Document - Admin Only)
@@ -284,14 +329,32 @@ The application requires specific composite indexes to execute queries without d
 - **Index 6 (User Bookings by Date)**:
   - `userUid` (Ascending)
   - `date` (Descending)
+- **Index 7 (User Bookings by Facility and Creation)**:
+  - `userUid` (Ascending)
+  - `facilityId` (Ascending)
+  - `createdAt` (Ascending)
+- **Index 8 (Facility Bookings by Status and Start Time)**:
+  - `facilityId` (Ascending)
+  - `status` (Ascending)
+  - `startTime` (Ascending)
+- **Index 9 (Facility Bookings by Start Time and Status)**:
+  - `facilityId` (Ascending)
+  - `startTime` (Ascending)
+  - `status` (Ascending)
 
 ### `payments` Collection
-- **Index 1**:
+- **Index 1 (Address Payments by Period)**:
   - `addressRef` (Ascending)
   - `period` (Descending)
-- **Index 2**:
+- **Index 2 (Resident Payments by Timestamp)**:
+  - `residentUid` (Ascending)
+  - `timestamp` (Descending)
+- **Index 3 (Uploader Payments by Creation)**:
   - `uploaderUid` (Ascending)
   - `createdAt` (Descending)
+- **Index 4 (Payment Status Filter by Timestamp)**:
+  - `status` (Ascending)
+  - `timestamp` (Descending)
 
 ### `ownership_claims` Collection
 - **Index 1**:
@@ -299,11 +362,37 @@ The application requires specific composite indexes to execute queries without d
   - `timestamp` (Descending)
 
 ### `qr_codes` Collection
-- **Index 1**:
+- **Index 1 (User QR Codes by Timestamp)**:
+  - `creatorUid` (Ascending)
+  - `timestamp` (Descending)
+- **Index 2 (User QR Codes by Creation)**:
   - `creatorUid` (Ascending)
   - `createdAt` (Descending)
+- **Index 3 (Status Filter by Timestamp)**:
+  - `status` (Ascending)
+  - `timestamp` (Descending)
 
 ### `documents` Collection
-- **Index 1**:
+- **Index 1 (Category by Upload Date)**:
+  - `category` (Ascending)
+  - `uploadedAt` (Descending)
+- **Index 2 (Category by Publication Date)**:
+  - `category` (Ascending)
+  - `publicationDate` (Descending)
+- **Index 3 (Folder by Upload Date)**:
+  - `folderId` (Ascending)
+  - `uploadedAt` (Descending)
+- **Index 4 (Category by Creation Date)**:
   - `category` (Ascending)
   - `createdAt` (Descending)
+
+### `access_logs` Collection
+- **Index 1 (Creator Logs by Timestamp)**:
+  - `creatorUid` (Ascending)
+  - `timestamp` (Descending)
+- **Index 2 (Category Logs by Timestamp)**:
+  - `accessCategory` (Ascending)
+  - `timestamp` (Descending)
+- **Index 3 (Status Logs by Timestamp)**:
+  - `status` (Ascending)
+  - `timestamp` (Descending)

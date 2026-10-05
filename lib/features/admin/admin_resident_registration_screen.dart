@@ -91,7 +91,9 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
         _selectedUser = null;
         _selectedAddress = null;
       });
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error registering resident: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminResidentRegistrationScreen._registerResident');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );

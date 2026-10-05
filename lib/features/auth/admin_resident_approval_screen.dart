@@ -73,8 +73,9 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.residentApprovedSuccess)),
       );
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error approving claim: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminResidentApprovalScreen._approveClaim');
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
       );
@@ -97,14 +98,16 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
       if (proofUrl != null && proofUrl.isNotEmpty) {
         try {
           await StorageService().deleteFileFromUrl(proofUrl);
-        } catch (err) {
+        } catch (err, stack) {
           debugPrint('Error deleting proof storage image: $err');
+          Backend.crashlytics.recordError(err, stack, reason: 'AdminResidentApprovalScreen.deleteProofImage');
         }
       }
 
       await DatabaseService().deleteDocument('ownership_claims', claimDoc['id']);
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error rejecting claim: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminResidentApprovalScreen._rejectClaim');
     } finally {
       if (mounted) {
         setState(() {
@@ -313,12 +316,15 @@ class _ResidentApprovalCardState extends State<_ResidentApprovalCard> {
                       children: [
                         const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                         const SizedBox(width: 8),
-                        Text(
-                          '${l10n.deliveryDateLabel}: ${DateFormat('yyyy-MM-dd').format(deliveryDate)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppConfig.textColor,
-                            fontFamily: AppConfig.fontFamily,
+                        Expanded(
+                          child: Text(
+                            '${l10n.deliveryDateLabel}: ${DateFormat('yyyy-MM-dd').format(deliveryDate)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppConfig.textColor,
+                              fontFamily: AppConfig.fontFamily,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -340,8 +346,10 @@ class _ResidentApprovalCardState extends State<_ResidentApprovalCard> {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 TextButton(
                   onPressed: widget.isProcessing ? null : () => widget.onReject(widget.doc),
@@ -350,7 +358,6 @@ class _ResidentApprovalCardState extends State<_ResidentApprovalCard> {
                     style: const TextStyle(color: Colors.redAccent),
                   ),
                 ),
-                const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: widget.isProcessing ? null : () => widget.onApprove(widget.doc),
                   style: ElevatedButton.styleFrom(

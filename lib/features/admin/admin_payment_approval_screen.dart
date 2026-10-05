@@ -4,14 +4,13 @@ import '../../core/config/app_config.dart';
 import '../../core/widgets/interactive_image_dialog.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/widgets/storage_network_image.dart';
-import 'package:intl/intl.dart';
 import '../payments/payment_service.dart';
 
 class AdminPaymentApprovalScreen extends StatefulWidget {
-  const AdminPaymentApprovalScreen({Key? key}) : super(key: key);
+  const AdminPaymentApprovalScreen({super.key});
 
   @override
-  _AdminPaymentApprovalScreenState createState() => _AdminPaymentApprovalScreenState();
+  State<AdminPaymentApprovalScreen> createState() => _AdminPaymentApprovalScreenState();
 }
 
 class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen> {
@@ -34,7 +33,9 @@ class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen>
           SnackBar(content: Text(l10n.paymentApprovedSuccess), backgroundColor: AppConfig.secondaryColor),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error approving payment: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminPaymentApprovalScreen._approvePayment');
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -52,12 +53,137 @@ class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen>
 
   void _rejectPayment(Map<String, dynamic> paymentDoc, String residentUid) async {
     final l10n = AppLocalizations.of(context)!;
+
+    // Load rejection reason pool from config/app_settings + defaults
+    final pool = <String>[
+      l10n.rejectionReasonPeriodMismatch,
+      l10n.rejectionReasonAmountMismatch,
+      l10n.rejectionReasonAddressMismatch,
+      l10n.rejectionReasonFolioMismatch,
+    ];
+
+    try {
+      final appSettings = await DatabaseService().getDocument('config', 'app_settings');
+      if (appSettings != null && appSettings['paymentRejectionReasons'] is List) {
+        for (var r in (appSettings['paymentRejectionReasons'] as List)) {
+          final str = r?.toString().trim() ?? '';
+          if (str.isNotEmpty && !pool.contains(str)) {
+            pool.add(str);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading app_settings paymentRejectionReasons: $e');
+    }
+    pool.add(l10n.rejectionReasonOther);
+
+    String selectedReason = pool.first;
+    final customReasonController = TextEditingController();
+
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final isOther = selectedReason == l10n.rejectionReasonOther;
+            return AlertDialog(
+              title: Text(l10n.rejectionReasonPoolTitle),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l10n.rejectionReasonSelect, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedReason,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        isDense: true,
+                      ),
+                      items: pool.map((r) => DropdownMenuItem(
+                        value: r,
+                        child: Text(r, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      )).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedReason = val;
+                          });
+                        }
+                      },
+                    ),
+                    if (isOther) ...[
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: customReasonController,
+                        decoration: InputDecoration(
+                          labelText: l10n.rejectionReasonOther,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          isDense: true,
+                        ),
+                        maxLines: 3,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(false),
+                  child: Text(l10n.cancel),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                  onPressed: () => Navigator.of(dialogCtx).pop(true),
+                  child: Text(l10n.rejectResidentButton),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      customReasonController.dispose();
+      return;
+    }
+
+    final finalReason = selectedReason == l10n.rejectionReasonOther
+        ? customReasonController.text.trim()
+        : selectedReason;
+    customReasonController.dispose();
+
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      await DatabaseService().updateDocument('payments', paymentDoc['id'], {'status': 'rejected'});
+      final currentAdminUid = AuthService().currentUser?.uid ?? '';
+      await DatabaseService().updateDocument('payments', paymentDoc['id'], {
+        'status': 'rejected',
+        'rejectionReason': finalReason.isNotEmpty ? finalReason : selectedReason,
+        'rejectedAt': DateTime.now().millisecondsSinceEpoch,
+        'rejectedBy': currentAdminUid,
+      });
+
+      // If this was a sanction payment, revert sanction back to active
+      final concept = paymentDoc['concept'] as String? ?? 'monthly quota';
+      final sanctionId = paymentDoc['sanctionId'] as String?;
+      if (concept == 'sanction' && sanctionId != null && sanctionId.isNotEmpty) {
+        try {
+          await DatabaseService().updateDocument('sanctions', sanctionId, {
+            'status': 'active',
+            'rejectionReason': finalReason.isNotEmpty ? finalReason : selectedReason,
+          });
+        } catch (sErr) {
+          debugPrint('Error reverting sanction status: $sErr');
+        }
+      }
+
       final userDoc = await DatabaseService().getDocument('users', residentUid);
       final addressRef = userDoc?['addressRef'] as DbReference?;
       if (addressRef != null) {
@@ -69,7 +195,9 @@ class _AdminPaymentApprovalScreenState extends State<AdminPaymentApprovalScreen>
           SnackBar(content: Text(l10n.paymentRejectedSuccess), backgroundColor: Colors.orange),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error rejecting payment: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminPaymentApprovalScreen._rejectPayment');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
@@ -197,11 +325,31 @@ class _PaymentApprovalCardState extends State<_PaymentApprovalCard> {
     final residentUid = widget.doc['residentUid'] as String? ?? '';
     final receiptUrl = widget.doc['receiptUrl'] as String? ?? '';
     final uploaderUid = widget.doc['uploaderUid'] as String? ?? residentUid;
-    final period = widget.doc['period'] as String? ?? '';
-    final formattedPeriod = _formatPeriod(period, Localizations.localeOf(context).languageCode);
+    final dynamic rawAmount = widget.doc['amount'];
+    final double? amount = rawAmount is num ? rawAmount.toDouble() : (rawAmount is String ? double.tryParse(rawAmount) : null);
+    final concept = widget.doc['concept'] as String? ?? 'monthly quota';
+    final folio = widget.doc['folio'] as String? ?? '';
+    final dynamic rawPaymentDate = widget.doc['paymentDate'] ?? widget.doc['timestamp'];
+    final DateTime? paymentDateTime = rawPaymentDate != null
+        ? DateTime.fromMillisecondsSinceEpoch(rawPaymentDate is int ? rawPaymentDate : int.tryParse(rawPaymentDate.toString()) ?? 0)
+        : null;
+
+    final List<String> periodsList = [];
+    if (widget.doc['periods'] is List) {
+      for (var p in (widget.doc['periods'] as List)) {
+        if (p != null && p.toString().trim().isNotEmpty) {
+          periodsList.add(p.toString().trim());
+        }
+      }
+    } else if (widget.doc['period'] != null) {
+      for (var p in widget.doc['period'].toString().split(',')) {
+        if (p.trim().isNotEmpty) periodsList.add(p.trim());
+      }
+    }
     
     // Enforcement: Cannot approve their own uploads
     final isSelfUploaded = uploaderUid == widget.currentAdminUid;
+    final locale = Localizations.localeOf(context).languageCode;
 
     return Card(
       elevation: 3,
@@ -241,30 +389,106 @@ class _PaymentApprovalCardState extends State<_PaymentApprovalCard> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppConfig.primaryColor,
-                            ),
-                          ),
-                          Text(email, style: const TextStyle(color: Colors.grey)),
-                          if (period.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.event, size: 16, color: Colors.grey),
-                                const SizedBox(width: 6),
-                                Text(
-                                  formattedPeriod,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
                                   style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppConfig.textColor,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppConfig.primaryColor,
                                   ),
                                 ),
-                              ],
+                              ),
+                              if (amount != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.green.shade300),
+                                  ),
+                                  child: Text(
+                                    '\$${amount.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade800,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          Text(email, style: const TextStyle(color: Colors.grey)),
+                          const SizedBox(height: 8),
+
+                          // Badges: Concept, Folio, Payment Date
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              Chip(
+                                avatar: Icon(
+                                  concept == 'sanction' ? Icons.gavel : Icons.receipt_long,
+                                  size: 14,
+                                  color: concept == 'sanction' ? Colors.red.shade700 : AppConfig.primaryColor,
+                                ),
+                                label: Text(
+                                  concept == 'sanction' ? l10n.conceptSanction : l10n.conceptMonthlyQuota,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: concept == 'sanction' ? Colors.red.shade800 : Colors.black87,
+                                  ),
+                                ),
+                                backgroundColor: concept == 'sanction' ? Colors.red.shade50 : Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              if (folio.isNotEmpty)
+                                Chip(
+                                  avatar: const Icon(Icons.tag, size: 14, color: Colors.blueGrey),
+                                  label: Text(
+                                    'Folio: $folio',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  backgroundColor: Colors.blueGrey.shade50,
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              if (paymentDateTime != null)
+                                Chip(
+                                  avatar: const Icon(Icons.calendar_today, size: 14, color: Colors.teal),
+                                  label: Text(
+                                    '${paymentDateTime.year}-${paymentDateTime.month.toString().padLeft(2, '0')}-${paymentDateTime.day.toString().padLeft(2, '0')}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  backgroundColor: Colors.teal.shade50,
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                            ],
+                          ),
+
+                          if (periodsList.isNotEmpty && concept != 'sanction') ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: periodsList.map((period) {
+                                return Chip(
+                                  avatar: const Icon(Icons.event, size: 14, color: AppConfig.primaryColor),
+                                  label: Text(
+                                    _formatPeriod(period, locale),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                  ),
+                                  backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                );
+                              }).toList(),
                             ),
                           ],
                         ],
@@ -299,8 +523,10 @@ class _PaymentApprovalCardState extends State<_PaymentApprovalCard> {
                     ),
                   ),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 8,
                   children: [
                     TextButton(
                       onPressed: widget.isProcessing ? null : () => widget.onReject(widget.doc, residentUid),
@@ -309,7 +535,6 @@ class _PaymentApprovalCardState extends State<_PaymentApprovalCard> {
                         style: const TextStyle(color: Colors.redAccent),
                       ),
                     ),
-                    const SizedBox(width: 12),
                     ElevatedButton(
                       onPressed: widget.isProcessing || isSelfUploaded
                           ? null

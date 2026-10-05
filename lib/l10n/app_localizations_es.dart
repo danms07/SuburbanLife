@@ -564,6 +564,23 @@ class AppLocalizationsEs extends AppLocalizations {
       'Acceso de administrador revocado exitosamente';
 
   @override
+  String get deleteUserButton => 'Eliminar Cuenta';
+
+  @override
+  String get deleteUserConfirmTitle => 'Eliminar Cuenta de Usuario';
+
+  @override
+  String get deleteUserConfirmText =>
+      '¿Estás seguro de que deseas eliminar permanentemente esta cuenta de usuario? Esta acción no se puede deshacer.';
+
+  @override
+  String get deleteUserSuccess => 'Cuenta de usuario eliminada exitosamente.';
+
+  @override
+  String get cannotDeleteSelfAdminError =>
+      'No puedes eliminar tu propia cuenta de administrador desde este directorio.';
+
+  @override
   String get roleResident => 'Residente';
 
   @override
@@ -629,6 +646,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get facilityAddedSuccess => 'Amenidad agregada exitosamente.';
 
   @override
+  String get editFacilityTitle => 'Editar Amenidad';
+
+  @override
+  String get facilityUpdatedSuccess => 'Amenidad actualizada exitosamente.';
+
+  @override
+  String get edit => 'Editar';
+
+  @override
   String get settingsSavedSuccess => 'Configuración actualizada exitosamente.';
 
   @override
@@ -636,6 +662,28 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get gracePeriodDaysLabel => 'Período de Gracia (Días)';
+
+  @override
+  String get timezoneLabel => 'Zona Horaria de Programación';
+
+  @override
+  String get timezoneHelperText =>
+      'Zona horaria para cálculos de corte y período de gracia';
+
+  @override
+  String get timezoneCstLabel => 'Hora Central (CST / Ciudad de México)';
+
+  @override
+  String get timezoneEstLabel => 'Hora del Este (EST / Cancún)';
+
+  @override
+  String get timezonePstLabel => 'Hora del Pacífico (PST / Tijuana)';
+
+  @override
+  String get timezoneMstLabel => 'Hora de la Montaña (MST / Hermosillo)';
+
+  @override
+  String get timezoneUtcLabel => 'Tiempo Universal Coordinado (UTC)';
 
   @override
   String get uploadDocumentTitle => 'Subir Documento';
@@ -681,6 +729,87 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get statusPastDue => 'Vencido';
+
+  @override
+  String get paymentAmountLabel => 'Monto del Pago';
+
+  @override
+  String get paymentAmountHint => 'ej. 1500.00';
+
+  @override
+  String get paymentAmountRequired => 'Por favor ingresa el monto del pago';
+
+  @override
+  String get paymentAmountInvalid =>
+      'Por favor ingresa un número positivo válido';
+
+  @override
+  String get coveredPeriodsLabel => 'Períodos Cubiertos';
+
+  @override
+  String get selectPeriodsHint =>
+      'Selecciona los meses cubiertos por este comprobante';
+
+  @override
+  String get atLeastOnePeriodRequired =>
+      'Por favor selecciona al menos un período';
+
+  @override
+  String get advancePaymentBadge => 'Pago Anticipado';
+
+  @override
+  String get duePaymentBadge => 'Por Vencer';
+
+  @override
+  String get paidPaymentBadge => 'Pagado';
+
+  @override
+  String get reviewingPaymentBadge => 'En Revisión';
+
+  @override
+  String get deliveryDateLabel => 'Fecha de entrega de la propiedad';
+
+  @override
+  String get deliveryDateNotSet => 'No configurada';
+
+  @override
+  String get setDeliveryDateButton => 'Establecer Fecha de Entrega';
+
+  @override
+  String get editDeliveryDateButton => 'Editar Fecha de Entrega';
+
+  @override
+  String get deliveryDateUpdatedSuccess =>
+      'Fecha de entrega actualizada exitosamente.';
+
+  @override
+  String deliveryDateUpdatedError(Object error) {
+    return 'Error al actualizar la fecha de entrega: $error';
+  }
+
+  @override
+  String get deliveryDateFutureError =>
+      'La fecha de entrega no puede ser en el futuro.';
+
+  @override
+  String get advanceMonthsSection => 'Meses Anticipados / Próximos';
+
+  @override
+  String get dueMonthsSection => 'Meses Pendientes / Por Vencer';
+
+  @override
+  String totalAmountLabel(Object amount) {
+    return 'Monto Total: $amount';
+  }
+
+  @override
+  String amountPaidLabel(Object amount) {
+    return 'Monto Pagado: $amount';
+  }
+
+  @override
+  String get selectCoveredPeriodsDialogTitle =>
+      'Seleccionar Períodos Cubiertos';
 
   @override
   String get manageGuardsMenu => 'Gestionar Guardias de Seguridad';
@@ -762,9 +891,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get roommateOnboardingInstructions =>
       'Pide a tu familiar que se registre en la aplicación, y en la pantalla de selección de dirección toque la pestaña o ícono de \'Grupo Familiar\' para mostrar su código QR o compartir su ID/correo.';
-
-  @override
-  String get deliveryDateLabel => 'Fecha de entrega de la propiedad';
 
   @override
   String get selectDeliveryDate => 'Selecciona la fecha de entrega';
@@ -1163,11 +1289,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get passwordComplexityRequirements =>
-      'La contraseña debe tener al menos 8 caracteres y contener al menos 1 letra mayúscula, 1 minúscula y 1 número.';
+      'La contraseña debe tener al menos 8 caracteres y contener al menos 1 letra mayúscula, 1 minúscula, 1 número y 1 carácter especial.';
 
   @override
   String get passwordComplexityHelper =>
-      'Mín. 8 caracteres (1 mayúscula, 1 minúscula, 1 número)';
+      'Mín. 8 caracteres (1 mayúscula, 1 minúscula, 1 número, 1 carácter especial)';
 
   @override
   String get passwordComplexityError =>
@@ -1257,7 +1383,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get passwordMinLengthValidation =>
-      'La contraseña debe tener al menos 6 caracteres.';
+      'La contraseña debe tener al menos 8 caracteres y cumplir con los requisitos de seguridad.';
 
   @override
   String get addressUnlinkedSuccess => 'Dirección desvinculada exitosamente.';
@@ -1267,7 +1393,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get guardFormValidation =>
-      'Por favor proporciona un nombre, correo y contraseña válidos (mín. 6 caracteres).';
+      'Por favor proporciona un nombre, correo y contraseña válidos (mín. 8 caracteres, mayúscula, minúscula, número y símbolo).';
 
   @override
   String errorProvisioningGuard(String error) {
@@ -1657,6 +1783,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get rejectionReasonOptional => 'Notas o motivo de rechazo (opcional)';
 
   @override
+  String get rejectionReasonLabel => 'Motivo del rechazo';
+
+  @override
+  String get rejectionReasonHint =>
+      'Explica por qué no se puede aprobar esta reservación';
+
+  @override
+  String get deleteBooking => 'Eliminar Reservación';
+
+  @override
+  String get deleteBookingConfirm =>
+      '¿Estás seguro de que deseas eliminar esta reservación?';
+
+  @override
+  String get bookingDeletedSuccess => 'Reservación eliminada con éxito.';
+
+  @override
   String get applicant => 'Solicitante';
 
   @override
@@ -1707,4 +1850,346 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get familyOnboardingStep3Desc =>
       'Escanea su código QR con el botón de abajo, o ingresa su correo electrónico / ID registrado.';
+
+  @override
+  String get searchUsersPlaceholder => 'Buscar por nombre, correo o calle...';
+
+  @override
+  String get filterByStreet => 'Calle';
+
+  @override
+  String get allStreets => 'Todas las calles';
+
+  @override
+  String get filterByRole => 'Rol';
+
+  @override
+  String get allRoles => 'Todos los roles';
+
+  @override
+  String loadMoreUsers(int count) {
+    return 'Cargar más usuarios ($count cargados)';
+  }
+
+  @override
+  String allUsersLoaded(int total) {
+    return 'Todos los usuarios cargados ($total en total)';
+  }
+
+  @override
+  String showingUsersCount(int count, int total) {
+    return 'Mostrando $count de $total usuarios cargados';
+  }
+
+  @override
+  String get noUsersFound =>
+      'No se encontraron usuarios que coincidan con la búsqueda o filtros.';
+
+  @override
+  String get clearFilters => 'Limpiar filtros';
+
+  @override
+  String get loadingUsers => 'Cargando usuarios...';
+
+  @override
+  String get loadingMoreUsers => 'Cargando más usuarios...';
+
+  @override
+  String batchExplorationInfo(int size) {
+    return 'Tamaño de lote: $size';
+  }
+
+  @override
+  String loadMoreLogs(int count) {
+    return 'Cargar más registros ($count cargados)';
+  }
+
+  @override
+  String allLogsLoaded(int total) {
+    return 'Todos los registros de acceso cargados ($total en total)';
+  }
+
+  @override
+  String showingLogsCount(int count, int total) {
+    return 'Mostrando $count de $total registros cargados';
+  }
+
+  @override
+  String get loadingAccessLogs => 'Cargando registros de acceso...';
+
+  @override
+  String get loadingMoreLogs => 'Cargando más registros...';
+
+  @override
+  String showingFilteredUsersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count usuarios encontrados en la base de datos',
+      one: '1 usuario encontrado en la base de datos',
+      zero: 'Ningún usuario coincide en la base de datos',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String showingFilteredLogsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count registros encontrados en la base de datos',
+      one: '1 registro encontrado en la base de datos',
+      zero: 'Ningún registro coincide en la base de datos',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get databaseSearchActive => 'Búsqueda en base de datos activa';
+
+  @override
+  String operatingHours(String hours) {
+    return 'Horario de operación: $hours';
+  }
+
+  @override
+  String get operatingHoursUnrestricted =>
+      'Horario de operación: Sin restricciones (24/7)';
+
+  @override
+  String get openingTimeLabel => 'Hora de apertura';
+
+  @override
+  String get closingTimeLabel => 'Hora de cierre';
+
+  @override
+  String get anticipationUnitLabel => 'Anticipación para reservar';
+
+  @override
+  String get anticipationValueLabel => 'Tiempo de anticipación';
+
+  @override
+  String get anticipationHours => 'Horas';
+
+  @override
+  String get anticipationDays => 'Días';
+
+  @override
+  String get anticipationWeeks => 'Semanas';
+
+  @override
+  String get anticipationUnrestricted => 'Sin anticipación requerida';
+
+  @override
+  String get presetApprovalMessageLabel =>
+      'Instrucciones de aprobación predeterminadas';
+
+  @override
+  String get presetApprovalMessageHint =>
+      'Instrucciones que verá el residente al aprobarse su reserva...';
+
+  @override
+  String get approvalInstructionsTitle => 'Instrucciones de Aprobación';
+
+  @override
+  String get approvalInstructionsConfirm =>
+      'Opcionalmente personalice las instrucciones para este residente:';
+
+  @override
+  String get approvalInstructionsCardTitle => 'Instrucciones y Próximos Pasos:';
+
+  @override
+  String advanceNoticeRequired(int value, String unit) {
+    return 'Aviso requerido: Al menos $value $unit de anticipación';
+  }
+
+  @override
+  String timeOutsideOperatingHours(String hours) {
+    return 'El horario seleccionado está fuera del horario de operación ($hours).';
+  }
+
+  @override
+  String get closingTimeBeforeOpeningTime =>
+      'La hora de cierre debe ser posterior a la de apertura.';
+
+  @override
+  String get submittingBooking => 'Enviando reserva...';
+
+  @override
+  String get folioLabel => 'Folio / Número de Autorización';
+
+  @override
+  String get folioHint => 'ej. 12345678';
+
+  @override
+  String get paymentConceptLabel => 'Concepto del Pago';
+
+  @override
+  String get conceptMonthlyQuota => 'Cuota de Mantenimiento';
+
+  @override
+  String get conceptSanction => 'Sanción / Multa';
+
+  @override
+  String get paymentDateLabel => 'Fecha del Pago';
+
+  @override
+  String get payAdvancePeriodsSwitch =>
+      'Pagar periodos adicionales / adelantados';
+
+  @override
+  String get selectAdvancePeriods =>
+      'Seleccione los periodos a incluir en este pago';
+
+  @override
+  String get missingPaymentFieldsWarning =>
+      'Por favor complete todos los campos obligatorios antes de enviar:';
+
+  @override
+  String get missingFolio =>
+      '• El folio / número de autorización es obligatorio';
+
+  @override
+  String get missingPaymentDate => '• La fecha de pago es obligatoria';
+
+  @override
+  String get missingAmount => '• Se requiere un monto válido';
+
+  @override
+  String get missingReceipt => '• Se requiere una foto del comprobante de pago';
+
+  @override
+  String get submitPayment => 'Enviar Comprobante';
+
+  @override
+  String get confirmAction => 'Confirmar';
+
+  @override
+  String get filterAll => 'Todos';
+
+  @override
+  String get selectAddressPrompt => 'Seleccionar Dirección';
+
+  @override
+  String get paymentRejectedBannerTitle => 'Pago anterior rechazado';
+
+  @override
+  String paymentRejectedBannerMsg(String reason) {
+    return 'Motivo: $reason\nPor favor revise los detalles, adjunte un comprobante actualizado y vuelva a enviarlo.';
+  }
+
+  @override
+  String get rejectionReasonPoolTitle => 'Motivo de Rechazo';
+
+  @override
+  String get rejectionReasonSelect => 'Seleccione plantilla de motivo';
+
+  @override
+  String get rejectionReasonPeriodMismatch =>
+      'Periodo incorrecto (El periodo en el comprobante no coincide con el seleccionado)';
+
+  @override
+  String get rejectionReasonAmountMismatch =>
+      'Monto incorrecto (El monto en el comprobante no coincide con el declarado)';
+
+  @override
+  String get rejectionReasonAddressMismatch =>
+      'Dirección incorrecta (El comprobante no corresponde al domicilio)';
+
+  @override
+  String get rejectionReasonFolioMismatch =>
+      'Número de comprobante incorrecto (El folio en la foto no coincide con el reportado)';
+
+  @override
+  String get rejectionReasonOther => 'Otro (Motivo personalizado)';
+
+  @override
+  String get manageRejectionReasons => 'Administrar Motivos de Rechazo';
+
+  @override
+  String get addRejectionReason => 'Agregar Plantilla de Motivo';
+
+  @override
+  String get rejectionReasonDeleted => 'Plantilla eliminada exitosamente';
+
+  @override
+  String get rejectionReasonAdded => 'Plantilla agregada exitosamente';
+
+  @override
+  String get sanctionsMenu => 'Sanciones y Multas';
+
+  @override
+  String get adminSanctionsTitle => 'Gestión de Sanciones';
+
+  @override
+  String get issueSanction => 'Aplicar Sanción';
+
+  @override
+  String get sanctionReasonLabel => 'Descripción de la infracción';
+
+  @override
+  String get sanctionReasonHint =>
+      'ej. Ruido excesivo fuera de horario, estacionamiento indebido...';
+
+  @override
+  String get sanctionAmountLabel => 'Monto de la Multa (MXN)';
+
+  @override
+  String get sanctionEvidencePhoto => 'Foto de Evidencia';
+
+  @override
+  String get sanctionEvidenceRequired =>
+      'Por favor tome o adjunte una foto de la evidencia de la infracción.';
+
+  @override
+  String get sanctionIssuedSuccess => '¡Sanción aplicada exitosamente!';
+
+  @override
+  String get sanctionStatusActive => 'Activa (Pendiente de pago)';
+
+  @override
+  String get sanctionStatusPendingReview => 'Pago en Revisión';
+
+  @override
+  String get sanctionStatusPaid => 'Pagada y Liquidada';
+
+  @override
+  String get sanctionStatusCancelled => 'Condonada / Cancelada';
+
+  @override
+  String get paySanction => 'Pagar Sanción';
+
+  @override
+  String get noSanctions =>
+      'No hay infracciones registradas para este domicilio.';
+
+  @override
+  String get sanctionsList => 'Infracciones y Sanciones';
+
+  @override
+  String get waiveSanction => 'Condonar Sanción';
+
+  @override
+  String get waiveSanctionConfirm =>
+      '¿Está seguro de que desea condonar y cancelar esta sanción?';
+
+  @override
+  String get sanctionWaivedSuccess => 'Sanción condonada exitosamente.';
+
+  @override
+  String activeSanctionsRestrictedWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sanciones activas',
+      one: '1 sanción activa',
+    );
+    return 'Su cuenta está restringida debido a $_temp0. Por favor liquide sus adeudos para restablecer el acceso.';
+  }
+
+  @override
+  String get paymentProofPhoto => 'Foto del Comprobante de Pago';
+
+  @override
+  String get switchCamera => 'Cambiar Cámara';
 }

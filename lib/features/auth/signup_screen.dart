@@ -47,13 +47,7 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
-  bool _isPasswordValid(String password) {
-    if (password.length < 8) return false;
-    if (!password.contains(RegExp(r'[A-Z]'))) return false;
-    if (!password.contains(RegExp(r'[a-z]'))) return false;
-    if (!password.contains(RegExp(r'[0-9]'))) return false;
-    return true;
-  }
+  bool _isPasswordValid(String password) => PasswordValidator.isValid(password);
 
   void _createAccount() async {
     final l10n = AppLocalizations.of(context)!;
@@ -79,16 +73,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
     final user = await _authService.signUp(email, password, name: name);
 
+    if (!mounted) return;
+
     if (user != null) {
-      final addresses = await _fetchUnclaimedAddresses();
-      setState(() {
-        _unclaimedAddresses = addresses;
-        _step = 2;
-        _isLoading = false;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.signUpSuccess)),
       );
+      Navigator.of(context).pop();
     } else {
       setState(() {
         _isLoading = false;
@@ -112,8 +103,9 @@ class _SignupScreenState extends State<SignupScreen> {
         }
       }
       return unclaimed;
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error fetching addresses: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'SignupScreen._fetchUnclaimedAddresses');
       return [];
     }
   }

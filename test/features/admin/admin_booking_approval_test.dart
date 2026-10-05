@@ -60,7 +60,7 @@ void main() {
       expect(doc?['status'], equals('approved (upcoming)'));
     });
 
-    test('Rejecting a booking sets status to rejected with notes', () async {
+    test('Rejecting a booking sets status to rejected with notes and rejectionReason', () async {
       FakeBackendHelper.db.seedDocument('bookings', 'booking_to_reject', {
         'id': 'booking_to_reject',
         'facilityId': 'roof_garden',
@@ -71,11 +71,13 @@ void main() {
       await FakeBackendHelper.db.updateDocument('bookings', 'booking_to_reject', {
         'status': 'rejected',
         'notes': 'Maintenance scheduled for roof garden.',
+        'rejectionReason': 'Maintenance scheduled for roof garden.',
       });
 
       final doc = await FakeBackendHelper.db.getDocument('bookings', 'booking_to_reject');
       expect(doc?['status'], equals('rejected'));
       expect(doc?['notes'], equals('Maintenance scheduled for roof garden.'));
+      expect(doc?['rejectionReason'], equals('Maintenance scheduled for roof garden.'));
     });
   });
 }

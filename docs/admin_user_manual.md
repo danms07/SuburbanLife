@@ -111,11 +111,18 @@ When residents self-register via the mobile app, they submit property proof phot
   3. Tap **Approve**: Sets `{ resident: true }` claim, links the address document, sets `paymentStatus: 'paid'`, and updates `deliveryDate`.
   4. Tap **Reject**: Notifies the resident to resubmit valid proof.
 
-### 3.4 User Directory & Role Management
-* **Navigation**: Dashboard $\rightarrow$ **User Management** (`AdminUserManagementScreen`).
-* **Directory Table**: Lists all registered accounts, user UIDs, assigned roles, and current claims.
-* **Role Modifications**: Upgrade or downgrade accounts between **Resident**, **Security Guard**, and **Administrator**.
+### 3.4 User Directory & Account Management
+* **Navigation**: Dashboard $\rightarrow$ **User Directory & Roles** (`AdminUserManagementScreen`).
+* **Whole-Database Search & Multi-Filter**:
+  * **Search Bar**: Real-time search across the entire database matching by **Name**, **Email**, or physical **Street / House Number**.
+  * **Street Filter**: Dropdown dynamically populated from community addresses to filter users across the whole neighborhood.
+  * **Role Filter**: Segment users by role (**All**, **Resident**, **Roommate**, **Admin**, **Guard**).
+  * **Clear Filters**: Quickly reset all active search and filter constraints.
+* **Unfiltered Batched Exploration (20 Users per Batch)**: When browsing without active filters, users are loaded in batches of 20 accounts with cursor pagination to optimize bandwidth. Tap **Load More Users** to explore subsequent batches.
+* **Role Modifications**: Upgrade or downgrade accounts between **Resident**, **Roommate**, and **Administrator**.
+* **Password Resets**: Direct administrative password update adhering to Firebase Auth password policy.
 * **Force Unbind Address**: Unlinks a resident from an address if they move out or transfer ownership.
+* **Account Removal**: Permanently deletes a user's account and authentication credentials with automated address unbinding and roommate reference cleanup. Self-deletion is protected for the active administrator.
 
 ---
 
@@ -156,6 +163,18 @@ Security personnel use dedicated scanning interfaces to validate visitor QR code
 ### 5.2 Administrative QR Pass Generator
 * **Navigation**: Dashboard $\rightarrow$ **Generate QR Access** (`QrGeneratorScreen`).
 * When logged in as an administrator, QR pass generation automatically assigns the default location **"Admin office" / "Oficina de administración"**, allowing administrators to issue guest entry passes without linking personal residential addresses.
+
+### 5.3 Access History & Audit Logs
+* **Navigation**: Dashboard $\rightarrow$ **Access Logs** (`AdminAccessLogsScreen`).
+* **Whole-Database Multi-Filter & Search**:
+  * **Address Dropdown**: Filter logs by specific residential address or administrative office across the entire database history.
+  * **Date Range**: Filter across all database logs by **All Dates**, **Today**, **This Week**, **This Month**, or a **Custom Date Range**.
+  * **Visitor Category**: Segment events by **All Types**, **Guests / Visitors**, or **Suppliers / Delivery**.
+  * **Search Bar**: Real-time keyword search through the entire database matching visitor names, vehicle license plates, host names, guard names, and entry notes.
+  * **Clear Filters**: Reset all active filter parameters with a single tap.
+* **Unfiltered Batched Exploration (20 Logs per Batch)**: When browsing without active filters, access logs are loaded in batches of 20 events sorted descending by timestamp. Tap **Load More Logs** to fetch older access records on demand.
+* **Photo Inspection**: View visitor ID badges and vehicle license plate photos with high-resolution pinch-to-zoom modals.
+* **KPI Metric Cards**: Real-time summary counts for Total Events, Allowed entries, Denied entries, and Supplier visits.
 
 ---
 

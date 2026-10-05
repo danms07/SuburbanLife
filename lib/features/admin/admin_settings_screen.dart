@@ -4,16 +4,18 @@ import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
-  const AdminSettingsScreen({Key? key}) : super(key: key);
+  const AdminSettingsScreen({super.key});
 
   @override
-  _AdminSettingsScreenState createState() => _AdminSettingsScreenState();
+  State<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
 }
 
 class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   // App & Payment Settings
   int _cutoffDay = 1;
   int _gracePeriodDays = 10;
+  String _timeZone = 'America/Mexico_City';
+  List<String> _paymentRejectionReasons = [];
 
   // SMTP Settings
   bool _smtpEnabled = false;
@@ -62,6 +64,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       if (appData != null) {
         _cutoffDay = appData['paymentCutoffDay'] ?? 1;
         _gracePeriodDays = appData['gracePeriodDays'] ?? 10;
+        _timeZone = appData['timeZone'] ?? 'America/Mexico_City';
+        if (appData['paymentRejectionReasons'] is List) {
+          _paymentRejectionReasons = List<String>.from(appData['paymentRejectionReasons']);
+        }
       }
 
       // 2. Load SMTP settings
@@ -78,8 +84,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         _customSubjectController.text = smtpData['customSubject'] ?? '';
         _customBodyController.text = smtpData['customBody'] ?? '';
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error loading settings: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminSettingsScreen._loadSettings');
     } finally {
       if (mounted) {
         setState(() {
@@ -109,6 +116,64 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       _customSubjectController.text = l10n.defaultWelcomeSubject;
       _customBodyController.text = l10n.defaultWelcomeBody;
     });
+  }
+
+  void _addRejectionReason() async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController();
+    final added = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          title: Text(l10n.addRejectionReason),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: l10n.rejectionReasonSelect,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: Text(l10n.cancel),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppConfig.primaryColor, foregroundColor: Colors.white),
+              onPressed: () {
+                final text = controller.text.trim();
+                if (text.isNotEmpty) {
+                  Navigator.of(dialogCtx).pop(text);
+                }
+              },
+              child: Text(l10n.save),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (added != null && added.isNotEmpty && mounted) {
+      setState(() {
+        if (!_paymentRejectionReasons.contains(added)) {
+          _paymentRejectionReasons.add(added);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.rejectionReasonAdded), backgroundColor: AppConfig.secondaryColor),
+      );
+    }
+  }
+
+  void _removeRejectionReason(int index) {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() {
+      _paymentRejectionReasons.removeAt(index);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.rejectionReasonDeleted), backgroundColor: Colors.orange),
+    );
   }
 
   void _testSmtpConnection() async {
@@ -191,8 +256,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('SMTP connection test error: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminSettingsScreen._testSmtpConnection');
       if (mounted) {
         setState(() {
           _isTestSuccess = false;
@@ -251,6 +317,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       await DatabaseService().setDocument('config', 'app_settings', {
         'paymentCutoffDay': _cutoffDay,
         'gracePeriodDays': _gracePeriodDays,
+        'timeZone': _timeZone,
+        'paymentRejectionReasons': _paymentRejectionReasons,
         'updatedAt': DbFieldValue.serverTimestamp(),
       });
 
@@ -275,8 +343,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           SnackBar(content: Text(l10n.settingsSavedSuccess), backgroundColor: AppConfig.secondaryColor),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error saving settings: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminSettingsScreen._saveSettings');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
@@ -373,6 +442,123 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                               });
                             },
                           ),
+                          const SizedBox(height: 16),
+
+                          // Timezone Dropdown
+                          DropdownButtonFormField<String>(
+                            initialValue: _timeZone,
+                            decoration: InputDecoration(
+                              labelText: l10n.timezoneLabel,
+                              helperText: l10n.timezoneHelperText,
+                              prefixIcon: const Icon(Icons.schedule, color: AppConfig.primaryColor),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              isDense: true,
+                            ),
+                            items: [
+                              DropdownMenuItem(
+                                value: 'America/Mexico_City',
+                                child: Text(l10n.timezoneCstLabel),
+                              ),
+                              DropdownMenuItem(
+                                value: 'America/Cancun',
+                                child: Text(l10n.timezoneEstLabel),
+                              ),
+                              DropdownMenuItem(
+                                value: 'America/Tijuana',
+                                child: Text(l10n.timezonePstLabel),
+                              ),
+                              DropdownMenuItem(
+                                value: 'America/Hermosillo',
+                                child: Text(l10n.timezoneMstLabel),
+                              ),
+                              DropdownMenuItem(
+                                value: 'UTC',
+                                child: Text(l10n.timezoneUtcLabel),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _timeZone = val;
+                                });
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // SECTION: Payment Rejection Reasons
+                  Card(
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.rule_folder_outlined, color: AppConfig.primaryColor, size: 26),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    l10n.manageRejectionReasons,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppConfig.primaryColor,
+                                      fontFamily: AppConfig.fontFamily,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add_circle, color: AppConfig.primaryColor),
+                                tooltip: l10n.addRejectionReason,
+                                onPressed: _addRejectionReason,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            l10n.rejectionReasonSelect,
+                            style: const TextStyle(fontSize: 13, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 12),
+                          if (_paymentRejectionReasons.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                'No custom reason templates configured. Default templates are always active.',
+                                style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                              ),
+                            )
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _paymentRejectionReasons.length,
+                              separatorBuilder: (context, index) => const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final reason = _paymentRejectionReasons[index];
+                                return ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.label_outline, size: 20, color: AppConfig.primaryColor),
+                                  title: Text(reason, style: const TextStyle(fontSize: 14)),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                    onPressed: () => _removeRejectionReason(index),
+                                  ),
+                                );
+                              },
+                            ),
                         ],
                       ),
                     ),
@@ -413,7 +599,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                             title: Text(l10n.smtpEnabledLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
                             subtitle: Text(l10n.smtpEnabledSubtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                             value: _smtpEnabled,
-                            activeColor: AppConfig.secondaryColor,
+                            activeThumbColor: AppConfig.secondaryColor,
                             onChanged: (val) {
                               setState(() {
                                 _smtpEnabled = val;
@@ -498,7 +684,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                             title: Text(l10n.smtpSecureLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                             subtitle: Text(l10n.smtpSecureSubtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                             value: _smtpSecure,
-                            activeColor: AppConfig.primaryColor,
+                            activeThumbColor: AppConfig.primaryColor,
                             onChanged: (val) {
                               setState(() {
                                 _smtpSecure = val;

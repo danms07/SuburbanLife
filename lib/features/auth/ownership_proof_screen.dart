@@ -45,11 +45,19 @@ class _OwnershipProofScreenState extends State<OwnershipProofScreen> {
     });
 
     try {
-      // Force camera permissions and enforce taking a photo directly
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 80, // High compression to reduce size
-      );
+      XFile? pickedFile;
+      try {
+        pickedFile = await _picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 80,
+        );
+      } catch (cameraError) {
+        debugPrint('Camera capture fallback to gallery on web/desktop: $cameraError');
+        pickedFile = await _picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 80,
+        );
+      }
 
       if (pickedFile == null) {
         setState(() {
@@ -69,11 +77,12 @@ class _OwnershipProofScreenState extends State<OwnershipProofScreen> {
           contentType: 'image/jpeg',
           metadata: {'uploaderUid': currentUser.uid},
         );
-      } catch (e) {
+      } catch (e, stack) {
         setState(() {
           _isLoading = false;
         });
         debugPrint(e.toString());
+        Backend.crashlytics.recordError(e, stack, reason: 'OwnershipProofScreen.uploadProof');
         messenger.showSnackBar(
           SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
         );

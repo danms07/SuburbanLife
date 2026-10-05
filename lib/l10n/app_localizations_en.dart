@@ -557,6 +557,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get userRevokedSuccess => 'Admin access revoked successfully';
 
   @override
+  String get deleteUserButton => 'Remove Account';
+
+  @override
+  String get deleteUserConfirmTitle => 'Remove User Account';
+
+  @override
+  String get deleteUserConfirmText =>
+      'Are you sure you want to permanently remove this user account? This action cannot be undone.';
+
+  @override
+  String get deleteUserSuccess => 'User account removed successfully.';
+
+  @override
+  String get cannotDeleteSelfAdminError =>
+      'You cannot remove your own administrator account from this directory.';
+
+  @override
   String get roleResident => 'Resident';
 
   @override
@@ -622,6 +639,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get facilityAddedSuccess => 'Amenity successfully added.';
 
   @override
+  String get editFacilityTitle => 'Edit Amenity';
+
+  @override
+  String get facilityUpdatedSuccess => 'Amenity successfully updated.';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
   String get settingsSavedSuccess => 'Settings successfully updated.';
 
   @override
@@ -629,6 +655,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get gracePeriodDaysLabel => 'Grace Period (Days)';
+
+  @override
+  String get timezoneLabel => 'Schedule Timezone';
+
+  @override
+  String get timezoneHelperText =>
+      'Timezone used for monthly cutoff and grace period calculations';
+
+  @override
+  String get timezoneCstLabel => 'Central Time (CST / Mexico City)';
+
+  @override
+  String get timezoneEstLabel => 'Eastern Time (EST / Cancun)';
+
+  @override
+  String get timezonePstLabel => 'Pacific Time (PST / Tijuana)';
+
+  @override
+  String get timezoneMstLabel => 'Mountain Time (MST / Hermosillo)';
+
+  @override
+  String get timezoneUtcLabel => 'Coordinated Universal Time (UTC)';
 
   @override
   String get uploadDocumentTitle => 'Upload Document';
@@ -674,6 +722,83 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusPastDue => 'Past Due';
+
+  @override
+  String get paymentAmountLabel => 'Payment Amount';
+
+  @override
+  String get paymentAmountHint => 'e.g. 1500.00';
+
+  @override
+  String get paymentAmountRequired => 'Please enter the payment amount';
+
+  @override
+  String get paymentAmountInvalid => 'Please enter a valid positive number';
+
+  @override
+  String get coveredPeriodsLabel => 'Covered Periods';
+
+  @override
+  String get selectPeriodsHint => 'Select the months covered by this receipt';
+
+  @override
+  String get atLeastOnePeriodRequired => 'Please select at least one period';
+
+  @override
+  String get advancePaymentBadge => 'Advance Payment';
+
+  @override
+  String get duePaymentBadge => 'Due';
+
+  @override
+  String get paidPaymentBadge => 'Paid';
+
+  @override
+  String get reviewingPaymentBadge => 'Under Review';
+
+  @override
+  String get deliveryDateLabel => 'Property Handover Date';
+
+  @override
+  String get deliveryDateNotSet => 'Not configured';
+
+  @override
+  String get setDeliveryDateButton => 'Set Delivery Date';
+
+  @override
+  String get editDeliveryDateButton => 'Edit Delivery Date';
+
+  @override
+  String get deliveryDateUpdatedSuccess =>
+      'Delivery date updated successfully.';
+
+  @override
+  String deliveryDateUpdatedError(Object error) {
+    return 'Error updating delivery date: $error';
+  }
+
+  @override
+  String get deliveryDateFutureError =>
+      'Delivery date cannot be in the future.';
+
+  @override
+  String get advanceMonthsSection => 'Advance / Upcoming Months';
+
+  @override
+  String get dueMonthsSection => 'Pending / Due Months';
+
+  @override
+  String totalAmountLabel(Object amount) {
+    return 'Total Amount: $amount';
+  }
+
+  @override
+  String amountPaidLabel(Object amount) {
+    return 'Amount Paid: $amount';
+  }
+
+  @override
+  String get selectCoveredPeriodsDialogTitle => 'Select Covered Periods';
 
   @override
   String get manageGuardsMenu => 'Manage Security Guards';
@@ -754,9 +879,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get roommateOnboardingInstructions =>
       'Ask your family member to register in the app, and on the address selection screen tap the \'Family Group\' tab to show their QR code or share their User ID/email.';
-
-  @override
-  String get deliveryDateLabel => 'Property Handover Date';
 
   @override
   String get selectDeliveryDate => 'Select delivery date';
@@ -1145,11 +1267,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get passwordComplexityRequirements =>
-      'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.';
+      'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.';
 
   @override
   String get passwordComplexityHelper =>
-      'Min. 8 characters (1 uppercase, 1 lowercase, 1 number)';
+      'Min. 8 characters (1 uppercase, 1 lowercase, 1 number, 1 special character)';
 
   @override
   String get passwordComplexityError =>
@@ -1237,7 +1359,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get passwordMinLengthValidation =>
-      'Password must be at least 6 characters.';
+      'Password must be at least 8 characters long and meet complexity requirements.';
 
   @override
   String get addressUnlinkedSuccess => 'Address unlinked successfully.';
@@ -1247,7 +1369,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guardFormValidation =>
-      'Please provide a valid name, email, and password (min 6 chars).';
+      'Please provide a valid name, email, and password (min. 8 chars, uppercase, lowercase, number, symbol).';
 
   @override
   String errorProvisioningGuard(String error) {
@@ -1632,6 +1754,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rejectionReasonOptional => 'Notes or rejection reason (optional)';
 
   @override
+  String get rejectionReasonLabel => 'Rejection Reason';
+
+  @override
+  String get rejectionReasonHint =>
+      'Explain why this reservation cannot be approved';
+
+  @override
+  String get deleteBooking => 'Delete Booking';
+
+  @override
+  String get deleteBookingConfirm =>
+      'Are you sure you want to delete this booking?';
+
+  @override
+  String get bookingDeletedSuccess => 'Booking deleted successfully.';
+
+  @override
   String get applicant => 'Applicant';
 
   @override
@@ -1682,4 +1821,343 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get familyOnboardingStep3Desc =>
       'Scan their QR code using the button below, or enter their registered email / User ID.';
+
+  @override
+  String get searchUsersPlaceholder => 'Search by name, email, or street...';
+
+  @override
+  String get filterByStreet => 'Street';
+
+  @override
+  String get allStreets => 'All Streets';
+
+  @override
+  String get filterByRole => 'Role';
+
+  @override
+  String get allRoles => 'All Roles';
+
+  @override
+  String loadMoreUsers(int count) {
+    return 'Load More Users ($count loaded)';
+  }
+
+  @override
+  String allUsersLoaded(int total) {
+    return 'All users loaded ($total total)';
+  }
+
+  @override
+  String showingUsersCount(int count, int total) {
+    return 'Showing $count of $total loaded users';
+  }
+
+  @override
+  String get noUsersFound => 'No users found matching your search or filters.';
+
+  @override
+  String get clearFilters => 'Clear Filters';
+
+  @override
+  String get loadingUsers => 'Loading users...';
+
+  @override
+  String get loadingMoreUsers => 'Loading more users...';
+
+  @override
+  String batchExplorationInfo(int size) {
+    return 'Batch size: $size';
+  }
+
+  @override
+  String loadMoreLogs(int count) {
+    return 'Load More Logs ($count loaded)';
+  }
+
+  @override
+  String allLogsLoaded(int total) {
+    return 'All access logs loaded ($total total)';
+  }
+
+  @override
+  String showingLogsCount(int count, int total) {
+    return 'Showing $count of $total loaded logs';
+  }
+
+  @override
+  String get loadingAccessLogs => 'Loading access logs...';
+
+  @override
+  String get loadingMoreLogs => 'Loading more logs...';
+
+  @override
+  String showingFilteredUsersCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matching users in database',
+      one: '1 matching user in database',
+      zero: 'No users match database search',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String showingFilteredLogsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matching access logs in database',
+      one: '1 matching access log in database',
+      zero: 'No access logs match database search',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get databaseSearchActive => 'Full Database Search Active';
+
+  @override
+  String operatingHours(String hours) {
+    return 'Operating Hours: $hours';
+  }
+
+  @override
+  String get operatingHoursUnrestricted =>
+      'Operating Hours: Unrestricted (24/7)';
+
+  @override
+  String get openingTimeLabel => 'Opening Time';
+
+  @override
+  String get closingTimeLabel => 'Closing Time';
+
+  @override
+  String get anticipationUnitLabel => 'Advance Booking Notice';
+
+  @override
+  String get anticipationValueLabel => 'Advance Notice Value';
+
+  @override
+  String get anticipationHours => 'Hours';
+
+  @override
+  String get anticipationDays => 'Days';
+
+  @override
+  String get anticipationWeeks => 'Weeks';
+
+  @override
+  String get anticipationUnrestricted => 'No advance notice required';
+
+  @override
+  String get presetApprovalMessageLabel =>
+      'Default Approval Instructions / Next Steps';
+
+  @override
+  String get presetApprovalMessageHint =>
+      'Instructions shown to resident upon booking approval...';
+
+  @override
+  String get approvalInstructionsTitle => 'Approval Instructions';
+
+  @override
+  String get approvalInstructionsConfirm =>
+      'Optionally customize next steps / instructions for this resident:';
+
+  @override
+  String get approvalInstructionsCardTitle =>
+      'Next Steps & Facility Instructions:';
+
+  @override
+  String advanceNoticeRequired(int value, String unit) {
+    return 'Notice Required: At least $value $unit in advance';
+  }
+
+  @override
+  String timeOutsideOperatingHours(String hours) {
+    return 'Selected time is outside facility operating hours ($hours).';
+  }
+
+  @override
+  String get closingTimeBeforeOpeningTime =>
+      'Closing time must be after opening time.';
+
+  @override
+  String get submittingBooking => 'Submitting booking...';
+
+  @override
+  String get folioLabel => 'Folio / Transaction Number';
+
+  @override
+  String get folioHint => 'e.g. 12345678';
+
+  @override
+  String get paymentConceptLabel => 'Payment Concept';
+
+  @override
+  String get conceptMonthlyQuota => 'Monthly Maintenance Quota';
+
+  @override
+  String get conceptSanction => 'Sanction Fine';
+
+  @override
+  String get paymentDateLabel => 'Payment Date';
+
+  @override
+  String get payAdvancePeriodsSwitch => 'Pay additional / advance periods';
+
+  @override
+  String get selectAdvancePeriods =>
+      'Select periods to include in this payment';
+
+  @override
+  String get missingPaymentFieldsWarning =>
+      'Please fill in all mandatory fields before submitting:';
+
+  @override
+  String get missingFolio => '• Folio / Transaction number is required';
+
+  @override
+  String get missingPaymentDate => '• Payment date is required';
+
+  @override
+  String get missingAmount => '• A valid payment amount is required';
+
+  @override
+  String get missingReceipt => '• A photo of the payment receipt is required';
+
+  @override
+  String get submitPayment => 'Submit Payment';
+
+  @override
+  String get confirmAction => 'Confirm';
+
+  @override
+  String get filterAll => 'All';
+
+  @override
+  String get selectAddressPrompt => 'Select Address';
+
+  @override
+  String get paymentRejectedBannerTitle => 'Previous Payment Rejected';
+
+  @override
+  String paymentRejectedBannerMsg(String reason) {
+    return 'Reason: $reason\nPlease review the details, attach an updated receipt, and re-submit.';
+  }
+
+  @override
+  String get rejectionReasonPoolTitle => 'Rejection Reason';
+
+  @override
+  String get rejectionReasonSelect => 'Select reason template';
+
+  @override
+  String get rejectionReasonPeriodMismatch =>
+      'Incorrect period (Receipt period doesn\'t match selected period)';
+
+  @override
+  String get rejectionReasonAmountMismatch =>
+      'Incorrect amount (Receipt amount doesn\'t match declared amount)';
+
+  @override
+  String get rejectionReasonAddressMismatch =>
+      'Incorrect address (Receipt doesn\'t match address)';
+
+  @override
+  String get rejectionReasonFolioMismatch =>
+      'Incorrect receipt number (Receipt number doesn\'t match reported number)';
+
+  @override
+  String get rejectionReasonOther => 'Other (Custom reason)';
+
+  @override
+  String get manageRejectionReasons => 'Manage Rejection Reasons';
+
+  @override
+  String get addRejectionReason => 'Add Reason Template';
+
+  @override
+  String get rejectionReasonDeleted => 'Template deleted successfully';
+
+  @override
+  String get rejectionReasonAdded => 'Template added successfully';
+
+  @override
+  String get sanctionsMenu => 'Sanctions & Fines';
+
+  @override
+  String get adminSanctionsTitle => 'Sanctions Management';
+
+  @override
+  String get issueSanction => 'Issue Sanction';
+
+  @override
+  String get sanctionReasonLabel => 'Infraction Description';
+
+  @override
+  String get sanctionReasonHint =>
+      'e.g. Excessive noise after hours, unauthorized parking...';
+
+  @override
+  String get sanctionAmountLabel => 'Fine Amount (MXN)';
+
+  @override
+  String get sanctionEvidencePhoto => 'Photo Evidence';
+
+  @override
+  String get sanctionEvidenceRequired =>
+      'Please take or attach a photo of the infraction evidence.';
+
+  @override
+  String get sanctionIssuedSuccess => 'Sanction issued successfully!';
+
+  @override
+  String get sanctionStatusActive => 'Active (Unpaid)';
+
+  @override
+  String get sanctionStatusPendingReview => 'Payment Under Review';
+
+  @override
+  String get sanctionStatusPaid => 'Paid & Cleared';
+
+  @override
+  String get sanctionStatusCancelled => 'Waived / Cancelled';
+
+  @override
+  String get paySanction => 'Pay Sanction';
+
+  @override
+  String get noSanctions => 'No infractions recorded for this address.';
+
+  @override
+  String get sanctionsList => 'Infractions & Sanctions';
+
+  @override
+  String get waiveSanction => 'Waive Sanction';
+
+  @override
+  String get waiveSanctionConfirm =>
+      'Are you sure you want to waive and cancel this sanction?';
+
+  @override
+  String get sanctionWaivedSuccess => 'Sanction waived successfully.';
+
+  @override
+  String activeSanctionsRestrictedWarning(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count active sanctions',
+      one: '1 active sanction',
+    );
+    return 'Your account is restricted due to $_temp0. Please settle all fines to restore full access.';
+  }
+
+  @override
+  String get paymentProofPhoto => 'Payment Receipt Photo';
+
+  @override
+  String get switchCamera => 'Switch Camera';
 }

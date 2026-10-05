@@ -18,6 +18,7 @@ class QrScannerScreen extends StatefulWidget {
 
 class _QrScannerScreenState extends State<QrScannerScreen> {
   final MobileScannerController _controller = MobileScannerController(
+    facing: CameraFacing.back,
     formats: const [BarcodeFormat.qrCode],
     detectionSpeed: DetectionSpeed.noDuplicates,
     returnImage: false,
@@ -52,15 +53,21 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   void _onDetect(BarcodeCapture capture) async {
-    if (!_isScanning) return;
+    if (!_isScanning || !mounted) return;
 
     for (final barcode in capture.barcodes) {
-      final code = barcode.rawValue ?? barcode.displayValue;
+      final code = (barcode.rawValue ?? barcode.displayValue)?.trim();
       if (code != null && code.isNotEmpty) {
         setState(() {
           _isScanning = false;
-          _statusMessage = AppLocalizations.of(context)!.validatingQr;
+          _statusMessage = AppLocalizations.of(context)?.validatingQr;
         });
+        try {
+          await _controller.stop();
+        } catch (e) {
+          debugPrint('Error stopping scanner controller: $e');
+        }
+        if (!mounted) return;
         _validateQr(code);
         break;
       }
@@ -68,13 +75,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   void _validateQr(String qrId) async {
-    final l10n = AppLocalizations.of(context)!;
+    final cleanQrId = qrId.trim();
     try {
       final res = await FunctionsService().callFunction('validateAndRegisterQrAccess', {
-        'qrId': qrId,
+        'qrId': cleanQrId,
         'mode': 'validate_only',
       });
 
+      if (!mounted) return;
+
+      final l10n = AppLocalizations.of(context)!;
       final isGranted = res?['granted'] == true;
       final qrData = res?['qrData'] as Map<String, dynamic>?;
       final serverReason = res?['reason']?.toString();
@@ -85,7 +95,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           _isValidQr = false;
           if (qrData != null) {
             _currentQrCode = QrCode(
-              id: qrData['id'] ?? qrId,
+              id: qrData['id'] ?? cleanQrId,
               creatorUid: qrData['creatorUid'] ?? '',
               guestName: qrData['visitorName'] ?? qrData['guestName'] ?? l10n.guestFallback,
               vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
@@ -98,7 +108,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       }
 
       final qrCode = QrCode(
-        id: qrData['id'] ?? qrId,
+        id: qrData['id'] ?? cleanQrId,
         creatorUid: qrData['creatorUid'] ?? '',
         guestName: qrData['visitorName'] ?? qrData['guestName'] ?? l10n.guestFallback,
         vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
@@ -111,19 +121,63 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         _isValidQr = true;
         _currentQrCode = qrCode;
       });
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('QR validation error: $e');
-      setState(() {
-        _statusMessage = l10n.invalidQrNotFound;
-        _isValidQr = false;
-      });
+      Backend.crashlytics.recordError(e, stack, reason: 'QrScannerScreen._validateQr');
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        setState(() {
+          _statusMessage = l10n.invalidQrNotFound;
+          _isValidQr = false;
+        });
+      }
     }
   }
 
-  void _takeIdPhoto() async {
+  Future<XFile?> _pickVisitorPhoto() async {
     final picker = ImagePicker();
-    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
-    if (photo != null) {
+    XFile? photo;
+    try {
+      // Release mobile scanner camera lock before attempting image capture
+      try {
+        await _controller.stop();
+      } catch (e, stack) {
+        debugPrint('Scanner stop note: $e');
+        Backend.crashlytics.recordError(e, stack, reason: 'QrScannerScreen.stopScanner');
+      }
+
+      try {
+        photo = await picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 60,
+        );
+      } catch (cameraError) {
+        debugPrint('Camera capture note (falling back to gallery/file): $cameraError');
+        // Graceful fallback to file selection if camera is busy or unavailable (common on Web)
+        photo = await picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 60,
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('Error capturing visitor photo: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'QrScannerScreen._pickVisitorPhoto');
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+    return photo;
+  }
+
+  void _takeIdPhoto() async {
+    final photo = await _pickVisitorPhoto();
+    if (photo != null && mounted) {
       setState(() {
         _idCardPhoto = photo;
       });
@@ -131,9 +185,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   void _takePlatePhoto() async {
-    final picker = ImagePicker();
-    final photo = await picker.pickImage(source: ImageSource.camera, imageQuality: 60);
-    if (photo != null) {
+    final photo = await _pickVisitorPhoto();
+    if (photo != null && mounted) {
       setState(() {
         _carPlatePhoto = photo;
       });
@@ -177,6 +230,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         'mode': 'validate_and_register',
       });
 
+      if (!mounted) return;
+
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.accessRegisteredSuccess)),
       );
@@ -193,13 +248,17 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         _reasonController.clear();
       });
       _controller.start();
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
-      );
-      setState(() {
-        _isProcessing = false;
-      });
+    } catch (e, stack) {
+      debugPrint('Error registering access: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'QrScannerScreen._registerAccess');
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+        );
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
   }
 
@@ -212,6 +271,23 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         title: Text(l10n.scanQr),
         backgroundColor: AppConfig.primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          if (_isScanning)
+            IconButton(
+              icon: ValueListenableBuilder<MobileScannerState>(
+                valueListenable: _controller,
+                builder: (context, state, child) {
+                  return Icon(
+                    state.cameraDirection == CameraFacing.front
+                        ? Icons.camera_front
+                        : Icons.camera_rear,
+                  );
+                },
+              ),
+              tooltip: l10n.switchCamera,
+              onPressed: () => _controller.switchCamera(),
+            ),
+        ],
       ),
       body: Stack(
         children: [
@@ -220,6 +296,28 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             controller: _controller,
             onDetect: _onDetect,
           ),
+          if (_isScanning)
+            Positioned(
+              bottom: 24,
+              right: 24,
+              child: FloatingActionButton.small(
+                heroTag: 'qr_scanner_switch_camera_fab',
+                backgroundColor: Colors.black54,
+                foregroundColor: Colors.white,
+                tooltip: l10n.switchCamera,
+                onPressed: () => _controller.switchCamera(),
+                child: ValueListenableBuilder<MobileScannerState>(
+                  valueListenable: _controller,
+                  builder: (context, state, child) {
+                    return Icon(
+                      state.cameraDirection == CameraFacing.front
+                          ? Icons.camera_front
+                          : Icons.camera_rear,
+                    );
+                  },
+                ),
+              ),
+            ),
           // Overlay processing or validation result when not actively scanning
           if (!_isScanning)
             Container(
@@ -309,36 +407,36 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _isProcessing ? null : _takeIdPhoto,
-                                    icon: Icon(_idCardPhoto != null ? Icons.check : Icons.badge),
-                                    label: Text(l10n.captureIdPhoto),
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      backgroundColor: _idCardPhoto != null ? Colors.green : AppConfig.secondaryColor,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _isProcessing ? null : _takePlatePhoto,
-                                    icon: Icon(_carPlatePhoto != null ? Icons.check : Icons.directions_car),
-                                    label: Text(l10n.capturePlatePhoto),
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                      backgroundColor: _carPlatePhoto != null ? Colors.green : AppConfig.primaryColor,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            ElevatedButton.icon(
+                              onPressed: _isProcessing ? null : _takeIdPhoto,
+                              icon: Icon(_idCardPhoto != null ? Icons.check_circle : Icons.badge),
+                              label: Text(
+                                l10n.captureIdPhoto,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                backgroundColor: _idCardPhoto != null ? Colors.green : AppConfig.secondaryColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton.icon(
+                              onPressed: _isProcessing ? null : _takePlatePhoto,
+                              icon: Icon(_carPlatePhoto != null ? Icons.check_circle : Icons.directions_car),
+                              label: Text(
+                                l10n.capturePlatePhoto,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                backgroundColor: _carPlatePhoto != null ? Colors.green : AppConfig.primaryColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
                             ),
                             const SizedBox(height: 16),
                             TextField(
@@ -365,12 +463,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                                     child: ElevatedButton(
                                       onPressed: () => _registerAccess(true),
                                       style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                                         backgroundColor: Colors.green,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      child: Text(l10n.allowAccessButton, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                      child: Text(
+                                        l10n.allowAccessButton,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -378,12 +480,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                                     child: ElevatedButton(
                                       onPressed: () => _registerAccess(false),
                                       style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                                         backgroundColor: Colors.redAccent,
                                         foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                       ),
-                                      child: Text(l10n.denyAccessButton, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                      child: Text(
+                                        l10n.denyAccessButton,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -402,12 +508,17 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                                   _carPlatePhoto = null;
                                   _reasonController.clear();
                                 });
+                                _controller.start();
                               },
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
-                              child: Text(l10n.scanAgainButton, style: const TextStyle(fontSize: 16)),
+                              child: Text(
+                                l10n.scanAgainButton,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 16),
+                              ),
                             ),
                           ],
                         ],

@@ -1160,6 +1160,36 @@ abstract class AppLocalizations {
   /// **'Admin access revoked successfully'**
   String get userRevokedSuccess;
 
+  /// No description provided for @deleteUserButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Account'**
+  String get deleteUserButton;
+
+  /// No description provided for @deleteUserConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove User Account'**
+  String get deleteUserConfirmTitle;
+
+  /// No description provided for @deleteUserConfirmText.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to permanently remove this user account? This action cannot be undone.'**
+  String get deleteUserConfirmText;
+
+  /// No description provided for @deleteUserSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'User account removed successfully.'**
+  String get deleteUserSuccess;
+
+  /// No description provided for @cannotDeleteSelfAdminError.
+  ///
+  /// In en, this message translates to:
+  /// **'You cannot remove your own administrator account from this directory.'**
+  String get cannotDeleteSelfAdminError;
+
   /// No description provided for @roleResident.
   ///
   /// In en, this message translates to:
@@ -1280,6 +1310,24 @@ abstract class AppLocalizations {
   /// **'Amenity successfully added.'**
   String get facilityAddedSuccess;
 
+  /// No description provided for @editFacilityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Amenity'**
+  String get editFacilityTitle;
+
+  /// No description provided for @facilityUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Amenity successfully updated.'**
+  String get facilityUpdatedSuccess;
+
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
   /// No description provided for @settingsSavedSuccess.
   ///
   /// In en, this message translates to:
@@ -1297,6 +1345,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Grace Period (Days)'**
   String get gracePeriodDaysLabel;
+
+  /// No description provided for @timezoneLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule Timezone'**
+  String get timezoneLabel;
+
+  /// No description provided for @timezoneHelperText.
+  ///
+  /// In en, this message translates to:
+  /// **'Timezone used for monthly cutoff and grace period calculations'**
+  String get timezoneHelperText;
+
+  /// No description provided for @timezoneCstLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Central Time (CST / Mexico City)'**
+  String get timezoneCstLabel;
+
+  /// No description provided for @timezoneEstLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Eastern Time (EST / Cancun)'**
+  String get timezoneEstLabel;
+
+  /// No description provided for @timezonePstLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pacific Time (PST / Tijuana)'**
+  String get timezonePstLabel;
+
+  /// No description provided for @timezoneMstLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Mountain Time (MST / Hermosillo)'**
+  String get timezoneMstLabel;
+
+  /// No description provided for @timezoneUtcLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Coordinated Universal Time (UTC)'**
+  String get timezoneUtcLabel;
 
   /// No description provided for @uploadDocumentTitle.
   ///
@@ -1387,6 +1477,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Past Due'**
   String get statusPastDue;
+
+  /// No description provided for @paymentAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Amount'**
+  String get paymentAmountLabel;
+
+  /// No description provided for @paymentAmountHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 1500.00'**
+  String get paymentAmountHint;
+
+  /// No description provided for @paymentAmountRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the payment amount'**
+  String get paymentAmountRequired;
+
+  /// No description provided for @paymentAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid positive number'**
+  String get paymentAmountInvalid;
+
+  /// No description provided for @coveredPeriodsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Covered Periods'**
+  String get coveredPeriodsLabel;
+
+  /// No description provided for @selectPeriodsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the months covered by this receipt'**
+  String get selectPeriodsHint;
+
+  /// No description provided for @atLeastOnePeriodRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select at least one period'**
+  String get atLeastOnePeriodRequired;
+
+  /// No description provided for @advancePaymentBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance Payment'**
+  String get advancePaymentBadge;
+
+  /// No description provided for @duePaymentBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Due'**
+  String get duePaymentBadge;
+
+  /// No description provided for @paidPaymentBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get paidPaymentBadge;
+
+  /// No description provided for @reviewingPaymentBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Under Review'**
+  String get reviewingPaymentBadge;
+
+  /// No description provided for @deliveryDateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Property Handover Date'**
+  String get deliveryDateLabel;
+
+  /// No description provided for @deliveryDateNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not configured'**
+  String get deliveryDateNotSet;
+
+  /// No description provided for @setDeliveryDateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Set Delivery Date'**
+  String get setDeliveryDateButton;
+
+  /// No description provided for @editDeliveryDateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Delivery Date'**
+  String get editDeliveryDateButton;
+
+  /// No description provided for @deliveryDateUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery date updated successfully.'**
+  String get deliveryDateUpdatedSuccess;
+
+  /// No description provided for @deliveryDateUpdatedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating delivery date: {error}'**
+  String deliveryDateUpdatedError(Object error);
+
+  /// No description provided for @deliveryDateFutureError.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery date cannot be in the future.'**
+  String get deliveryDateFutureError;
+
+  /// No description provided for @advanceMonthsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance / Upcoming Months'**
+  String get advanceMonthsSection;
+
+  /// No description provided for @dueMonthsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending / Due Months'**
+  String get dueMonthsSection;
+
+  /// No description provided for @totalAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Amount: {amount}'**
+  String totalAmountLabel(Object amount);
+
+  /// No description provided for @amountPaidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount Paid: {amount}'**
+  String amountPaidLabel(Object amount);
+
+  /// No description provided for @selectCoveredPeriodsDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Covered Periods'**
+  String get selectCoveredPeriodsDialogTitle;
 
   /// No description provided for @manageGuardsMenu.
   ///
@@ -1531,12 +1759,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ask your family member to register in the app, and on the address selection screen tap the \'Family Group\' tab to show their QR code or share their User ID/email.'**
   String get roommateOnboardingInstructions;
-
-  /// No description provided for @deliveryDateLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Property Handover Date'**
-  String get deliveryDateLabel;
 
   /// No description provided for @selectDeliveryDate.
   ///
@@ -2255,13 +2477,13 @@ abstract class AppLocalizations {
   /// No description provided for @passwordComplexityRequirements.
   ///
   /// In en, this message translates to:
-  /// **'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.'**
+  /// **'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.'**
   String get passwordComplexityRequirements;
 
   /// No description provided for @passwordComplexityHelper.
   ///
   /// In en, this message translates to:
-  /// **'Min. 8 characters (1 uppercase, 1 lowercase, 1 number)'**
+  /// **'Min. 8 characters (1 uppercase, 1 lowercase, 1 number, 1 special character)'**
   String get passwordComplexityHelper;
 
   /// No description provided for @passwordComplexityError.
@@ -2411,7 +2633,7 @@ abstract class AppLocalizations {
   /// No description provided for @passwordMinLengthValidation.
   ///
   /// In en, this message translates to:
-  /// **'Password must be at least 6 characters.'**
+  /// **'Password must be at least 8 characters long and meet complexity requirements.'**
   String get passwordMinLengthValidation;
 
   /// No description provided for @addressUnlinkedSuccess.
@@ -2429,7 +2651,7 @@ abstract class AppLocalizations {
   /// No description provided for @guardFormValidation.
   ///
   /// In en, this message translates to:
-  /// **'Please provide a valid name, email, and password (min 6 chars).'**
+  /// **'Please provide a valid name, email, and password (min. 8 chars, uppercase, lowercase, number, symbol).'**
   String get guardFormValidation;
 
   /// No description provided for @errorProvisioningGuard.
@@ -3080,6 +3302,36 @@ abstract class AppLocalizations {
   /// **'Notes or rejection reason (optional)'**
   String get rejectionReasonOptional;
 
+  /// No description provided for @rejectionReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection Reason'**
+  String get rejectionReasonLabel;
+
+  /// No description provided for @rejectionReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain why this reservation cannot be approved'**
+  String get rejectionReasonHint;
+
+  /// No description provided for @deleteBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Booking'**
+  String get deleteBooking;
+
+  /// No description provided for @deleteBookingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this booking?'**
+  String get deleteBookingConfirm;
+
+  /// No description provided for @bookingDeletedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking deleted successfully.'**
+  String get bookingDeletedSuccess;
+
   /// No description provided for @applicant.
   ///
   /// In en, this message translates to:
@@ -3175,6 +3427,558 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scan their QR code using the button below, or enter their registered email / User ID.'**
   String get familyOnboardingStep3Desc;
+
+  /// No description provided for @searchUsersPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name, email, or street...'**
+  String get searchUsersPlaceholder;
+
+  /// No description provided for @filterByStreet.
+  ///
+  /// In en, this message translates to:
+  /// **'Street'**
+  String get filterByStreet;
+
+  /// No description provided for @allStreets.
+  ///
+  /// In en, this message translates to:
+  /// **'All Streets'**
+  String get allStreets;
+
+  /// No description provided for @filterByRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get filterByRole;
+
+  /// No description provided for @allRoles.
+  ///
+  /// In en, this message translates to:
+  /// **'All Roles'**
+  String get allRoles;
+
+  /// No description provided for @loadMoreUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Load More Users ({count} loaded)'**
+  String loadMoreUsers(int count);
+
+  /// No description provided for @allUsersLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'All users loaded ({total} total)'**
+  String allUsersLoaded(int total);
+
+  /// No description provided for @showingUsersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {count} of {total} loaded users'**
+  String showingUsersCount(int count, int total);
+
+  /// No description provided for @noUsersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No users found matching your search or filters.'**
+  String get noUsersFound;
+
+  /// No description provided for @clearFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Filters'**
+  String get clearFilters;
+
+  /// No description provided for @loadingUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading users...'**
+  String get loadingUsers;
+
+  /// No description provided for @loadingMoreUsers.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more users...'**
+  String get loadingMoreUsers;
+
+  /// No description provided for @batchExplorationInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch size: {size}'**
+  String batchExplorationInfo(int size);
+
+  /// No description provided for @loadMoreLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Load More Logs ({count} loaded)'**
+  String loadMoreLogs(int count);
+
+  /// No description provided for @allLogsLoaded.
+  ///
+  /// In en, this message translates to:
+  /// **'All access logs loaded ({total} total)'**
+  String allLogsLoaded(int total);
+
+  /// No description provided for @showingLogsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing {count} of {total} loaded logs'**
+  String showingLogsCount(int count, int total);
+
+  /// No description provided for @loadingAccessLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading access logs...'**
+  String get loadingAccessLogs;
+
+  /// No description provided for @loadingMoreLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading more logs...'**
+  String get loadingMoreLogs;
+
+  /// No description provided for @showingFilteredUsersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No users match database search} =1{1 matching user in database} other{{count} matching users in database}}'**
+  String showingFilteredUsersCount(int count);
+
+  /// No description provided for @showingFilteredLogsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No access logs match database search} =1{1 matching access log in database} other{{count} matching access logs in database}}'**
+  String showingFilteredLogsCount(int count);
+
+  /// No description provided for @databaseSearchActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Full Database Search Active'**
+  String get databaseSearchActive;
+
+  /// No description provided for @operatingHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Operating Hours: {hours}'**
+  String operatingHours(String hours);
+
+  /// No description provided for @operatingHoursUnrestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Operating Hours: Unrestricted (24/7)'**
+  String get operatingHoursUnrestricted;
+
+  /// No description provided for @openingTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening Time'**
+  String get openingTimeLabel;
+
+  /// No description provided for @closingTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing Time'**
+  String get closingTimeLabel;
+
+  /// No description provided for @anticipationUnitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance Booking Notice'**
+  String get anticipationUnitLabel;
+
+  /// No description provided for @anticipationValueLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Advance Notice Value'**
+  String get anticipationValueLabel;
+
+  /// No description provided for @anticipationHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get anticipationHours;
+
+  /// No description provided for @anticipationDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get anticipationDays;
+
+  /// No description provided for @anticipationWeeks.
+  ///
+  /// In en, this message translates to:
+  /// **'Weeks'**
+  String get anticipationWeeks;
+
+  /// No description provided for @anticipationUnrestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'No advance notice required'**
+  String get anticipationUnrestricted;
+
+  /// No description provided for @presetApprovalMessageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Approval Instructions / Next Steps'**
+  String get presetApprovalMessageLabel;
+
+  /// No description provided for @presetApprovalMessageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions shown to resident upon booking approval...'**
+  String get presetApprovalMessageHint;
+
+  /// No description provided for @approvalInstructionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approval Instructions'**
+  String get approvalInstructionsTitle;
+
+  /// No description provided for @approvalInstructionsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Optionally customize next steps / instructions for this resident:'**
+  String get approvalInstructionsConfirm;
+
+  /// No description provided for @approvalInstructionsCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Next Steps & Facility Instructions:'**
+  String get approvalInstructionsCardTitle;
+
+  /// No description provided for @advanceNoticeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Notice Required: At least {value} {unit} in advance'**
+  String advanceNoticeRequired(int value, String unit);
+
+  /// No description provided for @timeOutsideOperatingHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected time is outside facility operating hours ({hours}).'**
+  String timeOutsideOperatingHours(String hours);
+
+  /// No description provided for @closingTimeBeforeOpeningTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing time must be after opening time.'**
+  String get closingTimeBeforeOpeningTime;
+
+  /// No description provided for @submittingBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting booking...'**
+  String get submittingBooking;
+
+  /// No description provided for @folioLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Folio / Transaction Number'**
+  String get folioLabel;
+
+  /// No description provided for @folioHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 12345678'**
+  String get folioHint;
+
+  /// No description provided for @paymentConceptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Concept'**
+  String get paymentConceptLabel;
+
+  /// No description provided for @conceptMonthlyQuota.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly Maintenance Quota'**
+  String get conceptMonthlyQuota;
+
+  /// No description provided for @conceptSanction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanction Fine'**
+  String get conceptSanction;
+
+  /// No description provided for @paymentDateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Date'**
+  String get paymentDateLabel;
+
+  /// No description provided for @payAdvancePeriodsSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay additional / advance periods'**
+  String get payAdvancePeriodsSwitch;
+
+  /// No description provided for @selectAdvancePeriods.
+  ///
+  /// In en, this message translates to:
+  /// **'Select periods to include in this payment'**
+  String get selectAdvancePeriods;
+
+  /// No description provided for @missingPaymentFieldsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Please fill in all mandatory fields before submitting:'**
+  String get missingPaymentFieldsWarning;
+
+  /// No description provided for @missingFolio.
+  ///
+  /// In en, this message translates to:
+  /// **'• Folio / Transaction number is required'**
+  String get missingFolio;
+
+  /// No description provided for @missingPaymentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'• Payment date is required'**
+  String get missingPaymentDate;
+
+  /// No description provided for @missingAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'• A valid payment amount is required'**
+  String get missingAmount;
+
+  /// No description provided for @missingReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'• A photo of the payment receipt is required'**
+  String get missingReceipt;
+
+  /// No description provided for @submitPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Payment'**
+  String get submitPayment;
+
+  /// No description provided for @confirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirmAction;
+
+  /// No description provided for @filterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get filterAll;
+
+  /// No description provided for @selectAddressPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Address'**
+  String get selectAddressPrompt;
+
+  /// No description provided for @paymentRejectedBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous Payment Rejected'**
+  String get paymentRejectedBannerTitle;
+
+  /// No description provided for @paymentRejectedBannerMsg.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason: {reason}\nPlease review the details, attach an updated receipt, and re-submit.'**
+  String paymentRejectedBannerMsg(String reason);
+
+  /// No description provided for @rejectionReasonPoolTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection Reason'**
+  String get rejectionReasonPoolTitle;
+
+  /// No description provided for @rejectionReasonSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select reason template'**
+  String get rejectionReasonSelect;
+
+  /// No description provided for @rejectionReasonPeriodMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect period (Receipt period doesn\'t match selected period)'**
+  String get rejectionReasonPeriodMismatch;
+
+  /// No description provided for @rejectionReasonAmountMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect amount (Receipt amount doesn\'t match declared amount)'**
+  String get rejectionReasonAmountMismatch;
+
+  /// No description provided for @rejectionReasonAddressMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect address (Receipt doesn\'t match address)'**
+  String get rejectionReasonAddressMismatch;
+
+  /// No description provided for @rejectionReasonFolioMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect receipt number (Receipt number doesn\'t match reported number)'**
+  String get rejectionReasonFolioMismatch;
+
+  /// No description provided for @rejectionReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other (Custom reason)'**
+  String get rejectionReasonOther;
+
+  /// No description provided for @manageRejectionReasons.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Rejection Reasons'**
+  String get manageRejectionReasons;
+
+  /// No description provided for @addRejectionReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Reason Template'**
+  String get addRejectionReason;
+
+  /// No description provided for @rejectionReasonDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Template deleted successfully'**
+  String get rejectionReasonDeleted;
+
+  /// No description provided for @rejectionReasonAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Template added successfully'**
+  String get rejectionReasonAdded;
+
+  /// No description provided for @sanctionsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanctions & Fines'**
+  String get sanctionsMenu;
+
+  /// No description provided for @adminSanctionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanctions Management'**
+  String get adminSanctionsTitle;
+
+  /// No description provided for @issueSanction.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue Sanction'**
+  String get issueSanction;
+
+  /// No description provided for @sanctionReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Infraction Description'**
+  String get sanctionReasonLabel;
+
+  /// No description provided for @sanctionReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Excessive noise after hours, unauthorized parking...'**
+  String get sanctionReasonHint;
+
+  /// No description provided for @sanctionAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fine Amount (MXN)'**
+  String get sanctionAmountLabel;
+
+  /// No description provided for @sanctionEvidencePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Evidence'**
+  String get sanctionEvidencePhoto;
+
+  /// No description provided for @sanctionEvidenceRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please take or attach a photo of the infraction evidence.'**
+  String get sanctionEvidenceRequired;
+
+  /// No description provided for @sanctionIssuedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanction issued successfully!'**
+  String get sanctionIssuedSuccess;
+
+  /// No description provided for @sanctionStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active (Unpaid)'**
+  String get sanctionStatusActive;
+
+  /// No description provided for @sanctionStatusPendingReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Under Review'**
+  String get sanctionStatusPendingReview;
+
+  /// No description provided for @sanctionStatusPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid & Cleared'**
+  String get sanctionStatusPaid;
+
+  /// No description provided for @sanctionStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Waived / Cancelled'**
+  String get sanctionStatusCancelled;
+
+  /// No description provided for @paySanction.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay Sanction'**
+  String get paySanction;
+
+  /// No description provided for @noSanctions.
+  ///
+  /// In en, this message translates to:
+  /// **'No infractions recorded for this address.'**
+  String get noSanctions;
+
+  /// No description provided for @sanctionsList.
+  ///
+  /// In en, this message translates to:
+  /// **'Infractions & Sanctions'**
+  String get sanctionsList;
+
+  /// No description provided for @waiveSanction.
+  ///
+  /// In en, this message translates to:
+  /// **'Waive Sanction'**
+  String get waiveSanction;
+
+  /// No description provided for @waiveSanctionConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to waive and cancel this sanction?'**
+  String get waiveSanctionConfirm;
+
+  /// No description provided for @sanctionWaivedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanction waived successfully.'**
+  String get sanctionWaivedSuccess;
+
+  /// No description provided for @activeSanctionsRestrictedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is restricted due to {count, plural, =1{1 active sanction} other{{count} active sanctions}}. Please settle all fines to restore full access.'**
+  String activeSanctionsRestrictedWarning(int count);
+
+  /// No description provided for @paymentProofPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Receipt Photo'**
+  String get paymentProofPhoto;
+
+  /// No description provided for @switchCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Camera'**
+  String get switchCamera;
 }
 
 class _AppLocalizationsDelegate

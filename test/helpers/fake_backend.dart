@@ -70,7 +70,27 @@ class FakeDatabaseService implements DatabaseService {
     final existing = _store[collection]![docId] ?? {'id': docId};
     final updated = Map<String, dynamic>.from(existing);
     data.forEach((key, value) {
-      updated[key] = value;
+      if (value is DbFieldValue) {
+        if (value.type == DbFieldValueType.arrayUnion) {
+          final currentList = List<dynamic>.from(existing[key] is Iterable ? existing[key] : []);
+          for (final item in (value.value as Iterable)) {
+            if (!currentList.contains(item)) currentList.add(item);
+          }
+          updated[key] = currentList;
+        } else if (value.type == DbFieldValueType.arrayRemove) {
+          final currentList = List<dynamic>.from(existing[key] is Iterable ? existing[key] : []);
+          for (final item in (value.value as Iterable)) {
+            currentList.remove(item);
+          }
+          updated[key] = currentList;
+        } else if (value.type == DbFieldValueType.delete) {
+          updated.remove(key);
+        } else if (value.type == DbFieldValueType.serverTimestamp) {
+          updated[key] = DateTime.now();
+        }
+      } else {
+        updated[key] = value;
+      }
     });
     _store[collection]![docId] = updated;
     _notify(collection, docId);
@@ -124,6 +144,7 @@ class FakeDatabaseService implements DatabaseService {
     String collection, {
     List<QueryFilter>? filters,
     List<QuerySort>? sorts,
+    int? limit,
   }) {
     final controller = _collectionControllers.putIfAbsent(collection, () {
       return StreamController<List<Map<String, dynamic>>>.broadcast();
@@ -131,12 +152,12 @@ class FakeDatabaseService implements DatabaseService {
 
     Future.microtask(() async {
       if (!controller.isClosed) {
-        final docs = await getCollection(collection, filters: filters, sorts: sorts);
+        final docs = await getCollection(collection, filters: filters, sorts: sorts, limit: limit);
         controller.add(docs);
       }
     });
 
-    return controller.stream.map((list) => _applyFiltersAndSorts(list, filters, sorts));
+    return controller.stream.map((list) => _applyFiltersAndSorts(list, filters, sorts, limit: limit));
   }
 
   @override
@@ -144,18 +165,22 @@ class FakeDatabaseService implements DatabaseService {
     String collection, {
     List<QueryFilter>? filters,
     List<QuerySort>? sorts,
+    int? limit,
+    dynamic startAfter,
   }) async {
     final docs = (_store[collection]?.values ?? [])
         .map((d) => Map<String, dynamic>.from(d))
         .toList();
-    return _applyFiltersAndSorts(docs, filters, sorts);
+    return _applyFiltersAndSorts(docs, filters, sorts, limit: limit, startAfter: startAfter);
   }
 
   List<Map<String, dynamic>> _applyFiltersAndSorts(
     List<Map<String, dynamic>> docs,
     List<QueryFilter>? filters,
-    List<QuerySort>? sorts,
-  ) {
+    List<QuerySort>? sorts, {
+    int? limit,
+    dynamic startAfter,
+  }) {
     var result = List<Map<String, dynamic>>.from(docs);
 
     if (filters != null) {
@@ -185,6 +210,23 @@ class FakeDatabaseService implements DatabaseService {
           return sort.descending ? -comp : comp;
         });
       }
+    }
+
+    if (startAfter != null) {
+      int startIndex = -1;
+      if (startAfter is String) {
+        startIndex = result.indexWhere((doc) => doc['id'] == startAfter || doc['uid'] == startAfter);
+      } else if (startAfter is Map) {
+        final startId = startAfter['id'] ?? startAfter['uid'];
+        startIndex = result.indexWhere((doc) => doc['id'] == startId || doc['uid'] == startId);
+      }
+      if (startIndex != -1 && startIndex < result.length) {
+        result = result.sublist(startIndex + 1);
+      }
+    }
+
+    if (limit != null && limit > 0) {
+      result = result.take(limit).toList();
     }
 
     return result;
@@ -309,6 +351,9 @@ class FakeAuthService implements AuthService {
   Future<void> signOut() async {
     emitUser(null);
   }
+
+  @override
+  Future<void> reloadUserToken({bool forceRefresh = true}) async {}
 
   @override
   Future<bool> isAdmin() async => isAdminMock;

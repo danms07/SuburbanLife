@@ -190,6 +190,11 @@
   "promoteAdminButton": "Promover a Administrador",
   "userPromotedSuccess": "Usuario promovido a Administrador exitosamente",
   "userRevokedSuccess": "Acceso de administrador revocado exitosamente",
+  "deleteUserButton": "Eliminar Cuenta",
+  "deleteUserConfirmTitle": "Eliminar Cuenta de Usuario",
+  "deleteUserConfirmText": "¿Estás seguro de que deseas eliminar permanentemente esta cuenta de usuario? Esta acción no se puede deshacer.",
+  "deleteUserSuccess": "Cuenta de usuario eliminada exitosamente.",
+  "cannotDeleteSelfAdminError": "No puedes eliminar tu propia cuenta de administrador desde este directorio.",
   "roleResident": "Residente",
   "roleRoommate": "Miembro",
   "roleAdmin": "Administrador",
@@ -210,9 +215,19 @@
   "isUniqueAmenityLabel": "Amenidad Única (Capacidad simple)",
   "quantityLabel": "Cantidad Disponible",
   "facilityAddedSuccess": "Amenidad agregada exitosamente.",
+  "editFacilityTitle": "Editar Amenidad",
+  "facilityUpdatedSuccess": "Amenidad actualizada exitosamente.",
+  "edit": "Editar",
   "settingsSavedSuccess": "Configuración actualizada exitosamente.",
   "paymentCutoffDayLabel": "Día de Corte de Pago del Mes",
   "gracePeriodDaysLabel": "Período de Gracia (Días)",
+  "timezoneLabel": "Zona Horaria de Programación",
+  "timezoneHelperText": "Zona horaria para cálculos de corte y período de gracia",
+  "timezoneCstLabel": "Hora Central (CST / Ciudad de México)",
+  "timezoneEstLabel": "Hora del Este (EST / Cancún)",
+  "timezonePstLabel": "Hora del Pacífico (PST / Tijuana)",
+  "timezoneMstLabel": "Hora de la Montaña (MST / Hermosillo)",
+  "timezoneUtcLabel": "Tiempo Universal Coordinado (UTC)",
   "uploadDocumentTitle": "Subir Documento",
   "documentTitleLabel": "Título del Documento",
   "categoryLabel": "Categoría",
@@ -230,6 +245,29 @@
   "statusPaid": "Pagado",
   "statusPending": "Pendiente",
   "statusPastDue": "Vencido",
+  "paymentAmountLabel": "Monto del Pago",
+  "paymentAmountHint": "ej. 1500.00",
+  "paymentAmountRequired": "Por favor ingresa el monto del pago",
+  "paymentAmountInvalid": "Por favor ingresa un número positivo válido",
+  "coveredPeriodsLabel": "Períodos Cubiertos",
+  "selectPeriodsHint": "Selecciona los meses cubiertos por este comprobante",
+  "atLeastOnePeriodRequired": "Por favor selecciona al menos un período",
+  "advancePaymentBadge": "Pago Anticipado",
+  "duePaymentBadge": "Por Vencer",
+  "paidPaymentBadge": "Pagado",
+  "reviewingPaymentBadge": "En Revisión",
+  "deliveryDateLabel": "Fecha de Entrega",
+  "deliveryDateNotSet": "No configurada",
+  "setDeliveryDateButton": "Establecer Fecha de Entrega",
+  "editDeliveryDateButton": "Editar Fecha de Entrega",
+  "deliveryDateUpdatedSuccess": "Fecha de entrega actualizada exitosamente.",
+  "deliveryDateUpdatedError": "Error al actualizar la fecha de entrega: {error}",
+  "deliveryDateFutureError": "La fecha de entrega no puede ser en el futuro.",
+  "advanceMonthsSection": "Meses Anticipados / Próximos",
+  "dueMonthsSection": "Meses Pendientes / Por Vencer",
+  "totalAmountLabel": "Monto Total: {amount}",
+  "amountPaidLabel": "Monto Pagado: {amount}",
+  "selectCoveredPeriodsDialogTitle": "Seleccionar Períodos Cubiertos",
   "manageGuardsMenu": "Gestionar Guardias de Seguridad",
   "provisionGuardTitle": "Provisión de Guardia de Seguridad",
   "guardNameLabel": "Nombre del Guardia",
@@ -423,8 +461,8 @@
   "cardAccessCategory": "Categoría de Acceso",
   "cardValidity": "Vigencia",
   "cardVehicleDetails": "Detalles del Vehículo",
-  "passwordComplexityRequirements": "La contraseña debe tener al menos 8 caracteres y contener al menos 1 letra mayúscula, 1 minúscula y 1 número.",
-  "passwordComplexityHelper": "Mín. 8 caracteres (1 mayúscula, 1 minúscula, 1 número)",
+  "passwordComplexityRequirements": "La contraseña debe tener al menos 8 caracteres y contener al menos 1 letra mayúscula, 1 minúscula, 1 número y 1 carácter especial.",
+  "passwordComplexityHelper": "Mín. 8 caracteres (1 mayúscula, 1 minúscula, 1 número, 1 carácter especial)",
   "passwordComplexityError": "La contraseña no cumple con los requisitos de seguridad.",
   "ok": "Aceptar",
   "close": "Cerrar",
@@ -450,10 +488,10 @@
   "bookingResubmittedSuccess": "Reservación reenviada para revisión.",
   "resubmitButton": "Reenviar",
   "addressDetailsNotFound": "No se encontraron los detalles de la dirección.",
-  "passwordMinLengthValidation": "La contraseña debe tener al menos 6 caracteres.",
+  "passwordMinLengthValidation": "La contraseña debe tener al menos 8 caracteres y cumplir con los requisitos de seguridad.",
   "addressUnlinkedSuccess": "Dirección desvinculada exitosamente.",
   "resetPasswordButton": "Restablecer Contraseña",
-  "guardFormValidation": "Por favor proporciona un nombre, correo y contraseña válidos (mín. 6 caracteres).",
+  "guardFormValidation": "Por favor proporciona un nombre, correo y contraseña válidos (mín. 8 caracteres, mayúscula, minúscula, número y símbolo).",
   "errorProvisioningGuard": "Error al registrar guardia: {error}",
   "errorRemovingGuard": "Error al eliminar guardia: {error}",
   "noGuardsProvisioned": "No hay guardias de seguridad registrados todavía.",
@@ -576,6 +614,11 @@
   "approveBookingConfirm": "¿Estás seguro de que deseas aprobar esta reservación?",
   "rejectBookingConfirm": "¿Estás seguro de que deseas rechazar esta reservación?",
   "rejectionReasonOptional": "Notas o motivo de rechazo (opcional)",
+  "rejectionReasonLabel": "Motivo del rechazo",
+  "rejectionReasonHint": "Explica por qué no se puede aprobar esta reservación",
+  "deleteBooking": "Eliminar Reservación",
+  "deleteBookingConfirm": "¿Estás seguro de que deseas eliminar esta reservación?",
+  "bookingDeletedSuccess": "Reservación eliminada con éxito.",
   "applicant": "Solicitante",
   "timeSlot": "Horario",
   "bookingDetails": "Detalles de la Reservación",
@@ -591,6 +634,205 @@
   "familyOnboardingStep2Title": "2. Seleccionar 'Grupo Familiar'",
   "familyOnboardingStep2Desc": "En la pantalla de selección de dirección, indícale tocar la opción 'Grupo Familiar' para ver su código QR.",
   "familyOnboardingStep3Title": "3. Escanear o Ingresar Datos",
-  "familyOnboardingStep3Desc": "Escanea su código QR con el botón de abajo, o ingresa su correo electrónico / ID registrado."
+  "familyOnboardingStep3Desc": "Escanea su código QR con el botón de abajo, o ingresa su correo electrónico / ID registrado.",
+  "searchUsersPlaceholder": "Buscar por nombre, correo o calle...",
+  "filterByStreet": "Calle",
+  "allStreets": "Todas las calles",
+  "filterByRole": "Rol",
+  "allRoles": "Todos los roles",
+  "loadMoreUsers": "Cargar más usuarios ({count} cargados)",
+  "@loadMoreUsers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "allUsersLoaded": "Todos los usuarios cargados ({total} en total)",
+  "@allUsersLoaded": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "showingUsersCount": "Mostrando {count} de {total} usuarios cargados",
+  "@showingUsersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "noUsersFound": "No se encontraron usuarios que coincidan con la búsqueda o filtros.",
+  "clearFilters": "Limpiar filtros",
+  "loadingUsers": "Cargando usuarios...",
+  "loadingMoreUsers": "Cargando más usuarios...",
+  "batchExplorationInfo": "Tamaño de lote: {size}",
+  "@batchExplorationInfo": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "loadMoreLogs": "Cargar más registros ({count} cargados)",
+  "@loadMoreLogs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "allLogsLoaded": "Todos los registros de acceso cargados ({total} en total)",
+  "@allLogsLoaded": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "showingLogsCount": "Mostrando {count} de {total} registros cargados",
+  "@showingLogsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "loadingAccessLogs": "Cargando registros de acceso...",
+  "loadingMoreLogs": "Cargando más registros...",
+  "showingFilteredUsersCount": "{count, plural, =0{Ningún usuario coincide en la base de datos} =1{1 usuario encontrado en la base de datos} other{{count} usuarios encontrados en la base de datos}}",
+  "@showingFilteredUsersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showingFilteredLogsCount": "{count, plural, =0{Ningún registro coincide en la base de datos} =1{1 registro encontrado en la base de datos} other{{count} registros encontrados en la base de datos}}",
+  "@showingFilteredLogsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "databaseSearchActive": "Búsqueda en base de datos activa",
+  "operatingHours": "Horario de operación: {hours}",
+  "@operatingHours": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "operatingHoursUnrestricted": "Horario de operación: Sin restricciones (24/7)",
+  "openingTimeLabel": "Hora de apertura",
+  "closingTimeLabel": "Hora de cierre",
+  "anticipationUnitLabel": "Anticipación para reservar",
+  "anticipationValueLabel": "Tiempo de anticipación",
+  "anticipationHours": "Horas",
+  "anticipationDays": "Días",
+  "anticipationWeeks": "Semanas",
+  "anticipationUnrestricted": "Sin anticipación requerida",
+  "presetApprovalMessageLabel": "Instrucciones de aprobación predeterminadas",
+  "presetApprovalMessageHint": "Instrucciones que verá el residente al aprobarse su reserva...",
+  "approvalInstructionsTitle": "Instrucciones de Aprobación",
+  "approvalInstructionsConfirm": "Opcionalmente personalice las instrucciones para este residente:",
+  "approvalInstructionsCardTitle": "Instrucciones y Próximos Pasos:",
+  "advanceNoticeRequired": "Aviso requerido: Al menos {value} {unit} de anticipación",
+  "@advanceNoticeRequired": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "timeOutsideOperatingHours": "El horario seleccionado está fuera del horario de operación ({hours}).",
+  "@timeOutsideOperatingHours": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "closingTimeBeforeOpeningTime": "La hora de cierre debe ser posterior a la de apertura.",
+  "submittingBooking": "Enviando reserva...",
+  "folioLabel": "Folio / Número de Autorización",
+  "folioHint": "ej. 12345678",
+  "paymentConceptLabel": "Concepto del Pago",
+  "conceptMonthlyQuota": "Cuota de Mantenimiento",
+  "conceptSanction": "Sanción / Multa",
+  "paymentDateLabel": "Fecha del Pago",
+  "payAdvancePeriodsSwitch": "Pagar periodos adicionales / adelantados",
+  "selectAdvancePeriods": "Seleccione los periodos a incluir en este pago",
+  "missingPaymentFieldsWarning": "Por favor complete todos los campos obligatorios antes de enviar:",
+  "missingFolio": "• El folio / número de autorización es obligatorio",
+  "missingPaymentDate": "• La fecha de pago es obligatoria",
+  "missingAmount": "• Se requiere un monto válido",
+  "missingReceipt": "• Se requiere una foto del comprobante de pago",
+  "submitPayment": "Enviar Comprobante",
+  "confirmAction": "Confirmar",
+  "filterAll": "Todos",
+  "selectAddressPrompt": "Seleccionar Dirección",
+  "paymentRejectedBannerTitle": "Pago anterior rechazado",
+  "paymentRejectedBannerMsg": "Motivo: {reason}\nPor favor revise los detalles, adjunte un comprobante actualizado y vuelva a enviarlo.",
+  "@paymentRejectedBannerMsg": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "rejectionReasonPoolTitle": "Motivo de Rechazo",
+  "rejectionReasonSelect": "Seleccione plantilla de motivo",
+  "rejectionReasonPeriodMismatch": "Periodo incorrecto (El periodo en el comprobante no coincide con el seleccionado)",
+  "rejectionReasonAmountMismatch": "Monto incorrecto (El monto en el comprobante no coincide con el declarado)",
+  "rejectionReasonAddressMismatch": "Dirección incorrecta (El comprobante no corresponde al domicilio)",
+  "rejectionReasonFolioMismatch": "Número de comprobante incorrecto (El folio en la foto no coincide con el reportado)",
+  "rejectionReasonOther": "Otro (Motivo personalizado)",
+  "manageRejectionReasons": "Administrar Motivos de Rechazo",
+  "addRejectionReason": "Agregar Plantilla de Motivo",
+  "rejectionReasonDeleted": "Plantilla eliminada exitosamente",
+  "rejectionReasonAdded": "Plantilla agregada exitosamente",
+  "sanctionsMenu": "Sanciones y Multas",
+  "adminSanctionsTitle": "Gestión de Sanciones",
+  "issueSanction": "Aplicar Sanción",
+  "sanctionReasonLabel": "Descripción de la infracción",
+  "sanctionReasonHint": "ej. Ruido excesivo fuera de horario, estacionamiento indebido...",
+  "sanctionAmountLabel": "Monto de la Multa (MXN)",
+  "sanctionEvidencePhoto": "Foto de Evidencia",
+  "sanctionEvidenceRequired": "Por favor tome o adjunte una foto de la evidencia de la infracción.",
+  "sanctionIssuedSuccess": "¡Sanción aplicada exitosamente!",
+  "sanctionStatusActive": "Activa (Pendiente de pago)",
+  "sanctionStatusPendingReview": "Pago en Revisión",
+  "sanctionStatusPaid": "Pagada y Liquidada",
+  "sanctionStatusCancelled": "Condonada / Cancelada",
+  "paySanction": "Pagar Sanción",
+  "noSanctions": "No hay infracciones registradas para este domicilio.",
+  "sanctionsList": "Infracciones y Sanciones",
+  "waiveSanction": "Condonar Sanción",
+  "waiveSanctionConfirm": "¿Está seguro de que desea condonar y cancelar esta sanción?",
+  "sanctionWaivedSuccess": "Sanción condonada exitosamente.",
+  "activeSanctionsRestrictedWarning": "Su cuenta está restringida debido a {count, plural, =1{1 sanción activa} other{{count} sanciones activas}}. Por favor liquide sus adeudos para restablecer el acceso.",
+  "@activeSanctionsRestrictedWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "paymentProofPhoto": "Foto del Comprobante de Pago",
+  "switchCamera": "Cambiar Cámara"
 }
 

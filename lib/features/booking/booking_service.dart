@@ -1,14 +1,30 @@
 import '../../core/backend/backend.dart';
 
 class BookingService {
+  Stream<List<Map<String, dynamic>>> getConfirmedBookings(String facilityId) {
+    return Backend.db.streamCollection(
+      'bookings',
+      filters: [
+        QueryFilter('facilityId', FilterOperator.equal, facilityId),
+        QueryFilter('isConfirmed', FilterOperator.equal, true),
+      ],
+    );
+  }
+
   Stream<List<Map<String, dynamic>>> getBookings(String facilityId) {
     return Backend.db.streamCollection(
       'bookings',
       filters: [
         QueryFilter('facilityId', FilterOperator.equal, facilityId),
-        QueryFilter('status', FilterOperator.notEqual, 'cancelled'),
       ],
-    );
+    ).map((list) => list.where((b) {
+      if (b['status'] == 'rejected' || b['status'] == 'cancelled') return false;
+      if (b.containsKey('isConfirmed')) {
+        return b['isConfirmed'] == true;
+      }
+      final status = (b['status'] ?? '').toString().toLowerCase();
+      return status.startsWith('approved') || status == 'confirmed' || status == 'closed';
+    }).toList());
   }
 
   Future<void> createBooking(String facilityId, DateTime startTime, DateTime endTime) async {
@@ -18,7 +34,8 @@ class BookingService {
         'startTime': startTime.millisecondsSinceEpoch,
         'endTime': endTime.millisecondsSinceEpoch,
       });
-    } catch (e) {
+    } catch (e, stack) {
+      Backend.crashlytics.recordError(e, stack, reason: 'BookingService.createBooking');
       throw Exception('Failed to create booking: $e');
     }
   }
@@ -28,7 +45,8 @@ class BookingService {
       await Backend.functions.callFunction('cancelBooking', {
         'bookingId': bookingId,
       });
-    } catch (e) {
+    } catch (e, stack) {
+      Backend.crashlytics.recordError(e, stack, reason: 'BookingService.cancelBooking');
       throw Exception('Failed to cancel booking: $e');
     }
   }

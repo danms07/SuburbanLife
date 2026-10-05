@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import '../config/app_config.dart';
 import 'backend.dart';
 
 class FirebaseDbReference implements DbReference {
@@ -139,8 +141,9 @@ class FirebaseAuthService implements AuthService {
     try {
       final credential = await _auth.signInWithEmailAndPassword(email: email, password: password);
       return _mapUser(credential.user);
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Sign in error: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'FirebaseAuthService.signIn');
       return null;
     }
   }
@@ -161,8 +164,9 @@ class FirebaseAuthService implements AuthService {
         });
       }
       return _mapUser(user);
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Sign up error: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'FirebaseAuthService.signUp');
       return null;
     }
   }
@@ -172,8 +176,9 @@ class FirebaseAuthService implements AuthService {
     try {
       await _auth.sendPasswordResetEmail(email: email);
       return true;
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Password reset error: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'FirebaseAuthService.sendPasswordReset');
       return false;
     }
   }
@@ -183,44 +188,68 @@ class FirebaseAuthService implements AuthService {
     await _auth.signOut();
   }
 
+  Future<Map<String, dynamic>?> _getCustomClaims({bool forceRefresh = false}) async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    try {
+      final tokenResult = await user.getIdTokenResult(forceRefresh);
+      return tokenResult.claims;
+    } catch (e, stack) {
+      debugPrint('Error getting ID token result (forceRefresh: $forceRefresh): $e');
+      if (forceRefresh) {
+        try {
+          final cachedResult = await user.getIdTokenResult(false);
+          return cachedResult.claims;
+        } catch (cachedError) {
+          debugPrint('Fallback to cached ID token result failed: $cachedError');
+        }
+      }
+      Backend.crashlytics.recordError(e, stack, reason: 'FirebaseAuthService._getCustomClaims');
+      return null;
+    }
+  }
+
+  @override
+  Future<void> reloadUserToken({bool forceRefresh = true}) async {
+    await _getCustomClaims(forceRefresh: forceRefresh);
+  }
+
   @override
   Future<bool> isAdmin() async {
-    final user = _auth.currentUser;
-    if (user != null) {
-      final idTokenResult = await user.getIdTokenResult(true);
-      return idTokenResult.claims?['admin'] == true;
-    }
-    return false;
+    final claims = await _getCustomClaims();
+    return claims?['admin'] == true;
   }
 
   @override
   Future<bool> isGuard() async {
     final user = _auth.currentUser;
-    if (user != null) {
-      final idTokenResult = await user.getIdTokenResult(true);
-      final hasClaim = idTokenResult.claims?['guard'] == true;
-      final isGuardEmail = user.email?.toLowerCase().contains('guard') == true;
-      return hasClaim || isGuardEmail;
-    }
-    return false;
+    if (user == null) return false;
+    final isGuardEmail = user.email?.toLowerCase().contains('guard') == true;
+    final claims = await _getCustomClaims();
+    final hasClaim = claims?['guard'] == true;
+    return hasClaim || isGuardEmail;
   }
 
   @override
   Future<bool> isResident() async {
     final user = _auth.currentUser;
-    if (user != null) {
-      if (await isGuard()) return false;
-      final idTokenResult = await user.getIdTokenResult(true);
-      return idTokenResult.claims?['resident'] == true;
-    }
-    return false;
+    if (user == null) return false;
+    if (await isGuard()) return false;
+    final claims = await _getCustomClaims();
+    return claims?['resident'] == true;
   }
 }
 
 class FirebaseDatabaseService implements DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Query _buildQuery(Query query, List<QueryFilter>? filters, List<QuerySort>? sorts) {
+  Query _buildQuery(
+    Query query,
+    List<QueryFilter>? filters,
+    List<QuerySort>? sorts, {
+    int? limit,
+    dynamic startAfter,
+  }) {
     if (filters != null) {
       for (var filter in filters) {
         final val = _mapValue(filter.value);
@@ -257,6 +286,18 @@ class FirebaseDatabaseService implements DatabaseService {
         query = query.orderBy(sort.field, descending: sort.descending);
       }
     }
+    if (startAfter != null) {
+      if (startAfter is DocumentSnapshot) {
+        query = query.startAfterDocument(startAfter);
+      } else if (startAfter is List) {
+        query = query.startAfter(startAfter);
+      } else {
+        query = query.startAfter([startAfter]);
+      }
+    }
+    if (limit != null && limit > 0) {
+      query = query.limit(limit);
+    }
     return query;
   }
 
@@ -265,7 +306,9 @@ class FirebaseDatabaseService implements DatabaseService {
     final doc = await _firestore.collection(collection).doc(docId).get();
     final data = doc.data();
     if (data == null) return null;
-    return _unmapData(data);
+    final unmapped = _unmapData(data);
+    unmapped['id'] = doc.id;
+    return unmapped;
   }
 
   @override
@@ -273,14 +316,21 @@ class FirebaseDatabaseService implements DatabaseService {
     return _firestore.collection(collection).doc(docId).snapshots().map((doc) {
       final data = doc.data();
       if (data == null) return null;
-      return _unmapData(data);
+      final unmapped = _unmapData(data);
+      unmapped['id'] = doc.id;
+      return unmapped;
     });
   }
 
   @override
-  Stream<List<Map<String, dynamic>>> streamCollection(String collection, {List<QueryFilter>? filters, List<QuerySort>? sorts}) {
+  Stream<List<Map<String, dynamic>>> streamCollection(
+    String collection, {
+    List<QueryFilter>? filters,
+    List<QuerySort>? sorts,
+    int? limit,
+  }) {
     Query query = _firestore.collection(collection);
-    query = _buildQuery(query, filters, sorts);
+    query = _buildQuery(query, filters, sorts, limit: limit);
     return query.snapshots().map((snap) {
       return snap.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
@@ -292,9 +342,24 @@ class FirebaseDatabaseService implements DatabaseService {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getCollection(String collection, {List<QueryFilter>? filters, List<QuerySort>? sorts}) async {
+  Future<List<Map<String, dynamic>>> getCollection(
+    String collection, {
+    List<QueryFilter>? filters,
+    List<QuerySort>? sorts,
+    int? limit,
+    dynamic startAfter,
+  }) async {
     Query query = _firestore.collection(collection);
-    query = _buildQuery(query, filters, sorts);
+    if (startAfter != null && startAfter is String) {
+      final docSnap = await _firestore.collection(collection).doc(startAfter).get();
+      if (docSnap.exists) {
+        query = _buildQuery(query, filters, sorts, limit: limit, startAfter: docSnap);
+      } else {
+        query = _buildQuery(query, filters, sorts, limit: limit, startAfter: startAfter);
+      }
+    } else {
+      query = _buildQuery(query, filters, sorts, limit: limit, startAfter: startAfter);
+    }
     final snap = await query.get();
     return snap.docs.map((doc) {
       final data = doc.data() as Map<String, dynamic>;
@@ -380,7 +445,12 @@ class FirebaseFunctionsService implements FunctionsService {
 
   @override
   Future<dynamic> callFunction(String name, [Map<String, dynamic>? parameters]) async {
-    final callable = _functions.httpsCallable(name);
+    final callable = _functions.httpsCallable(
+      name,
+      options: HttpsCallableOptions(
+        limitedUseAppCheckToken: !AppConfig.useFirebaseEmulator,
+      ),
+    );
     final result = await callable.call(parameters);
     return result.data;
   }
@@ -433,6 +503,14 @@ class FirebaseBackend {
       debugPrint('  ✓ Functions emulator configured (:5001)');
     } catch (e) {
       debugPrint('  ! Functions emulator configuration note: $e');
+    }
+
+    try {
+      // 5. App Check disabled for local emulator
+      await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
+      debugPrint('  ✓ App Check token auto-refresh disabled for emulator');
+    } catch (e) {
+      debugPrint('  ! App Check emulator configuration note: $e');
     }
   }
 }

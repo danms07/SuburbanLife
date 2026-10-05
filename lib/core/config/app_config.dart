@@ -7,9 +7,12 @@ class AppConfig {
   // App Assets & Branding Icons
   static const String launcherIconAsset = 'assets/icon/app_launcher_icon.png';
   static const String appLogoAsset = 'assets/icon/app_logo.png';
+  static const String whiteLogoAsset = 'assets/icon/app_logo.png';
+  static const String whiteLogoEmblemAsset = 'assets/icon/app_logo.png';
+  static const bool showLoginEmblem = false;
 
   // Color Palette
-  static const Color primaryColor = Color(0xFF2864BE); 
+  static const Color primaryColor = Color(0xFF152540); 
   static const Color gradientEndColor = Color(0xFF2965BE); 
   static const Color secondaryColor = Color(0xFF25D366); 
   static const Color accentColor = Color(0xFFFBBF24); 
@@ -26,8 +29,10 @@ class AppConfig {
 
   // Typography
   static const String fontFamily = 'Plus Jakarta Sans';
+  static const String brandingFontFamily = 'Plus Jakarta Sans';
 
   static String recaptchaSiteKey = '6LejAf4sAAAAAJUNSZm3IJLaOkcYlVcse8HyR2EZ';
+  static String recaptchaAndroidKey = '';
 
   // Firebase Emulator Configuration
   // Auto-connects to local emulators when running on localhost/127.0.0.1 on Web or via flag

@@ -41,8 +41,9 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
           });
         }
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error checking SMTP status: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminBulkUserImportScreen._checkSmtpStatus');
     }
   }
 
@@ -127,8 +128,9 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
         _parsedUsers = parsedRows;
         _importResult = null;
       });
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error picking or parsing CSV file: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminBulkUserImportScreen._pickCsvFile');
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -277,8 +279,9 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error processing bulk user import: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminBulkUserImportScreen._processImport');
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -355,8 +358,9 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
           );
         }
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error saving result CSV: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminBulkUserImportScreen._downloadResultCsv');
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(

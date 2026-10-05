@@ -52,13 +52,18 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   }
 
   void _checkAdmin() async {
-    debugPrint('>>> [TransparencyScreen] Checking if current user is admin...');
-    final isAdmin = await _authService.isAdmin();
-    debugPrint('>>> [TransparencyScreen] User admin status: $isAdmin');
-    if (mounted) {
-      setState(() {
-        _isAdmin = isAdmin;
-      });
+    try {
+      debugPrint('>>> [TransparencyScreen] Checking if current user is admin...');
+      final isAdmin = await _authService.isAdmin();
+      debugPrint('>>> [TransparencyScreen] User admin status: $isAdmin');
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Error checking admin status in TransparencyScreen: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'TransparencyScreen._checkAdmin');
     }
   }
 

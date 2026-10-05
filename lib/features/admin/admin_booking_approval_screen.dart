@@ -14,15 +14,33 @@ class AdminBookingApprovalScreen extends StatefulWidget {
 class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen> {
   bool _isProcessing = false;
 
-  void _approveBooking(String bookingId) async {
+  void _approveBooking(String bookingId, [String presetMsg = '']) async {
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
+    final instructionsController = TextEditingController(text: presetMsg);
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: Text(l10n.approveBookingTitle),
-        content: Text(l10n.approveBookingConfirm),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(l10n.approvalInstructionsConfirm),
+            const SizedBox(height: 12),
+            TextField(
+              controller: instructionsController,
+              decoration: InputDecoration(
+                labelText: l10n.presetApprovalMessageLabel,
+                hintText: l10n.presetApprovalMessageHint,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx, false),
@@ -47,9 +65,12 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
     });
 
     try {
+      final instructions = instructionsController.text.trim();
       debugPrint('>>> [AdminBookingApproval] Approving booking: $bookingId');
       await DatabaseService().updateDocument('bookings', bookingId, {
         'status': 'approved (upcoming)',
+        'isConfirmed': true,
+        'approvalMessage': instructions,
         'updatedAt': DbFieldValue.serverTimestamp(),
       });
 
@@ -63,6 +84,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
       }
     } catch (e, stack) {
       debugPrint('>>> [AdminBookingApproval] Error approving booking: $e\n$stack');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminBookingApprovalScreen._approveBooking');
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(
@@ -98,11 +120,12 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
             TextField(
               controller: notesController,
               decoration: InputDecoration(
-                labelText: l10n.rejectionReasonOptional,
+                labelText: l10n.rejectionReasonLabel,
+                hintText: l10n.rejectionReasonHint,
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
-              maxLines: 2,
+              maxLines: 3,
             ),
           ],
         ),
@@ -117,7 +140,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(dialogCtx, true),
-            child: Text(l10n.rejected),
+            child: Text(l10n.reject),
           ),
         ],
       ),
@@ -134,7 +157,9 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
       debugPrint('>>> [AdminBookingApproval] Rejecting booking: $bookingId, reason: $reason');
       await DatabaseService().updateDocument('bookings', bookingId, {
         'status': 'rejected',
+        'isConfirmed': false,
         'notes': reason,
+        'rejectionReason': reason,
         'updatedAt': DbFieldValue.serverTimestamp(),
       });
 
@@ -148,6 +173,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
       }
     } catch (e, stack) {
       debugPrint('>>> [AdminBookingApproval] Error rejecting booking: $e\n$stack');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminBookingApprovalScreen._rejectBooking');
       if (mounted) {
         messenger.showSnackBar(
           SnackBar(
@@ -218,7 +244,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
                 key: ValueKey(booking['id'] ?? index),
                 booking: booking,
                 isProcessing: _isProcessing,
-                onApprove: () => _approveBooking(booking['id']),
+                onApprove: (preset) => _approveBooking(booking['id'], preset),
                 onReject: () => _rejectBooking(booking['id']),
               );
             },
@@ -232,7 +258,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
 class _BookingApprovalCard extends StatelessWidget {
   final Map<String, dynamic> booking;
   final bool isProcessing;
-  final VoidCallback onApprove;
+  final void Function(String presetMessage) onApprove;
   final VoidCallback onReject;
 
   const _BookingApprovalCard({
@@ -286,25 +312,28 @@ class _BookingApprovalCard extends StatelessWidget {
       end = DateTime.now();
     }
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: Facility & Status Badge
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: DatabaseService().streamDocument('facilities', facilityId),
+      builder: (context, facilitySnapshot) {
+        final facDoc = facilitySnapshot.data;
+        final name = _getFacilityName(l10n, facilityId, facDoc);
+        final presetMsg = facDoc?['presetApprovalMessage']?.toString() ?? '';
+
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: StreamBuilder<Map<String, dynamic>?>(
-                    stream: DatabaseService().streamDocument('facilities', facilityId),
-                    builder: (context, facilitySnapshot) {
-                      final name = _getFacilityName(l10n, facilityId, facilitySnapshot.data);
-                      return Row(
+                // Header: Facility & Status Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
                         children: [
                           const Icon(Icons.event_seat, color: AppConfig.primaryColor),
                           const SizedBox(width: 8),
@@ -319,10 +348,8 @@ class _BookingApprovalCard extends StatelessWidget {
                             ),
                           ),
                         ],
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                    ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -381,9 +408,12 @@ class _BookingApprovalCard extends StatelessWidget {
                         children: [
                           Icon(Icons.person_outline, size: 16, color: Colors.grey.shade700),
                           const SizedBox(width: 6),
-                          Text(
-                            '${l10n.applicant}: $name',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          Expanded(
+                            child: Text(
+                              '${l10n.applicant}: $name',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
@@ -393,7 +423,13 @@ class _BookingApprovalCard extends StatelessWidget {
                           children: [
                             Icon(Icons.email_outlined, size: 16, color: Colors.grey.shade600),
                             const SizedBox(width: 6),
-                            Text(email, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                            Expanded(
+                              child: Text(
+                                email,
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -403,7 +439,13 @@ class _BookingApprovalCard extends StatelessWidget {
                           children: [
                             Icon(Icons.phone_outlined, size: 16, color: Colors.grey.shade600),
                             const SizedBox(width: 6),
-                            Text(phone, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                            Expanded(
+                              child: Text(
+                                phone,
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -415,8 +457,10 @@ class _BookingApprovalCard extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Actions: Approve & Reject
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 OutlinedButton.icon(
                   onPressed: isProcessing ? null : onReject,
@@ -426,9 +470,8 @@ class _BookingApprovalCard extends StatelessWidget {
                     side: const BorderSide(color: Colors.redAccent),
                   ),
                 ),
-                const SizedBox(width: 12),
                 ElevatedButton.icon(
-                  onPressed: isProcessing ? null : onApprove,
+                  onPressed: isProcessing ? null : () => onApprove(presetMsg),
                   icon: const Icon(Icons.check, size: 18),
                   label: Text(l10n.approve),
                   style: ElevatedButton.styleFrom(
@@ -441,6 +484,8 @@ class _BookingApprovalCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

@@ -76,8 +76,9 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       setState(() {
         _generatedQrId = docId;
       });
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error generating QR: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'QrGeneratorScreen._generateQrCode');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.qrGenerationFailed)),
       );
@@ -136,7 +137,10 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
                     final addressData = addressSnapshot.data;
                     final rawStatus = addressData?['paymentStatus'] as String?;
                     final paymentStatus = (rawStatus == null || rawStatus.trim().isEmpty) ? 'restricted' : rawStatus;
-                    final isRestricted = paymentStatus == 'restricted';
+                    final isWithinGrace = addressData?['isWithinGracePeriod'] as bool? ?? false;
+                    final isConsideredPaid = paymentStatus == 'paid' ||
+                        ((paymentStatus == 'pending' || paymentStatus == 'reviewing') && isWithinGrace);
+                    final isRestricted = !isConsideredPaid;
 
                     if (isRestricted) {
                       return Center(
@@ -409,7 +413,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       final paintHeader = Paint()..color = AppConfig.primaryColor;
       canvas.drawRect(const Rect.fromLTWH(0, 0, 800, 240), paintHeader);
       
-      final logoImage = await _loadAssetImage(AppConfig.appLogoAsset);
+      final logoImage = await _loadAssetImage(AppConfig.whiteLogoAsset);
       canvas.drawImageRect(
         logoImage,
         Rect.fromLTWH(0, 0, logoImage.width.toDouble(), logoImage.height.toDouble()),
@@ -424,6 +428,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
             color: Colors.white,
             fontSize: 32,
             fontWeight: FontWeight.bold,
+            fontFamily: AppConfig.brandingFontFamily,
           ),
         ),
         textDirection: ui.TextDirection.ltr,
@@ -504,16 +509,18 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         if (result.status == ShareResultStatus.success) {
           debugPrint('User successfully shared the QR code!');
         }
-      } catch (e) {
+      } catch (e, stack) {
         debugPrint('Error sharing image via SharePlus: $e');
         if (kIsWeb) {
           _triggerWebDownload(bytes, fileName, l10n);
         } else {
+          Backend.crashlytics.recordError(e, stack, reason: 'QrGeneratorScreen.shareImageNative');
           rethrow;
         }
       }
-    } catch (e) {
+    } catch (e, stack) {
       final l10n = AppLocalizations.of(context)!;
+      Backend.crashlytics.recordError(e, stack, reason: 'QrGeneratorScreen._shareQrCode');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.qrSharingError(e.toString()))),
       );

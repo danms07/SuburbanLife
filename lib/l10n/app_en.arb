@@ -190,6 +190,11 @@
   "promoteAdminButton": "Promote to Admin",
   "userPromotedSuccess": "User promoted to Admin successfully",
   "userRevokedSuccess": "Admin access revoked successfully",
+  "deleteUserButton": "Remove Account",
+  "deleteUserConfirmTitle": "Remove User Account",
+  "deleteUserConfirmText": "Are you sure you want to permanently remove this user account? This action cannot be undone.",
+  "deleteUserSuccess": "User account removed successfully.",
+  "cannotDeleteSelfAdminError": "You cannot remove your own administrator account from this directory.",
   "roleResident": "Resident",
   "roleRoommate": "Roommate",
   "roleAdmin": "Admin",
@@ -210,9 +215,19 @@
   "isUniqueAmenityLabel": "Unique Amenity (Single capacity)",
   "quantityLabel": "Available Quantity",
   "facilityAddedSuccess": "Amenity successfully added.",
+  "editFacilityTitle": "Edit Amenity",
+  "facilityUpdatedSuccess": "Amenity successfully updated.",
+  "edit": "Edit",
   "settingsSavedSuccess": "Settings successfully updated.",
   "paymentCutoffDayLabel": "Payment Cutoff Day of Month",
   "gracePeriodDaysLabel": "Grace Period (Days)",
+  "timezoneLabel": "Schedule Timezone",
+  "timezoneHelperText": "Timezone used for monthly cutoff and grace period calculations",
+  "timezoneCstLabel": "Central Time (CST / Mexico City)",
+  "timezoneEstLabel": "Eastern Time (EST / Cancun)",
+  "timezonePstLabel": "Pacific Time (PST / Tijuana)",
+  "timezoneMstLabel": "Mountain Time (MST / Hermosillo)",
+  "timezoneUtcLabel": "Coordinated Universal Time (UTC)",
   "uploadDocumentTitle": "Upload Document",
   "documentTitleLabel": "Document Title",
   "categoryLabel": "Category",
@@ -230,6 +245,29 @@
   "statusPaid": "Paid",
   "statusPending": "Pending",
   "statusPastDue": "Past Due",
+  "paymentAmountLabel": "Payment Amount",
+  "paymentAmountHint": "e.g. 1500.00",
+  "paymentAmountRequired": "Please enter the payment amount",
+  "paymentAmountInvalid": "Please enter a valid positive number",
+  "coveredPeriodsLabel": "Covered Periods",
+  "selectPeriodsHint": "Select the months covered by this receipt",
+  "atLeastOnePeriodRequired": "Please select at least one period",
+  "advancePaymentBadge": "Advance Payment",
+  "duePaymentBadge": "Due",
+  "paidPaymentBadge": "Paid",
+  "reviewingPaymentBadge": "Under Review",
+  "deliveryDateLabel": "Delivery Date",
+  "deliveryDateNotSet": "Not configured",
+  "setDeliveryDateButton": "Set Delivery Date",
+  "editDeliveryDateButton": "Edit Delivery Date",
+  "deliveryDateUpdatedSuccess": "Delivery date updated successfully.",
+  "deliveryDateUpdatedError": "Error updating delivery date: {error}",
+  "deliveryDateFutureError": "Delivery date cannot be in the future.",
+  "advanceMonthsSection": "Advance / Upcoming Months",
+  "dueMonthsSection": "Pending / Due Months",
+  "totalAmountLabel": "Total Amount: {amount}",
+  "amountPaidLabel": "Amount Paid: {amount}",
+  "selectCoveredPeriodsDialogTitle": "Select Covered Periods",
   "manageGuardsMenu": "Manage Security Guards",
   "provisionGuardTitle": "Provision Security Guard",
   "guardNameLabel": "Guard Name",
@@ -423,8 +461,8 @@
   "cardAccessCategory": "Access Category",
   "cardValidity": "Validity",
   "cardVehicleDetails": "Vehicle Details",
-  "passwordComplexityRequirements": "Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, and 1 number.",
-  "passwordComplexityHelper": "Min. 8 characters (1 uppercase, 1 lowercase, 1 number)",
+  "passwordComplexityRequirements": "Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.",
+  "passwordComplexityHelper": "Min. 8 characters (1 uppercase, 1 lowercase, 1 number, 1 special character)",
   "passwordComplexityError": "The password does not meet the security requirements.",
   "ok": "OK",
   "close": "Close",
@@ -485,10 +523,10 @@
   "bookingResubmittedSuccess": "Booking resubmitted for review.",
   "resubmitButton": "Resubmit",
   "addressDetailsNotFound": "Address details not found.",
-  "passwordMinLengthValidation": "Password must be at least 6 characters.",
+  "passwordMinLengthValidation": "Password must be at least 8 characters long and meet complexity requirements.",
   "addressUnlinkedSuccess": "Address unlinked successfully.",
   "resetPasswordButton": "Reset Pwd",
-  "guardFormValidation": "Please provide a valid name, email, and password (min 6 chars).",
+  "guardFormValidation": "Please provide a valid name, email, and password (min. 8 chars, uppercase, lowercase, number, symbol).",
   "errorProvisioningGuard": "Error provisioning guard: {error}",
   "@errorProvisioningGuard": {
     "placeholders": {
@@ -709,6 +747,11 @@
   "approveBookingConfirm": "Are you sure you want to approve this booking?",
   "rejectBookingConfirm": "Are you sure you want to reject this booking?",
   "rejectionReasonOptional": "Notes or rejection reason (optional)",
+  "rejectionReasonLabel": "Rejection Reason",
+  "rejectionReasonHint": "Explain why this reservation cannot be approved",
+  "deleteBooking": "Delete Booking",
+  "deleteBookingConfirm": "Are you sure you want to delete this booking?",
+  "bookingDeletedSuccess": "Booking deleted successfully.",
   "applicant": "Applicant",
   "timeSlot": "Time Slot",
   "bookingDetails": "Booking Details",
@@ -724,6 +767,205 @@
   "familyOnboardingStep2Title": "2. Select 'Family Group'",
   "familyOnboardingStep2Desc": "On the address selection screen, tell them to tap the 'Family Group' option to display their QR code.",
   "familyOnboardingStep3Title": "3. Scan QR or Enter Email/ID",
-  "familyOnboardingStep3Desc": "Scan their QR code using the button below, or enter their registered email / User ID."
+  "familyOnboardingStep3Desc": "Scan their QR code using the button below, or enter their registered email / User ID.",
+  "searchUsersPlaceholder": "Search by name, email, or street...",
+  "filterByStreet": "Street",
+  "allStreets": "All Streets",
+  "filterByRole": "Role",
+  "allRoles": "All Roles",
+  "loadMoreUsers": "Load More Users ({count} loaded)",
+  "@loadMoreUsers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "allUsersLoaded": "All users loaded ({total} total)",
+  "@allUsersLoaded": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "showingUsersCount": "Showing {count} of {total} loaded users",
+  "@showingUsersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "noUsersFound": "No users found matching your search or filters.",
+  "clearFilters": "Clear Filters",
+  "loadingUsers": "Loading users...",
+  "loadingMoreUsers": "Loading more users...",
+  "batchExplorationInfo": "Batch size: {size}",
+  "@batchExplorationInfo": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "loadMoreLogs": "Load More Logs ({count} loaded)",
+  "@loadMoreLogs": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "allLogsLoaded": "All access logs loaded ({total} total)",
+  "@allLogsLoaded": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "showingLogsCount": "Showing {count} of {total} loaded logs",
+  "@showingLogsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "loadingAccessLogs": "Loading access logs...",
+  "loadingMoreLogs": "Loading more logs...",
+  "showingFilteredUsersCount": "{count, plural, =0{No users match database search} =1{1 matching user in database} other{{count} matching users in database}}",
+  "@showingFilteredUsersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "showingFilteredLogsCount": "{count, plural, =0{No access logs match database search} =1{1 matching access log in database} other{{count} matching access logs in database}}",
+  "@showingFilteredLogsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "databaseSearchActive": "Full Database Search Active",
+  "operatingHours": "Operating Hours: {hours}",
+  "@operatingHours": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "operatingHoursUnrestricted": "Operating Hours: Unrestricted (24/7)",
+  "openingTimeLabel": "Opening Time",
+  "closingTimeLabel": "Closing Time",
+  "anticipationUnitLabel": "Advance Booking Notice",
+  "anticipationValueLabel": "Advance Notice Value",
+  "anticipationHours": "Hours",
+  "anticipationDays": "Days",
+  "anticipationWeeks": "Weeks",
+  "anticipationUnrestricted": "No advance notice required",
+  "presetApprovalMessageLabel": "Default Approval Instructions / Next Steps",
+  "presetApprovalMessageHint": "Instructions shown to resident upon booking approval...",
+  "approvalInstructionsTitle": "Approval Instructions",
+  "approvalInstructionsConfirm": "Optionally customize next steps / instructions for this resident:",
+  "approvalInstructionsCardTitle": "Next Steps & Facility Instructions:",
+  "advanceNoticeRequired": "Notice Required: At least {value} {unit} in advance",
+  "@advanceNoticeRequired": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "timeOutsideOperatingHours": "Selected time is outside facility operating hours ({hours}).",
+  "@timeOutsideOperatingHours": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "closingTimeBeforeOpeningTime": "Closing time must be after opening time.",
+  "submittingBooking": "Submitting booking...",
+  "folioLabel": "Folio / Transaction Number",
+  "folioHint": "e.g. 12345678",
+  "paymentConceptLabel": "Payment Concept",
+  "conceptMonthlyQuota": "Monthly Maintenance Quota",
+  "conceptSanction": "Sanction Fine",
+  "paymentDateLabel": "Payment Date",
+  "payAdvancePeriodsSwitch": "Pay additional / advance periods",
+  "selectAdvancePeriods": "Select periods to include in this payment",
+  "missingPaymentFieldsWarning": "Please fill in all mandatory fields before submitting:",
+  "missingFolio": "• Folio / Transaction number is required",
+  "missingPaymentDate": "• Payment date is required",
+  "missingAmount": "• A valid payment amount is required",
+  "missingReceipt": "• A photo of the payment receipt is required",
+  "submitPayment": "Submit Payment",
+  "confirmAction": "Confirm",
+  "filterAll": "All",
+  "selectAddressPrompt": "Select Address",
+  "paymentRejectedBannerTitle": "Previous Payment Rejected",
+  "paymentRejectedBannerMsg": "Reason: {reason}\nPlease review the details, attach an updated receipt, and re-submit.",
+  "@paymentRejectedBannerMsg": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "rejectionReasonPoolTitle": "Rejection Reason",
+  "rejectionReasonSelect": "Select reason template",
+  "rejectionReasonPeriodMismatch": "Incorrect period (Receipt period doesn't match selected period)",
+  "rejectionReasonAmountMismatch": "Incorrect amount (Receipt amount doesn't match declared amount)",
+  "rejectionReasonAddressMismatch": "Incorrect address (Receipt doesn't match address)",
+  "rejectionReasonFolioMismatch": "Incorrect receipt number (Receipt number doesn't match reported number)",
+  "rejectionReasonOther": "Other (Custom reason)",
+  "manageRejectionReasons": "Manage Rejection Reasons",
+  "addRejectionReason": "Add Reason Template",
+  "rejectionReasonDeleted": "Template deleted successfully",
+  "rejectionReasonAdded": "Template added successfully",
+  "sanctionsMenu": "Sanctions & Fines",
+  "adminSanctionsTitle": "Sanctions Management",
+  "issueSanction": "Issue Sanction",
+  "sanctionReasonLabel": "Infraction Description",
+  "sanctionReasonHint": "e.g. Excessive noise after hours, unauthorized parking...",
+  "sanctionAmountLabel": "Fine Amount (MXN)",
+  "sanctionEvidencePhoto": "Photo Evidence",
+  "sanctionEvidenceRequired": "Please take or attach a photo of the infraction evidence.",
+  "sanctionIssuedSuccess": "Sanction issued successfully!",
+  "sanctionStatusActive": "Active (Unpaid)",
+  "sanctionStatusPendingReview": "Payment Under Review",
+  "sanctionStatusPaid": "Paid & Cleared",
+  "sanctionStatusCancelled": "Waived / Cancelled",
+  "paySanction": "Pay Sanction",
+  "noSanctions": "No infractions recorded for this address.",
+  "sanctionsList": "Infractions & Sanctions",
+  "waiveSanction": "Waive Sanction",
+  "waiveSanctionConfirm": "Are you sure you want to waive and cancel this sanction?",
+  "sanctionWaivedSuccess": "Sanction waived successfully.",
+  "activeSanctionsRestrictedWarning": "Your account is restricted due to {count, plural, =1{1 active sanction} other{{count} active sanctions}}. Please settle all fines to restore full access.",
+  "@activeSanctionsRestrictedWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "paymentProofPhoto": "Payment Receipt Photo",
+  "switchCamera": "Switch Camera"
 }
 

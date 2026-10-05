@@ -57,8 +57,9 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error adding roommate: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'RoommatesScreen._addRoommate');
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -78,7 +79,6 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
   }
 
   void _openQrScanner() {
-    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -86,65 +86,49 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return Container(
-          height: MediaQuery.of(ctx).size.height * 0.7,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    l10n.roommateQrScannerTitle,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: AppConfig.fontFamily,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(15),
-                  child: MobileScanner(
-                    controller: MobileScannerController(
-                      detectionSpeed: DetectionSpeed.noDuplicates,
-                    ),
-                    onDetect: (capture) {
-                      final barcodes = capture.barcodes;
-                      if (barcodes.isNotEmpty) {
-                        final code = barcodes.first.rawValue ?? '';
-                        if (code.isNotEmpty) {
-                          Navigator.pop(ctx);
-                          _addRoommate(code);
-                        }
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
+        return _RoommateQrScannerSheet(
+          onScan: (code) {
+            _addRoommate(code);
+          },
         );
       },
     );
   }
 
-  Future<List<Map<String, dynamic>>> _fetchRoommatesDetails(List<dynamic> uids) async {
-    List<Map<String, dynamic>> details = [];
-    for (String uid in uids) {
-      final docData = await DatabaseService().getDocument('users', uid);
-      if (docData != null) {
-        details.add(docData);
+  Future<List<Map<String, dynamic>>> _fetchRoommatesDetails(
+    List<dynamic> uids,
+  ) async {
+    final Map<String, Map<String, dynamic>> detailsMap = {};
+
+    for (dynamic uid in uids) {
+      final uidStr = uid.toString().trim();
+      if (uidStr.isEmpty) continue;
+      try {
+        final docData = await DatabaseService().getDocument('users', uidStr);
+        if (docData != null) {
+          docData['uid'] = docData['uid'] ?? uidStr;
+          docData['id'] = docData['id'] ?? uidStr;
+          detailsMap[uidStr] = docData;
+        } else {
+          detailsMap[uidStr] = {
+            'uid': uidStr,
+            'id': uidStr,
+            'name': uidStr,
+            'email': '',
+          };
+        }
+      } catch (e) {
+        debugPrint('Error fetching roommate details for $uidStr: $e');
+        detailsMap[uidStr] = {
+          'uid': uidStr,
+          'id': uidStr,
+          'name': uidStr,
+          'email': '',
+        };
       }
     }
-    return details;
+
+    return detailsMap.values.toList();
   }
 
   Widget _buildInstructionStep({
@@ -335,16 +319,17 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                     ),
                     const Divider(),
                     Expanded(
-                      child: familyMembers.isEmpty
-                          ? Center(child: Text(l10n.noRoommates))
-                          : FutureBuilder<List<Map<String, dynamic>>>(
-                              future: _fetchRoommatesDetails(familyMembers),
-                              builder: (context, detailsSnapshot) {
-                                if (detailsSnapshot.connectionState == ConnectionState.waiting) {
-                                  return const Center(child: CircularProgressIndicator());
-                                }
-                                final roommates = detailsSnapshot.data ?? [];
-                                return ListView.builder(
+                      child: FutureBuilder<List<Map<String, dynamic>>>(
+                        future: _fetchRoommatesDetails(familyMembers),
+                        builder: (context, detailsSnapshot) {
+                          if (detailsSnapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          final roommates = detailsSnapshot.data ?? [];
+                          if (roommates.isEmpty) {
+                            return Center(child: Text(l10n.noRoommates));
+                          }
+                          return ListView.builder(
                                   padding: const EdgeInsets.all(20),
                                   itemCount: roommates.length,
                                   itemBuilder: (context, index) {
@@ -357,10 +342,16 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                                           child: Icon(Icons.person, color: Colors.white),
                                         ),
                                         title: Text(
-                                          r['name'] ?? 'Unknown',
+                                          (r['name'] != null && r['name'].toString().isNotEmpty)
+                                              ? r['name']
+                                              : (r['email'] ?? r['uid'] ?? 'Roommate'),
                                           style: const TextStyle(fontWeight: FontWeight.bold),
                                         ),
-                                        subtitle: Text(r['email'] ?? r['uid'] ?? ''),
+                                        subtitle: Text(
+                                          (r['email'] != null && r['email'].toString().isNotEmpty)
+                                              ? r['email']
+                                              : (r['uid'] ?? ''),
+                                        ),
                                         trailing: IconButton(
                                           icon: const Icon(
                                             Icons.remove_circle_outline,
@@ -369,13 +360,15 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                                           onPressed: _isLoading
                                               ? null
                                               : () async {
+                                                  final targetUid = r['uid'] ?? r['id'];
+                                                  if (targetUid == null) return;
                                                   setState(() {
                                                     _isLoading = true;
                                                   });
                                                   try {
                                                     await FunctionsService().callFunction(
                                                       'removeRoommate',
-                                                      {'roommateUid': r['uid']},
+                                                      {'roommateUid': targetUid},
                                                     );
                                                     if (mounted) {
                                                       ScaffoldMessenger.of(context).showSnackBar(
@@ -385,8 +378,9 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                                                         ),
                                                       );
                                                     }
-                                                  } catch (e) {
+                                                  } catch (e, stack) {
                                                     debugPrint('Error removing roommate: $e');
+                                                    Backend.crashlytics.recordError(e, stack, reason: 'RoommatesScreen.removeRoommate');
                                                     if (mounted) {
                                                       ScaffoldMessenger.of(context).showSnackBar(
                                                         SnackBar(
@@ -415,6 +409,134 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                 );
               },
             ),
+    );
+  }
+}
+
+class _RoommateQrScannerSheet extends StatefulWidget {
+  final ValueChanged<String> onScan;
+
+  const _RoommateQrScannerSheet({
+    required this.onScan,
+  });
+
+  @override
+  State<_RoommateQrScannerSheet> createState() => _RoommateQrScannerSheetState();
+}
+
+class _RoommateQrScannerSheetState extends State<_RoommateQrScannerSheet> {
+  late final MobileScannerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = MobileScannerController(
+      facing: CameraFacing.back,
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      formats: const [BarcodeFormat.qrCode],
+      returnImage: false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                l10n.roommateQrScannerTitle,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: AppConfig.fontFamily,
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: ValueListenableBuilder<MobileScannerState>(
+                      valueListenable: _controller,
+                      builder: (context, state, child) {
+                        return Icon(
+                          state.cameraDirection == CameraFacing.front
+                              ? Icons.camera_front
+                              : Icons.camera_rear,
+                          color: AppConfig.primaryColor,
+                        );
+                      },
+                    ),
+                    tooltip: l10n.switchCamera,
+                    onPressed: () => _controller.switchCamera(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  MobileScanner(
+                    controller: _controller,
+                    onDetect: (capture) {
+                      final barcodes = capture.barcodes;
+                      if (barcodes.isNotEmpty) {
+                        final code = (barcodes.first.rawValue ?? barcodes.first.displayValue)?.trim();
+                        if (code != null && code.isNotEmpty) {
+                          Navigator.pop(context);
+                          widget.onScan(code);
+                        }
+                      }
+                    },
+                  ),
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: FloatingActionButton.small(
+                      heroTag: 'roommate_switch_camera_fab',
+                      backgroundColor: Colors.black54,
+                      foregroundColor: Colors.white,
+                      tooltip: l10n.switchCamera,
+                      onPressed: () => _controller.switchCamera(),
+                      child: ValueListenableBuilder<MobileScannerState>(
+                        valueListenable: _controller,
+                        builder: (context, state, child) {
+                          return Icon(
+                            state.cameraDirection == CameraFacing.front
+                                ? Icons.camera_front
+                                : Icons.camera_rear,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

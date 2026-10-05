@@ -14,6 +14,9 @@
 - Keep the comments in the code updated and concise
 - Keep the README.md updated
 - Refer to Structure.md to gather information about the project
+- For bumping the app version, update pubspec.yaml file and version.json file.
+- After bumping the app version, run `flutter build web --source-maps` and `flutter build apk`
+- Use white_logo.png for the favicon icons in the web version
 
 ## Don't
 - Hardcode strings, always use the l18n system

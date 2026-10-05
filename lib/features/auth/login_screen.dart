@@ -28,6 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailController.text.trim(),
       _passwordController.text.trim(),
     );
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
     });
@@ -72,15 +73,29 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.all(48.0),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: AppConfig.showLoginEmblem
+                          ? CrossAxisAlignment.center
+                          : CrossAxisAlignment.start,
                       children: [
+                        if (AppConfig.showLoginEmblem) ...[
+                          Image.asset(
+                            AppConfig.whiteLogoEmblemAsset,
+                            height: 125,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.medium,
+                          ),
+                          const SizedBox(height: 50),
+                        ],
                         Text(
                           AppConfig.appName,
+                          textAlign: AppConfig.showLoginEmblem
+                              ? TextAlign.center
+                              : TextAlign.start,
                           style: const TextStyle(
                             fontSize: 54,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            fontFamily: AppConfig.fontFamily,
+                            fontFamily: AppConfig.brandingFontFamily,
                             letterSpacing: 1.5,
                             shadows: [
                               Shadow(
@@ -100,15 +115,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(3),
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        Text(
-                          l10n.welcome,
-                          style: TextStyle(
-                            fontSize: 24,
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontFamily: AppConfig.fontFamily,
+                        if (!AppConfig.showLoginEmblem) ...[
+                          const SizedBox(height: 24),
+                          Text(
+                            l10n.welcome,
+                            style: TextStyle(
+                              fontSize: 24,
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontFamily: AppConfig.fontFamily,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -232,7 +249,14 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           // Premium Header Matching Home Screen Look and Feel
           Container(
-            padding: const EdgeInsets.only(top: 80, left: 20, right: 20, bottom: 40),
+            padding: AppConfig.showLoginEmblem
+                ? EdgeInsets.only(
+                    top: MediaQuery.paddingOf(context).top + 24,
+                    left: 20,
+                    right: 20,
+                    bottom: 30,
+                  )
+                : const EdgeInsets.only(top: 80, left: 20, right: 20, bottom: 40),
             decoration: const BoxDecoration(
               color: AppConfig.primaryColor,
               borderRadius: BorderRadius.only(
@@ -241,16 +265,30 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
             child: Center(
-              child: Text(
-                AppConfig.appName,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontFamily: AppConfig.fontFamily,
-                  letterSpacing: 1.2,
-                ),
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (AppConfig.showLoginEmblem) ...[
+                    Image.asset(
+                      AppConfig.whiteLogoEmblemAsset,
+                      height: 50,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Text(
+                    AppConfig.appName,
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontFamily: AppConfig.brandingFontFamily,
+                      letterSpacing: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ),

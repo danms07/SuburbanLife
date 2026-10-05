@@ -22,7 +22,7 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (name.isEmpty || email.isEmpty || password.length < 6) {
+    if (name.isEmpty || email.isEmpty || !PasswordValidator.isValid(password)) {
       final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.guardFormValidation)),
@@ -50,7 +50,9 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
       _nameController.clear();
       _emailController.clear();
       _passwordController.clear();
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error provisioning guard: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminGuardManagementScreen._provisionGuard');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.errorProvisioningGuard(e.toString())), backgroundColor: Colors.redAccent),
       );
@@ -77,7 +79,9 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.guardRemovedSuccess), backgroundColor: Colors.orange),
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error removing guard: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminGuardManagementScreen._removeGuard');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.errorRemovingGuard(e.toString())), backgroundColor: Colors.redAccent),
       );
@@ -144,6 +148,7 @@ class _AdminGuardManagementScreenState extends State<AdminGuardManagementScreen>
                       controller: _passwordController,
                       decoration: InputDecoration(
                         labelText: l10n.guardPasswordLabel,
+                        helperText: l10n.passwordComplexityHelper,
                         prefixIcon: const Icon(Icons.lock, color: AppConfig.primaryColor),
                         border: const OutlineInputBorder(),
                         isDense: true,

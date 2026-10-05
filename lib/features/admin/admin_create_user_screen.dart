@@ -8,12 +8,12 @@ class AdminCreateUserScreen extends StatefulWidget {
   final String initialRole;
 
   const AdminCreateUserScreen({
-    Key? key,
+    super.key,
     this.initialRole = 'resident',
-  }) : super(key: key);
+  });
 
   @override
-  _AdminCreateUserScreenState createState() => _AdminCreateUserScreenState();
+  State<AdminCreateUserScreen> createState() => _AdminCreateUserScreenState();
 }
 
 class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
@@ -30,6 +30,7 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
   // Address selection for resident
   String? _selectedStreetName;
   Map<String, dynamic>? _selectedAddress;
+  DateTime? _deliveryDate;
 
   @override
   void initState() {
@@ -82,6 +83,16 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
       return;
     }
 
+    if (_selectedRole == 'resident' && _deliveryDate != null && _deliveryDate!.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.deliveryDateFutureError),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isCreating = true;
     });
@@ -96,6 +107,7 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
           'addressId': _selectedAddress!['id'],
           'streetName': _selectedAddress!['streetName'],
           'number': _selectedAddress!['number'],
+          if (_deliveryDate != null) 'deliveryDate': _deliveryDate!.toIso8601String(),
         },
       };
 
@@ -121,10 +133,12 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
           _passwordController.clear();
           _selectedStreetName = null;
           _selectedAddress = null;
+          _deliveryDate = null;
         });
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Error creating user: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminCreateUserScreen._createUser');
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -345,13 +359,7 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
                           isDense: true,
                         ),
                         validator: (value) {
-                          if (value == null || value.trim().length < 8) {
-                            return l10n.passwordComplexityRequirements;
-                          }
-                          final pass = value.trim();
-                          if (!pass.contains(RegExp(r'[A-Z]')) ||
-                              !pass.contains(RegExp(r'[a-z]')) ||
-                              !pass.contains(RegExp(r'[0-9]'))) {
+                          if (value == null || !PasswordValidator.isValid(value)) {
                             return l10n.passwordComplexityRequirements;
                           }
                           return null;
@@ -488,6 +496,46 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
                                       });
                                     }
                                   },
+                                ),
+                                const SizedBox(height: 14),
+
+                                // Delivery Date Field
+                                InkWell(
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: _deliveryDate ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime.now(),
+                                    );
+                                    if (picked != null) {
+                                      setState(() {
+                                        _deliveryDate = picked;
+                                      });
+                                    }
+                                  },
+                                  child: InputDecorator(
+                                    decoration: InputDecoration(
+                                      labelText: l10n.deliveryDateLabel,
+                                      prefixIcon: const Icon(Icons.calendar_today_outlined),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                      isDense: true,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          _deliveryDate != null
+                                              ? '${_deliveryDate!.day.toString().padLeft(2, '0')}/${_deliveryDate!.month.toString().padLeft(2, '0')}/${_deliveryDate!.year}'
+                                              : l10n.deliveryDateNotSet,
+                                          style: TextStyle(
+                                            color: _deliveryDate != null ? Colors.black87 : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        const Icon(Icons.edit_calendar, size: 18, color: AppConfig.primaryColor),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             );

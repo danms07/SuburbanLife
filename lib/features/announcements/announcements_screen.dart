@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:ui' as ui;
-import 'dart:js_util' as js_util;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:universal_html/html.dart' as html;
+import 'clipboard_image_helper.dart';
 import '../../core/backend/backend.dart';
 import 'package:suburban_life/core/config/app_config.dart';
 import 'package:suburban_life/core/widgets/interactive_image_dialog.dart';
@@ -42,14 +41,24 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 
   void _checkAdmin() async {
-    final isAdmin = await _authService.isAdmin();
-    final isResident = await _authService.isResident();
-    if (mounted) {
-      setState(() {
-        _isAdmin = isAdmin;
-        _isResident = isResident;
-        _isLoading = false;
-      });
+    try {
+      final isAdmin = await _authService.isAdmin();
+      final isResident = await _authService.isResident();
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+          _isResident = isResident;
+          _isLoading = false;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Error checking admin status in AnnouncementsScreen: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AnnouncementsScreen._checkAdmin');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -75,6 +84,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           debugPrint('>>> [_markAnnouncementsAsRead] Successfully marked announcement $docId as read in Firestore.');
         } catch (e, stack) {
           debugPrint('>>> [_markAnnouncementsAsRead] Error updating readBy on announcement $docId: $e\n$stack');
+          Backend.crashlytics.recordError(e, stack, reason: 'AnnouncementsScreen._markAnnouncementsAsRead');
         }
       }
     }
@@ -116,8 +126,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       if (byteData != null) {
         return byteData.buffer.asUint8List();
       }
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Thumbnail generation error: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AnnouncementsScreen._generateThumbnail');
     }
     return originalBytes;
   }
@@ -125,35 +136,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   /// Reads image bytes from system clipboard (Web and cross-platform)
   Future<Uint8List?> _getClipboardImageBytes() async {
     if (kIsWeb) {
-      try {
-        final nav = html.window.navigator;
-        final clipboard = js_util.getProperty(nav, 'clipboard');
-        if (clipboard != null) {
-          final promise = js_util.callMethod(clipboard, 'read', []);
-          final dynamic items = await js_util.promiseToFuture(promise);
-          final dynamic rawLen = js_util.getProperty(items, 'length');
-          final int length = (rawLen is num) ? rawLen.toInt() : 0;
-          for (int i = 0; i < length; i++) {
-            final item = js_util.callMethod(items, 'item', [i]) ?? js_util.getProperty(items, i.toString());
-            final dynamic types = js_util.getProperty(item, 'types');
-            final dynamic rawTypesLen = js_util.getProperty(types, 'length');
-            final int typesLength = (rawTypesLen is num) ? rawTypesLen.toInt() : 0;
-            for (int j = 0; j < typesLength; j++) {
-              final String type = (js_util.callMethod(types, 'item', [j]) ?? js_util.getProperty(types, j.toString())).toString();
-              if (type.startsWith('image/')) {
-                final dynamic blobPromise = js_util.callMethod(item, 'getType', [type]);
-                final html.Blob blob = await js_util.promiseToFuture(blobPromise);
-                final reader = html.FileReader();
-                reader.readAsArrayBuffer(blob);
-                await reader.onLoadEnd.first;
-                return Uint8List.fromList(reader.result as List<int>);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Clipboard read error: $e');
-      }
+      return getWebClipboardImageBytes();
     }
     return null;
   }
@@ -484,8 +467,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             );
           }
         }
-      } catch (e) {
+      } catch (e, stack) {
         debugPrint('Error pasting image: $e');
+        Backend.crashlytics.recordError(e, stack, reason: 'AnnouncementsScreen.pasteFromClipboard');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -506,25 +490,8 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           builder: (context, setStateDialog) {
             // Attach document paste listener on Web
             if (kIsWeb && pasteSubscription == null) {
-              pasteSubscription = html.document.onPaste.listen((html.ClipboardEvent event) async {
-                final items = event.clipboardData?.items;
-                if (items != null) {
-                  final int count = items.length ?? 0;
-                  for (int i = 0; i < count; i++) {
-                    final item = items[i];
-                    if (item.type?.startsWith('image/') == true) {
-                      final file = item.getAsFile();
-                      if (file != null) {
-                        final reader = html.FileReader();
-                        reader.readAsArrayBuffer(file);
-                        await reader.onLoadEnd.first;
-                        final bytes = Uint8List.fromList(reader.result as List<int>);
-                        handlePastedBytes(bytes, setStateDialog);
-                        break;
-                      }
-                    }
-                  }
-                }
+              pasteSubscription = listenToWebPaste((bytes) {
+                handlePastedBytes(bytes, setStateDialog);
               });
             }
 
@@ -704,8 +671,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                                               selectedImageName = picked.name;
                                             });
                                           }
-                                        } catch (e) {
+                                        } catch (e, stack) {
                                           debugPrint('Image pick error: $e');
+                                          Backend.crashlytics.recordError(e, stack, reason: 'AnnouncementsScreen.pickImage');
                                         }
                                       },
                                       icon: const Icon(Icons.add_photo_alternate_outlined),
@@ -864,8 +832,9 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                                     ),
                                   );
                                 }
-                              } catch (e) {
+                              } catch (e, stack) {
                                 debugPrint('Error publishing announcement: $e');
+                                Backend.crashlytics.recordError(e, stack, reason: 'AnnouncementsScreen.publishAnnouncement');
                                 setStateDialog(() {
                                   isUploading = false;
                                 });

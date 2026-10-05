@@ -138,6 +138,7 @@ class _AdminBulkAddressImportScreenState
       debugPrint('[BulkAddressImport] setState executed: _fileName="$selectedFileName", _parsedItems.length=${items.length}');
     } catch (e, stackTrace) {
       debugPrint('[BulkAddressImport] Exception in _pickAndParseCsv: $e\n$stackTrace');
+      Backend.crashlytics.recordError(e, stackTrace, reason: 'AdminBulkAddressImportScreen._pickAndParseCsv');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -354,6 +355,7 @@ class _AdminBulkAddressImportScreenState
       }
     } catch (e, stackTrace) {
       debugPrint('[BulkAddressImport] Error importing addresses: $e\n$stackTrace');
+      Backend.crashlytics.recordError(e, stackTrace, reason: 'AdminBulkAddressImportScreen._importAddresses');
       if (mounted) {
         final l10n = AppLocalizations.of(context)!;
         ScaffoldMessenger.of(context).showSnackBar(

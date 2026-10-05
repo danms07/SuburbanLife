@@ -1,11 +1,23 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const { FieldValue } = require('firebase-admin/firestore');
 const { GoogleGenAI } = require('@google/genai');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 admin.initializeApp();
+
+// Determine if functions are running inside the Firebase Emulator
+const isEmulator = process.env.FUNCTIONS_EMULATOR === 'true' ||
+  Boolean(process.env.FIREBASE_EMULATOR_HUB) ||
+  Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST) ||
+  Boolean(process.env.FIRESTORE_EMULATOR_HOST);
+
+// Callable options: disable App Check enforcement in emulator mode for local testing
+const callableOptions = isEmulator
+  ? { enforceAppCheck: false }
+  : { enforceAppCheck: true, consumeAppCheckToken: true };
 
 /**
  * Generates a cryptographically secure random password meeting complexity requirements:
@@ -50,7 +62,27 @@ function generateSecurePassword(length = 12) {
   return combined.join('');
 }
 
-const projectId = process.env.GCLOUD_PROJECT || 'suburban-life';
+/**
+ * Validates whether a password satisfies the Firebase Auth password policy:
+ * - Length between 8 and 4096 characters
+ * - At least 1 uppercase letter (A-Z)
+ * - At least 1 lowercase letter (a-z)
+ * - At least 1 numeric digit (0-9)
+ * - At least 1 special character (non-alphanumeric symbol)
+ */
+function isPasswordCompliant(password) {
+  if (!password || typeof password !== 'string') return false;
+  const trimmed = password.trim();
+  if (trimmed.length < 8 || trimmed.length > 4096) return false;
+  if (!/[A-Z]/.test(trimmed)) return false;
+  if (!/[a-z]/.test(trimmed)) return false;
+  if (!/[0-9]/.test(trimmed)) return false;
+  if (!/[^A-Za-z0-9]/.test(trimmed)) return false;
+  return true;
+}
+
+const { DEFAULT_APP_NAME, DEFAULT_PROJECT_ID, BRAND_COLORS } = require('./brand_config');
+const projectId = process.env.GCLOUD_PROJECT || DEFAULT_PROJECT_ID;
 const ai = new GoogleGenAI({
   vertexai: true,
   project: projectId,
@@ -100,7 +132,63 @@ function replacePlaceholders(template, data) {
     .replace(/%password%/gi, data.password || '')
     .replace(/%address%/gi, data.address || 'N/A')
     .replace(/%role%/gi, data.role || 'Residente')
-    .replace(/%appName%/gi, data.appName || 'Suburban Life');
+    .replace(/%appName%/gi, data.appName || DEFAULT_APP_NAME);
+}
+
+// Helper: Build branded HTML welcome email matching AppConfig
+function buildWelcomeEmailHtml({ branding, name, userRole, email, password, addressLinked, customBody }) {
+  if (customBody && customBody.toString().trim().length > 0) {
+    const escapedBody = customBody
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br/>');
+
+    return `
+        <div style="font-family: ${BRAND_COLORS.fontFamily}; max-width: 600px; margin: 0 auto; padding: 24px; background-color: ${BRAND_COLORS.background}; border-radius: 12px;">
+          <div style="background-color: ${BRAND_COLORS.primary}; background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.gradientEnd} 100%); padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">${branding}</h1>
+          </div>
+          <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: ${BRAND_COLORS.textColor}; line-height: 1.6; font-size: 14px;">
+            ${escapedBody}
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+              Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
+            </p>
+          </div>
+        </div>
+      `;
+  }
+
+  const addressText = addressLinked ? `<li><strong>Dirección asignada:</strong> ${addressLinked}</li>` : '';
+
+  return `
+        <div style="font-family: ${BRAND_COLORS.fontFamily}; max-width: 600px; margin: 0 auto; padding: 24px; background-color: ${BRAND_COLORS.background}; border-radius: 12px;">
+          <div style="background-color: ${BRAND_COLORS.primary}; background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.gradientEnd} 100%); padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">¡Bienvenido(a) a ${branding}!</h1>
+          </div>
+          <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <p style="font-size: 16px; color: ${BRAND_COLORS.textColor}; margin-top: 0;">Hola <strong>${name}</strong>,</p>
+            <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
+              Tu cuenta de <strong>${userRole}</strong> ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso para ingresar a la aplicación:
+            </p>
+            <div style="background-color: ${BRAND_COLORS.cardBackground}; border-left: 4px solid ${BRAND_COLORS.primary}; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
+              <ul style="margin: 0; padding-left: 20px; color: ${BRAND_COLORS.textColor}; font-size: 14px; line-height: 1.8;">
+                <li><strong>Correo electrónico:</strong> ${email}</li>
+                <li><strong>Contraseña inicial:</strong> <code style="background-color: #ede8f5; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: ${BRAND_COLORS.primary};">${password}</code></li>
+                ${addressText}
+              </ul>
+            </div>
+            <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">
+              Te recomendamos iniciar sesión y cambiar tu contraseña por una personalizada en la sección de tu perfil.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+              Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
+            </p>
+          </div>
+        </div>
+      `;
 }
 
 // Helper: Send branded HTML and Plain Text welcome email
@@ -109,7 +197,7 @@ async function sendWelcomeEmail(smtpConfig, { email, name, password, addressLink
 
   try {
     const transporter = createSmtpTransporter(smtpConfig);
-    const branding = appName || smtpConfig.senderName || 'Suburban Life';
+    const branding = appName || smtpConfig.senderName || DEFAULT_APP_NAME;
     const fromAddress = smtpConfig.senderEmail && smtpConfig.senderEmail.toString().trim().length > 0
       ? `"${smtpConfig.senderName || branding}" <${smtpConfig.senderEmail.toString().trim()}>`
       : `"${smtpConfig.senderName || branding}" <${smtpConfig.user.toString().trim()}>`;
@@ -135,58 +223,26 @@ async function sendWelcomeEmail(smtpConfig, { email, name, password, addressLink
     if (smtpConfig.customBody && smtpConfig.customBody.toString().trim().length > 0) {
       const rawCustomBody = replacePlaceholders(smtpConfig.customBody.toString().trim(), placeholderData);
       textContent = rawCustomBody;
-
-      const escapedBody = rawCustomBody
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\n/g, '<br/>');
-
-      htmlContent = `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
-          <div style="background-color: #2864be; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">${branding}</h1>
-          </div>
-          <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #1f2937; line-height: 1.6; font-size: 14px;">
-            ${escapedBody}
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-              Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
-            </p>
-          </div>
-        </div>
-      `;
+      htmlContent = buildWelcomeEmailHtml({
+        branding,
+        name,
+        userRole,
+        email,
+        password,
+        addressLinked,
+        customBody: rawCustomBody,
+      });
     } else {
-      const addressText = addressLinked ? `<li><strong>Dirección asignada:</strong> ${addressLinked}</li>` : '';
       const addressPlain = addressLinked ? `\nDirección asignada: ${addressLinked}` : '';
 
-      htmlContent = `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
-          <div style="background-color: #2864be; padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: bold;">¡Bienvenido(a) a ${branding}!</h1>
-          </div>
-          <div style="background-color: #ffffff; padding: 28px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <p style="font-size: 16px; color: #1f2937; margin-top: 0;">Hola <strong>${name}</strong>,</p>
-            <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
-              Tu cuenta de <strong>${userRole}</strong> ha sido creada exitosamente. A continuación encontrarás tus credenciales de acceso para ingresar a la aplicación:
-            </p>
-            <div style="background-color: #f3f4f6; border-left: 4px solid #2864be; padding: 16px 20px; margin: 20px 0; border-radius: 6px;">
-              <ul style="margin: 0; padding-left: 20px; color: #1f2937; font-size: 14px; line-height: 1.8;">
-                <li><strong>Correo electrónico:</strong> ${email}</li>
-                <li><strong>Contraseña inicial:</strong> <code style="background-color: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #1e3a8a;">${password}</code></li>
-                ${addressText}
-              </ul>
-            </div>
-            <p style="font-size: 13px; color: #6b7280; line-height: 1.5;">
-              Te recomendamos iniciar sesión y cambiar tu contraseña por una personalizada en la sección de tu perfil.
-            </p>
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-            <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-              Este es un correo automático generado por la administración de ${branding}. Por favor no respondas directamente a este mensaje.
-            </p>
-          </div>
-        </div>
-      `;
+      htmlContent = buildWelcomeEmailHtml({
+        branding,
+        name,
+        userRole,
+        email,
+        password,
+        addressLinked,
+      });
 
       textContent = `¡Bienvenido(a) a ${branding}!\n\n` +
         `Hola ${name},\n\n` +
@@ -214,7 +270,7 @@ async function sendWelcomeEmail(smtpConfig, { email, name, password, addressLink
 }
 
 // Callable function to set user roles
-exports.setRole = onCall({ enforceAppCheck: true }, async (request) => {
+exports.setRole = onCall(callableOptions, async (request) => {
   // Check if the caller is an admin
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError(
@@ -293,7 +349,7 @@ exports.translateAnnouncement = onDocumentCreated('announcements/{announcementId
     }
 });
 
-exports.createBooking = onCall({ enforceAppCheck: true }, async (request) => {
+exports.createBooking = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
@@ -313,7 +369,10 @@ exports.createBooking = onCall({ enforceAppCheck: true }, async (request) => {
       if (addressRef) {
         const addressDoc = await addressRef.get();
         const status = addressDoc.exists ? addressDoc.data().paymentStatus : null;
-        if (!status || status.toString().trim() === '' || status === 'restricted') {
+        const isWithinGrace = addressDoc.exists ? addressDoc.data().isWithinGracePeriod === true : false;
+        const isConsideredPaid = status === 'paid' ||
+          ((status === 'pending' || status === 'reviewing') && isWithinGrace);
+        if (!isConsideredPaid) {
           throw new HttpsError('permission-denied', 'Your account is restricted due to missing payment.');
         }
       }
@@ -326,31 +385,60 @@ exports.createBooking = onCall({ enforceAppCheck: true }, async (request) => {
     }
     
     const facData = facilityDoc.data();
+    // 1. Anticipation & Operating Hours validation
+    let timeZone = 'America/Mexico_City';
+    try {
+      const configDoc = await admin.firestore().collection('config').doc('app_settings').get();
+      if (configDoc.exists && configDoc.data().timeZone) {
+        timeZone = configDoc.data().timeZone;
+      }
+    } catch (e) {}
+
+    validateFacilityBooking({ facData, startTime, endTime, timeZone, now: Date.now() });
+
     const cooldownUnit = facData.cooldownUnit || 'unrestricted';
     const cooldownValue = facData.cooldownValue || 0;
 
     if (cooldownUnit !== 'unrestricted') {
       let startTimeBoundary = 0;
+      let endTimeBoundary = Infinity;
       if (cooldownUnit === 'days') {
-        startTimeBoundary = startTime - (cooldownValue * 24 * 60 * 60 * 1000);
+        const ms = cooldownValue * 24 * 60 * 60 * 1000;
+        startTimeBoundary = startTime - ms;
+        endTimeBoundary = startTime + ms;
       } else if (cooldownUnit === 'months') {
-        const date = new Date(startTime);
-        date.setMonth(date.getMonth() - cooldownValue);
-        startTimeBoundary = date.getTime();
+        const dateBefore = new Date(startTime);
+        dateBefore.setMonth(dateBefore.getMonth() - cooldownValue);
+        startTimeBoundary = dateBefore.getTime();
+        const dateAfter = new Date(startTime);
+        dateAfter.setMonth(dateAfter.getMonth() + cooldownValue);
+        endTimeBoundary = dateAfter.getTime();
       } else if (cooldownUnit === 'years') {
-        const date = new Date(startTime);
-        date.setFullYear(date.getFullYear() - cooldownValue);
-        startTimeBoundary = date.getTime();
+        const dateBefore = new Date(startTime);
+        dateBefore.setFullYear(dateBefore.getFullYear() - cooldownValue);
+        startTimeBoundary = dateBefore.getTime();
+        const dateAfter = new Date(startTime);
+        dateAfter.setFullYear(dateAfter.getFullYear() + cooldownValue);
+        endTimeBoundary = dateAfter.getTime();
       }
 
       const recentBookings = await admin.firestore().collection('bookings')
         .where('userUid', '==', uid)
         .where('facilityId', '==', facilityId)
         .where('startTime', '>=', startTimeBoundary)
-        .where('status', '!=', 'cancelled')
         .get();
 
-      if (!recentBookings.empty) {
+      // The booking restriction should only be applied once the booking is confirmed
+      const confirmedBookings = recentBookings.docs.filter((doc) => {
+        const b = doc.data();
+        const status = (b.status || '').toLowerCase();
+        const isConfirmed = status.startsWith('approved') || status === 'confirmed' || status === 'closed';
+        if (!isConfirmed) return false;
+        const bStart = typeof b.startTime === 'number' ? b.startTime : (b.startTime ? b.startTime.toMillis() : 0);
+        return bStart >= startTimeBoundary && bStart <= endTimeBoundary;
+      });
+
+      if (confirmedBookings.length > 0) {
         throw new HttpsError(
           'failed-precondition',
           `You are only allowed to book this facility once every ${cooldownValue} ${cooldownUnit}.`
@@ -358,16 +446,21 @@ exports.createBooking = onCall({ enforceAppCheck: true }, async (request) => {
       }
     }
 
-    // 2. Clashes validation (Capacity & Quantity check)
+    // 2. Clashes validation (Capacity & Quantity check): bounded time range
     const quantity = facData.quantity || 1;
     const clashes = await admin.firestore().collection('bookings')
       .where('facilityId', '==', facilityId)
-      .where('status', '!=', 'cancelled')
+      .where('startTime', '<=', endTime)
+      .where('startTime', '>=', startTime - (7 * 24 * 60 * 60 * 1000))
       .get();
 
     const events = [];
     for (const doc of clashes.docs) {
       const b = doc.data();
+      // Ignore cancelled or rejected bookings
+      if (b.status === 'cancelled' || b.status === 'rejected') {
+        continue;
+      }
       const overlapStart = Math.max(startTime, b.startTime);
       const overlapEnd = Math.min(endTime, b.endTime);
       if (overlapStart < overlapEnd) {
@@ -404,11 +497,15 @@ exports.createBooking = onCall({ enforceAppCheck: true }, async (request) => {
     const bookingRef = admin.firestore().collection('bookings').doc();
     const bookingData = {
       id: bookingRef.id,
+      bookingId: bookingRef.id,
       facilityId,
       userUid: uid,
       startTime,
       endTime,
       status: 'pending review',
+      isConfirmed: false,
+      approvalMessage: '',
+      rejectionReason: '',
       timestamp: Date.now()
     };
 
@@ -421,7 +518,7 @@ exports.createBooking = onCall({ enforceAppCheck: true }, async (request) => {
   }
 });
 
-exports.cancelBooking = onCall({ enforceAppCheck: true }, async (request) => {
+exports.cancelBooking = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
@@ -463,7 +560,355 @@ exports.cancelBooking = onCall({ enforceAppCheck: true }, async (request) => {
   }
 });
 
-exports.approvePayment = onCall({ enforceAppCheck: true }, async (request) => {
+/**
+ * Helper: Formats a Date object or timestamp into integer components according to the given IANA timezone.
+ */
+function getDateInTimezone(date = new Date(), timeZone = 'America/Mexico_City') {
+  try {
+    const d = date instanceof Date ? date : new Date(date);
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timeZone || 'America/Mexico_City',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(d);
+    const map = {};
+    for (const p of parts) {
+      map[p.type] = p.value;
+    }
+    let hour = parseInt(map.hour, 10);
+    if (hour === 24) hour = 0;
+    return {
+      year: parseInt(map.year, 10),
+      month: parseInt(map.month, 10),
+      day: parseInt(map.day, 10),
+      hour: hour,
+      minute: parseInt(map.minute, 10),
+      second: parseInt(map.second, 10),
+    };
+  } catch (err) {
+    const d = date instanceof Date ? date : new Date(date);
+    return {
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+      day: d.getDate(),
+      hour: d.getHours(),
+      minute: d.getMinutes(),
+      second: d.getSeconds(),
+    };
+  }
+}
+
+/**
+ * Helper: Formats the current date and time into integer components according to the given IANA timezone.
+ */
+function getNowInTimezone(timeZone = 'America/Mexico_City') {
+  return getDateInTimezone(new Date(), timeZone);
+}
+
+/**
+ * Helper: Validates facility booking anticipation and daily operating hours windows.
+ */
+function validateFacilityBooking({ facData, startTime, endTime, timeZone = 'America/Mexico_City', now = Date.now() }) {
+  if (!facData) return;
+
+  // 1. Anticipation window
+  const anticipationUnit = facData.anticipationUnit || 'unrestricted';
+  const anticipationValue = typeof facData.anticipationValue === 'number' ? facData.anticipationValue : 0;
+  if (anticipationUnit !== 'unrestricted' && anticipationValue > 0) {
+    let anticipationMs = 0;
+    if (anticipationUnit === 'hours') {
+      anticipationMs = anticipationValue * 60 * 60 * 1000;
+    } else if (anticipationUnit === 'days') {
+      anticipationMs = anticipationValue * 24 * 60 * 60 * 1000;
+    } else if (anticipationUnit === 'weeks') {
+      anticipationMs = anticipationValue * 7 * 24 * 60 * 60 * 1000;
+    }
+    if (startTime < now + anticipationMs) {
+      throw new HttpsError(
+        'failed-precondition',
+        `This facility requires advance notice of at least ${anticipationValue} ${anticipationUnit}.`
+      );
+    }
+  }
+
+  // 2. Daily operating hours window
+  const openingTime = facData.openingTime || '00:00';
+  const closingTime = facData.closingTime || '23:59';
+  if (openingTime !== '00:00' || closingTime !== '23:59') {
+    const [openH, openM] = openingTime.split(':').map(Number);
+    const [closeH, closeM] = closingTime.split(':').map(Number);
+    const openingMinutes = openH * 60 + openM;
+    const closingMinutes = closeH * 60 + closeM;
+
+    const startTz = getDateInTimezone(startTime, timeZone);
+    const endTz = getDateInTimezone(endTime, timeZone);
+
+    const startMinutes = startTz.hour * 60 + startTz.minute;
+    const endMinutes = endTz.hour * 60 + endTz.minute;
+
+    if (startMinutes < openingMinutes || endMinutes > closingMinutes || startTz.day !== endTz.day) {
+      throw new HttpsError(
+        'invalid-argument',
+        `Reservation must be within operating hours (${openingTime} - ${closingTime}).`
+      );
+    }
+  }
+}
+
+/**
+ * Helper: Validates that a delivery date is valid and not in the future.
+ * Returns parsed Date object, or null if no deliveryDate was provided.
+ */
+function validateDeliveryDate(deliveryDate) {
+  if (!deliveryDate) return null;
+  const d = new Date(deliveryDate);
+  if (isNaN(d.getTime())) {
+    throw new HttpsError('invalid-argument', 'Invalid delivery date format.');
+  }
+  if (d.getTime() > Date.now()) {
+    throw new HttpsError('invalid-argument', 'Delivery date cannot be in the future.');
+  }
+  return d;
+}
+
+/**
+ * Helper: Recalculates payment status for an address based on deliveryDate and payments collection records,
+ * incorporating configured cutoff day, grace period, and timezone.
+ */
+async function recalculateAddressPaymentStatus(addressRef, isApproval = false, preloadedSettings = null) {
+  if (!addressRef) return;
+  const db = admin.firestore();
+  const addressDoc = typeof addressRef.get === 'function' ? await addressRef.get() : await db.doc(addressRef.path || addressRef).get();
+  if (!addressDoc.exists) return;
+
+  const addressData = addressDoc.data();
+  const deliveryTimestamp = addressData ? addressData.deliveryDate : null;
+  const targetRef = addressDoc.ref;
+
+  let newStatus = 'paid';
+  let isWithinGracePeriod = true;
+  if (deliveryTimestamp) {
+    const deliveryDate = deliveryTimestamp instanceof admin.firestore.Timestamp
+      ? deliveryTimestamp.toDate()
+      : (deliveryTimestamp.toDate ? deliveryTimestamp.toDate() : new Date(deliveryTimestamp));
+
+    if (deliveryDate && !isNaN(deliveryDate.getTime())) {
+      // Fetch or use preloaded app_settings (cutoff day, grace period, timezone)
+      let appSettings = preloadedSettings;
+      if (!appSettings) {
+        try {
+          const configDoc = await db.collection('config').doc('app_settings').get();
+          appSettings = configDoc.exists ? configDoc.data() : {};
+        } catch (e) {
+          appSettings = {};
+        }
+      }
+
+      const cutoffDay = (appSettings && typeof appSettings.paymentCutoffDay === 'number') ? appSettings.paymentCutoffDay : 1;
+      const gracePeriodDays = (appSettings && typeof appSettings.gracePeriodDays === 'number') ? appSettings.gracePeriodDays : 10;
+      const timeZone = (appSettings && appSettings.timeZone) ? appSettings.timeZone : 'America/Mexico_City';
+
+      const nowTz = getNowInTimezone(timeZone);
+      const currentPeriodStr = `${nowTz.year}-${String(nowTz.month).padStart(2, '0')}`;
+      const graceThresholdDay = cutoffDay + gracePeriodDays;
+
+      const requiredPeriods = [];
+      let current = new Date(deliveryDate.getFullYear(), deliveryDate.getMonth(), 1);
+      const target = new Date(nowTz.year, nowTz.month - 1, 1);
+
+      while (current <= target) {
+        const yyyy = current.getFullYear();
+        const mm = String(current.getMonth() + 1).padStart(2, '0');
+        requiredPeriods.push(`${yyyy}-${mm}`);
+        current.setMonth(current.getMonth() + 1);
+      }
+
+      const paymentsQuery = await db.collection('payments')
+        .where('addressRef', '==', targetRef)
+        .get();
+
+      const paymentsMap = {};
+      paymentsQuery.forEach((doc) => {
+        const pData = doc.data();
+        if (pData.concept && pData.concept !== 'monthly quota') {
+          return;
+        }
+        const status = pData.status;
+        const periodsList = [];
+        if (Array.isArray(pData.periods)) {
+          pData.periods.forEach((p) => {
+            if (p && typeof p === 'string' && p.trim()) periodsList.push(p.trim());
+          });
+        } else if (pData.period && typeof pData.period === 'string') {
+          pData.period.split(',').forEach((p) => {
+            if (p && p.trim()) periodsList.push(p.trim());
+          });
+        }
+
+        if (status && periodsList.length > 0) {
+          periodsList.forEach((period) => {
+            const existing = paymentsMap[period];
+            if (!existing || status === 'approved' || (status === 'pending' && existing === 'rejected')) {
+              paymentsMap[period] = status;
+            }
+          });
+        }
+      });
+
+      let hasPending = false;
+      let hasPendingPast = false;
+      let hasUnpaidPast = false;
+      let hasUnpaidCurrent = false;
+      let hasPendingGrace = false;
+
+      for (const period of requiredPeriods) {
+        const status = paymentsMap[period];
+        const isCurrentPeriod = period === currentPeriodStr;
+
+        if (isCurrentPeriod) {
+          if (status === 'approved') {
+            // Current month is approved and paid
+          } else if (status === 'pending') {
+            hasPending = true;
+          } else {
+            // status is null or rejected for the current active month
+            if (nowTz.day <= graceThresholdDay) {
+              hasPendingGrace = true;
+            } else {
+              hasUnpaidCurrent = true;
+            }
+          }
+        } else {
+          // Historical past periods
+          if (!status || status === 'rejected') {
+            hasUnpaidPast = true;
+          } else if (status === 'pending') {
+            hasPending = true;
+            hasPendingPast = true;
+          }
+        }
+      }
+
+      if (hasUnpaidPast || hasUnpaidCurrent) {
+        newStatus = 'restricted';
+      } else if (hasPending || hasPendingGrace) {
+        newStatus = 'pending';
+      } else {
+        newStatus = 'paid';
+      }
+
+      isWithinGracePeriod = !hasUnpaidPast && !hasPendingPast && (nowTz.day <= graceThresholdDay);
+    }
+  }
+
+  // Active sanctions check: Any active or pending_review sanction restricts the address immediately
+  let hasActiveSanctions = false;
+  let activeSanctionsCount = 0;
+  try {
+    const sanctionsQuery = await db.collection('sanctions')
+      .where('addressRef', '==', targetRef)
+      .where('status', 'in', ['active', 'pending_review'])
+      .get();
+    activeSanctionsCount = sanctionsQuery.size;
+    hasActiveSanctions = activeSanctionsCount > 0;
+  } catch (err) {
+    console.error('Error checking active sanctions in recalculateAddressPaymentStatus:', err);
+  }
+
+  if (hasActiveSanctions) {
+    newStatus = 'restricted';
+  }
+
+  const updateData = {
+    paymentStatus: newStatus,
+    isWithinGracePeriod: isWithinGracePeriod,
+    hasActiveSanctions: hasActiveSanctions,
+    activeSanctionsCount: activeSanctionsCount,
+  };
+  if (isApproval) {
+    updateData.lastPaymentApproval = Date.now();
+  }
+
+  await targetRef.update(updateData);
+  return newStatus;
+}
+
+/**
+ * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Evaluates payment cutoffs and grace periods across all active residential addresses.
+ */
+exports.checkMonthlyPaymentStatuses = onSchedule({
+  schedule: '0 0 * * *',
+  timeZone: 'America/Mexico_City',
+}, async (event) => {
+  const db = admin.firestore();
+  let appSettings = {};
+  try {
+    const appSettingsDoc = await db.collection('config').doc('app_settings').get();
+    if (appSettingsDoc.exists) {
+      appSettings = appSettingsDoc.data() || {};
+    }
+  } catch (err) {
+    console.error('Error loading app_settings in checkMonthlyPaymentStatuses:', err);
+  }
+
+  try {
+    const addressesSnap = await db.collection('addresses').get();
+    const tasks = [];
+    for (const doc of addressesSnap.docs) {
+      const data = doc.data();
+      if (data && (data.deliveryDate || data.residentUid)) {
+        tasks.push(recalculateAddressPaymentStatus(doc.ref, false, appSettings));
+      }
+    }
+    await Promise.all(tasks);
+    console.log(`checkMonthlyPaymentStatuses completed successfully for ${tasks.length} addresses.`);
+  } catch (error) {
+    console.error('Error executing checkMonthlyPaymentStatuses scheduled job:', error);
+  }
+});
+
+/**
+ * Trigger: Automatically recalculates address payment status whenever a payment is added, updated, or deleted.
+ */
+exports.onPaymentWritten = onDocumentWritten('payments/{paymentId}', async (event) => {
+  const afterData = event.data?.after?.data();
+  const beforeData = event.data?.before?.data();
+  const addressRef = afterData?.addressRef || beforeData?.addressRef;
+
+  if (addressRef) {
+    try {
+      await recalculateAddressPaymentStatus(addressRef, false);
+    } catch (err) {
+      console.error('Error auto-recalculating payment status in onPaymentWritten trigger:', err);
+    }
+  }
+});
+
+/**
+ * Trigger: Automatically recalculates address payment status whenever a sanction is added, updated, or deleted.
+ */
+exports.onSanctionWritten = onDocumentWritten('sanctions/{sanctionId}', async (event) => {
+  const afterData = event.data?.after?.data();
+  const beforeData = event.data?.before?.data();
+  const addressRef = afterData?.addressRef || beforeData?.addressRef;
+
+  if (addressRef) {
+    try {
+      await recalculateAddressPaymentStatus(addressRef, false);
+    } catch (err) {
+      console.error('Error auto-recalculating payment status in onSanctionWritten trigger:', err);
+    }
+  }
+});
+
+exports.approvePayment = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
@@ -497,71 +942,23 @@ exports.approvePayment = onCall({ enforceAppCheck: true }, async (request) => {
       approvalDate: Date.now()
     });
 
+    if (paymentData.concept === 'sanction' && paymentData.sanctionId) {
+      try {
+        await admin.firestore().collection('sanctions').doc(paymentData.sanctionId).update({
+          status: 'paid',
+          resolvedAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      } catch (sanctionErr) {
+        console.error('Error updating sanction status to paid in approvePayment:', sanctionErr);
+      }
+    }
+
     const userDoc = await admin.firestore().collection('users').doc(residentUid).get();
     if (userDoc.exists) {
       const addressRef = userDoc.data().addressRef;
       if (addressRef) {
-        const addressDoc = await addressRef.get();
-        const addressData = addressDoc.data();
-        const deliveryTimestamp = addressData ? addressData.deliveryDate : null;
-
-        let newStatus = 'paid';
-        if (deliveryTimestamp) {
-          const deliveryDate = deliveryTimestamp.toDate();
-          const requiredPeriods = [];
-          const now = new Date();
-          let current = new Date(deliveryDate.getFullYear(), deliveryDate.getMonth(), 1);
-          const target = new Date(now.getFullYear(), now.getMonth(), 1);
-
-          while (current <= target) {
-            const yyyy = current.getFullYear();
-            const mm = String(current.getMonth() + 1).padStart(2, '0');
-            requiredPeriods.push(`${yyyy}-${mm}`);
-            current.setMonth(current.getMonth() + 1);
-          }
-
-          const paymentsQuery = await admin.firestore().collection('payments')
-            .where('addressRef', '==', addressRef)
-            .get();
-
-          const paymentsMap = {};
-          paymentsQuery.forEach((doc) => {
-            const pData = doc.data();
-            const period = pData.period;
-            const status = pData.status;
-            if (period && status) {
-              const existing = paymentsMap[period];
-              if (!existing || status === 'approved' || (status === 'pending' && existing === 'rejected')) {
-                paymentsMap[period] = status;
-              }
-            }
-          });
-
-          let hasPending = false;
-          let hasUnpaid = false;
-
-          for (const period of requiredPeriods) {
-            const status = paymentsMap[period];
-            if (!status || status === 'rejected') {
-              hasUnpaid = true;
-            } else if (status === 'pending') {
-              hasPending = true;
-            }
-          }
-
-          if (hasUnpaid) {
-            newStatus = 'restricted';
-          } else if (hasPending) {
-            newStatus = 'reviewing';
-          } else {
-            newStatus = 'paid';
-          }
-        }
-
-        await addressRef.update({
-          paymentStatus: newStatus,
-          lastPaymentApproval: Date.now()
-        });
+        await recalculateAddressPaymentStatus(addressRef, true);
       }
     }
 
@@ -571,7 +968,7 @@ exports.approvePayment = onCall({ enforceAppCheck: true }, async (request) => {
   }
 });
 
-exports.addRoommate = onCall({ enforceAppCheck: true }, async (request) => {
+exports.addRoommate = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
@@ -694,7 +1091,7 @@ exports.notifyAccessResult = onDocumentCreated('access_logs/{logId}', async (eve
   }
 });
 
-exports.adminUpdatePassword = onCall({ enforceAppCheck: true }, async (request) => {
+exports.adminUpdatePassword = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
@@ -704,20 +1101,28 @@ exports.adminUpdatePassword = onCall({ enforceAppCheck: true }, async (request) 
     throw new HttpsError('invalid-argument', 'Missing uid or newPassword.');
   }
 
+  const cleanNewPassword = newPassword.toString().trim();
+  if (!isPasswordCompliant(cleanNewPassword)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Password does not meet complexity requirements (min. 8 characters, uppercase, lowercase, number, and special character).'
+    );
+  }
+
   try {
-    await admin.auth().updateUser(uid, { password: newPassword });
+    await admin.auth().updateUser(uid, { password: cleanNewPassword });
     return { success: true };
   } catch (error) {
     throw new HttpsError('internal', error.message);
   }
 });
 
-exports.adminCreateUser = onCall({ enforceAppCheck: true }, async (request) => {
+exports.adminCreateUser = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
 
-  const { name, email, password, role, streetName, number, addressId } = request.data;
+  const { name, email, password, role, streetName, number, addressId, deliveryDate } = request.data;
   if (!name || !email || !password || !role) {
     throw new HttpsError('invalid-argument', 'Missing name, email, password, or role.');
   }
@@ -727,12 +1132,20 @@ exports.adminCreateUser = onCall({ enforceAppCheck: true }, async (request) => {
   const cleanPassword = password.toString().trim();
   const cleanRole = role.toString().trim().toLowerCase();
 
-  if (cleanPassword.length < 6) {
-    throw new HttpsError('invalid-argument', 'Password must be at least 6 characters long.');
+  if (!isPasswordCompliant(cleanPassword)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Password does not meet complexity requirements (min. 8 characters, uppercase, lowercase, number, and special character).'
+    );
   }
 
   if (!['resident', 'guard', 'admin'].includes(cleanRole)) {
     throw new HttpsError('invalid-argument', `Invalid role: ${cleanRole}. Must be resident, guard, or admin.`);
+  }
+
+  let parsedDeliveryDate = null;
+  if (cleanRole === 'resident' && deliveryDate) {
+    parsedDeliveryDate = validateDeliveryDate(deliveryDate);
   }
 
   const db = admin.firestore();
@@ -824,12 +1237,18 @@ exports.adminCreateUser = onCall({ enforceAppCheck: true }, async (request) => {
 
     await admin.auth().setCustomUserClaims(userRecord.uid, claims);
 
-    // 4. Update address if resident (claim address and mark paymentStatus: 'paid')
+    // 4. Update address if resident (claim address and initialize paymentStatus as 'paid';
+    // deferring full payment status recalculation to checkMonthlyPaymentStatuses to give admins time to upload receipts)
     if (cleanRole === 'resident' && addressRef) {
-      await addressRef.update({
+      const addressUpdate = {
         residentUid: userRecord.uid,
         paymentStatus: 'paid',
-      });
+        isWithinGracePeriod: true,
+      };
+      if (parsedDeliveryDate) {
+        addressUpdate.deliveryDate = admin.firestore.Timestamp.fromDate(parsedDeliveryDate);
+      }
+      await addressRef.update(addressUpdate);
     }
 
     // 5. Create user document in Firestore users collection
@@ -861,7 +1280,7 @@ exports.adminCreateUser = onCall({ enforceAppCheck: true }, async (request) => {
         name: cleanName,
         password: cleanPassword,
         addressLinked: addressDisplay,
-        appName: 'Suburban Life',
+        appName: DEFAULT_APP_NAME,
         role: roleDisplayMap[cleanRole] || cleanRole,
       });
       emailSent = emailResult.sent === true;
@@ -883,7 +1302,7 @@ exports.adminCreateUser = onCall({ enforceAppCheck: true }, async (request) => {
   }
 });
 
-exports.adminProvisionGuard = onCall({ enforceAppCheck: true }, async (request) => {
+exports.adminProvisionGuard = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
@@ -893,10 +1312,18 @@ exports.adminProvisionGuard = onCall({ enforceAppCheck: true }, async (request) 
     throw new HttpsError('invalid-argument', 'Missing name, email, or password.');
   }
 
+  const cleanPassword = password.toString().trim();
+  if (!isPasswordCompliant(cleanPassword)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Password does not meet complexity requirements (min. 8 characters, uppercase, lowercase, number, and special character).'
+    );
+  }
+
   try {
     const userRecord = await admin.auth().createUser({
       email,
-      password,
+      password: cleanPassword,
       displayName: name,
     });
 
@@ -918,7 +1345,7 @@ exports.adminProvisionGuard = onCall({ enforceAppCheck: true }, async (request) 
         name,
         password,
         role: 'guardia de seguridad',
-        appName: 'Suburban Life',
+        appName: DEFAULT_APP_NAME,
       }).catch(err => console.error('Error sending guard welcome email:', err));
     }
 
@@ -928,7 +1355,7 @@ exports.adminProvisionGuard = onCall({ enforceAppCheck: true }, async (request) 
   }
 });
 
-exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (request) => {
+exports.adminTestSmtpConnection = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
@@ -957,8 +1384,8 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
 
     // 2. Send test email
     const fromAddress = config.senderEmail && config.senderEmail.length > 0
-      ? `"${config.senderName || 'Suburban Life'}" <${config.senderEmail}>`
-      : `"${config.senderName || 'Suburban Life'}" <${config.user}>`;
+      ? `"${config.senderName || DEFAULT_APP_NAME}" <${config.senderEmail}>`
+      : `"${config.senderName || DEFAULT_APP_NAME}" <${config.user}>`;
 
     const sampleData = {
       name: 'Usuario de Prueba',
@@ -966,28 +1393,28 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
       password: 'SamplePass#2026',
       address: 'Calle Ejemplo #101',
       role: 'Residente',
-      appName: config.senderName || 'Suburban Life',
+      appName: config.senderName || DEFAULT_APP_NAME,
     };
 
-    let subject = 'Suburban Life - Test de Configuración SMTP';
+    let subject = `${DEFAULT_APP_NAME} - Test de Configuración SMTP`;
     if (config.customSubject && config.customSubject.trim().length > 0) {
       subject = `[Test] ${replacePlaceholders(config.customSubject, sampleData)}`;
     }
 
-    let textBody = 'Este es un correo de prueba enviado desde la configuración de administración de Suburban Life para verificar el servicio SMTP.';
+    let textBody = `Este es un correo de prueba enviado desde la configuración de administración de ${DEFAULT_APP_NAME} para verificar el servicio SMTP.`;
     let htmlBody = `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
+      <div style="font-family: ${BRAND_COLORS.fontFamily}; max-width: 600px; margin: 0 auto; padding: 24px; background-color: ${BRAND_COLORS.background}; border-radius: 12px;">
         <div style="background-color: #25d366; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
           <h2 style="color: #ffffff; margin: 0; font-size: 22px;">¡Conexión SMTP Exitosa!</h2>
         </div>
         <div style="background-color: #ffffff; padding: 24px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-          <p style="font-size: 15px; color: #1f2937;">Tu servidor SMTP ha sido verificado correctamente.</p>
+          <p style="font-size: 15px; color: ${BRAND_COLORS.textColor};">Tu servidor SMTP ha sido verificado correctamente.</p>
           <p style="font-size: 14px; color: #4b5563; line-height: 1.6;">
             Los correos automáticos de bienvenida con credenciales para nuevos residentes y guardias están listos para ser enviados.
           </p>
           <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
           <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-            Suburban Life Administration System
+            ${DEFAULT_APP_NAME} Administration System
           </p>
         </div>
       </div>
@@ -1003,11 +1430,11 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
         .replace(/\n/g, '<br/>');
 
       htmlBody = `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f8f9fa; border-radius: 12px;">
+        <div style="font-family: ${BRAND_COLORS.fontFamily}; max-width: 600px; margin: 0 auto; padding: 24px; background-color: ${BRAND_COLORS.background}; border-radius: 12px;">
           <div style="background-color: #25d366; padding: 16px 20px; border-radius: 8px 8px 0 0; text-align: center;">
             <h2 style="color: #ffffff; margin: 0; font-size: 20px;">¡Conexión SMTP Exitosa & Vista Previa!</h2>
           </div>
-          <div style="background-color: #ffffff; padding: 24px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #1f2937; line-height: 1.6; font-size: 14px;">
+          <div style="background-color: #ffffff; padding: 24px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: ${BRAND_COLORS.textColor}; line-height: 1.6; font-size: 14px;">
             <p style="font-size: 13px; color: #059669; font-weight: bold; margin-top: 0;">
               ✓ Tu mensaje personalizado se visualiza así con datos de muestra:
             </p>
@@ -1016,7 +1443,7 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
             </div>
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
             <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-              Suburban Life Administration System
+              ${DEFAULT_APP_NAME} Administration System
             </p>
           </div>
         </div>
@@ -1042,7 +1469,7 @@ exports.adminTestSmtpConnection = onCall({ enforceAppCheck: true }, async (reque
   }
 });
 
-exports.adminDeleteUser = onCall({ enforceAppCheck: true }, async (request) => {
+exports.adminDeleteUser = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
@@ -1053,15 +1480,61 @@ exports.adminDeleteUser = onCall({ enforceAppCheck: true }, async (request) => {
   }
 
   try {
-    await admin.auth().deleteUser(uid);
-    await admin.firestore().collection('users').doc(uid).delete();
+    const db = admin.firestore();
+    const userDoc = await db.collection('users').doc(uid).get();
+
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      const batch = db.batch();
+
+      // 1. If primary resident with linked address, unbind address and reset status
+      if (userData.addressRef) {
+        batch.update(userData.addressRef, {
+          residentUid: null,
+          paymentStatus: 'restricted'
+        });
+      }
+
+      // 2. If they have registered roommates / family members, clear their addressRef and claims
+      const familyMembers = userData.familyMembers || [];
+      for (const roommateUid of familyMembers) {
+        const roommateRef = db.collection('users').doc(roommateUid);
+        batch.update(roommateRef, {
+          addressRef: null
+        });
+        await admin.auth().setCustomUserClaims(roommateUid, {});
+      }
+
+      // 3. If this user is a roommate in another resident's familyMembers list, remove them
+      const residentQuery = await db.collection('users')
+        .where('familyMembers', 'array-contains', uid)
+        .get();
+      for (const resDoc of residentQuery.docs) {
+        batch.update(resDoc.ref, {
+          familyMembers: FieldValue.arrayRemove(uid)
+        });
+      }
+
+      // 4. Delete Firestore user document
+      batch.delete(userDoc.ref);
+      await batch.commit();
+    }
+
+    try {
+      await admin.auth().deleteUser(uid);
+    } catch (authError) {
+      if (authError.code !== 'auth/user-not-found') {
+        throw authError;
+      }
+    }
+
     return { success: true };
   } catch (error) {
     throw new HttpsError('internal', error.message);
   }
 });
 
-exports.unbindAddress = onCall({ enforceAppCheck: true }, async (request) => {
+exports.unbindAddress = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
@@ -1110,12 +1583,13 @@ exports.unbindAddress = onCall({ enforceAppCheck: true }, async (request) => {
     // Clear resident custom claims
     await admin.auth().setCustomUserClaims(targetUid, {});
 
-    // 3. Clear addressRef on roommates (familyMembers)
+    // 3. Clear addressRef on roommates in familyMembers
     const familyMembers = userData.familyMembers || [];
     for (const roommateUid of familyMembers) {
       const roommateRef = db.collection('users').doc(roommateUid);
       batch.update(roommateRef, {
-        addressRef: null
+        addressRef: null,
+        role: FieldValue.delete()
       });
       await admin.auth().setCustomUserClaims(roommateUid, {});
     }
@@ -1127,7 +1601,7 @@ exports.unbindAddress = onCall({ enforceAppCheck: true }, async (request) => {
   }
 });
 
-exports.deleteOwnAccount = onCall({ enforceAppCheck: true }, async (request) => {
+exports.deleteOwnAccount = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
@@ -1150,7 +1624,7 @@ exports.deleteOwnAccount = onCall({ enforceAppCheck: true }, async (request) => 
   }
 });
 
-exports.removeRoommate = onCall({ enforceAppCheck: true }, async (request) => {
+exports.removeRoommate = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
@@ -1175,24 +1649,31 @@ exports.removeRoommate = onCall({ enforceAppCheck: true }, async (request) => {
       .where('familyMembers', 'array-contains', roommateUid)
       .get();
 
-    if (residentQuery.empty) {
-      throw new HttpsError('failed-precondition', 'Roommate is not associated with any family group.');
+    let residentDoc = null;
+    let residentUid = null;
+
+    if (!residentQuery.empty) {
+      residentDoc = residentQuery.docs[0];
+      residentUid = residentDoc.id;
     }
 
-    const residentDoc = residentQuery.docs[0];
-    const residentUid = residentDoc.id;
+    if (!residentUid && !isAdmin) {
+      throw new HttpsError('failed-precondition', 'Roommate is not associated with any family group you manage.');
+    }
 
     // Enforce authorization: must be admin OR the primary resident of that family group
-    if (callerUid !== residentUid && !isAdmin) {
+    if (residentUid && callerUid !== residentUid && !isAdmin) {
       throw new HttpsError('permission-denied', 'You do not have permission to remove this roommate.');
     }
 
     const batch = db.batch();
 
-    // 1. Remove roommateUid from resident's familyMembers list
-    batch.update(residentDoc.ref, {
-      familyMembers: FieldValue.arrayRemove(roommateUid)
-    });
+    // 1. Remove roommateUid from resident's familyMembers list (if resident document found)
+    if (residentDoc && residentDoc.data().familyMembers) {
+      batch.update(residentDoc.ref, {
+        familyMembers: FieldValue.arrayRemove(roommateUid)
+      });
+    }
 
     // 2. Clear addressRef and role on roommate's user document
     batch.update(roommateDoc.ref, {
@@ -1212,7 +1693,7 @@ exports.removeRoommate = onCall({ enforceAppCheck: true }, async (request) => {
   }
 });
 
-exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (request) => {
+exports.adminBulkImportResidents = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
@@ -1226,6 +1707,18 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
   let successCount = 0;
   let failureCount = 0;
   const smtpConfig = await getSmtpConfig();
+  const db = admin.firestore();
+
+  // Pre-fetch all addresses once for fast, zero-query in-memory lookups
+  const allAddressesSnap = await db.collection('addresses').get();
+  const addressMap = new Map();
+  for (const doc of allAddressesSnap.docs) {
+    const d = doc.data();
+    if (d.streetName && d.number !== undefined && d.number !== null) {
+      const key = `${d.streetName.toString().trim().toLowerCase()}::${d.number.toString().trim()}`;
+      addressMap.set(key, doc);
+    }
+  }
 
   for (const userRow of users) {
     const name = (userRow.name || userRow.fullName || '').toString().trim();
@@ -1246,51 +1739,24 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
       continue;
     }
 
-    // Determine password: if not specified or < 8 chars, generate a cryptographically secure random password
+    // Determine password: if not specified or does not satisfy complexity policy, generate a cryptographically secure random password
     let password = rawPassword;
     let isAutoGenerated = false;
-    if (!password || password.length < 8) {
+    if (!isPasswordCompliant(password)) {
       password = generateSecurePassword(12);
       isAutoGenerated = true;
     }
 
     try {
-      const db = admin.firestore();
       let addressRef = null;
       let addressMatched = false;
 
       // 1. Verify address existence if streetName and number are provided (do NOT create new addresses!)
       if (streetName && numberStr) {
-        const numVal = isNaN(Number(numberStr)) ? numberStr : Number(numberStr);
+        const lookupKey = `${streetName.toLowerCase()}::${numberStr}`;
+        const matchedDoc = addressMap.get(lookupKey);
 
-        let addressQuery = await db.collection('addresses')
-          .where('streetName', '==', streetName)
-          .where('number', '==', numVal)
-          .get();
-
-        if (addressQuery.empty && typeof numVal === 'number') {
-          addressQuery = await db.collection('addresses')
-            .where('streetName', '==', streetName)
-            .where('number', '==', numberStr)
-            .get();
-        }
-
-        // Case-insensitive & trimmed fallback lookup if direct query yields no results
-        if (addressQuery.empty) {
-          const allAddressesSnap = await db.collection('addresses').get();
-          const matchedDoc = allAddressesSnap.docs.find(doc => {
-            const d = doc.data();
-            const sName = (d.streetName || '').toString().trim().toLowerCase();
-            const sNum = (d.number !== undefined && d.number !== null) ? d.number.toString().trim() : '';
-            return sName === streetName.toLowerCase() && sNum === numberStr;
-          });
-
-          if (matchedDoc) {
-            addressQuery = { empty: false, docs: [matchedDoc] };
-          }
-        }
-
-        if (addressQuery.empty) {
+        if (!matchedDoc) {
           // Reject row: Address does not exist in DB records
           results.push({
             name,
@@ -1307,7 +1773,7 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
           continue;
         }
 
-        const existingDoc = addressQuery.docs[0];
+        const existingDoc = matchedDoc;
         addressRef = existingDoc.ref;
         addressMatched = true;
       }
@@ -1352,7 +1818,7 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
           name,
           password,
           addressLinked: addressMatched ? `${streetName} #${numberStr}` : null,
-          appName: 'Suburban Life',
+          appName: DEFAULT_APP_NAME,
           role: 'residente',
         });
       }
@@ -1400,7 +1866,7 @@ exports.adminBulkImportResidents = onCall({ enforceAppCheck: true }, async (requ
   };
 });
 
-exports.adminBulkImportAddresses = onCall({ enforceAppCheck: true }, async (request) => {
+exports.adminBulkImportAddresses = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
   }
@@ -1527,7 +1993,7 @@ exports.adminBulkImportAddresses = onCall({ enforceAppCheck: true }, async (requ
  * - Single-use pass invalidation upon entry
  * - Direct immutable audit entry into access_logs
  */
-exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (request) => {
+exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) => {
   if (!request.auth || (!request.auth.token.guard && !request.auth.token.admin)) {
     throw new HttpsError('permission-denied', 'Function must be called by an authenticated guard or admin.');
   }
@@ -1592,8 +2058,13 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
             streetName = addrData.streetName || '';
             houseNumber = addrData.number != null ? addrData.number.toString() : '';
             addressDisplay = `${streetName} #${houseNumber}`.trim();
-            if (addrData.paymentStatus && addrData.paymentStatus !== 'paid') {
-              isPaymentRestricted = true;
+            if (addrData.paymentStatus) {
+              const isWithinGrace = addrData.isWithinGracePeriod === true;
+              const isConsideredPaid = addrData.paymentStatus === 'paid' ||
+                ((addrData.paymentStatus === 'pending' || addrData.paymentStatus === 'reviewing') && isWithinGrace);
+              if (!isConsideredPaid) {
+                isPaymentRestricted = true;
+              }
             }
           }
         }
@@ -1832,8 +2303,18 @@ exports.validateAndRegisterQrAccess = onCall({ enforceAppCheck: true }, async (r
   });
 });
 
-// Export internal helper functions for unit testing
+// Export internal helper functions and configurations for unit testing
 exports._test = {
   generateSecurePassword,
+  isPasswordCompliant,
   replacePlaceholders,
+  getDateInTimezone,
+  getNowInTimezone,
+  validateDeliveryDate,
+  validateFacilityBooking,
+  recalculateAddressPaymentStatus,
+  isEmulator,
+  callableOptions,
+  BRAND_COLORS,
+  buildWelcomeEmailHtml,
 };

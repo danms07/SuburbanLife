@@ -54,6 +54,14 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                     final status = b['status'] ?? 'pending';
                     final facilityId = b['facilityId'] ?? 'unknown';
 
+                    final rawReason = (b['rejectionReason'] ?? b['notes'])?.toString().trim();
+                    final hasRejectionReason = status == 'rejected' && rawReason != null && rawReason.isNotEmpty;
+
+                    final approvalMessage = b['approvalMessage']?.toString().trim();
+                    final hasApprovalMessage = (status.toString().startsWith('approved') || status == 'confirmed') &&
+                        approvalMessage != null &&
+                        approvalMessage.isNotEmpty;
+
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       elevation: 2,
@@ -69,16 +77,105 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                             Text('${DateFormat('MMM dd, yyyy').format(start)} from ${DateFormat('hh:mm a').format(start)} to ${DateFormat('hh:mm a').format(end)}'),
                             const SizedBox(height: 4),
                             _buildStatusChip(l10n, status),
+                            if (hasApprovalMessage) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.info_outline, size: 14, color: AppConfig.secondaryColor),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          l10n.approvalInstructionsCardTitle,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppConfig.secondaryColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      approvalMessage,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.green.shade900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (hasRejectionReason) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.info_outline, size: 14, color: Colors.redAccent),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          l10n.rejectionReasonLabel,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      rawReason,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.red.shade900,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        trailing: status == 'rejected'
-                            ? IconButton(
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (status == 'rejected')
+                              IconButton(
                                 icon: const Icon(Icons.edit, color: AppConfig.primaryColor),
+                                tooltip: l10n.editRejectedBookingTitle,
                                 onPressed: () {
                                   _showEditDialog(b);
                                 },
-                              )
-                            : null,
+                              ),
+                            if (status == 'rejected' || status == 'pending review' || status == 'approved (upcoming)')
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                tooltip: l10n.deleteBooking,
+                                onPressed: () => _confirmCancelBooking(b['id']),
+                              ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -176,7 +273,48 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
             title: Text(l10n.editRejectedBookingTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if ((booking['rejectionReason'] != null && booking['rejectionReason'].toString().trim().isNotEmpty) ||
+                    (booking['notes'] != null && booking['notes'].toString().trim().isNotEmpty)) ...[
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 14, color: Colors.redAccent),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.rejectionReasonLabel,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.redAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          (booking['rejectionReason'] ?? booking['notes']).toString().trim(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 ListTile(
                   title: Text('${l10n.date}: ${DateFormat('yyyy-MM-dd').format(selectedDate)}'),
                   trailing: const Icon(Icons.calendar_today),
@@ -266,7 +404,9 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                         SnackBar(content: Text(l10n.bookingResubmittedSuccess)),
                       );
                     }
-                  } catch (e) {
+                  } catch (e, stack) {
+                    debugPrint('Error resubmitting booking: $e');
+                    Backend.crashlytics.recordError(e, stack, reason: 'ManageBookingsScreen.resubmitBooking');
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
@@ -281,5 +421,55 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
         },
       ),
     );
+  }
+
+  void _confirmCancelBooking(String bookingId) async {
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(l10n.deleteBooking),
+        content: Text(l10n.deleteBookingConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: Text(l10n.deleteBooking),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _bookingService.cancelBooking(bookingId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.bookingDeletedSuccess),
+            backgroundColor: AppConfig.secondaryColor,
+          ),
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('Error cancelling booking: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'ManageBookingsScreen._confirmCancelBooking');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 }

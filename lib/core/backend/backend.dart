@@ -111,9 +111,29 @@ abstract class AuthService {
   Future<AppUser?> signUp(String email, String password, {String? name});
   Future<bool> sendPasswordReset(String email);
   Future<void> signOut();
+  Future<void> reloadUserToken({bool forceRefresh = true});
   Future<bool> isAdmin();
   Future<bool> isGuard();
   Future<bool> isResident();
+}
+
+/// Centralized validator enforcing the Firebase Auth Password Policy:
+/// - Minimum 8 characters, maximum 4096 characters
+/// - At least 1 uppercase letter (A-Z)
+/// - At least 1 lowercase letter (a-z)
+/// - At least 1 numeric digit (0-9)
+/// - At least 1 special character / symbol (non-alphanumeric)
+class PasswordValidator {
+  static bool isValid(String? password) {
+    if (password == null) return false;
+    final trimmed = password.trim();
+    if (trimmed.length < 8 || trimmed.length > 4096) return false;
+    if (!trimmed.contains(RegExp(r'[A-Z]'))) return false;
+    if (!trimmed.contains(RegExp(r'[a-z]'))) return false;
+    if (!trimmed.contains(RegExp(r'[0-9]'))) return false;
+    if (!trimmed.contains(RegExp(r'[^A-Za-z0-9]'))) return false;
+    return true;
+  }
 }
 
 abstract class DatabaseService {
@@ -121,8 +141,8 @@ abstract class DatabaseService {
 
   Future<Map<String, dynamic>?> getDocument(String collection, String docId);
   Stream<Map<String, dynamic>?> streamDocument(String collection, String docId);
-  Stream<List<Map<String, dynamic>>> streamCollection(String collection, {List<QueryFilter>? filters, List<QuerySort>? sorts});
-  Future<List<Map<String, dynamic>>> getCollection(String collection, {List<QueryFilter>? filters, List<QuerySort>? sorts});
+  Stream<List<Map<String, dynamic>>> streamCollection(String collection, {List<QueryFilter>? filters, List<QuerySort>? sorts, int? limit});
+  Future<List<Map<String, dynamic>>> getCollection(String collection, {List<QueryFilter>? filters, List<QuerySort>? sorts, int? limit, dynamic startAfter});
   Future<void> setDocument(String collection, String docId, Map<String, dynamic> data);
   Future<String> addDocument(String collection, Map<String, dynamic> data);
   Future<void> updateDocument(String collection, String docId, Map<String, dynamic> data);

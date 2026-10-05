@@ -10,6 +10,7 @@
 .history
 .svn/
 .swiftpm/
+.kotlin/
 migrate_working_dir/
 
 # IntelliJ related
@@ -65,4 +66,10 @@ snippets/
 .agents/
 skills-lock.json
 
+# Error reports
+StackTrace.txt
+
+#Ideas and new feature planning notes
+/docs/plans/refactor_tasks.md
+/docs/plans/ticket-*
 

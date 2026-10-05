@@ -18,29 +18,79 @@ class _BookingScreenState extends State<BookingScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _startTime = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 12, minute: 0);
+  bool _isSubmitting = false;
 
-  void _submitBooking() async {
+  void _submitBooking(Map<String, dynamic> activeFac) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+
+    // 1. Operating Hours validation
+    final openTimeStr = (activeFac['openingTime'] ?? '00:00').toString();
+    final closeTimeStr = (activeFac['closingTime'] ?? '23:59').toString();
+    if (openTimeStr != '00:00' || closeTimeStr != '23:59') {
+      final openParts = openTimeStr.split(':').map(int.parse).toList();
+      final closeParts = closeTimeStr.split(':').map(int.parse).toList();
+      final openM = openParts[0] * 60 + openParts[1];
+      final closeM = closeParts[0] * 60 + closeParts[1];
+      final startM = _startTime.hour * 60 + _startTime.minute;
+      final endM = _endTime.hour * 60 + _endTime.minute;
+
+      if (startM < openM || endM > closeM || endM <= startM) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.timeOutsideOperatingHours('$openTimeStr - $closeTimeStr')),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+    }
+
+    final startDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _startTime.hour,
+      _startTime.minute,
+    );
+    final endDateTime = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      _endTime.hour,
+      _endTime.minute,
+    );
+
+    // 2. Anticipation Window validation
+    final anticipationUnit = (activeFac['anticipationUnit'] ?? 'unrestricted').toString();
+    final anticipationValue = (activeFac['anticipationValue'] as num?)?.toInt() ?? 0;
+    if (anticipationUnit != 'unrestricted' && anticipationValue > 0) {
+      Duration anticipationDur = Duration.zero;
+      if (anticipationUnit == 'hours') anticipationDur = Duration(hours: anticipationValue);
+      if (anticipationUnit == 'days') anticipationDur = Duration(days: anticipationValue);
+      if (anticipationUnit == 'weeks') anticipationDur = Duration(days: anticipationValue * 7);
+
+      final minAllowed = DateTime.now().add(anticipationDur);
+      if (startDateTime.isBefore(minAllowed)) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(l10n.advanceNoticeRequired(anticipationValue, anticipationUnit)),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
     try {
-      final startDateTime = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _startTime.hour,
-        _startTime.minute,
-      );
-      final endDateTime = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _endTime.hour,
-        _endTime.minute,
-      );
-
       await _bookingService.createBooking(_selectedFacility, startDateTime, endDateTime);
 
       if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(l10n.bookingCreatedSuccess),
             backgroundColor: AppConfig.secondaryColor,
@@ -49,13 +99,18 @@ class _BookingScreenState extends State<BookingScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(l10n.errorPrefix(e.toString())),
             backgroundColor: Colors.redAccent,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -98,7 +153,10 @@ class _BookingScreenState extends State<BookingScreen> {
                     final addressData = addressSnapshot.data;
                     final rawStatus = addressData?['paymentStatus'] as String?;
                     final paymentStatus = (rawStatus == null || rawStatus.trim().isEmpty) ? 'restricted' : rawStatus;
-                    final isRestricted = paymentStatus == 'restricted';
+                    final isWithinGrace = addressData?['isWithinGracePeriod'] as bool? ?? false;
+                    final isConsideredPaid = paymentStatus == 'paid' ||
+                        ((paymentStatus == 'pending' || paymentStatus == 'reviewing') && isWithinGrace);
+                    final isRestricted = !isConsideredPaid;
 
                     if (isRestricted) {
                       return Center(
@@ -141,12 +199,12 @@ class _BookingScreenState extends State<BookingScreen> {
 
                     // User specified rule: If empty, show an empty list / clear notification
                     if (facDocs.isEmpty) {
-                      return Center(
+                      return const Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(20.0),
+                          padding: EdgeInsets.all(20.0),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
+                            children: [
                               Icon(Icons.event_busy, size: 60, color: Colors.grey),
                               SizedBox(height: 16),
                               Text(
@@ -171,13 +229,35 @@ class _BookingScreenState extends State<BookingScreen> {
                     }
 
                     final activeFacId = facDocs.any((d) => d['id'] == _selectedFacility) ? _selectedFacility : facDocs.first['id'] as String;
+                    final activeFac = facDocs.firstWhere(
+                      (d) => d['id'] == activeFacId,
+                      orElse: () => facDocs.first,
+                    );
+
+                    final openTimeStr = (activeFac['openingTime'] ?? '00:00').toString();
+                    final closeTimeStr = (activeFac['closingTime'] ?? '23:59').toString();
+                    final isHoursRestricted = openTimeStr != '00:00' || closeTimeStr != '23:59';
+                    final anticipationUnit = (activeFac['anticipationUnit'] ?? 'unrestricted').toString();
+                    final anticipationValue = (activeFac['anticipationValue'] as num?)?.toInt() ?? 0;
+
+                    DateTime minDate = DateTime.now();
+                    if (anticipationUnit == 'hours') {
+                      minDate = minDate.add(Duration(hours: anticipationValue));
+                    } else if (anticipationUnit == 'days') {
+                      minDate = minDate.add(Duration(days: anticipationValue));
+                    } else if (anticipationUnit == 'weeks') {
+                      minDate = minDate.add(Duration(days: anticipationValue * 7));
+                    }
+
+                    if (_selectedDate.isBefore(minDate)) {
+                      _selectedDate = minDate;
+                    }
 
                     return SingleChildScrollView(
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 0),
                           DropdownButtonFormField<String>(
                             initialValue: activeFacId,
                             decoration: InputDecoration(
@@ -199,7 +279,38 @@ class _BookingScreenState extends State<BookingScreen> {
                               }
                             },
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 12),
+
+                          // Badges for Operating Hours and Advance Notice
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              Chip(
+                                avatar: const Icon(Icons.access_time, size: 16, color: AppConfig.primaryColor),
+                                label: Text(
+                                  isHoursRestricted
+                                      ? l10n.operatingHours('$openTimeStr - $closeTimeStr')
+                                      : l10n.operatingHoursUnrestricted,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                backgroundColor: isHoursRestricted
+                                    ? AppConfig.primaryColor.withValues(alpha: 0.1)
+                                    : Colors.grey.withValues(alpha: 0.1),
+                              ),
+                              if (anticipationUnit != 'unrestricted' && anticipationValue > 0)
+                                Chip(
+                                  avatar: const Icon(Icons.calendar_month, size: 16, color: Colors.orange),
+                                  label: Text(
+                                    l10n.advanceNoticeRequired(anticipationValue, anticipationUnit),
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  backgroundColor: Colors.orange.withValues(alpha: 0.1),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
                           ListTile(
                             title: Text('${l10n.date}: ${DateFormat('yyyy-MM-dd').format(_selectedDate)}'),
                             trailing: const Icon(Icons.calendar_today, color: AppConfig.primaryColor),
@@ -210,9 +321,9 @@ class _BookingScreenState extends State<BookingScreen> {
                             onTap: () async {
                               final picked = await showDatePicker(
                                 context: context,
-                                initialDate: _selectedDate,
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now().add(const Duration(days: 30)),
+                                initialDate: _selectedDate.isBefore(minDate) ? minDate : _selectedDate,
+                                firstDate: minDate,
+                                lastDate: DateTime.now().add(const Duration(days: 90)),
                               );
                               if (picked != null) {
                                 setState(() {
@@ -280,16 +391,22 @@ class _BookingScreenState extends State<BookingScreen> {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
-                              onPressed: _submitBooking,
-                              child: Text(
-                                l10n.confirmBooking,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  fontFamily: AppConfig.fontFamily,
-                                ),
-                              ),
+                              onPressed: _isSubmitting ? null : () => _submitBooking(activeFac),
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                    )
+                                  : Text(
+                                      l10n.confirmBooking,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontFamily: AppConfig.fontFamily,
+                                      ),
+                                    ),
                             ),
                           ),
                           const SizedBox(height: 40),
@@ -304,7 +421,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                           const SizedBox(height: 10),
                           StreamBuilder<List<Map<String, dynamic>>>(
-                            stream: _bookingService.getBookings(activeFacId),
+                            stream: _bookingService.getConfirmedBookings(activeFacId),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState == ConnectionState.waiting) {
                                 return const Center(child: CircularProgressIndicator());
@@ -318,24 +435,36 @@ class _BookingScreenState extends State<BookingScreen> {
                                 itemCount: snapshot.data!.length,
                                 itemBuilder: (context, index) {
                                   final b = snapshot.data![index];
-                                  final start = DateTime.fromMillisecondsSinceEpoch(b['startTime']);
-                                  final end = DateTime.fromMillisecondsSinceEpoch(b['endTime']);
+                                  final rawStart = b['startTime'];
+                                  final rawEnd = b['endTime'];
+                                  final start = rawStart is DateTime
+                                      ? rawStart
+                                      : (rawStart is int ? DateTime.fromMillisecondsSinceEpoch(rawStart) : DateTime.now());
+                                  final end = rawEnd is DateTime
+                                      ? rawEnd
+                                      : (rawEnd is int ? DateTime.fromMillisecondsSinceEpoch(rawEnd) : DateTime.now());
+
+                                  final isOwnBooking = b['userUid'] == user.uid;
+
                                   return Card(
                                     margin: const EdgeInsets.symmetric(vertical: 8),
                                     child: ListTile(
+                                      leading: const Icon(Icons.event_available, color: AppConfig.primaryColor),
                                       title: Text('${DateFormat('MMM dd, yyyy').format(start)} from ${DateFormat('hh:mm a').format(start)} to ${DateFormat('hh:mm a').format(end)}'),
                                       subtitle: Text(l10n.bookingStatusLabel(b['status']?.toString() ?? '')),
-                                      trailing: IconButton(
-                                        icon: const Icon(Icons.cancel, color: Colors.redAccent),
-                                        onPressed: () async {
-                                          await _bookingService.cancelBooking(b['id']);
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(content: Text(l10n.bookingCancelledSuccess)),
-                                            );
-                                          }
-                                        },
-                                      ),
+                                      trailing: isOwnBooking
+                                          ? IconButton(
+                                              icon: const Icon(Icons.cancel, color: Colors.redAccent),
+                                              onPressed: () async {
+                                                await _bookingService.cancelBooking(b['id']);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text(l10n.bookingCancelledSuccess)),
+                                                  );
+                                                }
+                                              },
+                                            )
+                                          : null,
                                     ),
                                   );
                                 },

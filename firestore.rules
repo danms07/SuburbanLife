@@ -21,14 +21,49 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Check if resident is linked to a valid address with paid status
+    function userHasPaidAddress(userId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(userId));
+      return userDoc != null && 
+             userDoc.data.addressRef != null && 
+             (get(userDoc.data.addressRef).data.paymentStatus == 'paid' ||
+              ((get(userDoc.data.addressRef).data.paymentStatus in ['pending', 'reviewing']) &&
+               get(userDoc.data.addressRef).data.isWithinGracePeriod == true));
+    }
+
+    // Check if caller is linked to the given address
+    function isCallerAddressResident(addressId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return userDoc != null && 
+             userDoc.data.addressRef != null && 
+             userDoc.data.addressRef == /databases/$(database)/documents/addresses/$(addressId);
+    }
+
+    // Check if target user is in caller's family group (via familyMembers list or target's familyMembers list)
+    function isFamilyMember(userId) {
+      let callerDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return (callerDoc != null && 
+              'familyMembers' in callerDoc.data && 
+              callerDoc.data.familyMembers is list &&
+              userId in callerDoc.data.familyMembers) ||
+             (resource.data != null && 
+              'familyMembers' in resource.data && 
+              resource.data.familyMembers is list && 
+              request.auth.uid in resource.data.familyMembers);
+    }
+
     match /users/{userId} {
-      allow read: if isAdmin() || isOwner(userId) || isGuard();
+      allow read: if isAdmin() || isOwner(userId) || isGuard() || (isAuthenticated() && isFamilyMember(userId));
       allow create: if isAdmin() || (
         isAuthenticated() && 
         request.auth.uid == userId && 
         request.resource.data.role == 'resident' && 
         request.resource.data.addressRef == null && 
-        request.resource.data.familyMembers.size() == 0
+        (!('familyMembers' in request.resource.data) || request.resource.data.familyMembers.size() == 0) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() <= 120 &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 120
       );
       allow update: if isAdmin() || (
         isOwner(userId) && 
@@ -39,7 +74,13 @@ service cloud.firestore {
 
     match /addresses/{addressId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() && 
+        (resource.data.residentUid == request.auth.uid || isCallerAddressResident(addressId)) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paymentStatus', 'isWithinGracePeriod']) &&
+        request.resource.data.paymentStatus in ['pending', 'reviewing']
+      );
+      allow create, delete: if isAdmin();
     }
 
     match /qr_codes/{qrId} {
@@ -47,20 +88,36 @@ service cloud.firestore {
       allow create: if isAdmin() || (
         isAuthenticated() && 
         request.resource.data.creatorUid == request.auth.uid &&
-        request.resource.data.status == 'valid' &&
-        get(get(/databases/$(database)/documents/users/$(request.auth.uid)).data.addressRef).data.paymentStatus == 'paid'
+        request.resource.data.status in ['active', 'valid'] &&
+        userHasPaidAddress(request.auth.uid)
       );
       allow update: if isAdmin() || (
         isAuthenticated() && 
         resource.data.creatorUid == request.auth.uid &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-        request.resource.data.status == 'revoked'
+        request.resource.data.status in ['revoked', 'deactivated (revoked)']
       );
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.creatorUid == request.auth.uid);
     }
 
     match /bookings/{bookingId} {
-      allow read: if isAuthenticated();
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.userUid == request.auth.uid ||
+          resource.data.isConfirmed == true ||
+          resource.data.status in ['approved (upcoming)', 'approved (in use)', 'closed', 'confirmed']
+        )
+      );
+      allow write: if isAdmin();
+    }
+
+    match /sanctions/{sanctionId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.residentUid == request.auth.uid ||
+          (resource.data.authorizedUids is list && request.auth.uid in resource.data.authorizedUids)
+        )
+      );
       allow write: if isAdmin();
     }
 
@@ -69,7 +126,8 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
         isAuthenticated() && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']) &&
+        request.resource.data.readBy.hasAll(resource.data.readBy)
       );
     }
 
@@ -90,9 +148,15 @@ service cloud.firestore {
 
     match /ownership_claims/{claimId} {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid && request.resource.data.status == 'pending review';
+      allow create: if isAuthenticated() && 
+        request.resource.data.userUid == request.auth.uid && 
+        request.resource.data.status in ['pending', 'pending review'];
       allow update: if isAdmin();
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid && resource.data.status == 'pending review');
+      allow delete: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.userUid == request.auth.uid && 
+        resource.data.status in ['pending', 'pending review']
+      );
     }
 
     match /access_logs/{logId} {
@@ -101,10 +165,16 @@ service cloud.firestore {
     }
 
     match /payments/{paymentId} {
-      allow read: if isAdmin() || (isAuthenticated() && (resource.data.residentUid == request.auth.uid || resource.data.uploaderUid == request.auth.uid));
+      allow read: if isAdmin() || (isAuthenticated() && (
+        resource.data.residentUid == request.auth.uid || 
+        resource.data.uploaderUid == request.auth.uid ||
+        (resource.data.addressRef != null && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.addressRef == resource.data.addressRef)
+      ));
       allow create: if isAuthenticated() && 
         (request.resource.data.residentUid == request.auth.uid || request.resource.data.uploaderUid == request.auth.uid) &&
-        request.resource.data.status == 'pending review';
+        request.resource.data.status in ['pending', 'pending review'] &&
+        (!('concept' in request.resource.data) || request.resource.data.concept in ['monthly quota', 'sanction']);
       allow update, delete: if isAdmin();
     }
 

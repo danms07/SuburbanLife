@@ -67,7 +67,7 @@ if (!supportedRoles.includes(role)) {
 if (isEmulator) {
   process.env.FIREBASE_AUTH_EMULATOR_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || '127.0.0.1:9099';
   process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
-  const projectId = process.env.GCLOUD_PROJECT || 'privadacatania-3a7b8';
+  const projectId = process.env.GCLOUD_PROJECT || 'suburban-life-a67ab';
   
   console.log(`[EMULATOR MODE] Connecting to Auth: ${process.env.FIREBASE_AUTH_EMULATOR_HOST}, Firestore: ${process.env.FIRESTORE_EMULATOR_HOST}`);
   

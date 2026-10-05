@@ -16,6 +16,8 @@ import 'package:suburban_life/features/booking/booking_screen.dart';
 import 'package:suburban_life/features/booking/manage_bookings_screen.dart';
 import 'package:suburban_life/features/transparency/transparency_screen.dart';
 import 'package:suburban_life/features/payments/payment_screen.dart';
+import 'package:suburban_life/features/sanctions/sanctions_screen.dart';
+import 'package:suburban_life/features/sanctions/admin_sanctions_screen.dart';
 import 'package:suburban_life/features/announcements/announcements_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_generator_screen.dart';
 import 'package:suburban_life/features/qr_access/manage_qr_screen.dart';
@@ -54,7 +56,7 @@ void main() async {
       await FirebaseAppCheck.instance.activate(
         providerAndroid: kDebugMode
             ? const AndroidDebugProvider()
-            : const AndroidPlayIntegrityProvider(),
+            : AndroidPlayIntegrityProvider(),
         providerApple: kDebugMode
             ? const AppleDebugProvider()
             : const AppleAppAttestProvider(),
@@ -88,7 +90,7 @@ void main() async {
   // Intercept Flutter framework errors (widget build, layout, RenderFlex)
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    crashlyticsService.recordFlutterError(details, fatal: true);
+    crashlyticsService.recordFlutterError(details, fatal: false);
   };
 
   // Intercept unhandled asynchronous errors (Futures, timers, microtasks)
@@ -200,17 +202,30 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _checkRoles() async {
-    final isGuard = await _authService.isGuard();
-    final isAdmin = await _authService.isAdmin();
-    final isResident = await _authService.isResident();
+    try {
+      await _authService.reloadUserToken(forceRefresh: true);
+      final isGuard = await _authService.isGuard();
+      final isAdmin = await _authService.isAdmin();
+      final isResident = await _authService.isResident();
 
-    setState(() {
-      _isGuard = isGuard;
-      _isAdmin = isAdmin;
-      _isResident = isResident;
-      _showAdminView = isAdmin && !isResident && !isGuard;
-      _isLoadingRoles = false;
-    });
+      if (!mounted) return;
+
+      setState(() {
+        _isGuard = isGuard;
+        _isAdmin = isAdmin;
+        _isResident = isResident;
+        _showAdminView = isAdmin && !isResident && !isGuard;
+        _isLoadingRoles = false;
+      });
+    } catch (e, stack) {
+      debugPrint('Error checking roles: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'MyHomePageState._checkRoles');
+      if (mounted) {
+        setState(() {
+          _isLoadingRoles = false;
+        });
+      }
+    }
   }
 
   Future<Map<String, String>> _getUserData(
@@ -250,7 +265,10 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: _showAdminView
           ? AppBar(
               backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-              title: Text(currentTitle),
+              title: Text(
+                currentTitle,
+                style: const TextStyle(fontFamily: AppConfig.brandingFontFamily),
+              ),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.waving_hand),
@@ -401,9 +419,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     OutlinedButton.icon(
                       onPressed: () async {
                         await Backend.db.deleteDocument('ownership_claims', claimDoc['id']);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.reviewCancelledSuccess)),
-                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(l10n.reviewCancelledSuccess)),
+                          );
+                        }
                       },
                       icon: const Icon(Icons.cancel, color: Colors.redAccent),
                       label: Text(
@@ -874,12 +894,15 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  l10n.waitingToBeLinked,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[600],
+                Flexible(
+                  child: Text(
+                    l10n.waitingToBeLinked,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey[600],
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
@@ -901,10 +924,19 @@ class _MyHomePageState extends State<MyHomePage> {
     final messenger = ScaffoldMessenger.of(context);
 
     try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 60,
-      );
+      XFile? pickedFile;
+      try {
+        pickedFile = await _picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 60,
+        );
+      } catch (cameraError) {
+        debugPrint('Camera capture fallback to gallery on web/desktop: $cameraError');
+        pickedFile = await _picker.pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 60,
+        );
+      }
 
       if (pickedFile == null) {
         setState(() {
@@ -955,7 +987,9 @@ class _MyHomePageState extends State<MyHomePage> {
         _claimAddress = null;
         _isClaimSubmitting = false;
       });
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error submitting claim photo: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'MyHomePage._takeClaimPhoto');
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );
@@ -1171,6 +1205,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         builder: (context) {
                           final rawStatus = addrData['paymentStatus'] as String?;
                           final paymentStatus = (rawStatus == null || rawStatus.trim().isEmpty) ? 'restricted' : rawStatus;
+                          final isWithinGrace = addrData['isWithinGracePeriod'] as bool? ?? false;
 
                           String statusText = l10n.allInOrder; // Default
                           String subtitleText = l10n.noDebts; // Default
@@ -1178,16 +1213,18 @@ class _MyHomePageState extends State<MyHomePage> {
                           Color iconColor = Colors.white;
                           Color avatarBgColor = AppConfig.primaryColor;
 
-                          if (paymentStatus == 'pending') {
-                            statusText = l10n.paymentRequired;
-                            subtitleText = l10n.pleaseMakePayment;
-                            statusIcon = Icons.warning;
-                            avatarBgColor = Colors.orange;
-                          } else if (paymentStatus == 'reviewing') {
-                            statusText = l10n.paymentUnderReview;
-                            subtitleText = l10n.receiptUnderReview;
-                            statusIcon = Icons.hourglass_empty;
-                            avatarBgColor = Colors.blue;
+                          if (paymentStatus == 'pending' || paymentStatus == 'reviewing') {
+                            if (isWithinGrace) {
+                              statusText = l10n.paymentRequired;
+                              subtitleText = l10n.pleaseMakePayment;
+                              statusIcon = Icons.warning;
+                              avatarBgColor = Colors.orange;
+                            } else {
+                              statusText = l10n.accessRestricted;
+                              subtitleText = l10n.accountRestrictedMsg;
+                              statusIcon = Icons.block;
+                              avatarBgColor = Colors.redAccent;
+                            }
                           } else if (paymentStatus == 'restricted') {
                             statusText = l10n.accessRestricted;
                             subtitleText = l10n.accountRestrictedMsg;
@@ -1333,7 +1370,19 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                           ),
-                          if (_isResident)
+                          if (_isResident) ...[
+                            _buildGridItem(
+                              icon: Icons.gavel,
+                              label: l10n.sanctionsMenu,
+                              color: AppConfig.primaryColor,
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      SanctionsScreen(currentUid: user.uid),
+                                ),
+                              ),
+                            ),
                             _buildGridItem(
                               icon: Icons.people,
                               label: l10n.familyGroupGrid,
@@ -1345,6 +1394,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 ),
                               ),
                             ),
+                          ],
                         ],
                       );
                     },
@@ -1559,6 +1609,19 @@ class _MyHomePageState extends State<MyHomePage> {
               context,
               MaterialPageRoute(
                 builder: (context) => const AdminFacilitiesScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _buildAdminMenuButton(
+            label: l10n.adminSanctionsTitle,
+            icon: Icons.gavel,
+            color: Colors.deepOrange,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminSanctionsScreen(),
               ),
             ),
           ),
@@ -1896,6 +1959,20 @@ class _MyHomePageState extends State<MyHomePage> {
                             },
                           ),
                           ListTile(
+                            leading: const Icon(Icons.gavel),
+                            title: Text(l10n.sanctionsMenu),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      SanctionsScreen(currentUid: user.uid),
+                                ),
+                              );
+                            },
+                          ),
+                          ListTile(
                             leading: const Icon(Icons.qr_code),
                             title: Text(l10n.manageQrCodes),
                             onTap: () {
@@ -1961,7 +2038,9 @@ class _MyHomePageState extends State<MyHomePage> {
                             if (context.mounted) {
                               _checkRoles();
                             }
-                          } catch (e) {
+                          } catch (e, stack) {
+                            debugPrint('Error unbinding address: $e');
+                            Backend.crashlytics.recordError(e, stack, reason: 'MyHomePage.unbindAddress');
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
@@ -2002,7 +2081,9 @@ class _MyHomePageState extends State<MyHomePage> {
                           try {
                             await Backend.functions.callFunction('deleteOwnAccount');
                             await Backend.auth.signOut();
-                          } catch (e) {
+                          } catch (e, stack) {
+                            debugPrint('Error deleting account: $e');
+                            Backend.crashlytics.recordError(e, stack, reason: 'MyHomePage.deleteOwnAccount');
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),

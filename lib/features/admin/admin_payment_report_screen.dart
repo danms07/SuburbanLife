@@ -212,7 +212,9 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
           SnackBar(content: Text('${l10n.reportSavedSuccess} Saved to: $filePath'), backgroundColor: AppConfig.secondaryColor),
         );
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('Error downloading payment report: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminPaymentReportScreen._downloadCsv');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
       );

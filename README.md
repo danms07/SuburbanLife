@@ -8,9 +8,13 @@ A white-label residential management platform built using **Flutter** and **Fire
 
 - **Secure Multi-Role Access Control**: Integrated with Firebase Auth and Cloud Functions.
 - **Bulk Resident & Address Import via CSV**: Administrator bulk creation with temporary passwords and automated claim granting.
+- **Address-Level Sanctions System**: Neighborhood infraction issuance with photographic evidence, automated standing restrictions, resident fine history with interactive photo zoom, and direct payment flows.
+- **Enhanced Payment Form & Rejection Recovery**: Strict validation for folio, concept (quota vs sanction), and payment date, advance periods toggle with checklist view, persistent missing-field warnings, customizable admin rejection reason pool, and one-tap recovery pre-filling for rejected payments.
+- **Facility Booking Hardening & Availability Windows**: Advance anticipation windows, daily operating hours boundaries (`openingTime` - `closingTime`), anonymous confirmed-only schedule calendar streaming, custom rejection rationale, and preset approval instruction templates.
 - **Rich Media & Emoji Community Announcements**: Broadcast announcements featuring high-resolution banner images, interactive full-screen viewer, quick-access announcement emojis, audience filtering (Everyone / Residents), and keyless Gemini AI Spanish-to-English translations.
 - **Configurable SMTP Email Service**: Automated delivery of welcome emails containing login credentials upon user provisioning and bulk import.
-- **QR-based Visitor Access**: Live validation logs and ID uploads for security personnel.
+- **QR-based Visitor Access & Audit Logs**: Live validation logs, ID and license plate photo capture for security personnel, and an administrator audit screen with whole-database query search & multi-filter exploration (address dropdown, date ranges, visitor categories, keyword search) and 20-event batches for unfiltered browsing.
+- **User Directory & Account Management**: Whole-database query search (by street, name, or email), street dropdown and role filtering, with 20-user batched query pagination for unfiltered browsing, in-memory address caching, role toggling, password resets, and account removals.
 - **Facility Booking & Document Viewers**: Seamless management of common spaces and important residential files.
 
 ---
@@ -160,7 +164,12 @@ To test cloud functions, firestore rules, and authentication flows locally:
    ```bash
    firebase emulators:start --only firestore,functions,storage,auth
    ```
-3. Configure the app to target the emulator backend when running locally.
+3. In a separate terminal, seed the emulator with sample addresses, facilities, settings, announcements, and default users (`admin@example.com`, `resident@test.com`, `roommate@test.com`, `guard@test.com`):
+   ```bash
+   node scripts/seed_emulator.js
+   ```
+   *(To seed a remote/staging Firebase project using `scripts/serviceAccountKey.json`, run `node scripts/seed_emulator.js --remote`)*
+4. Configure the app to target the emulator backend when running locally (automatically enabled on `localhost` / `127.0.0.1` on Web, or via `--dart-define=USE_FIREBASE_EMULATOR=true`).
 
 ### Running the App
 Run the application on your target device:
@@ -236,6 +245,34 @@ node populate_addresses.js
 
 ---
 
+## Batch Address Payment Status Maintenance
+
+A maintenance script [set_resident_addresses_paid.js](scripts/set_resident_addresses_paid.js) iterates through all addresses in Firestore that are already linked to a resident and transitions their `paymentStatus` to `'paid'`.
+
+### Features:
+* **Safe Dry-Run Mode**: Inspect matching addresses and preview status transitions without altering Firestore.
+* **Firebase Emulator Support**: Run seamlessly against local emulators (`--emulator`) without credentials.
+* **Batched Writes**: Updates are committed in chunks of 400 operations to respect Firestore's batch limits.
+* **System Address Safeguards**: Safely ignores system offices (`admin_office`).
+* **Bidirectional Link Detection**: Detects links via both `addresses.residentUid` and `users.addressRef`.
+
+### Usage:
+```bash
+# Preview in local emulator (dry-run):
+node scripts/set_resident_addresses_paid.js --emulator --dry-run
+
+# Apply in local emulator:
+node scripts/set_resident_addresses_paid.js --emulator
+
+# Preview in production:
+node scripts/set_resident_addresses_paid.js --dry-run
+
+# Apply in production:
+node scripts/set_resident_addresses_paid.js
+```
+
+---
+
 ## Bulk Resident Account Creation via CSV
 
 Administrators can create resident user accounts in bulk by uploading a CSV file through the app UI or calling the Cloud Function backend.
@@ -244,13 +281,27 @@ Administrators can create resident user accounts in bulk by uploading a CSV file
 1. Refer to the sample template at [resident_import_template.csv](resident_import_template.csv).
 2. Populate the CSV with `name`, `email`, `password` (optional), `street` (optional), and `number` (optional).
 3. Open the app as an admin, tap **Bulk User Creation (CSV)** on the dashboard, and select your file.
-4. Accounts are created server-side with instant **`resident`** claims (`{ resident: true }`). If `password` is omitted, the system generates a deterministic password (`Suburban#<localPart>2026`).
+4. Accounts are created server-side with instant **`resident`** claims (`{ resident: true }`). If `password` is omitted or does not satisfy complexity requirements, the system generates a cryptographically secure password meeting all Firebase Auth complexity rules (uppercase, lowercase, number, symbol, 12 chars).
 
 For complete architectural details, formula specs, and Cloud Function documentation, see [docs/bulk_user_creation.md](docs/bulk_user_creation.md).
 
 For a complete guide to all administrative tools (address import, payment approvals, user directory, amenities configurator, security guard management, and reporting), consult the Administrator User Manual available in:
 - [English Administrator User Manual](docs/admin_user_manual.md)
 - [Manual de Usuario para Administradores en Español](docs/admin_user_manual_es.md)
+
+---
+
+## Automated Pre-Rollout Testing Suite
+
+To ensure flawless operation across all resident and administrative workflows before deployment, run the zero-touch test pipeline:
+
+```bash
+./scripts/run_rollout_tests.sh
+```
+
+This single command starts the Firebase Emulators, seeds all 170 physical addresses, app settings, amenities, and default test accounts, executes all integration suites (roommate linking, announcements, advance multi-period payments, debt recovery & feature gating, partial settlement, and facility booking lifecycle), and cleanly shuts down the emulator instances upon completion.
+
+
 
 
 

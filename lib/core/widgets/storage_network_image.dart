@@ -2,8 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:universal_html/html.dart' as html;
-import 'dart:ui_web' as ui_web;
+import 'web_image_view.dart';
 
 class StorageNetworkImage extends StatefulWidget {
   final String imageUrl;
@@ -112,39 +111,12 @@ class _StorageNetworkImageState extends State<StorageNetworkImage> {
   }
 
   Widget _buildWebFallback() {
-    final String viewType = 'web-img-${widget.imageUrl.hashCode}';
-
-    // Register view factory
-    ui_web.platformViewRegistry.registerViewFactory(
-      viewType,
-      (int viewId) {
-        final html.ImageElement element = html.ImageElement()
-          ..src = widget.imageUrl
-          ..style.height = '100%'
-          ..style.width = '100%'
-          ..style.objectFit = _getHtmlObjectFit(widget.fit);
-        return element;
-      },
-    );
-
-    return SizedBox(
+    return buildWebImageView(
+      imageUrl: widget.imageUrl,
       height: widget.height,
       width: widget.width,
-      child: HtmlElementView(viewType: viewType),
+      fit: widget.fit,
     );
-  }
-
-  String _getHtmlObjectFit(BoxFit fit) {
-    switch (fit) {
-      case BoxFit.cover:
-        return 'cover';
-      case BoxFit.contain:
-        return 'contain';
-      case BoxFit.fill:
-        return 'fill';
-      default:
-        return 'cover';
-    }
   }
 
   Widget _buildErrorWidget() {

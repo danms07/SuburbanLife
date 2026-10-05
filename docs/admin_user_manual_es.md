@@ -111,11 +111,18 @@ Cuando los residentes se registran por su cuenta en la aplicación móvil, enví
   3. Presione **Aprobar**: Asigna el permiso `{ resident: true }`, vincula la dirección, establece `paymentStatus: 'paid'` y guarda la fecha de entrega (`deliveryDate`).
   4. Presione **Rechazar**: Notifica al residente para que reenvíe un comprobante válido.
 
-### 3.4 Directorio de Usuarios y Gestión de Roles
-* **Navegación**: Panel $\rightarrow$ **Gestión de Usuarios** (`AdminUserManagementScreen`).
-* **Tabla de Usuarios**: Muestra todas las cuentas registradas, UID de usuario, rol asignado y permisos activos.
-* **Modificación de Roles**: Promueva o deggrade cuentas entre **Residente**, **Guardia de Seguridad** y **Administrador**.
+### 3.4 Directorio de Usuarios y Gestión de Cuentas
+* **Navegación**: Panel $\rightarrow$ **Directorio y Roles** (`AdminUserManagementScreen`).
+* **Búsqueda y Filtros en Toda la Base de Datos**:
+  * **Barra de Búsqueda**: Búsqueda en tiempo real a través de toda la base de datos por **Nombre**, **Correo Electrónico** o **Calle / Número de Casa**.
+  * **Filtro por Calle**: Filtre usuarios por calles específicas de la comunidad mediante el selector desplegable.
+  * **Filtro por Rol**: Segmente usuarios por rol (**Todos**, **Residente**, **Coinquilino**, **Administrador**, **Guardia**).
+  * **Limpiar Filtros**: Restablezca instantáneamente todos los criterios de búsqueda y filtros activos.
+* **Exploración por Lotes sin Filtros (20 Usuarios por Lote)**: Al navegar sin filtros activos, los usuarios se cargan en bloques de 20 cuentas mediante paginación por cursor para optimizar el rendimiento. Presione **Cargar más usuarios** para explorar lotes subsiguientes.
+* **Modificación de Roles**: Promueva o degrade cuentas entre **Residente**, **Coinquilino** y **Administrador**.
+* **Restablecimiento de Contraseñas**: Actualización administrativa directa de contraseñas cumpliendo con las políticas de seguridad de Firebase Auth.
 * **Desvincular Dirección**: Desvincula una dirección si el residente se muda o cambia la titularidad.
+* **Eliminar Cuenta**: Elimina permanentemente la cuenta de usuario y credenciales de autenticación, con desvinculación automática de dirección y limpieza de miembros del grupo familiar. La autoeliminación está protegida para el administrador en sesión.
 
 ---
 
@@ -156,6 +163,18 @@ El personal de vigilancia utiliza la app para escanear códigos QR de visitantes
 ### 5.2 Generador de Pases QR Administrativos
 * **Navegación**: Panel $\rightarrow$ **Generar Acceso QR** (`QrGeneratorScreen`).
 * Al iniciar sesión como administrador, la generación de pases QR asigna automáticamente la ubicación predeterminada **"Oficina de administración"**, permitiendo emitir pases de entrada a visitantes sin vincular una casa residencial personal.
+
+### 5.3 Historial y Bitácora de Accesos
+* **Navegación**: Panel $\rightarrow$ **Bitácora de Accesos** (`AdminAccessLogsScreen`).
+* **Búsqueda y Filtros en Toda la Base de Datos**:
+  * **Selector de Dirección**: Filtre la bitácora por una vivienda específica o la oficina de administración en todo el historial registrado.
+  * **Rango de Fechas**: Filtre en toda la base de datos por **Todas las Fechas**, **Hoy**, **Esta Semana**, **Este Mes** o **Rango Personalizado**.
+  * **Categoría de Visitante**: Segmente entre **Todos**, **Invitados / Visitas** o **Proveedores / Servicios**.
+  * **Barra de Búsqueda**: Búsqueda en tiempo real en toda la base de datos por nombre de visitante, placa de vehículo, anfitrión, guardia o notas de acceso.
+  * **Limpiar Filtros**: Restablezca todos los filtros con un solo toque.
+* **Exploración por Lotes sin Filtros (20 Registros por Lote)**: Al navegar sin filtros activos, los registros se cargan en bloques de 20 eventos ordenados por fecha descendente. Presione **Cargar más registros** para consultar registros anteriores.
+* **Inspección Fotográfica**: Visualice fotos de credenciales de elector / identificación y placas tomadas en caseta con visor interactivo de zoom.
+* **Tarjetas de Resumen KPI**: Métricas en vivo de Total de Eventos, Accesos Permitidos, Accesos Denegados y Proveedores.
 
 ---
 
