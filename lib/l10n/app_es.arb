@@ -833,6 +833,14 @@
     }
   },
   "paymentProofPhoto": "Foto del Comprobante de Pago",
-  "switchCamera": "Cambiar Cámara"
+  "switchCamera": "Cambiar Cámara",
+  "documentVisibilityLabel": "Visibilidad",
+  "visibilityAllResidents": "Todos (Residentes y Administradores)",
+  "visibilityAdminOnly": "Solo Administradores",
+  "adminOnlyBadge": "SOLO ADMIN",
+  "changeVisibility": "Cambiar Visibilidad",
+  "selectNewVisibility": "Seleccione la visibilidad del documento",
+  "documentVisibilityChanged": "Visibilidad del documento actualizada exitosamente"
 }
+
 

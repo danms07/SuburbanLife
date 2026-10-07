@@ -1,9 +1,11 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-09-28 (Added sanctions module, facility operating hours, booking approval instructions, and expanded test suites)*
+*Last Verified/Updated: 2026-10-05 (Added automated Markdown-to-PDF documentation pipeline with Mermaid diagram PNG rendering, GitHub Actions CI/CD, syncTransparencyDocument Cloud Function, and role-based document visibility controls)*
 
 Current state of project files and folders:
 
+- `.github/workflows/`: CI/CD GitHub Actions workflows.
+    - `docs_pipeline.yml`: Automated workflow triggered on `git push` (for `docs/**` and `scripts/**`) and `workflow_dispatch` that renders Mermaid diagrams to PNG, compiles configured Markdown documents in `docs/docs_pipeline.json` to styled PDFs, uploads PDF artifacts, and publishes them to the Firebase Transparency section via `FIREBASE_SERVICE_ACCOUNT_JSON`.
 - `android/`: Native Android configuration and build files (including Google Services & Crashlytics Gradle plugins).
 - `assets/`: Application asset directories.
     - `icon/`: Launcher and branding icon assets.
@@ -11,22 +13,24 @@ Current state of project files and folders:
         - `app_logo.png`: Dedicated branding logo asset used across in-app UI surfaces (navigation drawer header, QR share cards).
         - `app_logo_1.png`: Alternate branding logo asset backup.
         - `app_icon.png`: Legacy master high-resolution icon asset.
-- `docs/`: Technical plans and documentation archives.
-    - `technical_overview.md`: Comprehensive technical description of the app, architecture, security measures, and data handling for non-technical users (English).
-    - `technical_overview_es.md`: Comprehensive technical description of the app, architecture, security measures, and data handling for non-technical users (Spanish).
-    - `admin_user_manual.md`: Comprehensive operational User Manual for system administrators (English).
-    - `admin_user_manual_es.md`: Comprehensive operational User Manual for system administrators (Spanish).
+- `docs/`: Technical plans, pipeline configuration, and documentation archives.
+    - `docs_pipeline.json`: Declarative manifest specifying which Markdown documents must be parsed (`"parse": true/false`), their target folder/category in the Transparency module, output PDF filename, and role visibility (`"visibility": "admin" | "all"`).
+    - `pdf/`: Generated branded PDF documentation outputs (`Manual_Usuario_Administrador_ES.pdf`, `Descripcion_Tecnica_General_ES.pdf`).
+    - `technical_overview.md`: Comprehensive technical description of the app, architecture, security measures, and data handling for non-technical users with Mermaid diagrams (English).
+    - `technical_overview_es.md`: Comprehensive technical description of the app, architecture, security measures, and data handling for non-technical users with Mermaid diagrams (Spanish).
+    - `admin_user_manual.md`: Comprehensive operational User Manual for system administrators with Mermaid diagrams (English).
+    - `admin_user_manual_es.md`: Comprehensive operational User Manual for system administrators with Mermaid diagrams (Spanish).
     - `bulk_user_creation.md`: Complete guide and Cloud Function spec for bulk resident creation via CSV.
     - `plans/`: Future implementation plans.
         - `biometric_auth_plan.md`: Plan for persistent biometric gating.
         - `credential_manager_plan.md`: Plan for Passkeys and Credential Manager integration.
 - `firebase.json.template`: Baseline Firebase project deployment configuration template mapping Firestore rules, Storage rules, functions, composite indexes, emulators, and Hosting Cache-Control headers (untracked `firebase.json` holds local and FlutterFire project bindings).
-- `firestore.rules`: Hardened security rules for Cloud Firestore collections with type safety checks, status alignment, readBy array protection, and admin-only gating for config/smtp_settings.
-- `firestore.indexes.json`: Comprehensive composite index definitions for Firestore queries (bookings, payments, qr_codes, documents, access_logs).
-- `storage.rules`: Security rules for Firebase Cloud Storage buckets.
+- `firestore.rules`: Hardened security rules for Cloud Firestore collections with type safety checks, status alignment, readBy array protection, role-based document visibility gating (`visibility == 'admin'` restricted to administrators), and admin-only gating for config/smtp_settings.
+- `firestore.indexes.json`: Comprehensive composite index definitions for Firestore queries (bookings, payments, qr_codes, documents with visibility, access_logs).
+- `storage.rules`: Security rules for Firebase Cloud Storage buckets (including admin-only protection for `/documents/admin_only/**` and `metadata.visibility == 'admin'`).
 - `flutter_launcher_icons.yaml`: Configuration for generating platform-specific launcher icons.
 - `functions/`: Cloud Functions for Firebase.
-    - `index.js`: Core function logic holding Gemini translations, address-based access restriction, address unbinding, own-account deletion, roommate account linking, admin user creation (initializing residential addresses with 'paid' status and deferring recalculation to checkMonthlyPaymentStatuses to allow admins time to upload receipts), admin bulk resident creation (with in-memory address caching), bulk address CSV creation, SMTP connection testing, onPaymentWritten auto-recalculation trigger, checkMonthlyPaymentStatuses daily 00:00 CST scheduled job, bounded createBooking clashes query, and automated welcome email dispatch adhering to AppConfig branding colors and typography.
+    - `index.js`: Core function logic holding Gemini 3.8 Flash (`gemini-3.8-flash`) translations via Vertex AI global endpoint, address-based access restriction, address unbinding, own-account deletion, roommate account linking, admin user creation (initializing residential addresses with 'paid' status and deferring recalculation to checkMonthlyPaymentStatuses to allow admins time to upload receipts), admin bulk resident creation (with in-memory address caching), bulk address CSV creation, SMTP connection testing, onPaymentWritten auto-recalculation trigger, checkMonthlyPaymentStatuses daily 00:00 CST scheduled job, bounded createBooking clashes query, `syncTransparencyDocument` callable function (validating and publishing PDF documents, folders, categories, and visibility settings into the Transparency module), and automated welcome email dispatch adhering to AppConfig branding colors and typography.
     - `brand_config.js`: Centralized brand color palette and typography constants mirroring `AppConfig` for HTML email templates.
 - `ios/`: Native iOS configuration and build files.
 - `LICENSE`: MIT No Attribution (MIT-0) license file.
@@ -86,23 +90,24 @@ Current state of project files and folders:
             - `qr_generator_screen.dart`: Generator interface.
             - `manage_qr_screen.dart`: History and management of QR codes.
             - `qr_scanner_screen.dart`: Security guard QR capture with camera selector (back/front switch), vertical step-by-step ID/plate evidence verification layout, centered decision action controls, and server-side atomic validation/access logging via `validateAndRegisterQrAccess`.
-        - `transparency/`: Transparency documents module emulating a file explorer with virtual directory tree, local caching, native rendering, document category re-assignment, and category management with in-use deletion protection.
-            - `transparency_screen.dart`: Main File Explorer screen with folder hierarchy navigation, breadcrumbs, search, category filter, document open delegation, category management, and admin folder/file management.
+        - `transparency/`: Transparency documents module emulating a file explorer with virtual directory tree, local caching, native rendering, role-based visibility controls (`all` vs `admin`), document category re-assignment, and category management with in-use deletion protection.
+            - `transparency_screen.dart`: Main File Explorer screen with folder hierarchy navigation, breadcrumbs, search, category filter, role-aware visibility filtering (`visibility: 'all' | 'admin'`), document open delegation, category management, and admin folder/file/visibility management.
             - `document_viewer_screen.dart`: Native in-app viewer for Markdown (`.md`) and plain text (`.txt`) documents with font resizing and sharing.
             - `widgets/`:
                 - `file_explorer_breadcrumb.dart`: Interactive breadcrumb navigation widget.
                 - `folder_card.dart`: Virtual folder card with child item counter and admin actions.
-                - `document_card.dart`: Document tile with type-specific iconography, metadata chips (category, publication date, size), cached status badge, and change category/move/delete actions.
+                - `document_card.dart`: Document tile with type-specific iconography, metadata chips (category, `ADMIN ONLY` visibility badge, publication date, size), cached status badge, and change category/change visibility/move/delete actions.
     - `l10n/`: Localization definitions in Spanish and English.
         - `app_en.arb`: English strings.
         - `app_es.arb`: Spanish strings.
 - `scripts/`: Helper scripts holding service accounts and automation runners.
+    - `build_and_publish_docs.js`: Automated Markdown-to-PDF documentation builder and Firebase publisher. Extracts Mermaid blocks and renders them into `.png` images via headless Chromium (`puppeteer`), compiles styled branded PDFs, and optionally publishes them to Firebase Cloud Storage (`documents/` or `documents/admin_only/`) and Firestore (`documents`, `document_folders`, `document_categories`) with declarative `visibility` settings.
     - `set_role.js`: Claims and role assignment utility supporting both Firebase Emulator (`--emulator`) and production modes with auto user provisioning.
     - `populate_addresses.js`: Batched write logic for address import on csv files.
     - `set_resident_addresses_paid.js`: Batch maintenance utility iterating across all physical addresses linked to a resident and updating their paymentStatus to 'paid' (with emulator, dry-run, force, and batching support).
     - `seed_emulator.js`: Automated Firebase database seeder supporting both local Emulators (default) and remote/staging projects (`--remote` / `--staging`), provisioning CSV addresses, admin, resident, roommate, and guard accounts (with role claims), app settings, neighborhood facilities with operating hours, and sample announcements.
     - `run_rollout_tests.sh`: Zero-touch test runner orchestrating emulator execution and automated integration testing.
-    - `test/`: Node.js test suite for script automation (`set_resident_addresses_paid.test.js`).
+    - `test/`: Node.js test suite for script automation (`set_resident_addresses_paid.test.js`, `build_and_publish_docs.test.js`).
 - `test_driver/`: Flutter Driver host scripts.
     - `integration_test.dart`: Standard integration test driver entry point.
 - `test/`: Project unit, widget, and integration test suites.

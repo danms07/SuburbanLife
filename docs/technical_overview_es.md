@@ -51,22 +51,12 @@ Este documento ofrece una visión técnica estructurada y redactada en un lengua
 
 Suburban Life ofrece interfaces y herramientas diseñadas a la medida para tres perfiles de usuario principales:
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Suburban Life                               │
-│                         Plataforma Residencial                          │
-└──────────────┬──────────────────────────┬───────────────────────────────┘
-               │                          │
-               ▼                          ▼
-┌───────────────────────────┐ ┌───────────────────────────┐ ┌─────────────▼───────────────┐
-│   Residentes y Familiares │ │    Caseta de Seguridad    │ │   Administración Condominal │
-│  • Pases QR de Invitados  │ │  • Escaneo Rápido de QR   │ │  • Directorio de Casas/User │
-│  • Reserva de Amenidades  │ │  • Fotos de ID y Placas   │ │  • Aprobación de Pagos      │
-│  • Carga de Comprobantes  │ │  • Bitácora en Vivo       │ │  • Validación de Propiedad  │
-│  • Avisos Comunitarios    │ │  • Decisión Permitir/Nego │ │  • Configuración Amenidades │
-│  • Portal de Transparencia│ └───────────────────────────┘ │  • Avisos Multilingües IA   │
-│  • Invitación a Familia   │                               │  • Importación CSV y SMTP   │
-└───────────────────────────┘                               └─────────────────────────────┘
+```mermaid
+flowchart TD
+    Platform["Suburban Life — Plataforma Residencial"]
+    Platform --> Res["<b>Residentes y Familiares</b><br/>• Pases QR de Invitados<br/>• Reserva de Amenidades<br/>• Carga de Comprobantes<br/>• Avisos Comunitarios<br/>• Portal de Transparencia<br/>• Invitación a Familia"]
+    Platform --> Guard["<b>Caseta de Seguridad</b><br/>• Escaneo Rápido de QR<br/>• Fotos de ID y Placas<br/>• Bitácora en Vivo<br/>• Decisión Permitir/Denegar"]
+    Platform --> Admin["<b>Administración Condominal</b><br/>• Directorio de Casas/Usuarios<br/>• Aprobación de Pagos<br/>• Validación de Propiedad<br/>• Configuración Amenidades<br/>• Avisos Multilingües IA<br/>• Importación CSV y SMTP"]
 ```
 
 ### 2.1 Para Residentes y Miembros del Hogar
@@ -102,16 +92,12 @@ Suburban Life ofrece interfaces y herramientas diseñadas a la medida para tres 
 
 Suburban Life está desarrollado utilizando **Flutter**, el framework multiplataforma de código abierto creado por Google.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     Código Único en Flutter (Dart)                      │
-└──────────────┬──────────────────────────┬───────────────────────────────┘
-               │                          │
-               ▼                          ▼
-┌───────────────────────────┐ ┌───────────────────────────┐ ┌─────────────▼───────────────┐
-│    Aplicación Android     │ │      Aplicación iOS       │ │     Aplicación Web          │
-│   (Google Play / APK)     │ │        (App Store)        │ │  (Navegadores de Escritorio)│
-└───────────────────────────┘ └───────────────────────────┘ └─────────────────────────────┘
+```mermaid
+flowchart TD
+    Code["Código Único en Flutter (Dart)"]
+    Code --> Android["<b>Aplicación Android</b><br/>(Google Play / APK)"]
+    Code --> iOS["<b>Aplicación iOS</b><br/>(App Store)"]
+    Code --> Web["<b>Aplicación Web</b><br/>(Navegadores de Escritorio y Móvil)"]
 ```
 
 ### 3.1 ¿Qué es Flutter?
@@ -138,16 +124,17 @@ A diferencia de las soluciones web empaquetadas tradicionales que dependen de mo
 
 Suburban Life utiliza la infraestructura en la nube de **Google Firebase**, garantizando alta disponibilidad, sincronización instantánea y cero necesidad de mantenimiento de servidores físicos.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     Nube de Suburban Life (Firebase)                  │
-├───────────────────┬───────────────────┬────────────────┬────────────────┤
-│   Firebase Auth   │  Cloud Firestore  │ Cloud Storage  │ Cloud Functions│
-│ (Identidad/Roles) │ (NoSQL en Vivo)   │(Archivos S3)   │ (Lógica Nube)  │
-├───────────────────┼───────────────────┼────────────────┼────────────────┤
-│     App Check     │ Firebase Hosting  │  Crashlytics   │ Google Gemini  │
-│(Filtro Antifraude)│  (CDN Mundial)    │ (Diagnósticos) │  (Vertex AI)   │
-└───────────────────┴───────────────────┴────────────────┴────────────────┘
+```mermaid
+flowchart TD
+    Cloud["Nube de Suburban Life (Google Firebase)"]
+    Cloud --> Auth["<b>Firebase Auth</b><br/>Identidad y Roles"]
+    Cloud --> DB["<b>Cloud Firestore</b><br/>NoSQL en Tiempo Real"]
+    Cloud --> Storage["<b>Cloud Storage</b><br/>Archivos Cifrados"]
+    Cloud --> Funcs["<b>Cloud Functions</b><br/>Lógica de Servidor"]
+    Cloud --> AppCheck["<b>App Check</b><br/>Filtro Antifraude"]
+    Cloud --> Hosting["<b>Firebase Hosting</b><br/>CDN Mundial SSL"]
+    Cloud --> Crash["<b>Crashlytics</b><br/>Diagnósticos"]
+    Cloud --> Gemini["<b>Google Gemini</b><br/>Vertex AI"]
 ```
 
 ### 4.1 Firebase Authentication (Identidad y Roles)
@@ -196,20 +183,14 @@ Suburban Life utiliza la infraestructura en la nube de **Google Firebase**, gara
 
 La seguridad y la confidencialidad de la información son pilares fundamentales de Suburban Life. El sistema aplica un esquema de **defensa en profundidad**, donde los datos están resguardados por múltiples capas independientes de protección.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     5 Capas de Seguridad Integradas                     │
-├─────────────────────────────────────────────────────────────────────────┤
-│ 1. Atestación de App    │ App Check con reCAPTCHA Enterprise            │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 2. Blindaje de Claves   │ Restricciones de API por Plataforma           │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 3. Identidad Segura     │ Firebase Auth con Roles Criptográficos (RBAC) │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 4. Antirreenvío (Replay)│ Consumo de Token de Un Solo Uso en Funciones  │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 5. Control de Acceso BD │ Reglas Declarativas en Firestore y Storage    │
-└─────────────────────────┴───────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    L1["<b>1. Atestación de App</b> — App Check con reCAPTCHA Enterprise"]
+    L2["<b>2. Blindaje de Claves</b> — Restricciones de API por Plataforma"]
+    L3["<b>3. Identidad Segura</b> — Firebase Auth con Roles Criptográficos (RBAC)"]
+    L4["<b>4. Antirreenvío (Replay)</b> — Consumo de Token de Un Solo Uso en Funciones"]
+    L5["<b>5. Control de Acceso BD</b> — Reglas Declarativas en Firestore y Storage"]
+    L1 --> L2 --> L3 --> L4 --> L5
 ```
 
 ### 5.1 Firebase Authentication y Control de Acceso Basado en Roles (RBAC)

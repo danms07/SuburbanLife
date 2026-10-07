@@ -13,8 +13,16 @@ service firebase.storage {
       return isAuthenticated() && request.auth.token.guard == true;
     }
 
+    match /documents/admin_only/{allPaths=**} {
+      allow read, write: if isAdmin();
+    }
+
     match /documents/{allPaths=**} {
-      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
+      allow read: if isAdmin() || (
+        isAuthenticated() &&
+        request.auth.token.resident == true &&
+        (resource == null || resource.metadata == null || !('visibility' in resource.metadata) || resource.metadata.visibility != 'admin')
+      );
       allow write: if isAdmin();
     }
 

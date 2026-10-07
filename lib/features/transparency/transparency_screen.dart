@@ -26,6 +26,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   final DocumentCacheService _cacheService = DocumentCacheService();
 
   bool _isAdmin = false;
+  bool _isCheckingAdmin = true;
   String _currentFolderId = 'root';
   final List<BreadcrumbItem> _breadcrumbs = [];
 
@@ -37,6 +38,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   final Set<String> _cachedDocIds = {};
+  final Set<String> _backfilledVisibilityIds = {};
 
   @override
   void initState() {
@@ -59,11 +61,17 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       if (mounted) {
         setState(() {
           _isAdmin = isAdmin;
+          _isCheckingAdmin = false;
         });
       }
     } catch (e, stack) {
       debugPrint('Error checking admin status in TransparencyScreen: $e');
       Backend.crashlytics.recordError(e, stack, reason: 'TransparencyScreen._checkAdmin');
+      if (mounted) {
+        setState(() {
+          _isCheckingAdmin = false;
+        });
+      }
     }
   }
 
@@ -153,7 +161,16 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   void _checkCachedDocuments(List<Map<String, dynamic>> docs) async {
     for (var doc in docs) {
       final docId = doc['id']?.toString() ?? '';
-      if (docId.isEmpty || _cachedDocIds.contains(docId)) continue;
+      if (docId.isEmpty) continue;
+
+      if (_isAdmin && doc['visibility'] == null && !_backfilledVisibilityIds.contains(docId)) {
+        _backfilledVisibilityIds.add(docId);
+        DatabaseService().updateDocument('documents', docId, {'visibility': 'all'}).catchError((e) {
+          debugPrint('Error backfilling document visibility for $docId: $e');
+        });
+      }
+
+      if (_cachedDocIds.contains(docId)) continue;
 
       final title = doc['title']?.toString() ?? doc['fileName']?.toString() ?? '';
       final rawFileName = doc['fileName']?.toString() ?? '$title.bin';
@@ -514,7 +531,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       return;
     }
 
-    if (rawBytes == null || rawBytes.isEmpty || selectedFileName == null) {
+    if (rawBytes == null || rawBytes.isEmpty || selectedFileName.isEmpty) {
       debugPrint('>>> [_uploadDocument] ERROR: File bytes or filename empty.');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -531,6 +548,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     }
     final initialCategory = availableCategories.first['id']!;
     String uploadCategory = initialCategory;
+    String uploadVisibility = 'all';
     DateTime publicationDate = DateTime.now();
 
     if (!mounted) {
@@ -586,6 +604,33 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         if (value != null) {
                           setDialogState(() {
                             uploadCategory = value;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Visibility Selector
+                    DropdownButtonFormField<String>(
+                      initialValue: uploadVisibility,
+                      decoration: InputDecoration(
+                        labelText: l10n.documentVisibilityLabel,
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: 'all',
+                          child: Text(l10n.visibilityAllResidents),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'admin',
+                          child: Text(l10n.visibilityAdminOnly),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setDialogState(() {
+                            uploadVisibility = value;
                           });
                         }
                       },
@@ -659,9 +704,14 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
                     try {
                       final ext = selectedFileName!.contains('.') ? selectedFileName.split('.').last : 'bin';
-                      final storagePath = 'documents/${DateTime.now().millisecondsSinceEpoch}_$selectedFileName';
+                      final storagePrefix = uploadVisibility == 'admin' ? 'documents/admin_only' : 'documents';
+                      final storagePath = '$storagePrefix/${DateTime.now().millisecondsSinceEpoch}_$selectedFileName';
                       debugPrint('>>> [_uploadDocument] Uploading bytes to Cloud Storage path: $storagePath');
-                      final downloadUrl = await StorageService().uploadFile(storagePath, rawBytes!);
+                      final downloadUrl = await StorageService().uploadFile(
+                        storagePath,
+                        rawBytes!,
+                        metadata: {'visibility': uploadVisibility},
+                      );
                       debugPrint('>>> [_uploadDocument] Storage upload success. URL: $downloadUrl');
 
                       final user = _authService.currentUser;
@@ -672,6 +722,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         'fileType': ext.toLowerCase(),
                         'fileSize': fileSize ?? rawBytes.length,
                         'category': uploadCategory,
+                        'visibility': uploadVisibility,
                         'url': downloadUrl,
                         'storagePath': storagePath,
                         'folderId': _currentFolderId,
@@ -699,6 +750,105 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     }
                   },
                   child: Text(l10n.uploadButton),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showChangeDocumentVisibilityDialog(Map<String, dynamic> doc) {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final docId = doc['id']?.toString() ?? '';
+    String selectedVisibility = (doc['visibility']?.toString().toLowerCase() == 'admin') ? 'admin' : 'all';
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  const Icon(Icons.visibility_outlined, color: AppConfig.primaryColor),
+                  const SizedBox(width: 8),
+                  Text(l10n.changeVisibility),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    doc['title']?.toString() ?? doc['fileName']?.toString() ?? '',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${l10n.documentVisibilityLabel}:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedVisibility,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: 'all',
+                        child: Text(l10n.visibilityAllResidents),
+                      ),
+                      DropdownMenuItem<String>(
+                        value: 'admin',
+                        child: Text(l10n.visibilityAdminOnly),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          selectedVisibility = val;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(l10n.cancel),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogCtx);
+                    try {
+                      await DatabaseService().updateDocument('documents', docId, {
+                        'visibility': selectedVisibility,
+                        'updatedAt': DbFieldValue.serverTimestamp(),
+                      });
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(l10n.documentVisibilityChanged),
+                            backgroundColor: AppConfig.secondaryColor,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        messenger.showSnackBar(
+                          SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+                        );
+                      }
+                    }
+                  },
+                  child: Text(l10n.save),
                 ),
               ],
             );
@@ -1431,11 +1581,18 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   }
 
   Widget _buildExplorerBody(BuildContext context, AppLocalizations l10n) {
+    if (_isCheckingAdmin) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: DatabaseService().streamCollection('document_folders'),
       builder: (context, folderSnapshot) {
         return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: DatabaseService().streamCollection('documents'),
+          stream: DatabaseService().streamCollection(
+            'documents',
+            filters: _isAdmin ? null : [QueryFilter('visibility', FilterOperator.equal, 'all')],
+          ),
           builder: (context, docSnapshot) {
             if (folderSnapshot.connectionState == ConnectionState.waiting ||
                 docSnapshot.connectionState == ConnectionState.waiting) {
@@ -1454,6 +1611,10 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
             // Filter documents
             final currentDocs = allDocs.where((doc) {
+              // 0. Visibility match (non-admins cannot see 'admin'-only documents)
+              final docVisibility = (doc['visibility'] ?? 'all').toString().toLowerCase();
+              if (!_isAdmin && docVisibility == 'admin') return false;
+
               // 1. Folder level match (unless global search query is active)
               if (_searchQuery.isEmpty) {
                 final folderId = doc['folderId']?.toString() ?? 'root';
@@ -1485,7 +1646,12 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
             final Map<String, int> folderItemCounts = {};
             for (var f in currentFolders) {
               final fid = f['id']?.toString() ?? '';
-              final childDocs = allDocs.where((d) => (d['folderId']?.toString() ?? 'root') == fid).length;
+              final childDocs = allDocs.where((d) {
+                if (!_isAdmin && (d['visibility'] ?? 'all').toString().toLowerCase() == 'admin') {
+                  return false;
+                }
+                return (d['folderId']?.toString() ?? 'root') == fid;
+              }).length;
               final childSubfolders = allFolders.where((sub) => (sub['parentId']?.toString() ?? 'root') == fid).length;
               folderItemCounts[fid] = childDocs + childSubfolders;
             }
@@ -1585,6 +1751,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     }
                   }
 
+                  final docVisibility = (doc['visibility'] ?? 'all').toString().toLowerCase();
+
                   return DocumentCard(
                     id: docId,
                     title: title,
@@ -1592,11 +1760,13 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     fileType: fileType,
                     fileSize: fileSize,
                     category: categoryName,
+                    visibility: docVisibility,
                     publicationDate: pubDate,
                     isCached: _cachedDocIds.contains(docId),
                     isAdmin: _isAdmin,
                     onTap: () => _openDocument(context, doc),
                     onChangeCategory: _isAdmin ? () => _showChangeDocumentCategoryDialog(doc) : null,
+                    onChangeVisibility: _isAdmin ? () => _showChangeDocumentVisibilityDialog(doc) : null,
                     onMove: _isAdmin ? () => _showMoveDocumentDialog(doc) : null,
                     onDelete: _isAdmin ? () => _confirmDeleteDocument(doc) : null,
                   );

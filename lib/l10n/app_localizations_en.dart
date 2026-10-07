@@ -2160,4 +2160,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get switchCamera => 'Switch Camera';
+
+  @override
+  String get documentVisibilityLabel => 'Visibility';
+
+  @override
+  String get visibilityAllResidents => 'All (Residents & Admins)';
+
+  @override
+  String get visibilityAdminOnly => 'Administrators Only';
+
+  @override
+  String get adminOnlyBadge => 'ADMIN ONLY';
+
+  @override
+  String get changeVisibility => 'Change Visibility';
+
+  @override
+  String get selectNewVisibility => 'Select document visibility';
+
+  @override
+  String get documentVisibilityChanged =>
+      'Document visibility updated successfully';
 }

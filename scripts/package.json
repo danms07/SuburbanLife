@@ -6,12 +6,18 @@
     "test": "node --test",
     "seed:emulator": "node seed_emulator.js",
     "seed:remote": "node seed_emulator.js --remote",
-    "set:paid": "node set_resident_addresses_paid.js"
+    "set:paid": "node set_resident_addresses_paid.js",
+    "docs:pdf": "node build_and_publish_docs.js",
+    "docs:publish": "node build_and_publish_docs.js --publish",
+    "docs:publish:emulator": "node build_and_publish_docs.js --publish --emulator"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "firebase-admin": "^13.8.0"
+    "firebase-admin": "^13.8.0",
+    "marked": "^16.0.0",
+    "mermaid": "^11.7.0",
+    "puppeteer": "^24.12.0"
   }
 }

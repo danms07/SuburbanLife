@@ -294,5 +294,56 @@ test('buildWelcomeEmailHtml uses AppConfig brand colors and typography', (t) => 
   assert.ok(customHtml.includes('Plus Jakarta Sans'), 'Custom template should use Plus Jakarta Sans typography');
 });
 
+test('Gemini AI configuration uses gemini-3.8-flash on global Vertex AI endpoint', (t) => {
+  const { GEMINI_MODEL, GEMINI_LOCATION } = _test;
+  assert.equal(GEMINI_MODEL, 'gemini-3.8-flash');
+  assert.equal(GEMINI_LOCATION, 'global');
+});
 
+test('validateTransparencyDocInput validates visibility, fileType, and strips path traversal', (t) => {
+  const { validateTransparencyDocInput } = _test;
+
+  const validAdminDoc = validateTransparencyDocInput({
+    docId: 'admin_user_manual_es',
+    title: 'Manual de Usuario para Administradores (ES)',
+    fileName: '../../etc/Manual_Admin.pdf',
+    visibility: 'admin',
+    category: 'manuals',
+    folderId: 'official_manuals',
+    folderName: 'Manuales Oficiales',
+  });
+
+  assert.equal(validAdminDoc.docId, 'admin_user_manual_es');
+  assert.equal(validAdminDoc.fileName, 'Manual_Admin.pdf');
+  assert.equal(validAdminDoc.fileType, 'pdf');
+  assert.equal(validAdminDoc.visibility, 'admin');
+  assert.equal(validAdminDoc.category, 'manuals');
+  assert.equal(validAdminDoc.folderId, 'official_manuals');
+
+  const defaultDoc = validateTransparencyDocInput({
+    title: 'Descripción Técnica General',
+    fileName: 'Descripcion_Tecnica.pdf',
+  });
+  assert.equal(defaultDoc.visibility, 'all');
+  assert.equal(defaultDoc.folderId, 'root');
+  assert.equal(defaultDoc.fileType, 'pdf');
+
+  // Invalid visibility throws
+  assert.throws(() => {
+    validateTransparencyDocInput({
+      title: 'Test',
+      fileName: 'test.pdf',
+      visibility: 'super_secret',
+    });
+  }, /Invalid visibility/);
+
+  // Unsupported extension throws
+  assert.throws(() => {
+    validateTransparencyDocInput({
+      title: 'Malicious Script',
+      fileName: 'payload.exe',
+      visibility: 'all',
+    });
+  }, /Unsupported fileType/);
+});
 

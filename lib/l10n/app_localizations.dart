@@ -3979,6 +3979,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Switch Camera'**
   String get switchCamera;
+
+  /// No description provided for @documentVisibilityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility'**
+  String get documentVisibilityLabel;
+
+  /// No description provided for @visibilityAllResidents.
+  ///
+  /// In en, this message translates to:
+  /// **'All (Residents & Admins)'**
+  String get visibilityAllResidents;
+
+  /// No description provided for @visibilityAdminOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Administrators Only'**
+  String get visibilityAdminOnly;
+
+  /// No description provided for @adminOnlyBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'ADMIN ONLY'**
+  String get adminOnlyBadge;
+
+  /// No description provided for @changeVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Visibility'**
+  String get changeVisibility;
+
+  /// No description provided for @selectNewVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Select document visibility'**
+  String get selectNewVisibility;
+
+  /// No description provided for @documentVisibilityChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Document visibility updated successfully'**
+  String get documentVisibilityChanged;
 }
 
 class _AppLocalizationsDelegate

@@ -51,22 +51,12 @@ This document provides a comprehensive technical overview written in accessible,
 
 Suburban Life provides tailored interfaces and tools for three primary groups of users:
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Suburban Life                               │
-│                         Residential Platform                            │
-└──────────────┬──────────────────────────┬───────────────────────────────┘
-               │                          │
-               ▼                          ▼
-┌───────────────────────────┐ ┌───────────────────────────┐ ┌─────────────▼───────────────┐
-│   Residents & Families    │ │   Security Checkpoint     │ │   Condo Administration      │
-│  • QR Visitor Passes      │ │  • Fast QR Code Scanning  │ │  • User & House Directory   │
-│  • Amenity Bookings       │ │  • ID & Plate Capture     │ │  • Payment Review & Matrix  │
-│  • Payment Proof Uploads  │ │  • Real-Time Access Logs  │ │  • Ownership Validations    │
-│  • Community Bulletins    │ │  • Instant Deny/Allow     │ │  • Amenity Rules & Limits   │
-│  • Transparency Documents │ └───────────────────────────┘ │  • AI Multilingual Notices  │
-│  • Family Member Invites  │                               │  • Bulk CSV Imports & SMTP  │
-└───────────────────────────┘                               └─────────────────────────────┘
+```mermaid
+flowchart TD
+    Platform["Suburban Life — Residential Platform"]
+    Platform --> Res["<b>Residents & Families</b><br/>• QR Visitor Passes<br/>• Amenity Bookings<br/>• Payment Proof Uploads<br/>• Community Bulletins<br/>• Transparency Documents<br/>• Family Member Invites"]
+    Platform --> Guard["<b>Security Checkpoint</b><br/>• Fast QR Code Scanning<br/>• ID & Plate Capture<br/>• Real-Time Access Logs<br/>• Instant Deny/Allow"]
+    Platform --> Admin["<b>Condo Administration</b><br/>• User & House Directory<br/>• Payment Review & Matrix<br/>• Ownership Validations<br/>• Amenity Rules & Limits<br/>• AI Multilingual Notices<br/>• Bulk CSV Imports & SMTP"]
 ```
 
 ### 2.1 For Residents and Household Members
@@ -102,16 +92,12 @@ Suburban Life provides tailored interfaces and tools for three primary groups of
 
 Suburban Life is built with **Flutter**, Google's industry-leading, open-source multi-platform framework.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      Single Flutter Codebase (Dart)                     │
-└──────────────┬──────────────────────────┬───────────────────────────────┘
-               │                          │
-               ▼                          ▼
-┌───────────────────────────┐ ┌───────────────────────────┐ ┌─────────────▼─────────────┐
-│        Android App        │ │          iOS App          │ │      Web Application        │
-│   (Google Play / APK)     │ │        (App Store)        │ │  (Desktop & Mobile Web CDN) │
-└───────────────────────────┘ └───────────────────────────┘ └─────────────────────────────┘
+```mermaid
+flowchart TD
+    Code["Single Flutter Codebase (Dart)"]
+    Code --> Android["<b>Android App</b><br/>(Google Play / APK)"]
+    Code --> iOS["<b>iOS App</b><br/>(App Store)"]
+    Code --> Web["<b>Web Application</b><br/>(Desktop & Mobile Web CDN)"]
 ```
 
 ### 3.1 What is Flutter?
@@ -138,16 +124,17 @@ Unlike traditional web wrappers or hybrid frameworks that rely on slow browser b
 
 Suburban Life leverages Google's **Firebase** cloud ecosystem, providing an enterprise-grade, serverless infrastructure that ensures high availability, real-time synchronization, and zero server maintenance overhead.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      Suburban Life Cloud (Firebase)                   │
-├───────────────────┬───────────────────┬────────────────┬────────────────┤
-│   Firebase Auth   │  Cloud Firestore  │ Cloud Storage  │ Cloud Functions│
-│ (Identity & Roles)│ (Real-time NoSQL) │ (Encrypted S3) │ (Backend Logic)│
-├───────────────────┼───────────────────┼────────────────┼────────────────┤
-│     App Check     │ Firebase Hosting  │  Crashlytics   │ Google Gemini  │
-│ (Anti-abuse Gate) │   (Global CDN)    │ (Error Alerts) │ (Vertex AI)    │
-└───────────────────┴───────────────────┴────────────────┴────────────────┘
+```mermaid
+flowchart TD
+    Cloud["Suburban Life Cloud (Google Firebase)"]
+    Cloud --> Auth["<b>Firebase Auth</b><br/>Identity & Roles"]
+    Cloud --> DB["<b>Cloud Firestore</b><br/>Real-time NoSQL"]
+    Cloud --> Storage["<b>Cloud Storage</b><br/>Encrypted Files"]
+    Cloud --> Funcs["<b>Cloud Functions</b><br/>Backend Logic"]
+    Cloud --> AppCheck["<b>App Check</b><br/>Anti-abuse Gate"]
+    Cloud --> Hosting["<b>Firebase Hosting</b><br/>Global SSL CDN"]
+    Cloud --> Crash["<b>Crashlytics</b><br/>Error Alerts"]
+    Cloud --> Gemini["<b>Google Gemini</b><br/>Vertex AI"]
 ```
 
 ### 4.1 Firebase Authentication
@@ -201,20 +188,14 @@ Suburban Life leverages Google's **Firebase** cloud ecosystem, providing an ente
 
 Security and privacy are engineered directly into the foundation of Suburban Life. The platform implements a **defense-in-depth** strategy, ensuring that security is enforced across multiple independent layers.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     5-Layer Security Architecture                       │
-├─────────────────────────────────────────────────────────────────────────┤
-│ 1. Client Attestation   │ App Check with reCAPTCHA Enterprise           │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 2. API Scope Lockdown   │ App-Level Platform API Key Restrictions       │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 3. Identity & Claims    │ Firebase Auth + Custom Role Claims (RBAC)     │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 4. Request Replay Guard │ Cloud Functions One-Time Token Consumption    │
-├─────────────────────────┼───────────────────────────────────────────────┤
-│ 5. Data Access Firewall │ Server-Enforced Firestore & Storage Rules     │
-└─────────────────────────┴───────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    L1["<b>1. Client Attestation</b> — App Check with reCAPTCHA Enterprise"]
+    L2["<b>2. API Scope Lockdown</b> — App-Level Platform API Key Restrictions"]
+    L3["<b>3. Identity & Claims</b> — Firebase Auth + Custom Role Claims (RBAC)"]
+    L4["<b>4. Request Replay Guard</b> — Cloud Functions One-Time Token Consumption"]
+    L5["<b>5. Data Access Firewall</b> — Server-Enforced Firestore & Storage Rules"]
+    L1 --> L2 --> L3 --> L4 --> L5
 ```
 
 ### 5.1 Firebase Authentication & Role-Based Access Control (RBAC)

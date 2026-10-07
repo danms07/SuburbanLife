@@ -9,11 +9,13 @@ class DocumentCard extends StatelessWidget {
   final String fileType;
   final int? fileSize;
   final String? category;
+  final String visibility;
   final DateTime? publicationDate;
   final bool isCached;
   final bool isAdmin;
   final VoidCallback onTap;
   final VoidCallback? onChangeCategory;
+  final VoidCallback? onChangeVisibility;
   final VoidCallback? onMove;
   final VoidCallback? onDelete;
 
@@ -25,11 +27,13 @@ class DocumentCard extends StatelessWidget {
     required this.fileType,
     this.fileSize,
     this.category,
+    this.visibility = 'all',
     this.publicationDate,
     this.isCached = false,
     required this.isAdmin,
     required this.onTap,
     this.onChangeCategory,
+    this.onChangeVisibility,
     this.onMove,
     this.onDelete,
   }) : super(key: key);
@@ -158,6 +162,34 @@ class DocumentCard extends StatelessWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        // Admin-Only Visibility Badge
+                        if (visibility.toLowerCase() == 'admin')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade700.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.red.shade700.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.lock_outline, size: 11, color: Colors.red.shade800),
+                                const SizedBox(width: 3),
+                                Text(
+                                  l10n.adminOnlyBadge,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         // Category
                         if (category != null && category!.isNotEmpty)
                           Container(
@@ -224,12 +256,14 @@ class DocumentCard extends StatelessWidget {
               ),
 
               // Trailing action menu / open button
-              if (isAdmin && (onMove != null || onDelete != null || onChangeCategory != null))
+              if (isAdmin && (onMove != null || onDelete != null || onChangeCategory != null || onChangeVisibility != null))
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
                   onSelected: (value) {
                     if (value == 'change_category' && onChangeCategory != null) {
                       onChangeCategory!();
+                    } else if (value == 'change_visibility' && onChangeVisibility != null) {
+                      onChangeVisibility!();
                     } else if (value == 'move' && onMove != null) {
                       onMove!();
                     } else if (value == 'delete' && onDelete != null) {
@@ -245,6 +279,17 @@ class DocumentCard extends StatelessWidget {
                             const Icon(Icons.category_outlined, size: 18, color: AppConfig.primaryColor),
                             const SizedBox(width: 8),
                             Text(l10n.changeCategory),
+                          ],
+                        ),
+                      ),
+                    if (onChangeVisibility != null)
+                      PopupMenuItem(
+                        value: 'change_visibility',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.visibility_outlined, size: 18, color: AppConfig.primaryColor),
+                            const SizedBox(width: 8),
+                            Text(l10n.changeVisibility),
                           ],
                         ),
                       ),

@@ -41,6 +41,25 @@ Upon logging in, administrators land on the **Admin Dashboard**, which features:
 * **Navigation Grid**: Direct access to all administrative modules.
 * **Quick Access Drawer**: Fast navigation menu for switching screens or accessing personal settings.
 
+```mermaid
+flowchart TD
+    Admin["Admin Dashboard"] --> Prop["Properties & Addresses"]
+    Admin --> Users["Users & Residents"]
+    Admin --> Fin["Finances & Payments"]
+    Admin --> Sec["Security & Access"]
+    Admin --> Amen["Amenities & Settings"]
+
+    Prop --> CSVAddr["Bulk Address CSV Import"]
+    Users --> ApproveRes["Ownership Approvals"]
+    Users --> DirRoles["User Directory & Roles"]
+    Fin --> ApprovePay["Payment Proof Reviews"]
+    Fin --> MatrixCSV["Payment Matrix CSV"]
+    Sec --> Guards["Guard Management"]
+    Sec --> Logs["Access Logs"]
+    Amen --> FacConfig["Amenities Configurator"]
+    Amen --> SysConfig["Cutoff, Grace & SMTP"]
+```
+
 ---
 
 ## 2. Property & Address Management
@@ -136,6 +155,17 @@ Residents upload monthly maintenance fee receipts to remain in good standing.
   1. View submitted payment receipts and target billing period (e.g. `2026-07`).
   2. Tap **Approve**: Sets receipt status to approved, updates `lastPaymentApproval`, and automatically recalculates the address's overall `paymentStatus` (`paid`, `pending`, or `restricted`).
   3. Tap **Reject**: Prompts for rejection reason to alert the resident.
+
+```mermaid
+flowchart LR
+    Upload["Resident Uploads Receipt"] --> Pending["Status: Pending Review"]
+    Pending --> Decision{"Admin Review"}
+    Decision -- "Approve" --> Recalc["Auto Recalculation"]
+    Decision -- "Reject" --> Rejected["Rejection Reason Sent to Resident"]
+    Recalc --> Paid["Paid (paid)"]
+    Recalc --> Grace["Grace Period (pending)"]
+    Recalc --> Restricted["Restricted (restricted)"]
+```
 
 ### 4.2 Uploading Payments on Behalf of Residents
 Administrators can manually record maintenance payments for residents who pay in cash or bank transfer.

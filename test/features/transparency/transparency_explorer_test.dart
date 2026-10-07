@@ -129,5 +129,67 @@ void main() {
       // 'unknown_cat' has 0 documents -> ALLOWED
       expect(canDeleteCategory('unknown_cat', sampleDocs), isTrue);
     });
+
+    test('Filters documents by visibility for non-admin vs admin users', () {
+      final visibilityDocs = [
+        {
+          'id': 'admin_user_manual_es',
+          'title': 'Manual de Usuario del Administrador',
+          'fileName': 'Manual_Usuario_Administrador_ES.pdf',
+          'fileType': 'pdf',
+          'folderId': 'folder-manuals',
+          'category': 'manuals',
+          'visibility': 'admin',
+        },
+        {
+          'id': 'technical_overview_es',
+          'title': 'Descripción Técnica General',
+          'fileName': 'Descripcion_Tecnica_General_ES.pdf',
+          'fileType': 'pdf',
+          'folderId': 'folder-manuals',
+          'category': 'manuals',
+          'visibility': 'all',
+        },
+        {
+          'id': 'legacy_doc',
+          'title': 'Legacy Document Without Visibility Field',
+          'fileName': 'legacy.pdf',
+          'fileType': 'pdf',
+          'folderId': 'folder-manuals',
+          'category': 'normatives',
+        },
+      ];
+
+      List<Map<String, dynamic>> filterForUser(List<Map<String, dynamic>> docs, {required bool isAdmin}) {
+        return docs.where((doc) {
+          final docVisibility = (doc['visibility'] ?? 'all').toString().toLowerCase();
+          if (!isAdmin && docVisibility == 'admin') return false;
+          return true;
+        }).toList();
+      }
+
+      // Non-admin resident only sees 'all' and legacy documents (not 'admin')
+      final residentVisible = filterForUser(visibilityDocs, isAdmin: false);
+      expect(residentVisible.length, 2);
+      expect(residentVisible.map((d) => d['id']), isNot(contains('admin_user_manual_es')));
+      expect(residentVisible.map((d) => d['id']), containsAll(['technical_overview_es', 'legacy_doc']));
+
+      // Admin sees all 3 documents including 'admin'-only manual
+      final adminVisible = filterForUser(visibilityDocs, isAdmin: true);
+      expect(adminVisible.length, 3);
+      expect(adminVisible.map((d) => d['id']), contains('admin_user_manual_es'));
+    });
+
+    test('Changing a document visibility updates visibility attribute between all and admin', () {
+      final mutableDoc = <String, dynamic>{
+        'id': 'doc-manual',
+        'title': 'Admin Guide',
+        'visibility': 'all',
+      };
+      expect(mutableDoc['visibility'], 'all');
+
+      mutableDoc['visibility'] = 'admin';
+      expect(mutableDoc['visibility'], 'admin');
+    });
   });
 }

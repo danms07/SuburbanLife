@@ -1,0 +1,63 @@
+{
+  "defaultFolder": {
+    "id": "official_manuals",
+    "name": "Manuales y Documentación Oficial",
+    "parentId": "root"
+  },
+  "defaultCategory": {
+    "id": "manuals",
+    "name": "Manuales / Manuals"
+  },
+  "documents": [
+    {
+      "id": "admin_user_manual_es",
+      "source": "docs/admin_user_manual_es.md",
+      "outputFileName": "Manual_Usuario_Administrador_ES.pdf",
+      "title": "Manual de Usuario para Administradores (ES)",
+      "category": "manuals",
+      "folderId": "official_manuals",
+      "visibility": "admin",
+      "parse": true
+    },
+    {
+      "id": "technical_overview_es",
+      "source": "docs/technical_overview_es.md",
+      "outputFileName": "Descripcion_Tecnica_General_ES.pdf",
+      "title": "Descripción Técnica General (ES)",
+      "category": "manuals",
+      "folderId": "official_manuals",
+      "visibility": "all",
+      "parse": true
+    },
+    {
+      "id": "admin_user_manual_en",
+      "source": "docs/admin_user_manual.md",
+      "outputFileName": "Admin_User_Manual_EN.pdf",
+      "title": "Administrator User Manual (EN)",
+      "category": "manuals",
+      "folderId": "official_manuals",
+      "visibility": "admin",
+      "parse": false
+    },
+    {
+      "id": "technical_overview_en",
+      "source": "docs/technical_overview.md",
+      "outputFileName": "Technical_Overview_EN.pdf",
+      "title": "Technical Overview (EN)",
+      "category": "manuals",
+      "folderId": "official_manuals",
+      "visibility": "all",
+      "parse": false
+    },
+    {
+      "id": "bulk_user_creation_en",
+      "source": "docs/bulk_user_creation.md",
+      "outputFileName": "Bulk_User_Creation_Guide_EN.pdf",
+      "title": "Bulk Resident User Creation Guide (EN)",
+      "category": "manuals",
+      "folderId": "official_manuals",
+      "visibility": "admin",
+      "parse": false
+    }
+  ]
+}

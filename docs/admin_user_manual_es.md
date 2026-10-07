@@ -41,6 +41,25 @@ Al iniciar sesión, los administradores ingresan al **Panel de Administración**
 * **Cuadrícula de Navegación**: Acceso directo a todos los módulos administrativos.
 * **Menú Lateral de Acceso Rápido**: Menú desplegable para cambiar de pantalla o acceder a la configuración.
 
+```mermaid
+flowchart TD
+    Admin["Panel de Administración (Admin)"] --> Prop["Propiedades y Direcciones"]
+    Admin --> Users["Usuarios y Residentes"]
+    Admin --> Fin["Finanzas y Pagos"]
+    Admin --> Sec["Seguridad y Accesos"]
+    Admin --> Amen["Amenidades y Configuración"]
+
+    Prop --> CSVAddr["Importación CSV de Calles"]
+    Users --> ApproveRes["Aprobar Titularidad"]
+    Users --> DirRoles["Directorio y Roles"]
+    Fin --> ApprovePay["Revisar Comprobantes"]
+    Fin --> MatrixCSV["Matriz de Pagos CSV"]
+    Sec --> Guards["Gestión de Guardias"]
+    Sec --> Logs["Bitácora de Accesos"]
+    Amen --> FacConfig["Configurador de Amenidades"]
+    Amen --> SysConfig["Corte, Gracia y SMTP"]
+```
+
 ---
 
 ## 2. Gestión de Propiedades y Direcciones
@@ -136,6 +155,17 @@ Los residentes suben sus comprobantes de mantenimiento mensual para mantenerse a
   1. Visualice el comprobante cargado y el periodo correspondiente (ej. `2026-07`).
   2. Presione **Aprobar**: Marca el comprobante como aprobado, actualiza la fecha `lastPaymentApproval` y recalcula automáticamente el estado de la vivienda (`paid`, `pending` o `restricted`).
   3. Presione **Rechazar**: Permite ingresar un motivo de rechazo para notificar al residente.
+
+```mermaid
+flowchart LR
+    Upload["Residente Sube Comprobante"] --> Pending["Estado: En Revisión"]
+    Pending --> Decision{"Revisión de Admin"}
+    Decision -- "Aprobar" --> Recalc["Recálculo Automático"]
+    Decision -- "Rechazar" --> Rejected["Notificación de Motivo al Residente"]
+    Recalc --> Paid["Al Día (paid)"]
+    Recalc --> Grace["Pendiente en Gracia (pending)"]
+    Recalc --> Restricted["Restringido (restricted)"]
+```
 
 ### 4.2 Registro de Pagos a Nombre de Residentes
 Permite registrar pagos manualmente cuando los residentes realizan pagos en efectivo o transferencia bancaria directa.

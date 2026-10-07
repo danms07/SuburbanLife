@@ -1,0 +1,71 @@
+name: Build & Publish Documentation PDFs
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'docs/**/*.md'
+      - 'docs/docs_pipeline.json'
+      - 'scripts/build_and_publish_docs.js'
+      - 'scripts/package.json'
+      - '.github/workflows/docs_pipeline.yml'
+  workflow_dispatch:
+    inputs:
+      only_docs:
+        description: 'Optional comma-separated document IDs to parse (leave empty to use parse:true from docs/docs_pipeline.json)'
+        required: false
+        default: ''
+        type: string
+      publish_to_firebase:
+        description: 'Publish generated PDFs to the Firebase Transparency section'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  build-and-publish-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: scripts/package-lock.json
+
+      - name: Install dependencies in scripts/
+        working-directory: ./scripts
+        run: npm ci
+
+      - name: Build PDFs and convert diagrams to PNG
+        working-directory: ./scripts
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ONLY_DOCS: ${{ github.event.inputs.only_docs }}
+          PUBLISH_INPUT: ${{ github.event.inputs.publish_to_firebase }}
+        run: |
+          ARGS=""
+          if [ -n "$ONLY_DOCS" ]; then
+            ARGS="$ARGS --only=$ONLY_DOCS"
+          fi
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT" ] && [ "$PUBLISH_INPUT" != "false" ]; then
+            ARGS="$ARGS --publish"
+          fi
+          node build_and_publish_docs.js $ARGS
+
+      - name: Upload generated PDFs and diagram images as CI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-pdfs
+          path: |
+            docs/pdf/*.pdf
+            docs/pdf/diagrams/*.png
+          if-no-files-found: error

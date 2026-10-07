@@ -132,7 +132,11 @@ service cloud.firestore {
     }
 
     match /documents/{documentId} {
-      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
+      allow read: if isAdmin() || (
+        isAuthenticated() &&
+        request.auth.token.resident == true &&
+        (!('visibility' in resource.data) || resource.data.visibility != 'admin')
+      );
       allow write: if isAdmin();
     }
 

@@ -73,3 +73,7 @@ StackTrace.txt
 /docs/plans/refactor_tasks.md
 /docs/plans/ticket-*
 
+# Intermediate documentation build artifacts
+/docs/pdf/*
+
+

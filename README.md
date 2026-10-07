@@ -291,6 +291,32 @@ For a complete guide to all administrative tools (address import, payment approv
 
 ---
 
+## Automated Documentation-to-PDF Pipeline & Transparency Sync
+
+The repository includes an automated pipeline ([scripts/build_and_publish_docs.js](scripts/build_and_publish_docs.js)) and GitHub Actions workflow ([.github/workflows/docs_pipeline.yml](.github/workflows/docs_pipeline.yml)) that converts Markdown documentation into branded PDF files with pre-rendered `.png` diagrams and populates them into the **Transparency** section of the app.
+
+### Key Capabilities:
+1. **Declarative Document Selection (`parse`)**: Configure which documents to compile and publish in [docs/docs_pipeline.json](docs/docs_pipeline.json) using `"parse": true | false` (or override via CLI `--only=admin_user_manual_es`).
+2. **Mermaid Diagram-to-PNG Pre-Rendering**: Extracts `mermaid` blocks, renders high-resolution `.png` images via headless Chromium, and embeds them directly into the branded PDF layout.
+3. **Role-Based Document Visibility (`visibility`)**: Each document specifies `"visibility": "admin" | "all"`. Documents marked `"admin"` (such as the Administrator User Manual) are restricted to administrators in the Transparency UI, Firestore security rules, and Cloud Storage (`/documents/admin_only/`), while `"all"` documents are visible to both residents and admins.
+4. **Cloud Function & Service Account Sync**: Supports publishing via the `syncTransparencyDocument` callable Cloud Function or directly via the Firebase Admin SDK (`scripts/serviceAccountKey.json` locally, or `FIREBASE_SERVICE_ACCOUNT_JSON` secret in GitHub Actions).
+
+### Usage:
+```bash
+cd scripts
+
+# 1. Generate PDFs and diagram PNGs locally (outputs to docs/pdf/):
+npm run docs:pdf
+
+# 2. Generate PDFs and publish to Firebase (Storage + Firestore Transparency section):
+npm run docs:publish
+
+# 3. Publish to local Firebase Emulators:
+npm run docs:publish:emulator
+```
+
+---
+
 ## Automated Pre-Rollout Testing Suite
 
 To ensure flawless operation across all resident and administrative workflows before deployment, run the zero-touch test pipeline:
@@ -300,6 +326,7 @@ To ensure flawless operation across all resident and administrative workflows be
 ```
 
 This single command starts the Firebase Emulators, seeds all 170 physical addresses, app settings, amenities, and default test accounts, executes all integration suites (roommate linking, announcements, advance multi-period payments, debt recovery & feature gating, partial settlement, and facility booking lifecycle), and cleanly shuts down the emulator instances upon completion.
+
 
 
 

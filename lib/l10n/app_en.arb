@@ -966,6 +966,14 @@
     }
   },
   "paymentProofPhoto": "Payment Receipt Photo",
-  "switchCamera": "Switch Camera"
+  "switchCamera": "Switch Camera",
+  "documentVisibilityLabel": "Visibility",
+  "visibilityAllResidents": "All (Residents & Admins)",
+  "visibilityAdminOnly": "Administrators Only",
+  "adminOnlyBadge": "ADMIN ONLY",
+  "changeVisibility": "Change Visibility",
+  "selectNewVisibility": "Select document visibility",
+  "documentVisibilityChanged": "Document visibility updated successfully"
 }
+
 

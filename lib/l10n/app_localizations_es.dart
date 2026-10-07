@@ -2192,4 +2192,26 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get switchCamera => 'Cambiar Cámara';
+
+  @override
+  String get documentVisibilityLabel => 'Visibilidad';
+
+  @override
+  String get visibilityAllResidents => 'Todos (Residentes y Administradores)';
+
+  @override
+  String get visibilityAdminOnly => 'Solo Administradores';
+
+  @override
+  String get adminOnlyBadge => 'SOLO ADMIN';
+
+  @override
+  String get changeVisibility => 'Cambiar Visibilidad';
+
+  @override
+  String get selectNewVisibility => 'Seleccione la visibilidad del documento';
+
+  @override
+  String get documentVisibilityChanged =>
+      'Visibilidad del documento actualizada exitosamente';
 }

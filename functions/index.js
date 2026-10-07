@@ -83,10 +83,12 @@ function isPasswordCompliant(password) {
 
 const { DEFAULT_APP_NAME, DEFAULT_PROJECT_ID, BRAND_COLORS } = require('./brand_config');
 const projectId = process.env.GCLOUD_PROJECT || DEFAULT_PROJECT_ID;
+const GEMINI_MODEL = 'gemini-3.8-flash';
+const GEMINI_LOCATION = 'global';
 const ai = new GoogleGenAI({
   vertexai: true,
   project: projectId,
-  location: 'us-central1',
+  location: GEMINI_LOCATION,
 });
 
 // Helper: Retrieve SMTP settings from Firestore
@@ -327,7 +329,7 @@ exports.translateAnnouncement = onDocumentCreated('announcements/{announcementId
       Content: ${content}`;
 
       const result = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_MODEL,
         contents: prompt,
       });
 
@@ -2303,6 +2305,202 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
   });
 });
 
+const path = require('path');
+
+const ALLOWED_DOCUMENT_VISIBILITIES = ['all', 'admin'];
+const ALLOWED_DOCUMENT_FILE_TYPES = ['pdf', 'md', 'txt', 'docx', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'webp'];
+const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit
+
+/**
+ * Validates and normalizes input parameters for publishing/syncing a document
+ * into the Transparency section.
+ */
+function validateTransparencyDocInput(data) {
+  if (!data || typeof data !== 'object') {
+    throw new HttpsError('invalid-argument', 'Document payload must be a valid object.');
+  }
+
+  const rawTitle = (data.title || '').toString().trim();
+  if (!rawTitle || rawTitle.length > 200) {
+    throw new HttpsError('invalid-argument', 'Document title is required and must be at most 200 characters.');
+  }
+
+  const rawFileName = path.basename((data.fileName || '').toString().trim());
+  const safeFileName = rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  if (!safeFileName || safeFileName === '.' || safeFileName === '..' || safeFileName.length > 200) {
+    throw new HttpsError('invalid-argument', 'A valid fileName is required.');
+  }
+
+  const extFromFile = safeFileName.includes('.')
+    ? safeFileName.split('.').pop().toLowerCase()
+    : '';
+  const fileType = ((data.fileType || extFromFile || 'pdf').toString().trim().toLowerCase());
+  if (!ALLOWED_DOCUMENT_FILE_TYPES.includes(fileType)) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Unsupported fileType "${fileType}". Allowed types: ${ALLOWED_DOCUMENT_FILE_TYPES.join(', ')}`
+    );
+  }
+
+  const visibility = ((data.visibility || 'all').toString().trim().toLowerCase());
+  if (!ALLOWED_DOCUMENT_VISIBILITIES.includes(visibility)) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Invalid visibility "${visibility}". Allowed values: ${ALLOWED_DOCUMENT_VISIBILITIES.join(', ')}`
+    );
+  }
+
+  const rawDocId = (data.docId || data.id || '').toString().trim();
+  const safeDocId = rawDocId ? rawDocId.replace(/[^a-zA-Z0-9_-]/g, '_') : '';
+
+  const category = ((data.category || 'manuals').toString().trim().toLowerCase()).replace(/[^a-z0-9_-]/g, '_');
+  const categoryName = (data.categoryName || 'Manuales / Manuals').toString().trim().slice(0, 100);
+  const folderId = ((data.folderId || 'root').toString().trim()).replace(/[^a-zA-Z0-9_-]/g, '_') || 'root';
+  const folderName = (data.folderName || '').toString().trim().slice(0, 120);
+
+  return {
+    docId: safeDocId,
+    title: rawTitle,
+    fileName: safeFileName,
+    fileType,
+    visibility,
+    category: category || 'manuals',
+    categoryName,
+    folderId,
+    folderName,
+  };
+}
+
+/**
+ * Callable Cloud Function: syncTransparencyDocument
+ * Populates or updates a document in the Transparency section (`documents` collection),
+ * optionally uploading the binary PDF/file to Cloud Storage using the Service Account
+ * and enforcing document visibility ('all' vs 'admin').
+ */
+exports.syncTransparencyDocument = onCall(callableOptions, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Only administrators can sync transparency documents.');
+  }
+
+  const validated = validateTransparencyDocInput(request.data || {});
+  const db = admin.firestore();
+  const uploaderUid = request.auth.uid;
+
+  let downloadUrl = (request.data.url || '').toString().trim();
+  let storagePath = (request.data.storagePath || '').toString().trim();
+  let fileSize = typeof request.data.fileSize === 'number' && request.data.fileSize >= 0
+    ? request.data.fileSize
+    : 0;
+
+  // If base64 file content is provided, upload directly to Cloud Storage via Admin SDK
+  if (request.data.fileBase64 && typeof request.data.fileBase64 === 'string') {
+    const fileBuffer = Buffer.from(request.data.fileBase64, 'base64');
+    if (fileBuffer.length === 0 || fileBuffer.length > MAX_DOCUMENT_SIZE_BYTES) {
+      throw new HttpsError('invalid-argument', 'File size must be between 1 byte and 10 MB.');
+    }
+
+    // Validate PDF magic bytes header (%PDF-) when fileType is pdf
+    if (validated.fileType === 'pdf') {
+      const magicHeader = fileBuffer.subarray(0, 5).toString('ascii');
+      if (magicHeader !== '%PDF-') {
+        throw new HttpsError('invalid-argument', 'Invalid PDF content: missing %PDF- magic header.');
+      }
+    }
+
+    // TODO(security): Integrate with an antivirus API and CDR tool to scan and strip active macros/scripts if untrusted uploads are accepted.
+    fileSize = fileBuffer.length;
+    const prefix = validated.visibility === 'admin' ? 'documents/admin_only' : 'documents';
+    const uniqueId = crypto.randomUUID();
+    storagePath = `${prefix}/${validated.docId || uniqueId}_${validated.fileName}`;
+
+    const bucket = admin.storage().bucket();
+    const fileRef = bucket.file(storagePath);
+    const downloadToken = crypto.randomUUID();
+
+    await fileRef.save(fileBuffer, {
+      resumable: false,
+      metadata: {
+        contentType: validated.fileType === 'pdf' ? 'application/pdf' : 'application/octet-stream',
+        contentDisposition: `attachment; filename="${validated.fileName}"`,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+          visibility: validated.visibility,
+          uploaderUid,
+        },
+      },
+    });
+
+    const encodedPath = encodeURIComponent(storagePath);
+    downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+  }
+
+  if (!downloadUrl) {
+    throw new HttpsError('invalid-argument', 'Either fileBase64 or a valid Storage url must be provided.');
+  }
+
+  // Ensure document category exists
+  if (validated.category) {
+    const catRef = db.collection('document_categories').doc(validated.category);
+    const catSnap = await catRef.get();
+    if (!catSnap.exists) {
+      await catRef.set({
+        name: validated.categoryName || validated.category,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  // Ensure target virtual folder exists if not root
+  if (validated.folderId !== 'root' && validated.folderName) {
+    const folderRef = db.collection('document_folders').doc(validated.folderId);
+    const folderSnap = await folderRef.get();
+    if (!folderSnap.exists) {
+      await folderRef.set({
+        name: validated.folderName,
+        parentId: 'root',
+        createdAt: FieldValue.serverTimestamp(),
+        createdBy: uploaderUid,
+      });
+    }
+  }
+
+  const docRef = validated.docId
+    ? db.collection('documents').doc(validated.docId)
+    : db.collection('documents').doc();
+
+  const existingSnap = await docRef.get();
+  const now = FieldValue.serverTimestamp();
+
+  const docData = {
+    title: validated.title,
+    fileName: validated.fileName,
+    fileType: validated.fileType,
+    fileSize,
+    category: validated.category,
+    folderId: validated.folderId,
+    visibility: validated.visibility,
+    url: downloadUrl,
+    storagePath,
+    publicationDate: now,
+    updatedAt: now,
+    uploaderUid,
+  };
+
+  if (!existingSnap.exists) {
+    docData.uploadedAt = now;
+  }
+
+  await docRef.set(docData, { merge: true });
+
+  return {
+    success: true,
+    docId: docRef.id,
+    visibility: validated.visibility,
+    url: downloadUrl,
+    storagePath,
+  };
+});
+
 // Export internal helper functions and configurations for unit testing
 exports._test = {
   generateSecurePassword,
@@ -2313,8 +2511,12 @@ exports._test = {
   validateDeliveryDate,
   validateFacilityBooking,
   recalculateAddressPaymentStatus,
+  validateTransparencyDocInput,
   isEmulator,
   callableOptions,
   BRAND_COLORS,
   buildWelcomeEmailHtml,
+  GEMINI_MODEL,
+  GEMINI_LOCATION,
 };
+

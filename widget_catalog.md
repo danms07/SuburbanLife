@@ -193,6 +193,11 @@ The following table maps each visual component to its feature domain and source 
 - **Description**: An amenity reservation view providing transparent availability feedback. Highlights the facility's daily operating window badge (`openingTime` - `closingTime`) and enforces client-side time-picker bounds, preventing residents from selecting slots outside operating hours. Limits calendar selection to valid future dates based on the configured advance anticipation window (`anticipationUnit`, `anticipationValue`). Renders an anonymous schedule calendar streaming only confirmed bookings (`isConfirmed == true`) to protect resident privacy while clearly displaying occupied slots.
 - **Usage**: Exposed via `BookingScreen`.
 
+## 33. Explorer Document Card & Role Visibility Controls
+- **Description**: A document card widget (`DocumentCard`) and upload/management dialog suite in `TransparencyScreen` supporting role-based visibility (`all` for all residents vs. `admin` for administrators only). Displays an `ADMIN ONLY` / `SOLO ADMIN` lock badge (`Icons.admin_panel_settings`) when `visibility == 'admin'`, alongside category, publication date, file size, and offline cache badges. Administrators can set visibility during document upload or toggle visibility on existing documents via the `Change Visibility` popup menu item (`_showChangeDocumentVisibilityDialog`). Non-admin residents automatically query and filter only `visibility == 'all'` documents.
+- **Usage**: Exposed via `TransparencyScreen` and `DocumentCard`.
+
+
 
 
 
