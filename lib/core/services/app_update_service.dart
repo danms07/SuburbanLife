@@ -192,7 +192,7 @@ class AppUpdateService with WidgetsBindingObserver {
       final sw = html.window.navigator.serviceWorker;
       if (sw != null) {
         final reg = await sw.getRegistration();
-        await reg?.update();
+        await reg.update();
       }
     } catch (e) {
       debugPrint('[AppUpdateService] Service worker update error: $e');

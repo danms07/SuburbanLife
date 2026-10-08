@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:universal_html/html.dart' as html;
 import 'package:path_provider/path_provider.dart';
 import '../../core/config/app_config.dart';
@@ -194,9 +193,6 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
         final bytes = utf8.encode(csvString);
         final blob = html.Blob([bytes]);
         final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
-          ..setAttribute('download', 'payment_report_${DateTime.now().millisecondsSinceEpoch}.csv')
-          ..click();
         html.Url.revokeObjectUrl(url);
 
         ScaffoldMessenger.of(context).showSnackBar(
