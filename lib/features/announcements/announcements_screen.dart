@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'clipboard_image_helper.dart';
 import '../../core/backend/backend.dart';
+import '../../core/services/temp_image_cleanup_service.dart';
 import 'package:suburban_life/core/config/app_config.dart';
 import 'package:suburban_life/core/widgets/interactive_image_dialog.dart';
 import 'package:suburban_life/core/widgets/storage_network_image.dart';
@@ -13,7 +14,16 @@ import 'package:suburban_life/features/announcements/announcement.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 
 class AnnouncementsScreen extends StatefulWidget {
-  const AnnouncementsScreen({super.key});
+  final bool isEmbedded;
+  final bool autoOpenCreateDialog;
+  final VoidCallback? onCreateDialogOpened;
+
+  const AnnouncementsScreen({
+    super.key,
+    this.isEmbedded = false,
+    this.autoOpenCreateDialog = false,
+    this.onCreateDialogOpened,
+  });
 
   @override
   State<AnnouncementsScreen> createState() => _AnnouncementsScreenState();
@@ -26,6 +36,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   bool _isAdmin = false;
   bool _isResident = false;
   bool _isLoading = true;
+  bool _didAutoOpenCreateDialog = false;
   String _currentLang = 'es'; // Default to Spanish
 
   // Curated list of high-relevance announcement emojis
@@ -40,6 +51,30 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     _checkAdmin();
   }
 
+  @override
+  void didUpdateWidget(covariant AnnouncementsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.autoOpenCreateDialog && !oldWidget.autoOpenCreateDialog) {
+      _didAutoOpenCreateDialog = false;
+      _maybeAutoOpenCreateDialog();
+    }
+  }
+
+  void _maybeAutoOpenCreateDialog() {
+    if (!widget.autoOpenCreateDialog ||
+        _didAutoOpenCreateDialog ||
+        !_isAdmin ||
+        _isLoading) {
+      return;
+    }
+    _didAutoOpenCreateDialog = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onCreateDialogOpened?.call();
+      _showCreateDialog();
+    });
+  }
+
   void _checkAdmin() async {
     try {
       final isAdmin = await _authService.isAdmin();
@@ -50,6 +85,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
           _isResident = isResident;
           _isLoading = false;
         });
+        _maybeAutoOpenCreateDialog();
       }
     } catch (e, stack) {
       debugPrint('Error checking admin status in AnnouncementsScreen: $e');
@@ -228,11 +264,13 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.announcements),
-          backgroundColor: AppConfig.primaryColor,
-          foregroundColor: Colors.white,
-        ),
+        appBar: widget.isEmbedded
+            ? null
+            : AppBar(
+                title: Text(l10n.announcements),
+                backgroundColor: AppConfig.primaryColor,
+                foregroundColor: Colors.white,
+              ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -242,11 +280,13 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     _currentLang = locale.languageCode;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.announcements),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(l10n.announcements),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: DatabaseService().streamCollection(
           'announcements',
@@ -560,10 +600,14 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                                 l10n.emojisLabel,
                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
                               ),
-                              const Spacer(),
-                              Text(
-                                l10n.insertEmojiHint,
-                                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  l10n.insertEmojiHint,
+                                  textAlign: TextAlign.end,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                ),
                               ),
                             ],
                           ),
@@ -662,10 +706,13 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
                                         try {
                                           final picked = await _picker.pickImage(
                                             source: ImageSource.gallery,
+                                            maxWidth: 2048,
+                                            maxHeight: 2048,
                                             imageQuality: 85,
                                           );
                                           if (picked != null) {
                                             final bytes = await picked.readAsBytes();
+                                            await TempImageCleanupService.deleteTempXFile(picked);
                                             setStateDialog(() {
                                               selectedImageBytes = bytes;
                                               selectedImageName = picked.name;

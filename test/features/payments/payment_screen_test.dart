@@ -150,4 +150,44 @@ void main() {
     // Missing receipt image should still remain
     expect(find.text('• Se requiere una foto del comprobante de pago'), findsOneWidget);
   });
+
+  testWidgets('PaymentScreen displays rejection recovery banner and auto-prefills folio and amount from latest rejected receipt', (tester) async {
+    final addressRef = FakeBackendHelper.db.createReference('addresses', 'addr_1');
+    FakeBackendHelper.db.seedDocument('payments', 'pay_rej_latest', {
+      'id': 'pay_rej_latest',
+      'addressRef': addressRef,
+      'residentUid': 'resident_test_uid',
+      'uploaderUid': 'resident_test_uid',
+      'status': 'rejected',
+      'rejectionReason': 'Comprobante ilegible',
+      'folio': 'REJ-9021',
+      'amount': 950.0,
+      'concept': 'monthly quota',
+      'periods': ['2026-10'],
+      'paymentDate': DateTime(2026, 10, 10).millisecondsSinceEpoch,
+      'timestamp': DateTime(2026, 10, 10, 14, 0).millisecondsSinceEpoch,
+    });
+
+    await tester.pumpWidget(wrapWithMaterial(const PaymentScreen(currentUid: 'resident_test_uid')));
+    await tester.pumpAndSettle();
+
+    final l10n = AppLocalizations.of(tester.element(find.byType(PaymentScreen)))!;
+    expect(find.text(l10n.paymentRejectedBannerTitle), findsOneWidget);
+    expect(find.text(l10n.paymentRejectedBannerMsg('Comprobante ilegible')), findsOneWidget);
+
+    final folioEditable = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const ValueKey('folio_field')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    final amountEditable = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const ValueKey('amount_field')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(folioEditable.controller.text, equals('REJ-9021'));
+    expect(amountEditable.controller.text, equals('950.0'));
+  });
 }

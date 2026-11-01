@@ -82,4 +82,87 @@ void main() {
       expect(updated?['status'], equals('deactivated (revoked)'));
     });
   });
+
+  group('QrService - resolveEffectiveStatus', () {
+    test('normalizes used, revoked, and expired status synonyms', () {
+      expect(
+        QrService.resolveEffectiveStatus({'status': 'used'}),
+        equals('deactivated (validated)'),
+      );
+      expect(
+        QrService.resolveEffectiveStatus({'status': 'deactivated (validated)'}),
+        equals('deactivated (validated)'),
+      );
+      expect(
+        QrService.resolveEffectiveStatus({'status': 'revoked'}),
+        equals('deactivated (revoked)'),
+      );
+      expect(
+        QrService.resolveEffectiveStatus({'status': 'expired'}),
+        equals('deactivated (expired)'),
+      );
+      expect(
+        QrService.resolveEffectiveStatus({'status': 'active', 'isValid': false}),
+        equals('deactivated'),
+      );
+    });
+
+    test('resolves active supplier or temporary QR code past expiryTime to deactivated (expired)', () {
+      final now = DateTime(2026, 10, 12, 14, 0, 0);
+      final pastExpiry = DateTime(2026, 10, 4, 23, 59, 59);
+      final futureExpiry = DateTime(2026, 10, 12, 23, 59, 59);
+
+      expect(
+        QrService.resolveEffectiveStatus(
+          {
+            'status': 'active',
+            'accessCategory': 'supplier',
+            'isOneTimeUse': true,
+            'expiryTime': pastExpiry,
+          },
+          now: now,
+        ),
+        equals('deactivated (expired)'),
+      );
+
+      expect(
+        QrService.resolveEffectiveStatus(
+          {
+            'status': 'active',
+            'accessCategory': 'supplier',
+            'isOneTimeUse': true,
+            'expiryTime': futureExpiry,
+          },
+          now: now,
+        ),
+        equals('active'),
+      );
+    });
+  });
+
+  group('QrService - isVisitorInside', () {
+    test('returns true only when isInside is explicitly true', () {
+      expect(QrService.isVisitorInside({'isInside': true}), isTrue);
+      expect(QrService.isVisitorInside({'isInside': false}), isFalse);
+      expect(QrService.isVisitorInside({}), isFalse);
+      expect(QrService.isVisitorInside({'isInside': null}), isFalse);
+    });
+
+    test('preserves isInside flag across getUserQrCodes stream', () async {
+      FakeBackendHelper.db.seedDocument('qr_codes', 'qr_inside', {
+        'id': 'qr_inside',
+        'creatorUid': 'res_inside',
+        'guestName': 'Maria Inside',
+        'timestamp': 500000,
+        'status': 'active',
+        'isInside': true,
+        'activeAccessLogId': 'log_99',
+      });
+
+      final list = await qrService.getUserQrCodes('res_inside').first;
+      expect(list.length, equals(1));
+      expect(QrService.isVisitorInside(list.first), isTrue);
+      expect(list.first['activeAccessLogId'], equals('log_99'));
+    });
+  });
 }

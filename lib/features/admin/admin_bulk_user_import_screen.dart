@@ -12,7 +12,130 @@ import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminBulkUserImportScreen extends StatefulWidget {
-  const AdminBulkUserImportScreen({super.key});
+  final List<Map<String, String>>? initialParsedUsers;
+  final String? initialFileName;
+  final bool isEmbedded;
+
+  const AdminBulkUserImportScreen({
+    super.key,
+    this.initialParsedUsers,
+    this.initialFileName,
+    this.isEmbedded = false,
+  });
+
+  static List<Map<String, String>> parseUserCsv(String csvContent) {
+    final List<Map<String, String>> result = [];
+    final lines = const LineSplitter().convert(csvContent);
+    if (lines.isEmpty) return result;
+
+    int nameCol = -1;
+    int emailCol = -1;
+    int passwordCol = -1;
+    int streetCol = -1;
+    int numberCol = -1;
+
+    final firstRowCells = splitCsvLine(lines[0]);
+    final lowerHeaders = firstRowCells.map((c) => c.toLowerCase().trim()).toList();
+
+    for (int i = 0; i < lowerHeaders.length; i++) {
+      final h = lowerHeaders[i];
+      if (h == 'name' || h == 'nombre' || h == 'full_name' || h == 'fullname' || h == 'display_name') {
+        nameCol = i;
+      } else if (h == 'email' || h == 'correo' || h == 'email_address') {
+        emailCol = i;
+      } else if (h == 'password' || h == 'contraseña' || h == 'contrasena' || h == 'pass') {
+        passwordCol = i;
+      } else if (h == 'street' || h == 'street_name' || h == 'calle' || h == 'streetname') {
+        streetCol = i;
+      } else if (h == 'number' || h == 'house_number' || h == 'numero' || h == 'número' || h == 'housenumber') {
+        numberCol = i;
+      }
+    }
+
+    int startIndex = 1;
+    // Fallback positional indexing if header row is missing or not detected
+    if (nameCol == -1 && emailCol == -1) {
+      startIndex = 0;
+      nameCol = 0;
+      emailCol = 1;
+      passwordCol = 2;
+      streetCol = 3;
+      numberCol = 4;
+    }
+
+    for (int i = startIndex; i < lines.length; i++) {
+      final line = lines[i].trim();
+      if (line.isEmpty) continue;
+
+      final cells = splitCsvLine(line);
+      String name = nameCol >= 0 && nameCol < cells.length ? cells[nameCol] : '';
+      String email = emailCol >= 0 && emailCol < cells.length ? cells[emailCol] : '';
+      String password = passwordCol >= 0 && passwordCol < cells.length ? cells[passwordCol] : '';
+      String street = streetCol >= 0 && streetCol < cells.length ? cells[streetCol] : '';
+      String number = numberCol >= 0 && numberCol < cells.length ? cells[numberCol] : '';
+
+      if (name.isNotEmpty && email.contains('@')) {
+        result.add({
+          'name': name,
+          'email': email,
+          'password': password,
+          'streetName': street,
+          'number': number,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  static List<String> splitCsvLine(String line) {
+    final List<String> cells = [];
+    final StringBuffer buffer = StringBuffer();
+    bool inQuotes = false;
+
+    for (int i = 0; i < line.length; i++) {
+      final char = line[i];
+      if (char == '"') {
+        inQuotes = !inQuotes;
+      } else if (char == ',' && !inQuotes) {
+        cells.add(cleanCell(buffer.toString()));
+        buffer.clear();
+      } else {
+        buffer.write(char);
+      }
+    }
+    cells.add(cleanCell(buffer.toString()));
+    return cells;
+  }
+
+  static String cleanCell(String val) {
+    String trimmed = val.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+      trimmed = trimmed.substring(1, trimmed.length - 1).trim();
+    }
+    return trimmed;
+  }
+
+  static String generateResultCsvString(List<Map<String, dynamic>> results) {
+    final buffer = StringBuffer();
+    buffer.writeln('name,email,password,street,number,status,assigned_password,email_sent,error');
+
+    for (var r in results) {
+      final name = (r['name'] ?? '').toString().replaceAll('"', '""');
+      final email = (r['email'] ?? '').toString().replaceAll('"', '""');
+      final inputPass = (r['password'] ?? '').toString().replaceAll('"', '""');
+      final street = (r['streetName'] ?? '').toString().replaceAll('"', '""');
+      final numStr = (r['number'] ?? '').toString().replaceAll('"', '""');
+      final status = (r['status'] ?? '').toString().replaceAll('"', '""');
+      final assignedPass = (r['assignedPassword'] ?? '').toString().replaceAll('"', '""');
+      final emailSent = (r['emailSent'] == true) ? 'yes' : 'no';
+      final error = (r['error'] ?? '').toString().replaceAll('"', '""');
+
+      buffer.writeln('"$name","$email","$inputPass","$street","$numStr","$status","$assignedPass","$emailSent","$error"');
+    }
+
+    return buffer.toString();
+  }
 
   @override
   State<AdminBulkUserImportScreen> createState() => _AdminBulkUserImportScreenState();
@@ -20,7 +143,7 @@ class AdminBulkUserImportScreen extends StatefulWidget {
 
 class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
   String? _fileName;
-  List<Map<String, String>> _parsedUsers = [];
+  late List<Map<String, String>> _parsedUsers;
   bool _isProcessing = false;
   Map<String, dynamic>? _importResult;
   bool _isSmtpConfigured = false;
@@ -28,6 +151,10 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
   @override
   void initState() {
     super.initState();
+    _parsedUsers = widget.initialParsedUsers != null
+        ? List<Map<String, String>>.from(widget.initialParsedUsers!)
+        : [];
+    _fileName = widget.initialFileName;
     _checkSmtpStatus();
   }
 
@@ -143,98 +270,8 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     }
   }
 
-  List<Map<String, String>> _parseCsv(String csvContent) {
-    final List<Map<String, String>> result = [];
-    final lines = const LineSplitter().convert(csvContent);
-    if (lines.isEmpty) return result;
-
-    int nameCol = -1;
-    int emailCol = -1;
-    int passwordCol = -1;
-    int streetCol = -1;
-    int numberCol = -1;
-
-    final firstRowCells = _splitCsvLine(lines[0]);
-    final lowerHeaders = firstRowCells.map((c) => c.toLowerCase().trim()).toList();
-
-    for (int i = 0; i < lowerHeaders.length; i++) {
-      final h = lowerHeaders[i];
-      if (h == 'name' || h == 'nombre' || h == 'full_name' || h == 'fullname' || h == 'display_name') {
-        nameCol = i;
-      } else if (h == 'email' || h == 'correo' || h == 'email_address') {
-        emailCol = i;
-      } else if (h == 'password' || h == 'contraseña' || h == 'contrasena' || h == 'pass') {
-        passwordCol = i;
-      } else if (h == 'street' || h == 'street_name' || h == 'calle' || h == 'streetname') {
-        streetCol = i;
-      } else if (h == 'number' || h == 'house_number' || h == 'numero' || h == 'número' || h == 'housenumber') {
-        numberCol = i;
-      }
-    }
-
-    int startIndex = 1;
-    // Fallback positional indexing if header row is missing or not detected
-    if (nameCol == -1 && emailCol == -1) {
-      startIndex = 0;
-      nameCol = 0;
-      emailCol = 1;
-      passwordCol = 2;
-      streetCol = 3;
-      numberCol = 4;
-    }
-
-    for (int i = startIndex; i < lines.length; i++) {
-      final line = lines[i].trim();
-      if (line.isEmpty) continue;
-
-      final cells = _splitCsvLine(line);
-      String name = nameCol >= 0 && nameCol < cells.length ? cells[nameCol] : '';
-      String email = emailCol >= 0 && emailCol < cells.length ? cells[emailCol] : '';
-      String password = passwordCol >= 0 && passwordCol < cells.length ? cells[passwordCol] : '';
-      String street = streetCol >= 0 && streetCol < cells.length ? cells[streetCol] : '';
-      String number = numberCol >= 0 && numberCol < cells.length ? cells[numberCol] : '';
-
-      if (name.isNotEmpty && email.contains('@')) {
-        result.add({
-          'name': name,
-          'email': email,
-          'password': password,
-          'streetName': street,
-          'number': number,
-        });
-      }
-    }
-
-    return result;
-  }
-
-  List<String> _splitCsvLine(String line) {
-    final List<String> cells = [];
-    final StringBuffer buffer = StringBuffer();
-    bool inQuotes = false;
-
-    for (int i = 0; i < line.length; i++) {
-      final char = line[i];
-      if (char == '"') {
-        inQuotes = !inQuotes;
-      } else if (char == ',' && !inQuotes) {
-        cells.add(_cleanCell(buffer.toString()));
-        buffer.clear();
-      } else {
-        buffer.write(char);
-      }
-    }
-    cells.add(_cleanCell(buffer.toString()));
-    return cells;
-  }
-
-  String _cleanCell(String val) {
-    String trimmed = val.trim();
-    if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
-      trimmed = trimmed.substring(1, trimmed.length - 1).trim();
-    }
-    return trimmed;
-  }
+  List<Map<String, String>> _parseCsv(String csvContent) =>
+      AdminBulkUserImportScreen.parseUserCsv(csvContent);
 
   void _copyCsvTemplate() {
     const template = 'name,email,password,street,number\nJohn Doe,john.doe@example.com,,1st Avenue,101\nJane Smith,jane.smith@example.com,SecretPass123!,Oak Street,12\n';
@@ -305,25 +342,7 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     final results = List<Map<String, dynamic>>.from(
       (_importResult!['results'] as List? ?? []).map((e) => Map<String, dynamic>.from(e as Map)),
     );
-
-    final buffer = StringBuffer();
-    buffer.writeln('name,email,password,street,number,status,assigned_password,email_sent,error');
-
-    for (var r in results) {
-      final name = (r['name'] ?? '').toString().replaceAll('"', '""');
-      final email = (r['email'] ?? '').toString().replaceAll('"', '""');
-      final inputPass = (r['password'] ?? '').toString().replaceAll('"', '""');
-      final street = (r['streetName'] ?? '').toString().replaceAll('"', '""');
-      final numStr = (r['number'] ?? '').toString().replaceAll('"', '""');
-      final status = (r['status'] ?? '').toString().replaceAll('"', '""');
-      final assignedPass = (r['assignedPassword'] ?? '').toString().replaceAll('"', '""');
-      final emailSent = (r['emailSent'] == true) ? 'yes' : 'no';
-      final error = (r['error'] ?? '').toString().replaceAll('"', '""');
-
-      buffer.writeln('"$name","$email","$inputPass","$street","$numStr","$status","$assignedPass","$emailSent","$error"');
-    }
-
-    return buffer.toString();
+    return AdminBulkUserImportScreen.generateResultCsvString(results);
   }
 
   void _downloadResultCsv() async {
@@ -411,11 +430,13 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.bulkUserImportTitle),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(l10n.bulkUserImportTitle),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(

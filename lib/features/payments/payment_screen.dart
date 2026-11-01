@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/temp_image_cleanup_service.dart';
 import 'payment_service.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -61,6 +63,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   void dispose() {
+    final pendingReceipt = _selectedReceiptImage;
+    _selectedReceiptImage = null;
+    if (pendingReceipt != null) {
+      unawaited(TempImageCleanupService.deleteTempXFile(pendingReceipt));
+    }
     _folioController.dispose();
     _amountController.dispose();
     _folioFocusNode.dispose();
@@ -74,18 +81,29 @@ class _PaymentScreenState extends State<PaymentScreen> {
       try {
         picked = await _picker.pickImage(
           source: ImageSource.camera,
+          maxWidth: 1600,
+          maxHeight: 1600,
           imageQuality: 60,
         );
       } catch (_) {
         picked = await _picker.pickImage(
           source: ImageSource.gallery,
+          maxWidth: 1600,
+          maxHeight: 1600,
           imageQuality: 60,
         );
       }
-      if (picked != null && mounted) {
-        setState(() {
-          _selectedReceiptImage = picked;
-        });
+      if (picked == null) return;
+      if (!mounted) {
+        unawaited(TempImageCleanupService.deleteTempXFile(picked));
+        return;
+      }
+      final previous = _selectedReceiptImage;
+      setState(() {
+        _selectedReceiptImage = picked;
+      });
+      if (previous != null && previous.path != picked.path) {
+        unawaited(TempImageCleanupService.deleteTempXFile(previous));
       }
     } catch (e) {
       debugPrint('Error picking receipt image: $e');
@@ -372,6 +390,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         return st == 'active' || st == 'pending_review';
                       }).toList();
 
+                      if (_selectedConcept == 'sanction' && _selectedSanctionId == null && activeSanctions.isNotEmpty) {
+                        _selectedSanctionId = activeSanctions.first['id']?.toString();
+                      }
+
                       return _buildPaymentUI(
                         context,
                         paymentStatus,
@@ -552,6 +574,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
+                        isExpanded: true,
                         initialValue: _selectedSanctionId ?? activeSanctions.first['id']?.toString(),
                         decoration: InputDecoration(
                           prefixIcon: const Icon(Icons.gavel, color: AppConfig.primaryColor),

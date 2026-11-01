@@ -39,7 +39,7 @@ service cloud.firestore {
              userDoc.data.addressRef == /databases/$(database)/documents/addresses/$(addressId);
     }
 
-    // Check if target user is in caller's family group (via familyMembers list or target's familyMembers list)
+    // Check if target user is in caller's family group (via familyMembers list, target's familyMembers list, or sharing the same addressRef)
     function isFamilyMember(userId) {
       let callerDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return (callerDoc != null && 
@@ -49,7 +49,14 @@ service cloud.firestore {
              (resource.data != null && 
               'familyMembers' in resource.data && 
               resource.data.familyMembers is list && 
-              request.auth.uid in resource.data.familyMembers);
+              request.auth.uid in resource.data.familyMembers) ||
+             (callerDoc != null && 
+              'addressRef' in callerDoc.data && 
+              callerDoc.data.addressRef != null && 
+              resource.data != null && 
+              'addressRef' in resource.data && 
+              resource.data.addressRef != null && 
+              callerDoc.data.addressRef == resource.data.addressRef);
     }
 
     match /users/{userId} {
@@ -118,7 +125,17 @@ service cloud.firestore {
           (resource.data.authorizedUids is list && request.auth.uid in resource.data.authorizedUids)
         )
       );
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        (resource.data.residentUid == request.auth.uid ||
+         (resource.data.authorizedUids is list && request.auth.uid in resource.data.authorizedUids)) &&
+        resource.data.status == 'active' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentId']) &&
+        request.resource.data.status == 'pending_review' &&
+        request.resource.data.paymentId is string &&
+        request.resource.data.paymentId.size() <= 128
+      );
     }
 
     match /announcements/{announcementId} {
@@ -134,19 +151,26 @@ service cloud.firestore {
     match /documents/{documentId} {
       allow read: if isAdmin() || (
         isAuthenticated() &&
-        request.auth.token.resident == true &&
-        (!('visibility' in resource.data) || resource.data.visibility != 'admin')
+        (request.auth.token.resident == true || request.auth.token.roommate == true) &&
+        (resource.data.visibility == 'all' || (!('visibility' in resource.data) || resource.data.visibility != 'admin'))
       );
       allow write: if isAdmin();
     }
 
     match /document_folders/{folderId} {
-      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
+      allow read: if isAdmin() || (
+        isAuthenticated() &&
+        (request.auth.token.resident == true || request.auth.token.roommate == true) &&
+        (resource.data.visibility == 'all' || (!('visibility' in resource.data) || resource.data.visibility != 'admin'))
+      );
       allow write: if isAdmin();
     }
 
     match /document_categories/{catId} {
-      allow read: if isAdmin() || (isAuthenticated() && request.auth.token.resident == true);
+      allow read: if isAdmin() || (
+        isAuthenticated() &&
+        (request.auth.token.resident == true || request.auth.token.roommate == true)
+      );
       allow write: if isAdmin();
     }
 

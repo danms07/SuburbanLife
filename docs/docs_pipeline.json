@@ -2,7 +2,8 @@
   "defaultFolder": {
     "id": "official_manuals",
     "name": "Manuales y Documentación Oficial",
-    "parentId": "root"
+    "parentId": "root",
+    "visibility": "admin"
   },
   "defaultCategory": {
     "id": "manuals",
@@ -26,7 +27,7 @@
       "title": "Descripción Técnica General (ES)",
       "category": "manuals",
       "folderId": "official_manuals",
-      "visibility": "all",
+      "visibility": "admin",
       "parse": true
     },
     {
@@ -46,7 +47,7 @@
       "title": "Technical Overview (EN)",
       "category": "manuals",
       "folderId": "official_manuals",
-      "visibility": "all",
+      "visibility": "admin",
       "parse": false
     },
     {

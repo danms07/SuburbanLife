@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -41,7 +40,8 @@ class _StorageNetworkImageState extends State<StorageNetworkImage> {
 
   void _initFetch() {
     if (widget.imageUrl.startsWith('gs://') || 
-        widget.imageUrl.contains('firebasestorage.googleapis.com')) {
+        widget.imageUrl.contains('firebasestorage.googleapis.com') ||
+        widget.imageUrl.contains(':9199/v0/b/')) {
       _fetchFuture = _downloadBytes(widget.imageUrl);
     } else {
       _fetchFuture = null;
@@ -50,7 +50,14 @@ class _StorageNetworkImageState extends State<StorageNetworkImage> {
 
   Future<Uint8List?> _downloadBytes(String url) async {
     try {
-      final Reference ref = FirebaseStorage.instance.refFromURL(url);
+      final Reference ref;
+      final emulatorMatch = RegExp(r':9199/v0/b/[^/]+/o/([^?]+)').firstMatch(url);
+      if (emulatorMatch != null) {
+        final fullPath = Uri.decodeComponent(emulatorMatch.group(1)!);
+        ref = FirebaseStorage.instance.ref(fullPath);
+      } else {
+        ref = FirebaseStorage.instance.refFromURL(url);
+      }
       // Limit maximum size to 5MB to protect device memory limits
       return await ref.getData(5 * 1024 * 1024);
     } catch (e) {

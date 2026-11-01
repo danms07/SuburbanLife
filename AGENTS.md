@@ -9,6 +9,13 @@
     - Update cloud functions documentation if needed
     - Update the .gitignore file if needed
     - Check for a conflict with the database_schema.md file, if there is a conflict, plan a refactor strategy
+    - Run the test suite and check the results.
+- When commiting
+    - Check for previously uncommited changes, if exist, handle them first
+- Before running the Firebase emulator
+   - Use `nvm default` to switch to the default node version 
+   - Use `npm i -g firebase-tools` to make sure you are using the latest Firebase CLI version 
+    
 
 - Always add spanish translations for the UI text
 - Keep the comments in the code updated and concise

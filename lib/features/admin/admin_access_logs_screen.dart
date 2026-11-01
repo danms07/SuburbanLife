@@ -6,7 +6,50 @@ import '../../core/widgets/interactive_image_dialog.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminAccessLogsScreen extends StatefulWidget {
-  const AdminAccessLogsScreen({super.key});
+  final bool isEmbedded;
+
+  const AdminAccessLogsScreen({super.key, this.isEmbedded = false});
+
+  /// Parses Firestore Timestamp, DateTime, epoch ms int, serialized map, or ISO string into DateTime.
+  static DateTime? parseLogDateTime(dynamic ts) {
+    if (ts == null) return null;
+    if (ts is DateTime) return ts;
+    if (ts is int) return DateTime.fromMillisecondsSinceEpoch(ts);
+    if (ts is Map && ts['_seconds'] != null) {
+      return DateTime.fromMillisecondsSinceEpoch((ts['_seconds'] as int) * 1000);
+    }
+    try {
+      final dynamic converted = (ts as dynamic).toDate();
+      if (converted is DateTime) return converted;
+    } catch (_) {}
+    return DateTime.tryParse(ts.toString());
+  }
+
+  /// Determines if an access log represents a visitor currently inside the community.
+  /// - Returns false if `exitTimestamp` is recorded or `isInside == false`.
+  /// - Returns true if `isInside == true`.
+  /// - Legacy same-day fallback: when `isInside` is omitted/null and `scanOnExitEnabled` is true,
+  ///   returns true if `status == 'allowed'` and `timestamp` is on the same calendar day as `now`.
+  static bool isLogCurrentlyInside(
+    Map<String, dynamic> log, {
+    DateTime? now,
+    bool scanOnExitEnabled = true,
+  }) {
+    if (log['exitTimestamp'] != null) return false;
+    if (log['isInside'] == true) return true;
+    if (log['isInside'] == false) return false;
+    if (!scanOnExitEnabled) return false;
+
+    final status = (log['status']?.toString() ?? '').toLowerCase();
+    if (status != 'allowed') return false;
+    final dt = parseLogDateTime(log['timestamp']);
+    if (dt == null) return false;
+    final localDt = dt.toLocal();
+    final localNow = (now ?? DateTime.now()).toLocal();
+    return localDt.year == localNow.year &&
+        localDt.month == localNow.month &&
+        localDt.day == localNow.day;
+  }
 
   @override
   State<AdminAccessLogsScreen> createState() => _AdminAccessLogsScreenState();
@@ -21,12 +64,14 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
   bool _isLoadingMore = false;
   bool _hasMore = true;
   String? _lastDocId;
+  bool _scanOnExitEnabled = false;
 
   // Filter state
   String _selectedAddress = 'all';
   String _selectedVisitorType = 'all'; // 'all', 'visitor', 'supplier'
   String _dateFilterMode = 'all'; // 'all', 'today', 'this_week', 'this_month', 'custom'
   DateTimeRange? _customDateRange;
+  bool _onlyCurrentlyInside = false;
 
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounceTimer;
@@ -37,6 +82,7 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchSettings();
     _fetchAddressOptions();
     _loadLogs();
   }
@@ -46,6 +92,20 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
     _searchDebounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchSettings() async {
+    try {
+      final appData = await DatabaseService().getDocument('config', 'app_settings');
+      if (mounted && appData != null) {
+        setState(() {
+          _scanOnExitEnabled = appData['scanOnExitEnabled'] == true;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Error fetching app_settings in AdminAccessLogsScreen: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminAccessLogsScreen._fetchSettings');
+    }
   }
 
   /// Fetches unique addresses for the address dropdown filter.
@@ -84,7 +144,8 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
       _searchQuery.isNotEmpty ||
       _selectedAddress != 'all' ||
       _selectedVisitorType != 'all' ||
-      _dateFilterMode != 'all';
+      _dateFilterMode != 'all' ||
+      _onlyCurrentlyInside;
 
   /// Loads access logs from the database.
   /// When search or filters are active (`hasActiveFilter`), queries the entire database for matching records.
@@ -266,21 +327,8 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
 
   String _formatTimestamp(dynamic ts) {
     if (ts == null) return '';
-    DateTime dt;
-    if (ts is DateTime) {
-      dt = ts;
-    } else if (ts is int) {
-      dt = DateTime.fromMillisecondsSinceEpoch(ts);
-    } else if (ts is Map && ts['_seconds'] != null) {
-      dt = DateTime.fromMillisecondsSinceEpoch((ts['_seconds'] as int) * 1000);
-    } else {
-      final parsed = DateTime.tryParse(ts.toString());
-      if (parsed != null) {
-        dt = parsed;
-      } else {
-        return ts.toString();
-      }
-    }
+    final dt = AdminAccessLogsScreen.parseLogDateTime(ts);
+    if (dt == null) return ts.toString();
 
     final local = dt.toLocal();
     final year = local.year.toString().padLeft(4, '0');
@@ -292,17 +340,18 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
     return '$year-$month-$day $hour:$minute';
   }
 
-  DateTime? _parseDateTime(dynamic ts) {
-    if (ts == null) return null;
-    if (ts is DateTime) return ts;
-    if (ts is int) return DateTime.fromMillisecondsSinceEpoch(ts);
-    if (ts is Map && ts['_seconds'] != null) {
-      return DateTime.fromMillisecondsSinceEpoch((ts['_seconds'] as int) * 1000);
-    }
-    return DateTime.tryParse(ts.toString());
-  }
+  DateTime? _parseDateTime(dynamic ts) => AdminAccessLogsScreen.parseLogDateTime(ts);
 
   bool _matchesFilter(Map<String, dynamic> log) {
+    // 0. Currently Inside filter
+    if (_onlyCurrentlyInside &&
+        !AdminAccessLogsScreen.isLogCurrentlyInside(
+          log,
+          scanOnExitEnabled: _scanOnExitEnabled,
+        )) {
+      return false;
+    }
+
     // 1. Address filter
     if (_selectedAddress != 'all') {
       final addrDisplay = log['addressDisplay']?.toString().trim() ?? '';
@@ -344,14 +393,18 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
       final address = (log['addressDisplay'] ?? '').toString().toLowerCase();
       final resident = (log['residentName'] ?? '').toString().toLowerCase();
       final guard = (log['guardName'] ?? '').toString().toLowerCase();
+      final exitGuard = (log['exitGuardName'] ?? '').toString().toLowerCase();
       final reason = (log['reason'] ?? '').toString().toLowerCase();
+      final exitReason = (log['exitReason'] ?? '').toString().toLowerCase();
 
       final matchesSearch = guestName.contains(q) ||
           plates.contains(q) ||
           address.contains(q) ||
           resident.contains(q) ||
           guard.contains(q) ||
-          reason.contains(q);
+          exitGuard.contains(q) ||
+          reason.contains(q) ||
+          exitReason.contains(q);
 
       if (!matchesSearch) return false;
     }
@@ -380,6 +433,7 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
       _selectedVisitorType = 'all';
       _dateFilterMode = 'all';
       _customDateRange = null;
+      _onlyCurrentlyInside = false;
     });
     _loadLogs();
   }
@@ -399,22 +453,30 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
       final cat = (l['accessCategory']?.toString() ?? '').toLowerCase();
       return cat == 'supplier' || cat == 'provider';
     }).length;
+    final insideCount = displayedLogs
+        .where((l) => AdminAccessLogsScreen.isLogCurrentlyInside(
+              l,
+              scanOnExitEnabled: _scanOnExitEnabled,
+            ))
+        .length;
 
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
-      appBar: AppBar(
-        title: Text(l10n.accessLogsTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: MaterialLocalizations.of(context).refreshIndicatorSemanticLabel,
-            onPressed: _isLoading ? null : () => _loadLogs(isRefresh: true),
-          ),
-        ],
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(l10n.accessLogsTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: MaterialLocalizations.of(context).refreshIndicatorSemanticLabel,
+                  onPressed: _isLoading ? null : () => _loadLogs(isRefresh: true),
+                ),
+              ],
+            ),
       body: RefreshIndicator(
         onRefresh: () async {
           await _loadLogs(isRefresh: true);
@@ -426,6 +488,16 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
+                if (widget.isEmbedded) ...[
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.refresh, color: AppConfig.primaryColor),
+                      tooltip: MaterialLocalizations.of(context).refreshIndicatorSemanticLabel,
+                      onPressed: _isLoading ? null : () => _loadLogs(isRefresh: true),
+                    ),
+                  ),
+                ],
                 // 1. Filter Section Card
                 _buildFilterCard(context, l10n, isDesktop, hasActiveFilter),
                 const SizedBox(height: 16),
@@ -441,6 +513,7 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
                   allowed: allowedCount,
                   denied: deniedCount,
                   providers: providerCount,
+                  inside: insideCount,
                   isDesktop: isDesktop,
                 ),
                 const SizedBox(height: 16),
@@ -478,169 +551,240 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
   }
 
   Widget _buildFilterCard(BuildContext context, AppLocalizations l10n, bool isDesktop, bool hasActiveFilter) {
+    final visitorTypeOptions = <(String, String, IconData)>[
+      ('all', l10n.allTypes, Icons.groups_outlined),
+      ('visitor', l10n.visitorTypeGuest, Icons.person_outline),
+      ('supplier', l10n.visitorTypeSupplier, Icons.local_shipping_outlined),
+    ];
+
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Search field
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: l10n.searchVisitorOrPlate,
-                prefixIcon: const Icon(Icons.search, color: AppConfig.primaryColor),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchDebounceTimer?.cancel();
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final useCompactTypeChips = constraints.maxWidth < 520;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Search field
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: l10n.searchVisitorOrPlate,
+                    prefixIcon: const Icon(Icons.search, color: AppConfig.primaryColor),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchDebounceTimer?.cancel();
+                              setState(() {
+                                _searchController.clear();
+                                _searchQuery = '';
+                              });
+                              _loadLogs();
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    isDense: true,
+                  ),
+                  onChanged: _onSearchChanged,
+                ),
+                const SizedBox(height: 14),
+
+                // Dropdowns and Selectors Area
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    // Address Dropdown Filter
+                    Container(
+                      constraints: BoxConstraints(
+                        maxWidth: isDesktop ? 320 : constraints.maxWidth,
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedAddress,
+                          isExpanded: true,
+                          icon: const Icon(Icons.location_on_outlined, color: AppConfig.primaryColor),
+                          items: [
+                            DropdownMenuItem<String>(
+                              value: 'all',
+                              child: Text(l10n.allAddresses, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            ),
+                            ..._availableAddresses.map((addr) {
+                              return DropdownMenuItem<String>(
+                                value: addr,
+                                child: Text(addr),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _selectedAddress = val;
+                              });
+                              _loadLogs();
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+
+                    // Visitor Type Selector: wrapping ChoiceChips on narrow screens, SegmentedButton on wide screens
+                    if (useCompactTypeChips)
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: visitorTypeOptions.map((option) {
+                            final (value, label, icon) = option;
+                            final isSelected = _selectedVisitorType == value;
+                            return ChoiceChip(
+                              key: ValueKey('visitor_type_chip_$value'),
+                              showCheckmark: false,
+                              avatar: Icon(
+                                icon,
+                                size: 16,
+                                color: isSelected ? Colors.white : AppConfig.primaryColor,
+                              ),
+                              label: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isSelected ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: AppConfig.primaryColor,
+                              backgroundColor: Colors.grey.shade100,
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              onSelected: (selected) {
+                                if (selected && _selectedVisitorType != value) {
+                                  setState(() {
+                                    _selectedVisitorType = value;
+                                  });
+                                  _loadLogs();
+                                }
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      )
+                    else
+                      SegmentedButton<String>(
+                        segments: visitorTypeOptions
+                            .map(
+                              (option) => ButtonSegment<String>(
+                                value: option.$1,
+                                label: Text(option.$2),
+                                icon: Icon(option.$3, size: 16),
+                              ),
+                            )
+                            .toList(),
+                        selected: {_selectedVisitorType},
+                        onSelectionChanged: (newSelection) {
                           setState(() {
-                            _searchController.clear();
-                            _searchQuery = '';
+                            _selectedVisitorType = newSelection.first;
                           });
                           _loadLogs();
                         },
-                      )
-                    : null,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                isDense: true,
-              ),
-              onChanged: _onSearchChanged,
-            ),
-            const SizedBox(height: 14),
-
-            // Dropdowns and Selectors Row
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                // Address Dropdown Filter
-                Container(
-                  constraints: BoxConstraints(maxWidth: isDesktop ? 320 : double.infinity),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedAddress,
-                      isExpanded: true,
-                      icon: const Icon(Icons.location_on_outlined, color: AppConfig.primaryColor),
-                      items: [
-                        DropdownMenuItem<String>(
-                          value: 'all',
-                          child: Text(l10n.allAddresses, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        style: const ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        ..._availableAddresses.map((addr) {
-                          return DropdownMenuItem<String>(
-                            value: addr,
-                            child: Text(addr),
-                          );
-                        }),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() {
-                            _selectedAddress = val;
-                          });
-                          _loadLogs();
-                        }
+                      ),
+
+                    // Currently Inside Filter Chip
+                    FilterChip(
+                      key: const ValueKey('filter_currently_inside_chip'),
+                      avatar: Icon(
+                        Icons.sensor_door_outlined,
+                        size: 16,
+                        color: _onlyCurrentlyInside ? Colors.white : Colors.teal.shade700,
+                      ),
+                      label: Text(
+                        l10n.currentlyInsideFilter,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _onlyCurrentlyInside ? Colors.white : Colors.teal.shade900,
+                        ),
+                      ),
+                      selected: _onlyCurrentlyInside,
+                      selectedColor: Colors.teal.shade700,
+                      checkmarkColor: Colors.white,
+                      backgroundColor: Colors.teal.shade50,
+                      onSelected: (selected) {
+                        setState(() {
+                          _onlyCurrentlyInside = selected;
+                        });
+                        _loadLogs();
                       },
                     ),
-                  ),
-                ),
 
-                // Visitor Type Segmented Selector
-                SegmentedButton<String>(
-                  segments: [
-                    ButtonSegment(
-                      value: 'all',
-                      label: Text(l10n.allTypes),
-                      icon: const Icon(Icons.groups_outlined, size: 16),
+                    // Clear Filters Action Button
+                    if (hasActiveFilter)
+                      TextButton.icon(
+                        onPressed: _clearFilters,
+                        icon: const Icon(Icons.filter_alt_off, size: 16, color: Colors.redAccent),
+                        label: Text(
+                          l10n.clearFilters,
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Date Filter Chips
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      '${l10n.filterByDate}:',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
-                    ButtonSegment(
-                      value: 'visitor',
-                      label: Text(l10n.visitorTypeGuest),
-                      icon: const Icon(Icons.person_outline, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: 'supplier',
-                      label: Text(l10n.visitorTypeSupplier),
-                      icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                    _buildDateChip(label: l10n.allDates, mode: 'all'),
+                    _buildDateChip(label: l10n.today, mode: 'today'),
+                    _buildDateChip(label: l10n.thisWeek, mode: 'this_week'),
+                    _buildDateChip(label: l10n.thisMonth, mode: 'this_month'),
+                    ActionChip(
+                      avatar: const Icon(Icons.date_range, size: 16),
+                      label: Text(
+                        _dateFilterMode == 'custom' && _customDateRange != null
+                            ? '${_formatTimestamp(_customDateRange!.start).split(' ')[0]} - ${_formatTimestamp(_customDateRange!.end).split(' ')[0]}'
+                            : l10n.customDateRange,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _dateFilterMode == 'custom' ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      backgroundColor: _dateFilterMode == 'custom'
+                          ? AppConfig.primaryColor
+                          : Colors.grey.shade100,
+                      onPressed: _selectCustomDateRange,
                     ),
                   ],
-                  selected: {_selectedVisitorType},
-                  onSelectionChanged: (newSelection) {
-                    setState(() {
-                      _selectedVisitorType = newSelection.first;
-                    });
-                    _loadLogs();
-                  },
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
                 ),
-
-                // Clear Filters Action Button
-                if (hasActiveFilter)
-                  TextButton.icon(
-                    onPressed: _clearFilters,
-                    icon: const Icon(Icons.filter_alt_off, size: 16, color: Colors.redAccent),
-                    label: Text(
-                      l10n.clearFilters,
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-                    ),
-                  ),
               ],
-            ),
-            const SizedBox(height: 12),
-
-            // Date Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  Text(
-                    '${l10n.filterByDate}: ',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(width: 6),
-                  _buildDateChip(label: l10n.allDates, mode: 'all'),
-                  const SizedBox(width: 6),
-                  _buildDateChip(label: l10n.today, mode: 'today'),
-                  const SizedBox(width: 6),
-                  _buildDateChip(label: l10n.thisWeek, mode: 'this_week'),
-                  const SizedBox(width: 6),
-                  _buildDateChip(label: l10n.thisMonth, mode: 'this_month'),
-                  const SizedBox(width: 6),
-                  ActionChip(
-                    avatar: const Icon(Icons.date_range, size: 16),
-                    label: Text(
-                      _dateFilterMode == 'custom' && _customDateRange != null
-                          ? '${_formatTimestamp(_customDateRange!.start).split(' ')[0]} - ${_formatTimestamp(_customDateRange!.end).split(' ')[0]}'
-                          : l10n.customDateRange,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _dateFilterMode == 'custom' ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    backgroundColor: _dateFilterMode == 'custom'
-                        ? AppConfig.primaryColor
-                        : Colors.grey.shade100,
-                    onPressed: _selectCustomDateRange,
-                  ),
-                ],
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -649,37 +793,43 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
   Widget _buildBatchInfoBar(BuildContext context, AppLocalizations l10n, int count, bool hasActiveFilter) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            hasActiveFilter
-                ? l10n.showingFilteredLogsCount(count)
-                : l10n.showingLogsCount(count, count),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
+      child: SizedBox(
+        width: double.infinity,
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            Text(
               hasActiveFilter
-                  ? l10n.databaseSearchActive
-                  : l10n.batchExplorationInfo(_batchSize),
+                  ? l10n.showingFilteredLogsCount(count)
+                  : l10n.showingLogsCount(count, count),
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
               ),
             ),
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                hasActiveFilter
+                    ? l10n.databaseSearchActive
+                    : l10n.batchExplorationInfo(_batchSize),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -714,6 +864,7 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
     required int allowed,
     required int denied,
     required int providers,
+    required int inside,
     required bool isDesktop,
   }) {
     final cards = [
@@ -721,6 +872,7 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
       _buildKpiCard(label: l10n.allowedAccesses, count: allowed, color: Colors.green.shade700, icon: Icons.check_circle_outline),
       _buildKpiCard(label: l10n.deniedAccesses, count: denied, color: Colors.redAccent, icon: Icons.cancel_outlined),
       _buildKpiCard(label: l10n.providerAccesses, count: providers, color: Colors.orange.shade800, icon: Icons.local_shipping_outlined),
+      _buildKpiCard(label: l10n.currentlyInsideKpi, count: inside, color: Colors.teal.shade700, icon: Icons.sensor_door_outlined),
     ];
 
     if (isDesktop) {
@@ -797,12 +949,17 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
     final logId = (log['id'] ?? log['logId'] ?? '').toString();
     final status = log['status']?.toString().toLowerCase() ?? 'allowed';
     final isAllowed = status == 'allowed';
+    final isCurrentlyInside = AdminAccessLogsScreen.isLogCurrentlyInside(
+      log,
+      scanOnExitEnabled: _scanOnExitEnabled,
+    );
 
     final cat = log['accessCategory']?.toString().toLowerCase() ?? 'visitor';
     final isSupplier = cat == 'supplier' || cat == 'provider';
 
     final guestName = (log['guestName'] ?? log['visitorName'] ?? 'Guest').toString();
     final timestampStr = _formatTimestamp(log['timestamp']);
+    final exitTimestampStr = _formatTimestamp(log['exitTimestamp']);
 
     final addressDisplay = (log['addressDisplay'] ??
             ((log['streetName'] != null)
@@ -813,6 +970,7 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
 
     final residentName = log['residentName']?.toString().trim();
     final guardName = log['guardName']?.toString().trim();
+    final exitGuardName = log['exitGuardName']?.toString().trim();
 
     final vehicleType = log['vehicleType']?.toString();
     final vehiclePlates = log['vehiclePlates'] ?? log['vehiclePlate'];
@@ -821,6 +979,7 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
     final idPhotoUrl = log['visitorIdPhotoUrl']?.toString().trim();
     final platePhotoUrl = log['visitorPlatePhotoUrl']?.toString().trim();
     final reason = log['reason']?.toString().trim();
+    final exitReason = log['exitReason']?.toString().trim();
 
     return Card(
       key: ValueKey('access_log_card_$logId'),
@@ -905,6 +1064,37 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
                         ],
                       ),
                     ),
+
+                    // Currently Inside Status Badge
+                    if (isCurrentlyInside)
+                      Container(
+                        key: ValueKey('log_inside_badge_$logId'),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.teal.shade600),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.sensor_door_outlined,
+                              size: 14,
+                              color: Colors.teal.shade800,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              l10n.visitorInsideBadge,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
 
@@ -933,6 +1123,24 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
                   value: guestName,
                 ),
 
+                // Entry Time
+                if (timestampStr.isNotEmpty)
+                  _buildInfoItem(
+                    icon: Icons.login,
+                    label: l10n.entryTimeLabel,
+                    value: timestampStr,
+                  ),
+
+                // Exit Time (or Inside pending label)
+                if (exitTimestampStr.isNotEmpty || isCurrentlyInside)
+                  _buildInfoItem(
+                    icon: Icons.logout,
+                    label: l10n.exitTimeLabel,
+                    value: exitTimestampStr.isNotEmpty
+                        ? exitTimestampStr
+                        : l10n.exitPendingLabel,
+                  ),
+
                 // Destination Address
                 if (addressDisplay.isNotEmpty)
                   _buildInfoItem(
@@ -955,6 +1163,14 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
                     icon: Icons.security,
                     label: l10n.verifiedByGuard,
                     value: guardName,
+                  ),
+
+                // Exit Guard
+                if (exitGuardName != null && exitGuardName.isNotEmpty)
+                  _buildInfoItem(
+                    icon: Icons.badge_outlined,
+                    label: l10n.exitGuardLabel,
+                    value: exitGuardName,
                   ),
 
                 // Vehicle Details
@@ -1001,6 +1217,40 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           color: isAllowed ? Colors.black87 : Colors.red.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Exit Notes
+            if (exitReason != null && exitReason.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade50.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.teal.shade200),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.logout,
+                      size: 16,
+                      color: Colors.teal.shade700,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${l10n.exitNotesLabel}: $exitReason',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.teal.shade900,
                         ),
                       ),
                     ),

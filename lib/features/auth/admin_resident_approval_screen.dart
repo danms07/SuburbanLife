@@ -7,7 +7,9 @@ import 'package:suburban_life/core/widgets/storage_network_image.dart';
 import 'package:intl/intl.dart';
 
 class AdminResidentApprovalScreen extends StatefulWidget {
-  const AdminResidentApprovalScreen({super.key});
+  final bool isEmbedded;
+
+  const AdminResidentApprovalScreen({super.key, this.isEmbedded = false});
 
   @override
   State<AdminResidentApprovalScreen> createState() => _AdminResidentApprovalScreenState();
@@ -128,42 +130,43 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
     return Scaffold(
       body: Column(
         children: [
-          // Premium Header
-          Container(
-            padding: EdgeInsets.only(
-              top: MediaQuery.paddingOf(context).top + 16,
-              left: 20,
-              right: 20,
-              bottom: 30,
-            ),
-            decoration: const BoxDecoration(
-              color: AppConfig.primaryColor,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
+          if (!widget.isEmbedded)
+            // Premium Header
+            Container(
+              padding: EdgeInsets.only(
+                top: MediaQuery.paddingOf(context).top + 16,
+                left: 20,
+                right: 20,
+                bottom: 30,
               ),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
+              decoration: const BoxDecoration(
+                color: AppConfig.primaryColor,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    l10n.approveResidentsMenu,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: AppConfig.fontFamily,
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.approveResidentsMenu,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: AppConfig.fontFamily,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           // Claims List
           Expanded(

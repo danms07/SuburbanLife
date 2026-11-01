@@ -6,15 +6,16 @@ A white-label residential management platform built using **Flutter** and **Fire
 
 ## Features
 
+- **Adaptive Admin NavDrawer Workspace**: Persistent left sidebar on desktop (`>= 900px`) and modal hamburger `Drawer` on mobile (`< 900px`) organizing administrative workflows into **Overview** (with pending approval cards and live community KPIs that collapse into expandable cards on mobile, conditional **Visitors currently inside** KPI shown when **Scan on exit** is enabled, 6 quick **Shortcuts** cards, and an Overview-only **Generate Access QR** FAB), collapsible category groups (**User Management**, **Residential Management**, **Finance**, **Transparency & Community**) with roll-up notification badges, and a direct single-tap **General Settings** item.
 - **Secure Multi-Role Access Control**: Integrated with Firebase Auth and Cloud Functions.
 - **Bulk Resident & Address Import via CSV**: Administrator bulk creation with temporary passwords and automated claim granting.
 - **Address-Level Sanctions System**: Neighborhood infraction issuance with photographic evidence, automated standing restrictions, resident fine history with interactive photo zoom, and direct payment flows.
-- **Enhanced Payment Form & Rejection Recovery**: Strict validation for folio, concept (quota vs sanction), and payment date, advance periods toggle with checklist view, persistent missing-field warnings, customizable admin rejection reason pool, and one-tap recovery pre-filling for rejected payments.
+- **Enhanced Payment Form, Receipt Review & Rejection Recovery**: Strict validation for folio, concept (quota vs sanction), and payment date, advance periods toggle with checklist view, persistent missing-field warnings, admin approval cards with proof-of-payment thumbnails that open in a full-screen viewer with 20% padding and 90-degree rotation controls, customizable admin rejection reason pool, and one-tap recovery pre-filling for rejected payments.
 - **Facility Booking Hardening & Availability Windows**: Advance anticipation windows, daily operating hours boundaries (`openingTime` - `closingTime`), anonymous confirmed-only schedule calendar streaming, custom rejection rationale, and preset approval instruction templates.
 - **Rich Media & Emoji Community Announcements**: Broadcast announcements featuring high-resolution banner images, interactive full-screen viewer, quick-access announcement emojis, audience filtering (Everyone / Residents), and keyless Gemini AI Spanish-to-English translations.
-- **Configurable SMTP Email Service**: Automated delivery of welcome emails containing login credentials upon user provisioning and bulk import.
-- **QR-based Visitor Access & Audit Logs**: Live validation logs, ID and license plate photo capture for security personnel, and an administrator audit screen with whole-database query search & multi-filter exploration (address dropdown, date ranges, visitor categories, keyword search) and 20-event batches for unfiltered browsing.
-- **User Directory & Account Management**: Whole-database query search (by street, name, or email), street dropdown and role filtering, with 20-user batched query pagination for unfiltered browsing, in-memory address caching, role toggling, password resets, and account removals.
+- **Collapsible Auto-Saving Admin Settings & SMTP Email Service**: Expandable/collapsible settings cards with real-time auto-save for switches and general settings, plus dedicated manual saving and handshake testing for SMTP server credentials and custom welcome email templates.
+- **QR-based Visitor Access, Optional Exit Scanning & Audit Logs**: Live validation logs, memory-bounded ID and license plate photo capture on entry with automatic local device cleanup immediately after Cloud Storage upload, optional admin-configurable **Scan on exit** (`Escanear para salir`) mode with fast one-tap guard departure logging (supporting automatic entry/exit detection and legacy same-day QR passes), live **INSIDE** badges on resident QR passes, and an administrator audit screen with **Currently Inside** KPIs, entry/exit timestamps, adaptive multi-filter exploration (wrapping `ChoiceChip`s on mobile), wrapping search summary bars, and 20-event batches for unfiltered browsing.
+- **User Directory & Account Management**: Unified user and security guard directory with whole-database query search (by street, name, or email), street dropdown and adaptive role filtering (`SegmentedButton` on wide viewports and wrapping `ChoiceChip`s on mobile), wrapping search summary bars, 20-user batched query pagination for unfiltered browsing, and compact button-free summary cards that open a dedicated **User Account Details** screen separating standard actions (password resets, role toggling, delivery date editing) from sensitive actions (address unbinding and account removals).
 - **Facility Booking & Document Viewers**: Seamless management of common spaces and important residential files.
 
 ---
@@ -108,7 +109,7 @@ The Suburban Life application follows a layered design to decouple the UI from t
 ### State Management
 State is managed using a clean mix of:
 - **Local Widget State**: Enforcing strict lifecycle control on text fields, form validators, and single-card state scopes (e.g., keyed widgets preventing redraws).
-- **Streams & Futures**: High-fidelity live bindings to Firestore (e.g., watching active guard lists, facility bookings) via `StreamBuilder` and `FutureBuilder` to deliver instantaneous database state synchronization.
+- **Streams & Futures**: High-fidelity live bindings to Firestore (e.g., watching payment status, pending approvals, facility bookings) via `StreamBuilder` and `FutureBuilder` to deliver instantaneous database state synchronization.
 
 ---
 
@@ -177,18 +178,29 @@ Run the application on your target device:
 flutter run
 ```
 
-### Running Unit Tests
+### Running Automated Tests
 
-To run the complete suite of Flutter unit and architectural tests:
+To run the complete suite of Flutter unit, widget, workflow, and architectural boundary tests:
 ```bash
 flutter test
 ```
 
-To run Cloud Functions unit tests:
+To run Cloud Functions callable handler, helper, and static Security Rules audit tests:
 ```bash
-cd functions
-npm test
+npm --prefix functions test
 ```
+
+To run Node.js automation script tests:
+```bash
+npm --prefix scripts test
+```
+
+To run the full end-to-end emulator rollout suite (starts Firebase Auth, Firestore, Functions, and Storage emulators, runs live `@firebase/rules-unit-testing` security rules verification, script tests, and all Flutter tests):
+```bash
+./scripts/run_rollout_tests.sh
+```
+
+On GitHub, [`.github/workflows/ci_tests.yml`](.github/workflows/ci_tests.yml) automatically runs `flutter gen-l10n`, `flutter analyze --no-fatal-infos`, `flutter test`, `npm --prefix functions test`, and `npm --prefix scripts test` on every push and pull request.
 
 ### Adding Translations (l18n)
 All user-facing UI copy must have Spanish translations.
@@ -207,7 +219,7 @@ dart run flutter_launcher_icons
 
 ### Web Hosting & Automatic Upgrades
 When deployed to Firebase Hosting, the web application includes an automated background update mechanism (`AppUpdateService`):
-- **Cache-Busting Headers**: `firebase.json` specifies `no-cache, no-store, must-revalidate` for `index.html`, `flutter_bootstrap.js`, `flutter_service_worker.js`, and `/version.json`.
+- **Cache-Busting Headers**: `firebase.json` specifies `no-cache, no-store, must-revalidate` for `index.html`, `flutter_bootstrap.js`, `flutter_service_worker.js`, `/version.json`, `/manifest.json`, and `/icons/**`.
 - **Seamless Inactivity / Tab-Switch Reload**: The app periodically polls `/version.json` in the background. When a new deployment version is detected, it automatically purges browser `CacheStorage` and refreshes the application seamlessly when the user switches tabs or becomes idle.
 
 ---
@@ -241,6 +253,20 @@ A helper script [populate_addresses.js](scripts/populate_addresses.js) is provid
 ```bash
 cd scripts
 node populate_addresses.js
+```
+
+---
+
+## Assigning User Roles via Admin SDK
+
+Use [set_role.js](scripts/set_role.js) to assign roles (`admin`, `resident`, `guard`, `roommate`) and synchronize Firebase Auth custom claims with Firestore. When promoting an existing resident to `admin`, the script preserves their `resident` claim and residential `addressRef` so they can switch freely between Admin and Resident views.
+
+```bash
+# Promote a user to admin in production:
+node scripts/set_role.js user@example.com admin
+
+# Assign a role against local Firebase Emulators:
+node scripts/set_role.js admin@example.com admin --emulator
 ```
 
 ---
@@ -298,18 +324,20 @@ The repository includes an automated pipeline ([scripts/build_and_publish_docs.j
 ### Key Capabilities:
 1. **Declarative Document Selection (`parse`)**: Configure which documents to compile and publish in [docs/docs_pipeline.json](docs/docs_pipeline.json) using `"parse": true | false` (or override via CLI `--only=admin_user_manual_es`).
 2. **Mermaid Diagram-to-PNG Pre-Rendering**: Extracts `mermaid` blocks, renders high-resolution `.png` images via headless Chromium, and embeds them directly into the branded PDF layout.
-3. **Role-Based Document Visibility (`visibility`)**: Each document specifies `"visibility": "admin" | "all"`. Documents marked `"admin"` (such as the Administrator User Manual) are restricted to administrators in the Transparency UI, Firestore security rules, and Cloud Storage (`/documents/admin_only/`), while `"all"` documents are visible to both residents and admins.
-4. **Cloud Function & Service Account Sync**: Supports publishing via the `syncTransparencyDocument` callable Cloud Function or directly via the Firebase Admin SDK (`scripts/serviceAccountKey.json` locally, or `FIREBASE_SERVICE_ACCOUNT_JSON` secret in GitHub Actions).
+3. **Role-Based Document Visibility (`visibility`)**: Each document and folder specifies `"visibility": "admin" | "all"`. All documentation manuals generated by the pipeline (`Manual_Usuario_Administrador_ES.pdf`, `Descripcion_Tecnica_General_ES.pdf`, etc.) and their `official_manuals` folder are configured with `"visibility": "admin"`, restricting access exclusively to administrators in the Transparency UI, Firestore security rules, and Cloud Storage (`/documents/admin_only/`).
+4. **Automatic Cloud Storage & Firestore Sync**: Whenever Firebase credentials (`scripts/serviceAccountKey.json` locally, or `FIREBASE_SERVICE_ACCOUNT` / `FIREBASE_SERVICE_ACCOUNT_JSON` secrets in GitHub Actions) are present, running `npm run docs:pdf` or `npm run docs:publish` automatically uploads the generated PDF binaries to Firebase Storage and updates the Firestore `documents` collection.
 
 ### Usage:
 ```bash
 cd scripts
 
-# 1. Generate PDFs and diagram PNGs locally (outputs to docs/pdf/):
+# 1. Generate PDFs and automatically upload to Firebase Storage + Firestore (when credentials exist):
 npm run docs:pdf
-
-# 2. Generate PDFs and publish to Firebase (Storage + Firestore Transparency section):
+# or explicitly:
 npm run docs:publish
+
+# 2. Generate PDFs locally only (skip Firebase upload):
+node build_and_publish_docs.js --no-publish
 
 # 3. Publish to local Firebase Emulators:
 npm run docs:publish:emulator

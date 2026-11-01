@@ -13,6 +13,16 @@ service firebase.storage {
       return isAuthenticated() && request.auth.token.guard == true;
     }
 
+    function isValidUploadSize() {
+      return request.resource != null && request.resource.size < 10 * 1024 * 1024;
+    }
+
+    function isAllowedProofOrPhoto() {
+      return request.resource != null &&
+        (request.resource.contentType.matches('image/.*') ||
+         request.resource.contentType == 'application/pdf');
+    }
+
     match /documents/admin_only/{allPaths=**} {
       allow read, write: if isAdmin();
     }
@@ -20,7 +30,7 @@ service firebase.storage {
     match /documents/{allPaths=**} {
       allow read: if isAdmin() || (
         isAuthenticated() &&
-        request.auth.token.resident == true &&
+        (request.auth.token.resident == true || request.auth.token.roommate == true) &&
         (resource == null || resource.metadata == null || !('visibility' in resource.metadata) || resource.metadata.visibility != 'admin')
       );
       allow write: if isAdmin();
@@ -31,21 +41,44 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
-    match /payments/{allPaths=**} {
-      allow read: if isAdmin() || (isAuthenticated() && (request.auth.uid == resource.metadata.uploaderUid || request.auth.uid == resource.metadata.uploader));
-      allow write: if isAuthenticated();
+    match /sanctions/{addressId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidUploadSize() && isAllowedProofOrPhoto();
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{ownerOrAddressId}/{allPaths=**} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          request.auth.uid == ownerOrAddressId ||
+          (resource != null && resource.metadata != null &&
+           (request.auth.uid == resource.metadata.uploaderUid || request.auth.uid == resource.metadata.uploader))
+        )
+      );
+      allow create, update: if (isAdmin() || (isAuthenticated() && request.auth.uid == ownerOrAddressId)) &&
+        isValidUploadSize() &&
+        isAllowedProofOrPhoto();
+      allow delete: if isAdmin();
     }
 
     match /ownership_proofs/{userId}/{allPaths=**} {
-      allow read, write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow create, update: if (isAdmin() || (isAuthenticated() && request.auth.uid == userId)) &&
+        isValidUploadSize() &&
+        isAllowedProofOrPhoto();
+      allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
     }
 
     match /visitor_ids/{allPaths=**} {
-      allow read, write: if isGuard() || isAdmin();
+      allow read: if isGuard() || isAdmin();
+      allow create, update: if (isGuard() || isAdmin()) && isValidUploadSize() && isAllowedProofOrPhoto();
+      allow delete: if isAdmin();
     }
 
     match /visitor_plates/{allPaths=**} {
-      allow read, write: if isGuard() || isAdmin();
+      allow read: if isGuard() || isAdmin();
+      allow create, update: if (isGuard() || isAdmin()) && isValidUploadSize() && isAllowedProofOrPhoto();
+      allow delete: if isAdmin();
     }
   }
 }

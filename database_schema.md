@@ -35,6 +35,8 @@ erDiagram
         string type "'permanent' | 'temporary'"
         timestamp expiry
         string status "'active' | 'deactivated'"
+        boolean isInside "True while visitor is inside"
+        string activeAccessLogId "Open access_logs doc ID"
         string qrData "Encrypted token"
     }
     bookings {
@@ -65,11 +67,16 @@ erDiagram
         string qrCodeId FK
         string guardUid FK
         string creatorUid FK
-        timestamp timestamp
+        timestamp timestamp "Entry timestamp"
+        timestamp exitTimestamp "Optional exit timestamp"
+        boolean isInside "True while visitor has not scanned out"
+        string exitGuardUid "Optional guard UID who registered exit"
+        string exitGuardName "Optional guard name on exit"
         string visitorIdPhotoUrl
         string visitorPlatePhotoUrl
         string status "'allowed' | 'denied'"
         string reason
+        string exitReason "Optional exit notes"
     }
     payments {
         string paymentId PK
@@ -102,6 +109,7 @@ erDiagram
         string documentId PK "app_settings | smtp_settings"
         number paymentCutoffDay
         number gracePeriodDays
+        boolean scanOnExitEnabled "Enable QR scan on exit"
         boolean smtpEnabled
         string smtpHost
         number smtpPort
@@ -160,6 +168,8 @@ erDiagram
 - `type`: string ('permanent', 'temporary')
 - `expiry`: timestamp (for temporary)
 - `status`: string ("active", "deactivated (validated|revoked|expired)")
+- `isInside`: boolean (Optional; true when visitor has entered and has not yet scanned out while `scanOnExitEnabled` is active. Legacy same-day allowed logs without `isInside` default to `true` upon second scan on the same day.)
+- `activeAccessLogId`: string | null (Optional ID of the currently open `access_logs` entry for O(1) transactional exit updates)
 - `qrData`: string (encrypted or unique token)
 
 ### `bookings` (Collection)
@@ -197,8 +207,10 @@ erDiagram
 - `folderId`: string (Document ID)
 - `name`: string (Folder display name)
 - `parentId`: string (Parent folder ID or 'root' for root directory)
+- `visibility`: string ('all' | 'admin', optional — when 'admin' and containing 0 resident-visible items, hidden from non-admin residents)
 - `createdAt`: timestamp
-- `createdBy`: string (Admin UID)
+- `createdBy`: string (Admin UID or 'system_docs_pipeline')
+
 
 ### `documents` (Collection)
 - `docId`: string (Document ID)
@@ -219,12 +231,18 @@ erDiagram
 - `logId`: string (Document ID)
 - `qrCodeId`: string
 - `guardUid`: string
+- `guardName`: string (Name of guard verifying entry)
 - `creatorUid`: string
-- `timestamp`: timestamp
+- `timestamp`: timestamp (Entry timestamp)
+- `exitTimestamp`: timestamp | null (Optional timestamp recorded when visitor scans out)
+- `isInside`: boolean (True while visitor is currently inside; false once exited or denied)
+- `exitGuardUid`: string (Optional UID of guard who registered visitor exit)
+- `exitGuardName`: string (Optional name of guard who registered visitor exit)
 - `visitorIdPhotoUrl`: string
 - `visitorPlatePhotoUrl`: string (Optional)
 - `status`: string ('allowed', 'denied')
 - `reason`: string
+- `exitReason`: string (Optional exit notes recorded by guard)
 
 ### `payments` (Collection)
 - `paymentId`: string (Document ID)
@@ -288,6 +306,7 @@ erDiagram
 - `paymentCutoffDay`: number (Configured day of the month serving as cutoff date, default 1)
 - `gracePeriodDays`: number (Grace period span before user features restrict automatically, default 10)
 - `timeZone`: string (Configured IANA timezone for cutoff and grace period calculations, default 'America/Mexico_City')
+- `scanOnExitEnabled`: boolean (Optional; enables QR exit scanning workflow for visitors and suppliers, default false)
 - `paymentRejectionReasons`: array of string (Customizable pool of rejection reason templates for payment reviews)
 - `updatedAt`: timestamp
 
@@ -397,3 +416,17 @@ The application requires specific composite indexes to execute queries without d
 - **Index 3 (Status Logs by Timestamp)**:
   - `status` (Ascending)
   - `timestamp` (Descending)
+- **Index 4 (QR Code Logs by Timestamp — Legacy Same-Day Exit Fallback)**:
+  - `qrCodeId` (Ascending)
+  - `timestamp` (Descending)
+- **Index 5 (QR Code Open Visit Lookup)**:
+  - `qrCodeId` (Ascending)
+  - `isInside` (Ascending)
+- **Index 6 (Currently Inside Logs by Timestamp)**:
+  - `isInside` (Ascending)
+  - `timestamp` (Descending)
+
+### `users` Collection
+- **Index 1 (User Directory Role Filter by Name)**:
+  - `role` (Ascending)
+  - `name` (Ascending)

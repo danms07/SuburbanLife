@@ -213,6 +213,38 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "access_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "qrCodeId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "access_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "qrCodeId", "order": "ASCENDING" },
+        { "fieldPath": "isInside", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "access_logs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isInside", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "role", "order": "ASCENDING" },
+        { "fieldPath": "name", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

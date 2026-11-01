@@ -1,11 +1,34 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const admin = require('firebase-admin');
-const { FieldValue } = require('firebase-admin/firestore');
+const { initializeApp, getApp, getApps, cert, applicationDefault } = require('firebase-admin/app');
+const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
+const { getMessaging } = require('firebase-admin/messaging');
+const { getStorage } = require('firebase-admin/storage');
 const { GoogleGenAI } = require('@google/genai');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+
+const admin = {
+  initializeApp,
+  app: getApp,
+  get apps() {
+    return getApps();
+  },
+  credential: {
+    cert,
+    applicationDefault,
+  },
+  firestore: Object.assign(() => getFirestore(), {
+    FieldValue,
+    Timestamp,
+  }),
+  auth: () => getAuth(),
+  messaging: () => getMessaging(),
+  storage: () => getStorage(),
+};
+
 admin.initializeApp();
 
 // Determine if functions are running inside the Firebase Emulator
@@ -305,6 +328,45 @@ exports.setRole = onCall(callableOptions, async (request) => {
     await admin.auth().setCustomUserClaims(uid, claims);
     
     return { success: true, message: `Role ${role} set for user ${uid}` };
+  } catch (error) {
+    throw new HttpsError('internal', error.message);
+  }
+});
+
+exports.setCustomUserClaims = onCall(callableOptions, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError(
+      'failed-precondition',
+      'The function must be called by an authenticated admin.'
+    );
+  }
+
+  const { uid, claims } = request.data || {};
+  if (!uid || typeof uid !== 'string' || !claims || typeof claims !== 'object' || Array.isArray(claims)) {
+    throw new HttpsError(
+      'invalid-argument',
+      'The function must be called with a valid uid and claims object.'
+    );
+  }
+
+  const allowedKeys = ['admin', 'resident', 'guard', 'roommate'];
+  const sanitizedClaims = {};
+  for (const key of allowedKeys) {
+    if (Object.prototype.hasOwnProperty.call(claims, key) && typeof claims[key] === 'boolean') {
+      sanitizedClaims[key] = claims[key];
+    }
+  }
+
+  if (uid === request.auth.uid && sanitizedClaims.admin === false) {
+    throw new HttpsError(
+      'permission-denied',
+      'You cannot revoke your own admin role from User Management.'
+    );
+  }
+
+  try {
+    await admin.auth().setCustomUserClaims(uid, sanitizedClaims);
+    return { success: true, claims: sanitizedClaims };
   } catch (error) {
     throw new HttpsError('internal', error.message);
   }
@@ -874,6 +936,15 @@ exports.checkMonthlyPaymentStatuses = onSchedule({
   } catch (error) {
     console.error('Error executing checkMonthlyPaymentStatuses scheduled job:', error);
   }
+
+  try {
+    const expiredCount = await expireOutdatedQrCodes(db);
+    if (expiredCount > 0) {
+      console.log(`Expired ${expiredCount} outdated QR codes.`);
+    }
+  } catch (qrError) {
+    console.error('Error expiring outdated QR codes in scheduled job:', qrError);
+  }
 });
 
 /**
@@ -966,6 +1037,7 @@ exports.approvePayment = onCall(callableOptions, async (request) => {
 
     return { success: true };
   } catch (error) {
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError('internal', error.message);
   }
 });
@@ -1047,6 +1119,27 @@ exports.notifyAccessResult = onDocumentCreated('access_logs/{logId}', async (eve
   const data = snapshot.data();
   const { creatorUid, status, qrCodeId } = data;
 
+  // Invalidate one-time use QR code first, independent of FCM push notification availability.
+  // Skip immediate invalidation if isInside === true so the visitor can still scan out on exit.
+  if (status === 'allowed' && qrCodeId && data.isInside !== true) {
+    try {
+      const qrDoc = await admin.firestore().collection('qr_codes').doc(qrCodeId).get();
+      if (qrDoc.exists) {
+        const qrData = qrDoc.data() || {};
+        if (isOneTimeQrCode(qrData) && qrData.status !== 'deactivated (validated)') {
+          await qrDoc.ref.update({
+            status: 'deactivated (validated)',
+            isValid: false,
+            usedAt: FieldValue.serverTimestamp(),
+          });
+          console.log(`Deactivated one-time use QR code ${qrCodeId}`);
+        }
+      }
+    } catch (qrError) {
+      console.error(`Error invalidating one-time QR code ${qrCodeId} in notifyAccessResult:`, qrError);
+    }
+  }
+
   if (!creatorUid) return null;
 
   try {
@@ -1074,17 +1167,6 @@ exports.notifyAccessResult = onDocumentCreated('access_logs/{logId}', async (eve
 
     const response = await admin.messaging().sendEachForMulticast(message);
     console.log(`${response.successCount} messages were sent successfully`);
-
-    // Invalidate if one-time use
-    if (status === 'allowed' && qrCodeId) {
-      const qrDoc = await admin.firestore().collection('qr_codes').doc(qrCodeId).get();
-      if (qrDoc.exists && qrDoc.data().isOneTimeUse === true) {
-        await qrDoc.ref.update({
-          status: 'deactivated (validated)',
-        });
-        console.log(`Deactivated one-time use QR code ${qrCodeId}`);
-      }
-    }
 
     return null;
   } catch (error) {
@@ -1599,6 +1681,7 @@ exports.unbindAddress = onCall(callableOptions, async (request) => {
     await batch.commit();
     return { success: true, message: 'Address unlinked successfully.' };
   } catch (error) {
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError('internal', error.message);
   }
 });
@@ -1622,6 +1705,7 @@ exports.deleteOwnAccount = onCall(callableOptions, async (request) => {
     await admin.auth().deleteUser(uid);
     return { success: true };
   } catch (error) {
+    if (error instanceof HttpsError) throw error;
     throw new HttpsError('internal', error.message);
   }
 });
@@ -1986,14 +2070,199 @@ exports.adminBulkImportAddresses = onCall(callableOptions, async (request) => {
 });
 
 /**
- * Validates a QR code and registers physical access atomically in Cloud Functions.
+ * Determines whether a QR code document represents a single-use pass.
+ */
+function isOneTimeQrCode(qrData) {
+  if (!qrData || typeof qrData !== 'object') return false;
+  return (
+    qrData.isOneTimeUse === true ||
+    qrData.isOneTime === true ||
+    qrData.type === 'one_time' ||
+    qrData.accessCategory === 'supplier'
+  );
+}
+
+/**
+ * Evaluates whether a QR code's status and isValid flags permit entry.
+ */
+function evaluateQrValidityStatus(qrData) {
+  if (!qrData || typeof qrData !== 'object') {
+    return { isValid: false, reason: 'QR Code is invalid.' };
+  }
+  const status = typeof qrData.status === 'string' ? qrData.status.trim().toLowerCase() : 'active';
+  if (status === 'used' || status === 'deactivated (validated)') {
+    return { isValid: false, reason: 'QR Code has already been used.' };
+  }
+  if (status === 'revoked' || status === 'deactivated (revoked)') {
+    return { isValid: false, reason: 'QR Code has been revoked.' };
+  }
+  if (status === 'expired' || status === 'deactivated (expired)') {
+    return { isValid: false, reason: 'QR Code has expired.' };
+  }
+  if (qrData.isValid === false || status === 'deactivated' || (status !== 'active' && status !== 'valid')) {
+    return { isValid: false, reason: 'QR Code is invalid.' };
+  }
+  return { isValid: true, reason: null };
+}
+
+/**
+ * Extracts the expiration timestamp in milliseconds from a QR code document.
+ */
+function getQrExpiryMillis(qrData) {
+  if (!qrData || typeof qrData !== 'object') return 0;
+  const expTime = qrData.expiresAt || qrData.expiryTime || qrData.expiry;
+  if (!expTime) return 0;
+  if (typeof expTime.toMillis === 'function') {
+    return expTime.toMillis();
+  }
+  if (expTime instanceof Date) {
+    return expTime.getTime();
+  }
+  if (typeof expTime === 'string' || typeof expTime === 'number') {
+    const parsed = new Date(expTime).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
+/**
+ * Marks active QR codes whose expiration time has passed as 'deactivated (expired)'.
+ */
+async function expireOutdatedQrCodes(db, nowMillis = Date.now()) {
+  const activeSnap = await db.collection('qr_codes').where('status', '==', 'active').get();
+  if (activeSnap.empty) return 0;
+
+  let expiredCount = 0;
+  let batch = db.batch();
+  let opCount = 0;
+  const batches = [];
+
+  for (const doc of activeSnap.docs) {
+    const data = doc.data() || {};
+    const expMillis = getQrExpiryMillis(data);
+    if (expMillis > 0 && nowMillis > expMillis) {
+      batch.update(doc.ref, {
+        status: 'deactivated (expired)',
+        isValid: false,
+      });
+      expiredCount++;
+      opCount++;
+      if (opCount === 500) {
+        batches.push(batch);
+        batch = db.batch();
+        opCount = 0;
+      }
+    }
+  }
+
+  if (opCount > 0) {
+    batches.push(batch);
+  }
+
+  for (const b of batches) {
+    await b.commit();
+  }
+
+  return expiredCount;
+}
+
+/**
+ * Extracts a millisecond epoch timestamp from Firestore Timestamp, Date, number, ISO string, or serialized map.
+ */
+function extractTimestampMillis(val) {
+  if (!val) return 0;
+  if (typeof val.toMillis === 'function') {
+    return val.toMillis();
+  }
+  if (val instanceof Date) {
+    return val.getTime();
+  }
+  if (typeof val === 'object' && typeof val._seconds === 'number') {
+    return val._seconds * 1000;
+  }
+  if (typeof val === 'number') {
+    return val;
+  }
+  if (typeof val === 'string') {
+    const parsed = new Date(val).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
+/**
+ * Checks whether two millisecond epoch timestamps fall on the same calendar day in the given IANA timezone.
+ */
+function isSameCalendarDayInTimezone(tsMillisA, tsMillisB, timeZone = 'America/Mexico_City') {
+  if (!tsMillisA || !tsMillisB) return false;
+  const dateA = getDateInTimezone(tsMillisA, timeZone);
+  const dateB = getDateInTimezone(tsMillisB, timeZone);
+  return dateA.year === dateB.year && dateA.month === dateB.month && dateA.day === dateB.day;
+}
+
+/**
+ * Determines whether a QR pass currently has an open visit (inside the community) and returns the open log snapshot.
+ * - Explicit open visit: `qrData.isInside === true` (via `directLogSnap` or latest open allowed doc in `candidateLogDocs`).
+ * - Legacy fallback: when `qrData.isInside` is undefined/null (legacy QR created before exit tracking),
+ *   a second scan within the same calendar day defaults `isInside` to `true` if the latest allowed log today
+ *   has no `exitTimestamp` and `isInside !== false`.
+ */
+function resolveOpenVisitLog({
+  qrData,
+  directLogSnap = null,
+  candidateLogDocs = [],
+  nowMillis = Date.now(),
+  timeZone = 'America/Mexico_City',
+}) {
+  if (!qrData || typeof qrData !== 'object') return null;
+
+  if (qrData.isInside === true) {
+    if (directLogSnap && directLogSnap.exists) {
+      const d = directLogSnap.data() || {};
+      if (!d.exitTimestamp && d.isInside !== false) {
+        return directLogSnap;
+      }
+    }
+    for (const doc of candidateLogDocs) {
+      const d = doc.data ? (doc.data() || {}) : doc;
+      if (d.status === 'allowed' && !d.exitTimestamp && d.isInside !== false) {
+        return doc;
+      }
+    }
+    return null;
+  }
+
+  // Legacy QR fallback: `isInside` not present on QR document -> check same-day allowed log without exitTimestamp
+  if (qrData.isInside === undefined || qrData.isInside === null) {
+    for (const doc of candidateLogDocs) {
+      const d = doc.data ? (doc.data() || {}) : doc;
+      const logMillis = extractTimestampMillis(d.timestamp);
+      if (!isSameCalendarDayInTimezone(logMillis, nowMillis, timeZone)) {
+        continue;
+      }
+      if (d.status === 'allowed') {
+        if (!d.exitTimestamp && d.isInside !== false) {
+          return doc;
+        }
+        // Latest allowed log today already exited
+        return null;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Validates a QR code and registers physical access or exit atomically in Cloud Functions.
  * Enforces:
  * - Guard or Admin caller authentication
- * - QR existence and validity status
- * - Temporary pass expiration against server clock
- * - Linked resident address paymentStatus == 'paid'
- * - Single-use pass invalidation upon entry
- * - Direct immutable audit entry into access_logs
+ * - Automatic Exit detection when `scanOnExitEnabled` is active (including legacy same-day QR fallback)
+ * - QR existence and validity status on entry
+ * - Temporary pass expiration against server clock on entry
+ * - Linked resident address paymentStatus == 'paid' on entry
+ * - Single-use pass invalidation upon entry (or upon exit when `scanOnExitEnabled` is active)
+ * - Atomic audit entry / exit timestamp update in access_logs
  */
 exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) => {
   if (!request.auth || (!request.auth.token.guard && !request.auth.token.admin)) {
@@ -2013,20 +2282,28 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
     throw new HttpsError('invalid-argument', 'Valid qrId must be provided.');
   }
 
+  const sanitizedReason = typeof reason === 'string' ? reason.trim().slice(0, 500) : '';
+
   const db = admin.firestore();
   const guardUid = request.auth.uid;
   const qrRef = db.collection('qr_codes').doc(qrId);
 
   return await db.runTransaction(async (transaction) => {
-    // 0. Fetch guard record for audit attribution
+    // 0. Fetch guard record, app settings, and QR document first (all reads before writes)
     const guardSnap = await transaction.get(db.collection('users').doc(guardUid));
     const guardName = (guardSnap.exists && guardSnap.data()?.name) ? guardSnap.data().name : 'Security Guard';
+
+    const appSettingsSnap = await transaction.get(db.collection('config').doc('app_settings'));
+    const appSettings = appSettingsSnap.exists ? (appSettingsSnap.data() || {}) : {};
+    const scanOnExitEnabled = appSettings.scanOnExitEnabled === true;
+    const timeZone = appSettings.timeZone || 'America/Mexico_City';
 
     const qrSnap = await transaction.get(qrRef);
     if (!qrSnap.exists) {
       return {
         success: false,
         granted: false,
+        isExit: false,
         reason: 'QR Code not found.',
         qrData: null,
       };
@@ -2034,6 +2311,7 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
 
     const qrData = qrSnap.data();
     const now = admin.firestore.Timestamp.now();
+    const nowMillis = now.toMillis();
 
     // Resolve Resident and Address data
     let residentName = '';
@@ -2073,18 +2351,122 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
       }
     }
 
+    // Perform open visit read if scanOnExitEnabled is active
+    let directLogSnap = null;
+    let candidateLogDocs = [];
+    if (scanOnExitEnabled) {
+      if (qrData.isInside === true && qrData.activeAccessLogId) {
+        directLogSnap = await transaction.get(db.collection('access_logs').doc(qrData.activeAccessLogId));
+      }
+      const needsQuery = !directLogSnap || !directLogSnap.exists || Boolean((directLogSnap.data() || {}).exitTimestamp);
+      if (needsQuery && (qrData.isInside === true || qrData.isInside === undefined || qrData.isInside === null)) {
+        const recentLogsQuery = db.collection('access_logs')
+          .where('qrCodeId', '==', qrId)
+          .orderBy('timestamp', 'desc')
+          .limit(5);
+        const recentLogsSnap = await transaction.get(recentLogsQuery);
+        candidateLogDocs = recentLogsSnap.docs || [];
+      }
+    }
+
+    const isOneTime = isOneTimeQrCode(qrData);
     const guestName = qrData.guestName || qrData.visitorName || 'Guest';
-    const accessCategory = qrData.accessCategory || (qrData.type === 'one_time' || qrData.isOneTime ? 'supplier' : 'visitor');
+    const accessCategory = qrData.accessCategory || (isOneTime ? 'supplier' : 'visitor');
     const vehicleType = qrData.vehicleType || 'walking';
     const vehiclePlates = qrData.vehiclePlates || qrData.vehiclePlate || '';
     const passengers = qrData.passengers || 0;
+    const expMillis = getQrExpiryMillis(qrData);
 
+    const responseQrData = {
+      id: qrId,
+      visitorName: guestName,
+      guestName: guestName,
+      vehicleType: vehicleType,
+      vehiclePlate: vehiclePlates,
+      vehiclePlates: vehiclePlates,
+      passengers: passengers,
+      type: qrData.type || 'temporary',
+      accessCategory: accessCategory,
+      creatorUid: qrData.creatorUid || '',
+      residentName: residentName,
+      addressDisplay: addressDisplay,
+      isOneTime: isOneTime,
+      isOneTimeUse: isOneTime,
+    };
+
+    // EXIT BRANCH: Automatic exit detection when scanOnExitEnabled is active
+    if (scanOnExitEnabled) {
+      const openLogSnap = resolveOpenVisitLog({
+        qrData,
+        directLogSnap,
+        candidateLogDocs,
+        nowMillis,
+        timeZone,
+      });
+
+      if (openLogSnap || qrData.isInside === true) {
+        const openLogData = openLogSnap ? (openLogSnap.data() || {}) : {};
+        const openLogSummary = {
+          id: openLogSnap ? openLogSnap.id : '',
+          entryTimestampMillis: extractTimestampMillis(openLogData.timestamp),
+          guardName: openLogData.guardName || '',
+          visitorIdPhotoUrl: openLogData.visitorIdPhotoUrl || '',
+          visitorPlatePhotoUrl: openLogData.visitorPlatePhotoUrl || '',
+          reason: openLogData.reason || '',
+        };
+
+        if (mode === 'validate_only') {
+          return {
+            success: true,
+            granted: true,
+            isExit: true,
+            reason: 'Exit scan ready.',
+            qrData: responseQrData,
+            openLog: openLogSummary,
+          };
+        }
+
+        // Register exit on the open access log (or self-heal if missing)
+        if (openLogSnap) {
+          transaction.update(openLogSnap.ref, {
+            exitTimestamp: FieldValue.serverTimestamp(),
+            isInside: false,
+            exitGuardUid: guardUid,
+            exitGuardName: guardName,
+            exitReason: sanitizedReason,
+          });
+        }
+
+        const qrExitUpdates = {
+          isInside: false,
+          activeAccessLogId: null,
+        };
+        if (isOneTime) {
+          qrExitUpdates.status = 'deactivated (validated)';
+          qrExitUpdates.isValid = false;
+          qrExitUpdates.usedAt = FieldValue.serverTimestamp();
+        } else if (expMillis > 0 && nowMillis > expMillis && qrData.status === 'active') {
+          qrExitUpdates.status = 'deactivated (expired)';
+          qrExitUpdates.isValid = false;
+        }
+        transaction.update(qrRef, qrExitUpdates);
+
+        return {
+          success: true,
+          granted: true,
+          isExit: true,
+          reason: 'Exit registered.',
+          qrData: responseQrData,
+          openLog: openLogSummary,
+        };
+      }
+    }
+
+    // ENTRY BRANCH
     // 1. Check validity status
-    const isValidFlag = qrData.isValid !== false && qrData.status !== 'used' && qrData.status !== 'revoked';
-    if (!isValidFlag) {
-      const statusReason = qrData.status === 'used'
-        ? 'QR Code has already been used.'
-        : (qrData.status === 'revoked' ? 'QR Code has been revoked.' : 'QR Code is invalid.');
+    const validityCheck = evaluateQrValidityStatus(qrData);
+    if (!validityCheck.isValid) {
+      const statusReason = validityCheck.reason;
 
       if (mode === 'validate_and_register') {
         const logRef = db.collection('access_logs').doc();
@@ -2104,6 +2486,8 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           addressDisplay: addressDisplay,
           addressRef: addressRef,
           timestamp: FieldValue.serverTimestamp(),
+          exitTimestamp: null,
+          isInside: false,
           visitorIdPhotoUrl: visitorIdPhotoUrl || '',
           visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
           status: 'denied',
@@ -2114,73 +2498,55 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
       return {
         success: true,
         granted: false,
+        isExit: false,
         reason: statusReason,
-        qrData: {
-          id: qrId,
-          visitorName: guestName,
-          guestName: guestName,
-          vehiclePlate: vehiclePlates,
-          vehiclePlates: vehiclePlates,
-          type: qrData.type || 'temporary',
-          accessCategory: accessCategory,
-          creatorUid: qrData.creatorUid || '',
-          residentName: residentName,
-          addressDisplay: addressDisplay,
-        },
+        qrData: responseQrData,
       };
     }
 
     // 2. Check expiration for temporary passes
-    if (qrData.expiresAt || qrData.expiryTime) {
-      const expTime = qrData.expiresAt || qrData.expiryTime;
-      const expMillis = (expTime instanceof admin.firestore.Timestamp)
-        ? expTime.toMillis()
-        : (typeof expTime === 'string' || typeof expTime === 'number' ? new Date(expTime).getTime() : 0);
-
-      if (expMillis > 0 && now.toMillis() > expMillis) {
-        if (mode === 'validate_and_register') {
-          const logRef = db.collection('access_logs').doc();
-          transaction.set(logRef, {
-            qrCodeId: qrId,
-            guardUid: guardUid,
-            guardName: guardName,
-            creatorUid: qrData.creatorUid || 'unknown',
-            residentName: residentName,
-            guestName: guestName,
-            accessCategory: accessCategory,
-            vehicleType: vehicleType,
-            vehiclePlates: vehiclePlates,
-            passengers: passengers,
-            streetName: streetName,
-            number: houseNumber,
-            addressDisplay: addressDisplay,
-            addressRef: addressRef,
-            timestamp: FieldValue.serverTimestamp(),
-            visitorIdPhotoUrl: visitorIdPhotoUrl || '',
-            visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
-            status: 'denied',
-            reason: 'QR Code has expired.',
-          });
-        }
-
-        return {
-          success: true,
-          granted: false,
-          reason: 'QR Code has expired.',
-          qrData: {
-            id: qrId,
-            visitorName: guestName,
-            guestName: guestName,
-            vehiclePlate: vehiclePlates,
-            vehiclePlates: vehiclePlates,
-            type: qrData.type || 'temporary',
-            accessCategory: accessCategory,
-            creatorUid: qrData.creatorUid || '',
-            residentName: residentName,
-            addressDisplay: addressDisplay,
-          },
-        };
+    if (expMillis > 0 && nowMillis > expMillis) {
+      if (qrData.status === 'active') {
+        transaction.update(qrRef, {
+          status: 'deactivated (expired)',
+          isValid: false,
+        });
       }
+
+      if (mode === 'validate_and_register') {
+        const logRef = db.collection('access_logs').doc();
+        transaction.set(logRef, {
+          qrCodeId: qrId,
+          guardUid: guardUid,
+          guardName: guardName,
+          creatorUid: qrData.creatorUid || 'unknown',
+          residentName: residentName,
+          guestName: guestName,
+          accessCategory: accessCategory,
+          vehicleType: vehicleType,
+          vehiclePlates: vehiclePlates,
+          passengers: passengers,
+          streetName: streetName,
+          number: houseNumber,
+          addressDisplay: addressDisplay,
+          addressRef: addressRef,
+          timestamp: FieldValue.serverTimestamp(),
+          exitTimestamp: null,
+          isInside: false,
+          visitorIdPhotoUrl: visitorIdPhotoUrl || '',
+          visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
+          status: 'denied',
+          reason: 'QR Code has expired.',
+        });
+      }
+
+      return {
+        success: true,
+        granted: false,
+        isExit: false,
+        reason: 'QR Code has expired.',
+        qrData: responseQrData,
+      };
     }
 
     // 3. Verify creator resident address payment standing
@@ -2203,6 +2569,8 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           addressDisplay: addressDisplay,
           addressRef: addressRef,
           timestamp: FieldValue.serverTimestamp(),
+          exitTimestamp: null,
+          isInside: false,
           visitorIdPhotoUrl: visitorIdPhotoUrl || '',
           visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
           status: 'denied',
@@ -2213,19 +2581,9 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
       return {
         success: true,
         granted: false,
+        isExit: false,
         reason: 'Resident address payment status is restricted or unpaid.',
-        qrData: {
-          id: qrId,
-          visitorName: guestName,
-          guestName: guestName,
-          vehiclePlate: vehiclePlates,
-          vehiclePlates: vehiclePlates,
-          type: qrData.type || 'temporary',
-          accessCategory: accessCategory,
-          creatorUid: qrData.creatorUid || '',
-          residentName: residentName,
-          addressDisplay: addressDisplay,
-        },
+        qrData: responseQrData,
       };
     }
 
@@ -2234,35 +2592,39 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
       return {
         success: true,
         granted: true,
+        isExit: false,
         reason: 'Access granted.',
-        qrData: {
-          id: qrId,
-          visitorName: guestName,
-          guestName: guestName,
-          vehiclePlate: vehiclePlates,
-          vehiclePlates: vehiclePlates,
-          type: qrData.type || 'temporary',
-          accessCategory: accessCategory,
-          creatorUid: qrData.creatorUid || '',
-          residentName: residentName,
-          addressDisplay: addressDisplay,
-          isOneTime: qrData.isOneTime === true || qrData.type === 'one_time',
-        },
+        qrData: responseQrData,
       };
     }
 
-    // 5. If isAllowed is true and single-use, mark used
-    const isOneTime = qrData.isOneTime === true || qrData.type === 'one_time';
-    if (isAllowed && isOneTime) {
-      transaction.update(qrRef, {
-        status: 'used',
-        isValid: false,
-        usedAt: FieldValue.serverTimestamp(),
-      });
+    // 5. Prepare access_logs reference and update qr_codes state
+    const logRef = db.collection('access_logs').doc();
+    const markInside = Boolean(isAllowed && scanOnExitEnabled);
+
+    if (isAllowed) {
+      if (scanOnExitEnabled) {
+        transaction.update(qrRef, {
+          isInside: true,
+          activeAccessLogId: logRef.id,
+        });
+      } else if (isOneTime) {
+        transaction.update(qrRef, {
+          status: 'deactivated (validated)',
+          isValid: false,
+          usedAt: FieldValue.serverTimestamp(),
+          isInside: false,
+          activeAccessLogId: null,
+        });
+      } else if (qrData.isInside === true || qrData.activeAccessLogId) {
+        transaction.update(qrRef, {
+          isInside: false,
+          activeAccessLogId: null,
+        });
+      }
     }
 
     // 6. Write to access_logs
-    const logRef = db.collection('access_logs').doc();
     transaction.set(logRef, {
       qrCodeId: qrId,
       guardUid: guardUid,
@@ -2279,28 +2641,20 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
       addressDisplay: addressDisplay,
       addressRef: addressRef,
       timestamp: FieldValue.serverTimestamp(),
+      exitTimestamp: null,
+      isInside: markInside,
       visitorIdPhotoUrl: visitorIdPhotoUrl || '',
       visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
       status: isAllowed ? 'allowed' : 'denied',
-      reason: reason || (isAllowed ? 'Access granted' : 'Denied by guard'),
+      reason: sanitizedReason || (isAllowed ? 'Access granted' : 'Denied by guard'),
     });
 
     return {
       success: true,
       granted: isAllowed,
-      reason: isAllowed ? 'Access granted.' : (reason || 'Denied by guard'),
-      qrData: {
-        id: qrId,
-        visitorName: guestName,
-        guestName: guestName,
-        vehiclePlate: vehiclePlates,
-        vehiclePlates: vehiclePlates,
-        type: qrData.type || 'temporary',
-        accessCategory: accessCategory,
-        creatorUid: qrData.creatorUid || '',
-        residentName: residentName,
-        addressDisplay: addressDisplay,
-      },
+      isExit: false,
+      reason: isAllowed ? 'Access granted.' : (sanitizedReason || 'Denied by guard'),
+      qrData: responseQrData,
     };
   });
 });
@@ -2518,5 +2872,13 @@ exports._test = {
   buildWelcomeEmailHtml,
   GEMINI_MODEL,
   GEMINI_LOCATION,
+  isOneTimeQrCode,
+  evaluateQrValidityStatus,
+  getQrExpiryMillis,
+  expireOutdatedQrCodes,
+  extractTimestampMillis,
+  isSameCalendarDayInTimezone,
+  resolveOpenVisitLog,
+  admin,
 };
 

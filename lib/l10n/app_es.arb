@@ -183,7 +183,7 @@
   "uploadPaymentOnBehalfMenu": "Subir Pago a Nombre de Usuario",
   "manageUsersMenu": "Directorio de Usuarios y Roles",
   "manageFacilitiesMenu": "Gestionar Amenidades",
-  "adminSettingsMenu": "Configuración de Mantenimiento",
+  "adminSettingsMenu": "Configuración General",
   "resignAdminRole": "Renunciar al Rol de Administrador",
   "resignAdminConfirm": "¿Estás seguro de que deseas renunciar como Administrador? Esta acción revocará tus privilegios de administrador de inmediato.",
   "revokeAdminButton": "Revocar Administrador",
@@ -840,7 +840,58 @@
   "adminOnlyBadge": "SOLO ADMIN",
   "changeVisibility": "Cambiar Visibilidad",
   "selectNewVisibility": "Seleccione la visibilidad del documento",
-  "documentVisibilityChanged": "Visibilidad del documento actualizada exitosamente"
+  "documentVisibilityChanged": "Visibilidad del documento actualizada exitosamente",
+  "accessControlSettingsSection": "Control de Acceso y QR",
+  "scanOnExitTitle": "Escanear para salir",
+  "scanOnExitSubtitle": "Solicitar en caseta escanear nuevamente el código QR de invitados y proveedores al salir para registrar su hora de salida.",
+  "exitScanHeader": "Salida de Visitante Lista",
+  "registerExitButton": "Registrar Salida",
+  "exitRegisteredSuccess": "Salida registrada exitosamente.",
+  "exitNotesOptional": "Notas de salida (opcional)",
+  "entryTimeLabel": "Hora de Entrada",
+  "exitTimeLabel": "Hora de Salida",
+  "entryPhotosLabel": "Fotos Tomadas al Ingresar",
+  "qrStatusInside": "Dentro",
+  "currentlyInsideKpi": "Dentro Ahora",
+  "currentlyInsideFilter": "Dentro Ahora",
+  "visitorInsideBadge": "Dentro",
+  "exitPendingLabel": "Dentro (Sin salida registrada)",
+  "exitGuardLabel": "Guardia de Salida",
+  "exitNotesLabel": "Notas de Salida",
+  "rotateImage": "Rotar Imagen",
+  "dateOfPaymentLabel": "Fecha de pago",
+  "periodPaidLabel": "Periodo pagado",
+  "adminOverviewMenu": "Resumen General",
+  "adminOverviewSubtitle": "Aprobaciones pendientes y estado de la comunidad en vivo",
+  "adminPendingReviewsSection": "Aprobaciones Pendientes",
+  "adminCommunityStatsSection": "Estado de la Comunidad en Vivo",
+  "adminQuickAccessSection": "Accesos Rápidos",
+  "adminShortcutUserDirectory": "Directorio de Usuarios",
+  "adminShortcutSettings": "Configuración",
+  "adminActiveSanctionsStat": "Sanciones Activas",
+  "adminVisitorsCurrentlyInsideStat": "Visitantes actualmente dentro",
+  "adminPendingItemsCount": "{count, plural, =0{Al día} =1{1 pendiente} other{{count} pendientes}}",
+  "@adminPendingItemsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminGroupUserManagement": "Gestión de Usuarios",
+  "adminGroupResidentialManagement": "Gestión Residencial",
+  "adminGroupFinance": "Finanzas",
+  "adminGroupTransparencyCommunity": "Transparencia y Comunidad",
+  "adminGroupGeneralSettings": "Configuración General",
+  "settingsAutoSaveHint": "Los interruptores y ajustes generales se guardan automáticamente",
+  "settingsAutoSavingLabel": "Guardando...",
+  "settingsAutoSavedLabel": "Guardado",
+  "saveSmtpConfigButton": "Guardar Servidor SMTP",
+  "saveEmailTemplateButton": "Guardar Plantilla de Correo",
+  "noCustomRejectionReasonsHint": "No hay motivos personalizados configurados. Las plantillas predeterminadas siempre están activas.",
+  "userActionsSectionTitle": "Acciones de Cuenta y Propiedad",
+  "userDangerZoneSectionTitle": "Acciones Sensibles",
+  "paymentStandingLabel": "Estatus de Pago"
 }
 
 

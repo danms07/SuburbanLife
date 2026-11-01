@@ -183,7 +183,7 @@
   "uploadPaymentOnBehalfMenu": "Upload Payment on Behalf",
   "manageUsersMenu": "User Directory & Roles",
   "manageFacilitiesMenu": "Manage Amenities",
-  "adminSettingsMenu": "Maintenance Settings",
+  "adminSettingsMenu": "General Settings",
   "resignAdminRole": "Resign Admin Role",
   "resignAdminConfirm": "Are you sure you want to step down as an Admin? This action will revoke your admin privileges immediately.",
   "revokeAdminButton": "Revoke Admin",
@@ -973,7 +973,58 @@
   "adminOnlyBadge": "ADMIN ONLY",
   "changeVisibility": "Change Visibility",
   "selectNewVisibility": "Select document visibility",
-  "documentVisibilityChanged": "Document visibility updated successfully"
+  "documentVisibilityChanged": "Document visibility updated successfully",
+  "accessControlSettingsSection": "Access Control & QR",
+  "scanOnExitTitle": "Scan on exit",
+  "scanOnExitSubtitle": "Require security guards to scan visitor and supplier QR passes again when leaving to record exit timestamps.",
+  "exitScanHeader": "Visitor Exit Ready",
+  "registerExitButton": "Register Exit",
+  "exitRegisteredSuccess": "Visitor exit registered successfully.",
+  "exitNotesOptional": "Exit notes (optional)",
+  "entryTimeLabel": "Entry Time",
+  "exitTimeLabel": "Exit Time",
+  "entryPhotosLabel": "Entry Verification Photos",
+  "qrStatusInside": "Inside",
+  "currentlyInsideKpi": "Currently Inside",
+  "currentlyInsideFilter": "Currently Inside",
+  "visitorInsideBadge": "Inside",
+  "exitPendingLabel": "Inside (No exit recorded)",
+  "exitGuardLabel": "Exit Guard",
+  "exitNotesLabel": "Exit Notes",
+  "rotateImage": "Rotate Image",
+  "dateOfPaymentLabel": "Date of payment",
+  "periodPaidLabel": "Period paid",
+  "adminOverviewMenu": "Overview",
+  "adminOverviewSubtitle": "Pending approvals and live community status",
+  "adminPendingReviewsSection": "Pending Approvals",
+  "adminCommunityStatsSection": "Live Community Status",
+  "adminQuickAccessSection": "Shortcuts",
+  "adminShortcutUserDirectory": "User Directory",
+  "adminShortcutSettings": "Settings",
+  "adminActiveSanctionsStat": "Active Sanctions",
+  "adminVisitorsCurrentlyInsideStat": "Visitors currently inside",
+  "adminPendingItemsCount": "{count, plural, =0{Up to date} =1{1 pending} other{{count} pending}}",
+  "@adminPendingItemsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "adminGroupUserManagement": "User Management",
+  "adminGroupResidentialManagement": "Residential Management",
+  "adminGroupFinance": "Finance",
+  "adminGroupTransparencyCommunity": "Transparency & Community",
+  "adminGroupGeneralSettings": "General Settings",
+  "settingsAutoSaveHint": "Switches and general settings are saved automatically",
+  "settingsAutoSavingLabel": "Saving...",
+  "settingsAutoSavedLabel": "Saved",
+  "saveSmtpConfigButton": "Save SMTP Server",
+  "saveEmailTemplateButton": "Save Email Template",
+  "noCustomRejectionReasonsHint": "No custom reason templates configured. Default templates are always active.",
+  "userActionsSectionTitle": "Account & Property Actions",
+  "userDangerZoneSectionTitle": "Sensitive Actions",
+  "paymentStandingLabel": "Payment Standing"
 }
 
 

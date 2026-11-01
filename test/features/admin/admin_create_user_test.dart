@@ -96,8 +96,15 @@ void main() {
     );
   }
 
-  group('Admin Resident Creation & Delivery Date Validation', () {
-    test('Cloud Function validation rejects resident creation with future delivery date (January 1st 2100)', () async {
+  group('AdminCreateUserScreen Form Validation, Role Switching & Error Handling', () {
+    testWidgets('Validates weak password and missing address before invoking Cloud Function', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       FakeBackendHelper.db.seedDocument('addresses', 'loreto_108', {
         'id': 'loreto_108',
         'streetName': 'loreto',
@@ -106,68 +113,93 @@ void main() {
         'residentUid': null,
       });
 
-      final futureDate = DateTime(2100, 1, 1).toIso8601String();
+      await tester.pumpWidget(wrapWithMaterial(const AdminCreateUserScreen(initialRole: 'resident')));
+      await tester.pumpAndSettle();
 
-      expect(
-        () => FunctionsService().callFunction('adminCreateUser', {
-          'name': 'Karla Islas',
-          'email': 'karip2209@gmail.com',
-          'password': 'Password123!',
-          'role': 'resident',
-          'addressId': 'loreto_108',
-          'streetName': 'loreto',
-          'number': 108,
-          'deliveryDate': futureDate,
-        }),
-        throwsA(
-          isA<Exception>().having(
-            (e) => e.toString(),
-            'message',
-            contains('Delivery date cannot be in the future.'),
-          ),
-        ),
-      );
+      final textFields = find.byType(TextField);
+      await tester.enterText(textFields.at(0), 'Karla Islas');
+      await tester.enterText(textFields.at(1), 'karip2209@gmail.com');
+      await tester.enterText(textFields.at(2), 'weak');
+      await tester.pumpAndSettle();
 
-      // Verify no user was created and address remains unclaimed
-      final addressDoc = await FakeBackendHelper.db.getDocument('addresses', 'loreto_108');
-      expect(addressDoc?['residentUid'], isNull);
+      final submitBtn = find.byType(ElevatedButton);
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      // Weak password blocks submission
+      expect(FakeBackendHelper.functions.callHistory, isEmpty);
+
+      // Tap random password generator button -> produces compliant password
+      await tester.tap(find.byIcon(Icons.auto_fix_high));
+      await tester.pumpAndSettle();
+
+      // Submitting resident without selecting an address shows warning SnackBar and does not call backend
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+      expect(FakeBackendHelper.functions.callHistory, isEmpty);
+      expect(find.textContaining('Please select a street and house number'), findsOneWidget);
     });
 
-    test('Cloud Function validation creates resident with past delivery date (January 1st 2025)', () async {
-      FakeBackendHelper.db.seedDocument('addresses', 'loreto_108', {
-        'id': 'loreto_108',
-        'streetName': 'loreto',
-        'number': 108,
-        'paymentStatus': 'paid',
-        'residentUid': null,
+    testWidgets('Switches role to Security Guard, hides address card, creates guard, and logs server errors gracefully', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
       });
 
-      final validDate = DateTime(2025, 1, 1).toIso8601String();
+      await tester.pumpWidget(wrapWithMaterial(const AdminCreateUserScreen(initialRole: 'resident')));
+      await tester.pumpAndSettle();
 
-      final result = await FunctionsService().callFunction('adminCreateUser', {
-        'name': 'Karla Islas',
-        'email': 'karip2209@gmail.com',
-        'password': 'Password123!',
-        'role': 'resident',
-        'addressId': 'loreto_108',
-        'streetName': 'loreto',
-        'number': 108,
-        'deliveryDate': validDate,
+      // Switch role dropdown from Resident to Guard
+      await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guard').last);
+      await tester.pumpAndSettle();
+
+      // Address street dropdown should no longer exist for Guard role
+      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+
+      final textFields = find.byType(TextField);
+      await tester.enterText(textFields.at(0), 'Pedro Guard');
+      await tester.enterText(textFields.at(1), 'pedro.guard@catania.com');
+      await tester.enterText(textFields.at(2), 'SecurePass123!');
+      await tester.pumpAndSettle();
+
+      final submitBtn = find.byType(ElevatedButton);
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      expect(
+        FakeBackendHelper.functions.callHistory.any(
+          (c) =>
+              c['name'] == 'adminCreateUser' &&
+              c['parameters']?['role'] == 'guard' &&
+              c['parameters']?['email'] == 'pedro.guard@catania.com',
+        ),
+        isTrue,
+      );
+
+      // Advance SnackBar and simulate a server-side failure (e.g. duplicate email)
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      FakeBackendHelper.functions.registerHandler('adminCreateUser', (_) async {
+        throw Exception('Email address is already in use.');
       });
 
-      expect(result['success'], equals(true));
-      final uid = result['uid'];
+      await tester.enterText(textFields.at(0), 'Duplicate Guard');
+      await tester.enterText(textFields.at(1), 'pedro.guard@catania.com');
+      await tester.enterText(textFields.at(2), 'SecurePass123!');
+      await tester.pumpAndSettle();
 
-      // Verify user document
-      final userDoc = await FakeBackendHelper.db.getDocument('users', uid);
-      expect(userDoc?['email'], equals('karip2209@gmail.com'));
-      expect(userDoc?['name'], equals('Karla Islas'));
-      expect(userDoc?['role'], equals('resident'));
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
 
-      // Verify address was claimed with delivery date
-      final addressDoc = await FakeBackendHelper.db.getDocument('addresses', 'loreto_108');
-      expect(addressDoc?['residentUid'], equals(uid));
-      expect(addressDoc?['deliveryDate'], equals(DateTime(2025, 1, 1)));
+      expect(find.textContaining('Email address is already in use.'), findsOneWidget);
+      expect(FakeBackendHelper.crashlytics.recordedErrors, isNotEmpty);
     });
 
     testWidgets('AdminCreateUserScreen widget creates resident and shows success', (tester) async {

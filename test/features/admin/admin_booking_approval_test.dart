@@ -1,83 +1,145 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:suburban_life/features/admin/admin_booking_approval_screen.dart';
+import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
+
+Widget _wrapWithL10n(Widget child) {
+  return MaterialApp(
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('en'), Locale('es')],
+    locale: const Locale('en'),
+    home: child,
+  );
+}
 
 void main() {
   setUp(() {
     FakeBackendHelper.setUp();
   });
 
-  group('Admin Booking Approval Flow & Lifecycle', () {
-    test('Correctly retrieves only pending review bookings for admin', () async {
-      FakeBackendHelper.db.seedDocument('bookings', 'b_pending_1', {
-        'id': 'b_pending_1',
-        'facilityId': 'multipurpose_room',
-        'userUid': 'user_1',
-        'status': 'pending review',
-        'startTime': DateTime(2026, 9, 1, 10, 0).millisecondsSinceEpoch,
-        'endTime': DateTime(2026, 9, 1, 12, 0).millisecondsSinceEpoch,
-      });
-
-      FakeBackendHelper.db.seedDocument('bookings', 'b_approved', {
-        'id': 'b_approved',
-        'facilityId': 'bicycle_1',
-        'userUid': 'user_2',
-        'status': 'approved (upcoming)',
-        'startTime': DateTime(2026, 9, 1, 14, 0).millisecondsSinceEpoch,
-        'endTime': DateTime(2026, 9, 1, 16, 0).millisecondsSinceEpoch,
-      });
-
-      FakeBackendHelper.db.seedDocument('bookings', 'b_rejected', {
-        'id': 'b_rejected',
+  group('AdminBookingApprovalScreen - Widget & State Transitions', () {
+    testWidgets('renders empty state and hides already-approved or rejected bookings', (tester) async {
+      FakeBackendHelper.db.seedDocument('bookings', 'bk_approved', {
         'facilityId': 'roof_garden',
-        'userUid': 'user_3',
+        'userUid': 'res_1',
+        'status': 'approved (upcoming)',
+        'startTime': DateTime(2026, 6, 10, 14, 0),
+        'endTime': DateTime(2026, 6, 10, 18, 0),
+      });
+      FakeBackendHelper.db.seedDocument('bookings', 'bk_rejected', {
+        'facilityId': 'roof_garden',
+        'userUid': 'res_2',
         'status': 'rejected',
-        'startTime': DateTime(2026, 9, 2, 10, 0).millisecondsSinceEpoch,
-        'endTime': DateTime(2026, 9, 2, 12, 0).millisecondsSinceEpoch,
+        'startTime': DateTime(2026, 6, 11, 14, 0),
+        'endTime': DateTime(2026, 6, 11, 18, 0),
       });
 
-      final pendingStream = FakeBackendHelper.db.streamCollection('bookings');
-      final list = await pendingStream.first;
-      final pendingOnly = list.where((b) => b['status'] == 'pending review').toList();
+      await tester.pumpWidget(_wrapWithL10n(const AdminBookingApprovalScreen()));
+      await tester.pumpAndSettle();
 
-      expect(pendingOnly.length, equals(1));
-      expect(pendingOnly.first['id'], equals('b_pending_1'));
-      expect(pendingOnly.first['facilityId'], equals('multipurpose_room'));
+      expect(find.byIcon(Icons.event_available), findsOneWidget);
+      expect(find.byIcon(Icons.check), findsNothing);
     });
 
-    test('Approving a booking sets status to approved (upcoming)', () async {
-      FakeBackendHelper.db.seedDocument('bookings', 'booking_to_approve', {
-        'id': 'booking_to_approve',
-        'facilityId': 'multipurpose_room',
-        'userUid': 'user_123',
+    testWidgets('approves pending booking with facility preset message and custom instructions', (tester) async {
+      FakeBackendHelper.db.seedDocument('facilities', 'roof_garden', {
+        'name': 'Roof Garden',
+        'presetApprovalMessage': 'Pick up keys at guardhouse.',
+      });
+      FakeBackendHelper.db.seedDocument('users', 'res_1', {
+        'name': 'Laura Resident',
+        'email': 'laura@test.com',
+        'phoneNumber': '555-0199',
+      });
+      FakeBackendHelper.db.seedDocument('bookings', 'bk_pending_1', {
+        'facilityId': 'roof_garden',
+        'userUid': 'res_1',
         'status': 'pending review',
+        'isConfirmed': false,
+        'startTime': DateTime(2026, 6, 15, 16, 0),
+        'endTime': DateTime(2026, 6, 15, 20, 0),
       });
 
-      await FakeBackendHelper.db.updateDocument('bookings', 'booking_to_approve', {
-        'status': 'approved (upcoming)',
-      });
+      await tester.pumpWidget(_wrapWithL10n(const AdminBookingApprovalScreen()));
+      await tester.pumpAndSettle();
 
-      final doc = await FakeBackendHelper.db.getDocument('bookings', 'booking_to_approve');
-      expect(doc?['status'], equals('approved (upcoming)'));
+      expect(find.text('Roof Garden'), findsOneWidget);
+      expect(find.textContaining('Laura Resident'), findsOneWidget);
+      expect(find.text('laura@test.com'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.check));
+      await tester.pumpAndSettle();
+
+      // Verify preset message pre-populated inside dialog TextField
+      expect(find.text('Pick up keys at guardhouse.'), findsOneWidget);
+
+      final dialogField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogField, 'Pick up keys at guardhouse before 3:45 PM.');
+
+      final confirmBtn = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(ElevatedButton),
+      );
+      await tester.tap(confirmBtn);
+      await tester.pumpAndSettle();
+
+      final updated = await FakeBackendHelper.db.getDocument('bookings', 'bk_pending_1');
+      expect(updated!['status'], equals('approved (upcoming)'));
+      expect(updated['isConfirmed'], isTrue);
+      expect(updated['approvalMessage'], equals('Pick up keys at guardhouse before 3:45 PM.'));
+      expect(updated['updatedAt'], isA<DateTime>());
     });
 
-    test('Rejecting a booking sets status to rejected with notes and rejectionReason', () async {
-      FakeBackendHelper.db.seedDocument('bookings', 'booking_to_reject', {
-        'id': 'booking_to_reject',
-        'facilityId': 'roof_garden',
-        'userUid': 'user_456',
+    testWidgets('rejects pending booking and records rejection reason', (tester) async {
+      FakeBackendHelper.db.seedDocument('facilities', 'multipurpose_room', {
+        'name': 'Multipurpose Room',
+      });
+      FakeBackendHelper.db.seedDocument('users', 'res_2', {
+        'name': 'Marco Resident',
+      });
+      FakeBackendHelper.db.seedDocument('bookings', 'bk_pending_2', {
+        'facilityId': 'multipurpose_room',
+        'userUid': 'res_2',
         'status': 'pending review',
+        'isConfirmed': false,
+        'startTime': DateTime(2026, 6, 20, 12, 0),
+        'endTime': DateTime(2026, 6, 20, 16, 0),
       });
 
-      await FakeBackendHelper.db.updateDocument('bookings', 'booking_to_reject', {
-        'status': 'rejected',
-        'notes': 'Maintenance scheduled for roof garden.',
-        'rejectionReason': 'Maintenance scheduled for roof garden.',
-      });
+      await tester.pumpWidget(_wrapWithL10n(const AdminBookingApprovalScreen()));
+      await tester.pumpAndSettle();
 
-      final doc = await FakeBackendHelper.db.getDocument('bookings', 'booking_to_reject');
-      expect(doc?['status'], equals('rejected'));
-      expect(doc?['notes'], equals('Maintenance scheduled for roof garden.'));
-      expect(doc?['rejectionReason'], equals('Maintenance scheduled for roof garden.'));
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      final dialogField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogField, 'Scheduled maintenance window');
+
+      final rejectConfirmBtn = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(ElevatedButton),
+      );
+      await tester.tap(rejectConfirmBtn);
+      await tester.pumpAndSettle();
+
+      final updated = await FakeBackendHelper.db.getDocument('bookings', 'bk_pending_2');
+      expect(updated!['status'], equals('rejected'));
+      expect(updated['isConfirmed'], isFalse);
+      expect(updated['rejectionReason'], equals('Scheduled maintenance window'));
+      expect(updated['notes'], equals('Scheduled maintenance window'));
     });
   });
 }

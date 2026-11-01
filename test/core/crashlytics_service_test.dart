@@ -1,111 +1,123 @@
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:suburban_life/core/backend/backend.dart';
-
-class MockCrashlyticsService implements CrashlyticsService {
-  final List<String> recordedErrors = [];
-  final List<String> logs = [];
-  String currentUserId = '';
-  final Map<String, Object> customKeys = {};
-  bool isCollectionEnabled = false;
-
-  @override
-  Future<void> recordError(
-    dynamic exception,
-    StackTrace? stack, {
-    dynamic reason,
-    Iterable<Object> information = const [],
-    bool fatal = false,
-  }) async {
-    recordedErrors.add('$exception (fatal: $fatal, reason: $reason)');
-  }
-
-  @override
-  Future<void> recordFlutterError(FlutterErrorDetails details, {bool fatal = false}) async {
-    recordedErrors.add('${details.exceptionAsString()} (fatal: $fatal)');
-  }
-
-  @override
-  Future<void> log(String message) async {
-    logs.add(message);
-  }
-
-  @override
-  Future<void> setUserIdentifier(String identifier) async {
-    currentUserId = identifier;
-  }
-
-  @override
-  Future<void> setCustomKey(String key, Object value) async {
-    customKeys[key] = value;
-  }
-
-  @override
-  Future<void> setCrashlyticsCollectionEnabled(bool enabled) async {
-    isCollectionEnabled = enabled;
-  }
-}
+import 'package:suburban_life/core/widgets/error_fallback_screen.dart';
+import 'package:suburban_life/features/payments/payment_service.dart';
+import 'package:suburban_life/l10n/app_localizations.dart';
+import '../helpers/fake_backend.dart';
 
 void main() {
-  group('CrashlyticsService & BaaS Abstraction Tests', () {
-    late MockCrashlyticsService mockCrashlytics;
+  setUp(() {
+    FakeBackendHelper.setUp();
+  });
 
-    setUp(() {
-      mockCrashlytics = MockCrashlyticsService();
-    });
+  group('CrashlyticsService BaaS Delegation & Production Error Reporting', () {
+    test('CrashlyticsService() factory delegates all telemetry calls to Backend.crashlytics', () async {
+      final crashlytics = CrashlyticsService();
 
-    test('Record non-fatal and fatal errors correctly', () async {
-      await mockCrashlytics.recordError(
-        Exception('Test non-fatal error'),
+      await crashlytics.setCrashlyticsCollectionEnabled(true);
+      expect(FakeBackendHelper.crashlytics.isCollectionEnabled, isTrue);
+
+      await crashlytics.setUserIdentifier('user-12345');
+      expect(FakeBackendHelper.crashlytics.currentUserId, equals('user-12345'));
+
+      await crashlytics.setCustomKey('role', 'admin');
+      await crashlytics.log('Navigated to Admin dashboard');
+      expect(FakeBackendHelper.crashlytics.customKeys['role'], equals('admin'));
+      expect(FakeBackendHelper.crashlytics.logs, contains('Navigated to Admin dashboard'));
+
+      await crashlytics.recordError(
+        Exception('Non-fatal network timeout'),
         StackTrace.current,
-        reason: 'Testing handled exception',
+        reason: 'DashboardSync',
         fatal: false,
       );
 
-      await mockCrashlytics.recordError(
-        Exception('Fatal uncaught error'),
-        StackTrace.current,
-        fatal: true,
-      );
-
-      expect(mockCrashlytics.recordedErrors.length, 2);
-      expect(mockCrashlytics.recordedErrors.first, contains('Test non-fatal error (fatal: false, reason: Testing handled exception)'));
-      expect(mockCrashlytics.recordedErrors.last, contains('Fatal uncaught error (fatal: true, reason: null)'));
-    });
-
-    test('Record FlutterErrorDetails correctly', () async {
-      final details = FlutterErrorDetails(
-        exception: Exception('Widget build failed'),
+      final flutterDetails = FlutterErrorDetails(
+        exception: Exception('RenderBox overflow'),
         stack: StackTrace.current,
         library: 'widgets library',
       );
+      await crashlytics.recordFlutterError(flutterDetails, fatal: true);
 
-      await mockCrashlytics.recordFlutterError(details, fatal: true);
-
-      expect(mockCrashlytics.recordedErrors.length, 1);
-      expect(mockCrashlytics.recordedErrors.first, contains('Widget build failed (fatal: true)'));
+      expect(FakeBackendHelper.crashlytics.recordedErrors.length, equals(2));
+      expect(
+        FakeBackendHelper.crashlytics.recordedErrors.first,
+        contains('Non-fatal network timeout (fatal: false, reason: DashboardSync)'),
+      );
+      expect(
+        FakeBackendHelper.crashlytics.recordedErrors.last,
+        contains('RenderBox overflow (fatal: true)'),
+      );
     });
 
-    test('Manage user identification and custom keys', () async {
-      await mockCrashlytics.setUserIdentifier('user-12345');
-      expect(mockCrashlytics.currentUserId, 'user-12345');
+    test('PaymentService.uploadPaymentReceipt reports storage failures to Crashlytics', () async {
+      FakeBackendHelper.db.seedDocument('users', 'res_1', {
+        'addressRef': FakeBackendHelper.db.createReference('addresses', 'addr_1'),
+      });
+      FakeBackendHelper.storage.uploadHandler = (path, data) async {
+        throw Exception('Storage bucket unreachable');
+      };
 
-      await mockCrashlytics.setCustomKey('role', 'admin');
-      await mockCrashlytics.setCustomKey('app_version', '1.0.0');
+      final fakeXFile = XFile.fromData(
+        Uint8List.fromList([1, 2, 3, 4]),
+        name: 'receipt.jpg',
+        path: '/virtual/receipt.jpg',
+      );
 
-      expect(mockCrashlytics.customKeys['role'], 'admin');
-      expect(mockCrashlytics.customKeys['app_version'], '1.0.0');
+      await expectLater(
+        () => PaymentService().uploadPaymentReceipt(
+          'res_1',
+          ['2026-05'],
+          1500.0,
+          pickedFile: fakeXFile,
+        ),
+        throwsException,
+      );
 
-      await mockCrashlytics.log('User navigated to Admin screen');
-      expect(mockCrashlytics.logs, contains('User navigated to Admin screen'));
+      expect(FakeBackendHelper.crashlytics.recordedErrors, isNotEmpty);
+      expect(
+        FakeBackendHelper.crashlytics.recordedErrors.single,
+        contains('reason: PaymentService.uploadPaymentReceipt'),
+      );
+    });
+  });
+
+  group('ErrorFallbackScreen Widget Tests', () {
+    testWidgets('renders localized fallback screen when wrapped with AppLocalizations', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('en'), Locale('es')],
+          locale: const Locale('es'),
+          home: Builder(
+            builder: (context) => ErrorFallbackScreen(
+              details: FlutterErrorDetails(exception: Exception('Fatal UI error')),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
+      // Should render non-empty title and message without throwing
+      expect(find.byType(Card), findsOneWidget);
     });
 
-    test('Toggle crash collection status', () async {
-      await mockCrashlytics.setCrashlyticsCollectionEnabled(true);
-      expect(mockCrashlytics.isCollectionEnabled, true);
+    testWidgets('renders standalone fallback text when no Localization ancestor exists', (tester) async {
+      await tester.pumpWidget(const ErrorFallbackScreen());
+      await tester.pumpAndSettle();
 
-      await mockCrashlytics.setCrashlyticsCollectionEnabled(false);
-      expect(mockCrashlytics.isCollectionEnabled, false);
+      expect(find.text('Something went wrong'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
     });
   });
 }

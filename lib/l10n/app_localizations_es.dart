@@ -540,7 +540,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get manageFacilitiesMenu => 'Gestionar Amenidades';
 
   @override
-  String get adminSettingsMenu => 'Configuración de Mantenimiento';
+  String get adminSettingsMenu => 'Configuración General';
 
   @override
   String get resignAdminRole => 'Renunciar al Rol de Administrador';
@@ -2214,4 +2214,150 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get documentVisibilityChanged =>
       'Visibilidad del documento actualizada exitosamente';
+
+  @override
+  String get accessControlSettingsSection => 'Control de Acceso y QR';
+
+  @override
+  String get scanOnExitTitle => 'Escanear para salir';
+
+  @override
+  String get scanOnExitSubtitle =>
+      'Solicitar en caseta escanear nuevamente el código QR de invitados y proveedores al salir para registrar su hora de salida.';
+
+  @override
+  String get exitScanHeader => 'Salida de Visitante Lista';
+
+  @override
+  String get registerExitButton => 'Registrar Salida';
+
+  @override
+  String get exitRegisteredSuccess => 'Salida registrada exitosamente.';
+
+  @override
+  String get exitNotesOptional => 'Notas de salida (opcional)';
+
+  @override
+  String get entryTimeLabel => 'Hora de Entrada';
+
+  @override
+  String get exitTimeLabel => 'Hora de Salida';
+
+  @override
+  String get entryPhotosLabel => 'Fotos Tomadas al Ingresar';
+
+  @override
+  String get qrStatusInside => 'Dentro';
+
+  @override
+  String get currentlyInsideKpi => 'Dentro Ahora';
+
+  @override
+  String get currentlyInsideFilter => 'Dentro Ahora';
+
+  @override
+  String get visitorInsideBadge => 'Dentro';
+
+  @override
+  String get exitPendingLabel => 'Dentro (Sin salida registrada)';
+
+  @override
+  String get exitGuardLabel => 'Guardia de Salida';
+
+  @override
+  String get exitNotesLabel => 'Notas de Salida';
+
+  @override
+  String get rotateImage => 'Rotar Imagen';
+
+  @override
+  String get dateOfPaymentLabel => 'Fecha de pago';
+
+  @override
+  String get periodPaidLabel => 'Periodo pagado';
+
+  @override
+  String get adminOverviewMenu => 'Resumen General';
+
+  @override
+  String get adminOverviewSubtitle =>
+      'Aprobaciones pendientes y estado de la comunidad en vivo';
+
+  @override
+  String get adminPendingReviewsSection => 'Aprobaciones Pendientes';
+
+  @override
+  String get adminCommunityStatsSection => 'Estado de la Comunidad en Vivo';
+
+  @override
+  String get adminQuickAccessSection => 'Accesos Rápidos';
+
+  @override
+  String get adminShortcutUserDirectory => 'Directorio de Usuarios';
+
+  @override
+  String get adminShortcutSettings => 'Configuración';
+
+  @override
+  String get adminActiveSanctionsStat => 'Sanciones Activas';
+
+  @override
+  String get adminVisitorsCurrentlyInsideStat =>
+      'Visitantes actualmente dentro';
+
+  @override
+  String adminPendingItemsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pendientes',
+      one: '1 pendiente',
+      zero: 'Al día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminGroupUserManagement => 'Gestión de Usuarios';
+
+  @override
+  String get adminGroupResidentialManagement => 'Gestión Residencial';
+
+  @override
+  String get adminGroupFinance => 'Finanzas';
+
+  @override
+  String get adminGroupTransparencyCommunity => 'Transparencia y Comunidad';
+
+  @override
+  String get adminGroupGeneralSettings => 'Configuración General';
+
+  @override
+  String get settingsAutoSaveHint =>
+      'Los interruptores y ajustes generales se guardan automáticamente';
+
+  @override
+  String get settingsAutoSavingLabel => 'Guardando...';
+
+  @override
+  String get settingsAutoSavedLabel => 'Guardado';
+
+  @override
+  String get saveSmtpConfigButton => 'Guardar Servidor SMTP';
+
+  @override
+  String get saveEmailTemplateButton => 'Guardar Plantilla de Correo';
+
+  @override
+  String get noCustomRejectionReasonsHint =>
+      'No hay motivos personalizados configurados. Las plantillas predeterminadas siempre están activas.';
+
+  @override
+  String get userActionsSectionTitle => 'Acciones de Cuenta y Propiedad';
+
+  @override
+  String get userDangerZoneSectionTitle => 'Acciones Sensibles';
+
+  @override
+  String get paymentStandingLabel => 'Estatus de Pago';
 }

@@ -143,3 +143,16 @@ test('escapeHtml and buildPdfDocumentHtml encode untrusted characters safely', (
   assert.ok(html.includes('<title>Manual &lt;Admin&gt;</title>'));
   assert.ok(html.includes('VISIBILIDAD: SOLO ADMINISTRADORES'));
 });
+
+test('docs/docs_pipeline.json configures all manuals and default folder with admin visibility', () => {
+  const fs = require('node:fs');
+  const pipelineConfig = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, '../../docs/docs_pipeline.json'), 'utf8')
+  );
+  assert.equal(pipelineConfig.defaultFolder.visibility, 'admin');
+  const allDocs = selectDocumentsToParse(pipelineConfig, { all: true });
+  assert.ok(allDocs.length >= 2);
+  for (const doc of allDocs) {
+    assert.equal(doc.visibility, 'admin', `Expected doc "${doc.id}" to have visibility "admin"`);
+  }
+});

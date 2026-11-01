@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/temp_image_cleanup_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../payments/payment_service.dart';
 
 class AdminUploadPaymentScreen extends StatefulWidget {
-  const AdminUploadPaymentScreen({super.key});
+  final bool isEmbedded;
+
+  const AdminUploadPaymentScreen({super.key, this.isEmbedded = false});
 
   @override
   State<AdminUploadPaymentScreen> createState() => _AdminUploadPaymentScreenState();
@@ -48,7 +51,6 @@ class _AdminUploadPaymentScreenState extends State<AdminUploadPaymentScreen> {
         await DatabaseService().updateDocument('addresses', addressId, {
           'deliveryDate': picked,
         });
-        await _paymentService.recalculatePaymentStatusForAddress(addressId);
         if (mounted) {
           setState(() {
             _selectedAddress!['deliveryDate'] = picked;
@@ -110,12 +112,16 @@ class _AdminUploadPaymentScreenState extends State<AdminUploadPaymentScreen> {
       try {
         pickedFile = await _picker.pickImage(
           source: ImageSource.camera,
+          maxWidth: 1600,
+          maxHeight: 1600,
           imageQuality: 60,
         );
       } catch (cameraError) {
         debugPrint('Camera capture fallback to gallery on web/desktop: $cameraError');
         pickedFile = await _picker.pickImage(
           source: ImageSource.gallery,
+          maxWidth: 1600,
+          maxHeight: 1600,
           imageQuality: 60,
         );
       }
@@ -135,6 +141,7 @@ class _AdminUploadPaymentScreenState extends State<AdminUploadPaymentScreen> {
         contentType: 'image/jpeg',
         metadata: {'uploaderUid': currentAdminUid},
       );
+      await TempImageCleanupService.deleteTempXFile(pickedFile);
 
       final bool isSelfUpload = targetResidentUid != null && targetResidentUid == currentAdminUid;
       final sortedPeriods = _selectedPeriods.toList()..sort();
@@ -193,11 +200,13 @@ class _AdminUploadPaymentScreenState extends State<AdminUploadPaymentScreen> {
 
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
-      appBar: AppBar(
-        title: Text(l10n.uploadPaymentOnBehalfMenu, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(l10n.uploadPaymentOnBehalfMenu, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Card(

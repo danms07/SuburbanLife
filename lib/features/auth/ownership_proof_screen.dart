@@ -6,12 +6,18 @@ import 'package:suburban_life/core/config/app_config.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import '../../core/backend/backend.dart';
+import '../../core/services/temp_image_cleanup_service.dart';
 
 
 class OwnershipProofScreen extends StatefulWidget {
   final DbReference addressRef;
+  final Future<XFile?> Function()? pickImageOverride;
 
-  const OwnershipProofScreen({super.key, required this.addressRef});
+  const OwnershipProofScreen({
+    super.key,
+    required this.addressRef,
+    this.pickImageOverride,
+  });
 
   @override
   State<OwnershipProofScreen> createState() => _OwnershipProofScreenState();
@@ -46,17 +52,25 @@ class _OwnershipProofScreenState extends State<OwnershipProofScreen> {
 
     try {
       XFile? pickedFile;
-      try {
-        pickedFile = await _picker.pickImage(
-          source: ImageSource.camera,
-          imageQuality: 80,
-        );
-      } catch (cameraError) {
-        debugPrint('Camera capture fallback to gallery on web/desktop: $cameraError');
-        pickedFile = await _picker.pickImage(
-          source: ImageSource.gallery,
-          imageQuality: 80,
-        );
+      if (widget.pickImageOverride != null) {
+        pickedFile = await widget.pickImageOverride!();
+      } else {
+        try {
+          pickedFile = await _picker.pickImage(
+            source: ImageSource.camera,
+            maxWidth: 1600,
+            maxHeight: 1600,
+            imageQuality: 80,
+          );
+        } catch (cameraError) {
+          debugPrint('Camera capture fallback to gallery on web/desktop: $cameraError');
+          pickedFile = await _picker.pickImage(
+            source: ImageSource.gallery,
+            maxWidth: 1600,
+            maxHeight: 1600,
+            imageQuality: 80,
+          );
+        }
       }
 
       if (pickedFile == null) {
@@ -77,7 +91,9 @@ class _OwnershipProofScreenState extends State<OwnershipProofScreen> {
           contentType: 'image/jpeg',
           metadata: {'uploaderUid': currentUser.uid},
         );
+        await TempImageCleanupService.deleteTempXFile(pickedFile);
       } catch (e, stack) {
+        await TempImageCleanupService.deleteTempXFile(pickedFile);
         setState(() {
           _isLoading = false;
         });

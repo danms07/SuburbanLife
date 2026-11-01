@@ -1,4 +1,10 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const admin = {
+  initializeApp,
+  credential: { cert },
+  firestore: Object.assign(() => getFirestore(), { FieldValue }),
+};
 const fs = require('fs');
 const path = require('path');
 

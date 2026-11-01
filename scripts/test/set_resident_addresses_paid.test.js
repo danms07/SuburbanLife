@@ -16,7 +16,9 @@ test('extractAddressId extracts ID from various reference formats', () => {
   assert.equal(extractAddressId('addresses/1st_Avenue_99'), '1st_Avenue_99');
   assert.equal(extractAddressId('1st_Avenue_99'), '1st_Avenue_99');
   assert.equal(extractAddressId({ id: 'doc_123' }), 'doc_123');
-  assert.equal(extractAddressId({ path: 'addresses/doc_123' }), null);
+  assert.equal(extractAddressId({ path: 'addresses/doc_123' }), 'doc_123');
+  assert.equal(extractAddressId('projects/p/databases/(default)/documents/addresses/doc_456'), 'doc_456');
+  assert.equal(extractAddressId({}), null);
 });
 
 test('buildResidentUsersMap indexes residents and roommates correctly', () => {

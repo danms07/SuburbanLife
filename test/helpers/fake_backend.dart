@@ -57,9 +57,44 @@ class FakeDatabaseService implements DatabaseService {
     setDocumentSync(collection, docId, data);
   }
 
+  Map<String, dynamic> _resolveFieldValues(
+    Map<String, dynamic> base,
+    Map<String, dynamic> incoming,
+  ) {
+    final resolved = Map<String, dynamic>.from(base);
+    incoming.forEach((key, value) {
+      if (value is DbFieldValue) {
+        if (value.type == DbFieldValueType.arrayUnion) {
+          final currentList = List<dynamic>.from(
+            resolved[key] is Iterable ? resolved[key] : [],
+          );
+          for (final item in (value.value as Iterable)) {
+            if (!currentList.contains(item)) currentList.add(item);
+          }
+          resolved[key] = currentList;
+        } else if (value.type == DbFieldValueType.arrayRemove) {
+          final currentList = List<dynamic>.from(
+            resolved[key] is Iterable ? resolved[key] : [],
+          );
+          for (final item in (value.value as Iterable)) {
+            currentList.remove(item);
+          }
+          resolved[key] = currentList;
+        } else if (value.type == DbFieldValueType.delete) {
+          resolved.remove(key);
+        } else if (value.type == DbFieldValueType.serverTimestamp) {
+          resolved[key] = DateTime.now();
+        }
+      } else {
+        resolved[key] = value;
+      }
+    });
+    return resolved;
+  }
+
   void setDocumentSync(String collection, String docId, Map<String, dynamic> data) {
     _store.putIfAbsent(collection, () => {});
-    final docData = Map<String, dynamic>.from(data);
+    final docData = _resolveFieldValues({}, data);
     docData['id'] ??= docId;
     _store[collection]![docId] = docData;
     _notify(collection, docId);
@@ -68,30 +103,7 @@ class FakeDatabaseService implements DatabaseService {
   void updateDocumentSync(String collection, String docId, Map<String, dynamic> data) {
     _store.putIfAbsent(collection, () => {});
     final existing = _store[collection]![docId] ?? {'id': docId};
-    final updated = Map<String, dynamic>.from(existing);
-    data.forEach((key, value) {
-      if (value is DbFieldValue) {
-        if (value.type == DbFieldValueType.arrayUnion) {
-          final currentList = List<dynamic>.from(existing[key] is Iterable ? existing[key] : []);
-          for (final item in (value.value as Iterable)) {
-            if (!currentList.contains(item)) currentList.add(item);
-          }
-          updated[key] = currentList;
-        } else if (value.type == DbFieldValueType.arrayRemove) {
-          final currentList = List<dynamic>.from(existing[key] is Iterable ? existing[key] : []);
-          for (final item in (value.value as Iterable)) {
-            currentList.remove(item);
-          }
-          updated[key] = currentList;
-        } else if (value.type == DbFieldValueType.delete) {
-          updated.remove(key);
-        } else if (value.type == DbFieldValueType.serverTimestamp) {
-          updated[key] = DateTime.now();
-        }
-      } else {
-        updated[key] = value;
-      }
-    });
+    final updated = _resolveFieldValues(existing, data);
     _store[collection]![docId] = updated;
     _notify(collection, docId);
   }
@@ -192,12 +204,12 @@ class FakeDatabaseService implements DatabaseService {
       }
     }
 
-    if (sorts != null) {
-      for (final sort in sorts) {
-        result.sort((a, b) {
+    if (sorts != null && sorts.isNotEmpty) {
+      result.sort((a, b) {
+        for (final sort in sorts) {
           final valA = a[sort.field];
           final valB = b[sort.field];
-          if (valA == null && valB == null) return 0;
+          if (valA == null && valB == null) continue;
           if (valA == null) return sort.descending ? 1 : -1;
           if (valB == null) return sort.descending ? -1 : 1;
 
@@ -207,9 +219,12 @@ class FakeDatabaseService implements DatabaseService {
           } else {
             comp = valA.toString().compareTo(valB.toString());
           }
-          return sort.descending ? -comp : comp;
-        });
-      }
+          if (comp != 0) {
+            return sort.descending ? -comp : comp;
+          }
+        }
+        return 0;
+      });
     }
 
     if (startAfter != null) {
@@ -309,6 +324,9 @@ class FakeAuthService implements AuthService {
   bool isAdminMock = false;
   bool isGuardMock = false;
   bool isResidentMock = true;
+  Future<AppUser?> Function(String email, String password)? signInHandler;
+  Future<AppUser?> Function(String email, String password, {String? name})? signUpHandler;
+  Future<bool> Function(String email)? sendPasswordResetHandler;
 
   final StreamController<AppUser?> _userStreamController = StreamController<AppUser?>.broadcast();
 
@@ -317,6 +335,9 @@ class FakeAuthService implements AuthService {
     isAdminMock = false;
     isGuardMock = false;
     isResidentMock = true;
+    signInHandler = null;
+    signUpHandler = null;
+    sendPasswordResetHandler = null;
   }
 
   @override
@@ -332,6 +353,9 @@ class FakeAuthService implements AuthService {
 
   @override
   Future<AppUser?> signIn(String email, String password) async {
+    if (signInHandler != null) {
+      return signInHandler!(email, password);
+    }
     final user = AppUser(uid: 'uid_${email.split('@').first}', email: email, displayName: 'Test User');
     emitUser(user);
     return user;
@@ -339,13 +363,21 @@ class FakeAuthService implements AuthService {
 
   @override
   Future<AppUser?> signUp(String email, String password, {String? name}) async {
+    if (signUpHandler != null) {
+      return signUpHandler!(email, password, name: name);
+    }
     final user = AppUser(uid: 'uid_${email.split('@').first}', email: email, displayName: name);
     emitUser(user);
     return user;
   }
 
   @override
-  Future<bool> sendPasswordReset(String email) async => true;
+  Future<bool> sendPasswordReset(String email) async {
+    if (sendPasswordResetHandler != null) {
+      return sendPasswordResetHandler!(email);
+    }
+    return true;
+  }
 
   @override
   Future<void> signOut() async {
@@ -369,10 +401,12 @@ class FakeAuthService implements AuthService {
 class FakeStorageService implements StorageService {
   final Map<String, dynamic> uploadedFiles = {};
   final List<String> deletedUrls = [];
+  Future<String> Function(String path, dynamic fileData)? uploadHandler;
 
   void clear() {
     uploadedFiles.clear();
     deletedUrls.clear();
+    uploadHandler = null;
   }
 
   @override
@@ -382,6 +416,9 @@ class FakeStorageService implements StorageService {
     String? contentType,
     Map<String, String>? metadata,
   }) async {
+    if (uploadHandler != null) {
+      return uploadHandler!(path, fileData);
+    }
     uploadedFiles[path] = fileData;
     return 'https://fake-storage.local/$path';
   }

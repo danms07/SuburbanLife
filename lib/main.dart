@@ -9,7 +9,6 @@ import 'package:suburban_life/core/config/app_config.dart';
 import 'package:suburban_life/features/auth/login_screen.dart';
 import 'package:suburban_life/features/auth/roommates_screen.dart';
 import 'package:suburban_life/features/auth/signup_screen.dart';
-import 'package:suburban_life/features/auth/admin_resident_approval_screen.dart';
 import 'package:suburban_life/features/auth/forgot_password_screen.dart';
 import 'firebase_options.dart';
 import 'package:suburban_life/features/booking/booking_screen.dart';
@@ -17,28 +16,17 @@ import 'package:suburban_life/features/booking/manage_bookings_screen.dart';
 import 'package:suburban_life/features/transparency/transparency_screen.dart';
 import 'package:suburban_life/features/payments/payment_screen.dart';
 import 'package:suburban_life/features/sanctions/sanctions_screen.dart';
-import 'package:suburban_life/features/sanctions/admin_sanctions_screen.dart';
 import 'package:suburban_life/features/announcements/announcements_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_generator_screen.dart';
 import 'package:suburban_life/features/qr_access/manage_qr_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_scanner_screen.dart';
-import 'package:suburban_life/features/admin/admin_create_user_screen.dart';
-import 'package:suburban_life/features/admin/admin_payment_approval_screen.dart';
-import 'package:suburban_life/features/admin/admin_booking_approval_screen.dart';
-import 'package:suburban_life/features/admin/admin_upload_payment_screen.dart';
-import 'package:suburban_life/features/admin/admin_user_management_screen.dart';
-import 'package:suburban_life/features/admin/admin_facilities_screen.dart';
-import 'package:suburban_life/features/admin/admin_settings_screen.dart';
-import 'package:suburban_life/features/admin/admin_payment_report_screen.dart';
-import 'package:suburban_life/features/admin/admin_guard_management_screen.dart';
-import 'package:suburban_life/features/admin/admin_bulk_user_import_screen.dart';
-import 'package:suburban_life/features/admin/admin_bulk_address_import_screen.dart';
-import 'package:suburban_life/features/admin/admin_access_logs_screen.dart';
+import 'package:suburban_life/features/admin/admin_shell_screen.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'l10n/app_localizations.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/core/backend/firebase_backend.dart';
 import 'package:suburban_life/core/services/app_update_service.dart';
+import 'package:suburban_life/core/services/temp_image_cleanup_service.dart';
 import 'package:suburban_life/core/widgets/error_fallback_screen.dart';
 
 void main() async {
@@ -205,8 +193,20 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       await _authService.reloadUserToken(forceRefresh: true);
       final isGuard = await _authService.isGuard();
-      final isAdmin = await _authService.isAdmin();
-      final isResident = await _authService.isResident();
+      bool isAdmin = await _authService.isAdmin();
+      bool isResident = await _authService.isResident();
+
+      final currentUser = _authService.currentUser;
+      if (currentUser != null) {
+        final userDoc = await Backend.db.getDocument('users', currentUser.uid);
+        final firestoreRole = userDoc?['role']?.toString().toLowerCase();
+        if (firestoreRole != null && firestoreRole != 'admin') {
+          isAdmin = false;
+          if (firestoreRole == 'resident' || firestoreRole == 'roommate') {
+            isResident = true;
+          }
+        }
+      }
 
       if (!mounted) return;
 
@@ -251,87 +251,43 @@ class _MyHomePageState extends State<MyHomePage> {
       return Scaffold(body: _buildGuardPanel(l10n));
     }
 
-    Widget currentBody;
-    String currentTitle = widget.title;
-
     if (_showAdminView) {
-      currentTitle = "$currentTitle (Admin)";
-      currentBody = _buildAdminPanel(l10n);
-    } else {
-      currentBody = _buildResidentPanel(l10n);
+      return AdminShellScreen(
+        appTitle: widget.title,
+        isAdmin: _isAdmin,
+        isResident: _isResident,
+        onSwitchToResidentView: () {
+          setState(() {
+            _showAdminView = false;
+          });
+        },
+        onResignAdminRole: () async {
+          final user = Backend.auth.currentUser;
+          if (user != null) {
+            await Backend.functions.callFunction('setRole', {
+              'uid': user.uid,
+              'role': 'resident',
+            });
+            await Backend.db.updateDocument('users', user.uid, {
+              'role': 'resident',
+            });
+            await _authService.reloadUserToken(forceRefresh: true);
+            if (mounted) {
+              setState(() {
+                _isAdmin = false;
+                _isResident = true;
+                _showAdminView = false;
+              });
+            }
+          }
+        },
+        onLogout: () => Backend.auth.signOut(),
+      );
     }
 
     return Scaffold(
-      appBar: _showAdminView
-          ? AppBar(
-              backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-              title: Text(
-                currentTitle,
-                style: const TextStyle(fontFamily: AppConfig.brandingFontFamily),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.waving_hand),
-                  tooltip: l10n.resignAdminRole,
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(l10n.resignAdminRole),
-                        content: Text(l10n.resignAdminConfirm),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text(l10n.cancel),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.redAccent,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: () async {
-                              Navigator.pop(context);
-                              final user = Backend.auth.currentUser;
-                              if (user != null) {
-                                await Backend.functions.callFunction('setRole', {
-                                  'uid': user.uid,
-                                  'role': 'resident',
-                                });
-                                await Backend.db.updateDocument('users', user.uid, {
-                                  'role': 'resident',
-                                });
-                                setState(() {
-                                  _isAdmin = false;
-                                  _showAdminView = false;
-                                });
-                              }
-                            },
-                            child: Text(l10n.resignAdminRole),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                if (_isAdmin && _isResident)
-                  IconButton(
-                    icon: const Icon(Icons.person),
-                    tooltip: l10n.switchToResidentViewTooltip,
-                    onPressed: () {
-                      setState(() {
-                        _showAdminView = false;
-                      });
-                    },
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  onPressed: () => Backend.auth.signOut(),
-                ),
-              ],
-            )
-          : null, // Resident panel uses custom action header without top native AppBar
-      drawer: !_showAdminView ? _buildDrawer(context, l10n) : null,
-      body: currentBody,
+      drawer: _buildDrawer(context, l10n),
+      body: _buildResidentPanel(l10n),
     );
   }
 
@@ -928,12 +884,16 @@ class _MyHomePageState extends State<MyHomePage> {
       try {
         pickedFile = await _picker.pickImage(
           source: ImageSource.camera,
+          maxWidth: 1600,
+          maxHeight: 1600,
           imageQuality: 60,
         );
       } catch (cameraError) {
         debugPrint('Camera capture fallback to gallery on web/desktop: $cameraError');
         pickedFile = await _picker.pickImage(
           source: ImageSource.gallery,
+          maxWidth: 1600,
+          maxHeight: 1600,
           imageQuality: 60,
         );
       }
@@ -948,21 +908,25 @@ class _MyHomePageState extends State<MyHomePage> {
       // Upload to storage
       final storagePath = 'ownership_proofs/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
       String proofUrl = '';
-      if (kIsWeb) {
-        final bytes = await pickedFile.readAsBytes();
-        proofUrl = await Backend.storage.uploadFile(
-          storagePath,
-          bytes,
-          contentType: 'image/jpeg',
-          metadata: {'uploaderUid': uid},
-        );
-      } else {
-        proofUrl = await Backend.storage.uploadFile(
-          storagePath,
-          File(pickedFile.path),
-          contentType: 'image/jpeg',
-          metadata: {'uploaderUid': uid},
-        );
+      try {
+        if (kIsWeb) {
+          final bytes = await pickedFile.readAsBytes();
+          proofUrl = await Backend.storage.uploadFile(
+            storagePath,
+            bytes,
+            contentType: 'image/jpeg',
+            metadata: {'uploaderUid': uid},
+          );
+        } else {
+          proofUrl = await Backend.storage.uploadFile(
+            storagePath,
+            File(pickedFile.path),
+            contentType: 'image/jpeg',
+            metadata: {'uploaderUid': uid},
+          );
+        }
+      } finally {
+        await TempImageCleanupService.deleteTempXFile(pickedFile);
       }
 
       // Create claim in DB
@@ -1300,7 +1264,7 @@ class _MyHomePageState extends State<MyHomePage> {
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const TransparencyScreen(),
+                                builder: (context) => const TransparencyScreen(isAdminView: false),
                               ),
                             ),
                           ),
@@ -1409,306 +1373,6 @@ class _MyHomePageState extends State<MyHomePage> {
           },
         );
       },
-    );
-  }
-
-  Widget _buildAdminPanel(AppLocalizations l10n) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            l10n.adminPanelTitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: AppConfig.primaryColor,
-              fontFamily: AppConfig.fontFamily,
-            ),
-          ),
-          const SizedBox(height: 30),
-
-          // Primary Approval Dashboard Option with Badge
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: Backend.db.streamCollection('ownership_claims'),
-            builder: (context, snapshot) {
-              final count = snapshot.data?.length ?? 0;
-              return _buildAdminMenuButton(
-                label: l10n.approveResidentsMenu,
-                icon: Icons.verified_user,
-                color: Colors.deepPurple,
-                badgeCount: count,
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminResidentApprovalScreen(),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Pending Payments Review Option with Badge
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: Backend.db.streamCollection('payments', filters: [
-              QueryFilter('status', FilterOperator.equal, 'pending'),
-            ]),
-            builder: (context, snapshot) {
-              final count = snapshot.data?.length ?? 0;
-              return _buildAdminMenuButton(
-                label: l10n.reviewPaymentsMenu,
-                icon: Icons.payments,
-                color: Colors.blue,
-                badgeCount: count,
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminPaymentApprovalScreen(),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Pending Bookings Review Option with Badge
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: Backend.db.streamCollection('bookings', filters: [
-              QueryFilter('status', FilterOperator.equal, 'pending review'),
-            ]),
-            builder: (context, snapshot) {
-              final count = snapshot.data?.length ?? 0;
-              return _buildAdminMenuButton(
-                label: l10n.reviewBookingsMenu,
-                icon: Icons.event_available,
-                color: Colors.teal.shade700,
-                badgeCount: count,
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminBookingApprovalScreen(),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.downloadReportMenu,
-            icon: Icons.table_chart,
-            color: Colors.green[700]!,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminPaymentReportScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.accessLogsMenu,
-            icon: Icons.history,
-            color: Colors.blueGrey[800]!,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminAccessLogsScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.createUserMenu,
-            icon: Icons.person_add_alt_1,
-            color: AppConfig.primaryColor,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminCreateUserScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.bulkUserImportMenu,
-            icon: Icons.group_add,
-            color: Colors.indigo,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminBulkUserImportScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.bulkAddressImportMenu,
-            icon: Icons.domain_add,
-            color: Colors.teal,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminBulkAddressImportScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.uploadPaymentOnBehalfMenu,
-            icon: Icons.upload_file,
-            color: Colors.orange,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminUploadPaymentScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.manageUsersMenu,
-            icon: Icons.people_alt,
-            color: Colors.teal,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminUserManagementScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.manageGuardsMenu,
-            icon: Icons.security,
-            color: Colors.blueGrey[700]!,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminGuardManagementScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.manageFacilitiesMenu,
-            icon: Icons.category,
-            color: AppConfig.secondaryColor,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminFacilitiesScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.adminSanctionsTitle,
-            icon: Icons.gavel,
-            color: Colors.deepOrange,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminSanctionsScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.manageTransparencyDocs,
-            icon: Icons.description,
-            color: Colors.brown,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const TransparencyScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.manageAnnouncements,
-            icon: Icons.announcement,
-            color: Colors.blueGrey,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => AnnouncementsScreen()),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.generateQr,
-            icon: Icons.qr_code,
-            color: Colors.indigo,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const QrGeneratorScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _buildAdminMenuButton(
-            label: l10n.adminSettingsMenu,
-            icon: Icons.settings,
-            color: Colors.grey[700]!,
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AdminSettingsScreen(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAdminMenuButton({
-    required String label,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-    int badgeCount = 0,
-  }) {
-    return ElevatedButton.icon(
-      icon: Badge(
-        isLabelVisible: badgeCount > 0,
-        label: Text(badgeCount.toString()),
-        child: Icon(icon, color: Colors.white),
-      ),
-      label: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size.fromHeight(55),
-        backgroundColor: color,
-        alignment: Alignment.centerLeft,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      onPressed: onPressed,
     );
   }
 

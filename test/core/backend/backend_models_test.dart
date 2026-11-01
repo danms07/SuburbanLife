@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suburban_life/core/backend/backend.dart';
+import '../../helpers/fake_backend.dart';
 
 void main() {
   group('Backend Models - AppUser & AuthResult', () {
@@ -89,6 +90,52 @@ void main() {
 
       final sortDesc = QuerySort('timestamp', descending: true);
       expect(sortDesc.descending, isTrue);
+    });
+  });
+
+  group('FakeDatabaseService Fidelity', () {
+    test('setDocument and addDocument resolve DbFieldValue operations', () async {
+      final db = FakeDatabaseService();
+      await db.setDocument('events', 'ev_1', {
+        'title': 'Assembly',
+        'tags': DbFieldValue.arrayUnion(['urgent', 'urgent', 'community']),
+        'obsolete': DbFieldValue.delete(),
+        'createdAt': DbFieldValue.serverTimestamp(),
+      });
+
+      final doc = await db.getDocument('events', 'ev_1');
+      expect(doc, isNotNull);
+      expect(doc!['id'], equals('ev_1'));
+      expect(doc['tags'], equals(['urgent', 'community']));
+      expect(doc.containsKey('obsolete'), isFalse);
+      expect(doc['createdAt'], isA<DateTime>());
+
+      final addedId = await db.addDocument('events', {
+        'createdAt': DbFieldValue.serverTimestamp(),
+      });
+      final addedDoc = await db.getDocument('events', addedId);
+      expect(addedDoc!['createdAt'], isA<DateTime>());
+    });
+
+    test('getCollection chains multiple QuerySort comparators as tie-breakers', () async {
+      final db = FakeDatabaseService();
+      db.seedDocument('addresses', 'a1', {'street': 'Roble', 'houseNumber': '20'});
+      db.seedDocument('addresses', 'a2', {'street': 'Cedro', 'houseNumber': '15'});
+      db.seedDocument('addresses', 'a3', {'street': 'Cedro', 'houseNumber': '05'});
+      db.seedDocument('addresses', 'a4', {'street': 'Roble', 'houseNumber': '02'});
+
+      final sorted = await db.getCollection(
+        'addresses',
+        sorts: [
+          QuerySort('street'),
+          QuerySort('houseNumber'),
+        ],
+      );
+
+      expect(
+        sorted.map((d) => d['id']).toList(),
+        equals(['a3', 'a2', 'a4', 'a1']),
+      );
     });
   });
 }

@@ -15,7 +15,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "firebase-admin": "^13.8.0",
+    "firebase-admin": "^14.5.0",
     "marked": "^16.0.0",
     "mermaid": "^11.7.0",
     "puppeteer": "^24.12.0"

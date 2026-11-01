@@ -1,0 +1,69 @@
+name: Automated Test & Static Analysis Suite
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-tests:
+    name: Flutter Analyze & Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Generate localizations
+        run: flutter gen-l10n
+
+      - name: Run static analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run unit, widget, boundary, and workflow tests
+        run: flutter test
+
+  node-backend-tests:
+    name: Cloud Functions, Security Rules & Scripts Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            functions/package-lock.json
+            scripts/package-lock.json
+
+      - name: Install & test Cloud Functions + Security Rules static audit
+        working-directory: ./functions
+        run: |
+          npm ci
+          npm test
+
+      - name: Install & test Automation Scripts
+        working-directory: ./scripts
+        run: |
+          npm ci
+          npm test

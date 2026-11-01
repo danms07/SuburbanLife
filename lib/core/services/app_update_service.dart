@@ -18,12 +18,82 @@ class AppUpdateService with WidgetsBindingObserver {
   bool _isReloading = false;
   DateTime _lastInteractionTime = DateTime.now();
 
+  bool? _webModeOverride;
+  Future<String?> Function()? _remoteVersionFetcherOverride;
+  Future<void> Function()? _onReloadOverride;
+  bool Function()? _isTabHiddenOverride;
+  DateTime Function()? _nowOverride;
+
   static const Duration _pollInterval = Duration(minutes: 15);
   static const Duration _idleThreshold = Duration(seconds: 45);
 
+  bool get _isWebActive => _webModeOverride ?? kIsWeb;
+  DateTime _now() => _nowOverride != null ? _nowOverride!() : DateTime.now();
+
+  /// Parses raw `/version.json` text into a `version+build_number` string.
+  static String? parseVersionPayload(String rawJson) {
+    try {
+      final dynamic decoded = jsonDecode(rawJson);
+      if (decoded is! Map<String, dynamic>) return null;
+      final version = decoded['version']?.toString() ?? '1.0.0';
+      final buildNumber = decoded['build_number']?.toString() ?? '1';
+      return '$version+$buildNumber';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @visibleForTesting
+  String? get currentVersion => _currentVersion;
+
+  @visibleForTesting
+  bool get isUpdatePending => _isUpdatePending;
+
+  @visibleForTesting
+  bool get isReloading => _isReloading;
+
+  @visibleForTesting
+  void configureForTesting({
+    bool? webModeOverride,
+    Future<String?> Function()? remoteVersionFetcher,
+    Future<void> Function()? onReload,
+    bool Function()? isTabHidden,
+    DateTime Function()? nowProvider,
+    DateTime? lastInteractionTime,
+  }) {
+    _webModeOverride = webModeOverride;
+    _remoteVersionFetcherOverride = remoteVersionFetcher;
+    _onReloadOverride = onReload;
+    _isTabHiddenOverride = isTabHidden;
+    _nowOverride = nowProvider;
+    if (lastInteractionTime != null) {
+      _lastInteractionTime = lastInteractionTime;
+    }
+  }
+
+  @visibleForTesting
+  void resetForTesting() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    _currentVersion = null;
+    _isUpdatePending = false;
+    _isReloading = false;
+    _webModeOverride = null;
+    _remoteVersionFetcherOverride = null;
+    _onReloadOverride = null;
+    _isTabHiddenOverride = null;
+    _nowOverride = null;
+    _lastInteractionTime = DateTime.now();
+  }
+
+  @visibleForTesting
+  void triggerUserIdleForTesting() => _onUserIdle();
+
   /// Initializes the update service for web platforms.
   Future<void> initialize() async {
-    if (!kIsWeb) return;
+    if (!_isWebActive) return;
 
     WidgetsBinding.instance.addObserver(this);
 
@@ -56,18 +126,20 @@ class AppUpdateService with WidgetsBindingObserver {
   /// Sets up event listeners for user input (mouse, touch, keyboard) to track activity.
   void _setupInteractionListeners() {
     void onInteraction([html.Event? event]) {
-      _lastInteractionTime = DateTime.now();
+      _lastInteractionTime = _now();
       _idleTimer?.cancel();
       _idleTimer = Timer(_idleThreshold, _onUserIdle);
     }
 
-    try {
-      html.window.onMouseMove.listen(onInteraction);
-      html.window.onKeyDown.listen(onInteraction);
-      html.window.onTouchStart.listen(onInteraction);
-      html.window.onClick.listen(onInteraction);
-    } catch (e) {
-      debugPrint('[AppUpdateService] Failed to attach interaction listeners: $e');
+    if (kIsWeb) {
+      try {
+        html.window.onMouseMove.listen(onInteraction);
+        html.window.onKeyDown.listen(onInteraction);
+        html.window.onTouchStart.listen(onInteraction);
+        html.window.onClick.listen(onInteraction);
+      } catch (e) {
+        debugPrint('[AppUpdateService] Failed to attach interaction listeners: $e');
+      }
     }
 
     _idleTimer = Timer(_idleThreshold, _onUserIdle);
@@ -83,9 +155,12 @@ class AppUpdateService with WidgetsBindingObserver {
 
   /// Listens to document visibility changes (e.g. user switching tabs).
   void _setupVisibilityListener() {
+    if (!kIsWeb) return;
     try {
       html.document.onVisibilityChange.listen((_) {
-        final isHidden = html.document.hidden == true;
+        final isHidden = _isTabHiddenOverride != null
+            ? _isTabHiddenOverride!()
+            : (html.document.hidden == true);
         if (isHidden && _isUpdatePending && !_isReloading) {
           debugPrint('[AppUpdateService] Tab hidden with pending update. Triggering reload.');
           reloadApp();
@@ -109,7 +184,7 @@ class AppUpdateService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!kIsWeb) return;
+    if (!_isWebActive) return;
 
     if (state == AppLifecycleState.resumed) {
       checkForUpdates();
@@ -125,13 +200,13 @@ class AppUpdateService with WidgetsBindingObserver {
 
   /// Fetches `/version.json` from the server with cache-busting query parameter.
   Future<String?> _fetchRemoteVersionData() async {
+    if (_remoteVersionFetcherOverride != null) {
+      return await _remoteVersionFetcherOverride!();
+    }
     try {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final timestamp = _now().millisecondsSinceEpoch;
       final response = await html.HttpRequest.getString('/version.json?t=$timestamp');
-      final Map<String, dynamic> data = jsonDecode(response);
-      final version = data['version']?.toString() ?? '1.0.0';
-      final buildNumber = data['build_number']?.toString() ?? '1';
-      return '$version+$buildNumber';
+      return parseVersionPayload(response);
     } catch (e) {
       return null;
     }
@@ -139,7 +214,7 @@ class AppUpdateService with WidgetsBindingObserver {
 
   /// Manually or periodically checks if a newer version is available.
   Future<void> checkForUpdates() async {
-    if (!kIsWeb || _isReloading) return;
+    if (!_isWebActive || _isReloading) return;
 
     try {
       final remoteVersion = await _fetchRemoteVersionData();
@@ -154,12 +229,14 @@ class AppUpdateService with WidgetsBindingObserver {
         debugPrint('[AppUpdateService] New version detected ($remoteVersion != $_currentVersion).');
         _isUpdatePending = true;
 
-        final isHidden = html.document.hidden == true;
-        final isIdle = DateTime.now().difference(_lastInteractionTime) > _idleThreshold;
+        final isHidden = _isTabHiddenOverride != null
+            ? _isTabHiddenOverride!()
+            : (kIsWeb && html.document.hidden == true);
+        final isIdle = _now().difference(_lastInteractionTime) > _idleThreshold;
 
         if (isHidden || isIdle) {
           debugPrint('[AppUpdateService] Immediately reloading as tab is hidden or idle.');
-          reloadApp();
+          await reloadApp();
         } else {
           debugPrint('[AppUpdateService] Update queued until next idle or tab switch.');
         }
@@ -171,8 +248,13 @@ class AppUpdateService with WidgetsBindingObserver {
 
   /// Purges browser cache storage and hard reloads the application.
   Future<void> reloadApp() async {
-    if (!kIsWeb || _isReloading) return;
+    if (!_isWebActive || _isReloading) return;
     _isReloading = true;
+
+    if (_onReloadOverride != null) {
+      await _onReloadOverride!();
+      return;
+    }
 
     try {
       // 1. Purge CacheStorage entries
@@ -208,7 +290,7 @@ class AppUpdateService with WidgetsBindingObserver {
 
   /// Disposes timers and observers when teardown is needed.
   void dispose() {
-    if (kIsWeb) {
+    if (_isWebActive) {
       WidgetsBinding.instance.removeObserver(this);
       _pollTimer?.cancel();
       _idleTimer?.cancel();

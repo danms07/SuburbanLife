@@ -7,10 +7,10 @@ import 'qr_generator_screen.dart';
 import '../../l10n/app_localizations.dart';
 
 class ManageQrScreen extends StatefulWidget {
-  const ManageQrScreen({Key? key}) : super(key: key);
+  const ManageQrScreen({super.key});
 
   @override
-  _ManageQrScreenState createState() => _ManageQrScreenState();
+  State<ManageQrScreen> createState() => _ManageQrScreenState();
 }
 
 class _ManageQrScreenState extends State<ManageQrScreen> {
@@ -53,14 +53,14 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
                       ? DateTime.fromMillisecondsSinceEpoch(qr['timestamp']) 
                       : DateTime.now();
                     final type = qr['type'] ?? 'temporary';
-                    final status = qr['status'] ?? 'active';
+                    final status = QrService.resolveEffectiveStatus(qr);
                     final qrId = qr['id'] ?? 'unknown';
                     final guestName = qr['guestName'] as String?;
                     final vehiclePlates = qr['vehiclePlates'] as String?;
                     final vehicleType = qr['vehicleType'] as String?;
                     final passengers = qr['passengers'] as int?;
                     final accessCategory = qr['accessCategory'] as String? ?? 'visitor';
-                    final isOneTimeUse = qr['isOneTimeUse'] == true;
+                    final isOneTimeUse = qr['isOneTimeUse'] == true || qr['isOneTime'] == true || accessCategory == 'supplier';
 
                     final displayTitle = guestName != null && guestName.isNotEmpty 
                       ? guestName 
@@ -90,15 +90,26 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
                             if (passengers != null)
                               Text('${l10n.passengersCount}: $passengers', style: const TextStyle(fontSize: 12)),
                             const SizedBox(height: 4),
-                            _buildStatusChip(l10n, status),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                _buildStatusChip(l10n, status),
+                                if (QrService.isVisitorInside(qr))
+                                  _buildInsideChip(l10n, qrId),
+                              ],
+                            ),
                           ],
                         ),
                         trailing: status == 'active'
                             ? IconButton(
                                 icon: const Icon(Icons.cancel, color: Colors.redAccent),
                                 onPressed: () async {
+                                  final messenger = ScaffoldMessenger.of(context);
                                   await _qrService.invalidateQrCode(qrId);
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  if (!mounted) return;
+                                  messenger.showSnackBar(
                                     SnackBar(content: Text(l10n.qrInvalidatedSuccess)),
                                   );
                                 },
@@ -130,10 +141,13 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
         return l10n.active;
       case 'deactivated':
         return l10n.deactivated;
+      case 'revoked':
       case 'deactivated (revoked)':
         return l10n.deactivatedRevoked;
+      case 'expired':
       case 'deactivated (expired)':
         return l10n.deactivatedExpired;
+      case 'used':
       case 'deactivated (validated)':
         return l10n.deactivatedValidated;
       default:
@@ -141,11 +155,34 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
     }
   }
 
+  Widget _buildInsideChip(AppLocalizations l10n, String qrId) {
+    return Container(
+      key: ValueKey('qr_inside_badge_$qrId'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.teal.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: Colors.teal.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.sensor_door_outlined, size: 13, color: Colors.teal),
+          const SizedBox(width: 4),
+          Text(
+            l10n.qrStatusInside.toUpperCase(),
+            style: const TextStyle(color: Colors.teal, fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusChip(AppLocalizations l10n, String status) {
     Color color = Colors.grey;
     if (status == 'active') {
       color = Colors.green;
-    } else if (status.startsWith('deactivated')) {
+    } else if (status.startsWith('deactivated') || status == 'used' || status == 'revoked' || status == 'expired') {
       color = Colors.red;
     }
 

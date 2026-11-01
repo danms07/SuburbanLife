@@ -189,13 +189,17 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
                       return const Center(child: CircularProgressIndicator());
                     }
                     final users = snapshot.data ?? [];
+                    final selectedUserId = (_selectedUser != null && users.any((u) => u['id'] == _selectedUser!['id']))
+                        ? _selectedUser!['id'] as String?
+                        : null;
                     return DropdownButtonFormField<String>(
+                      key: ValueKey('user_$selectedUserId'),
                       decoration: InputDecoration(
                         labelText: l10n.selectResidentLabel,
                         prefixIcon: const Icon(Icons.person, color: AppConfig.primaryColor),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      value: (_selectedUser != null && users.any((u) => u['id'] == _selectedUser!['id'])) ? _selectedUser!['id'] as String? : null,
+                      initialValue: selectedUserId,
                       items: users.map((doc) {
                         return DropdownMenuItem<String>(
                           value: doc['id'] as String,
@@ -233,13 +237,18 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
                       return numA.toString().compareTo(numB.toString());
                     });
 
+                    final selectedAddressId = (_selectedAddress != null && sortedAddresses.any((a) => a['id'] == _selectedAddress!['id']))
+                        ? _selectedAddress!['id'] as String?
+                        : null;
+
                     return DropdownButtonFormField<String>(
+                      key: ValueKey('addr_$selectedAddressId'),
                       decoration: InputDecoration(
                         labelText: l10n.selectAddressTitle,
                         prefixIcon: const Icon(Icons.home, color: AppConfig.primaryColor),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      value: (_selectedAddress != null && sortedAddresses.any((a) => a['id'] == _selectedAddress!['id'])) ? _selectedAddress!['id'] as String? : null,
+                      initialValue: selectedAddressId,
                       items: sortedAddresses.map((doc) {
                         final isClaimed = doc['residentUid'] != null && doc['residentUid'].toString().trim().isNotEmpty;
                         final statusTag = isClaimed ? ' [Linked]' : ' [Available]';

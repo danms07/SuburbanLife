@@ -6,10 +6,12 @@ import '../../l10n/app_localizations.dart';
 
 class AdminCreateUserScreen extends StatefulWidget {
   final String initialRole;
+  final bool isEmbedded;
 
   const AdminCreateUserScreen({
     super.key,
     this.initialRole = 'resident',
+    this.isEmbedded = false,
   });
 
   @override
@@ -163,11 +165,13 @@ class _AdminCreateUserScreenState extends State<AdminCreateUserScreen> {
 
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
-      appBar: AppBar(
-        title: Text(l10n.createUserTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(l10n.createUserTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Form(

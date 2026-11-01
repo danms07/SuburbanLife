@@ -4,7 +4,9 @@ import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminFacilitiesScreen extends StatefulWidget {
-  const AdminFacilitiesScreen({super.key});
+  final bool isEmbedded;
+
+  const AdminFacilitiesScreen({super.key, this.isEmbedded = false});
 
   @override
   State<AdminFacilitiesScreen> createState() => _AdminFacilitiesScreenState();
@@ -411,11 +413,13 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
 
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
-      appBar: AppBar(
-        title: Text(l10n.manageFacilitiesMenu, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(l10n.manageFacilitiesMenu, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
       body: Column(
         children: [
           // Form to Add New Facility

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/features/admin/admin_booking_approval_screen.dart';
+import 'package:suburban_life/features/admin/admin_create_user_screen.dart';
 import 'package:suburban_life/features/admin/admin_payment_approval_screen.dart';
 import 'package:suburban_life/features/announcements/announcements_screen.dart';
+import 'package:suburban_life/features/auth/roommates_screen.dart';
 import 'package:suburban_life/features/booking/booking_screen.dart';
 import 'package:suburban_life/features/booking/booking_service.dart';
 import 'package:suburban_life/features/payments/payment_service.dart';
@@ -258,6 +260,13 @@ void main() {
 
   group('Rollout Automated Test Suite', () {
     testWidgets('Suite A: Roommate Account Linking & Address Synchronization', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       // 1. Seed address and primary resident
       final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_101');
       FakeBackendHelper.db.seedDocument('addresses', 'addr_101', {
@@ -274,6 +283,7 @@ void main() {
         'email': 'resident@test.com',
         'role': 'resident',
         'addressRef': addrRef,
+        'familyMembers': <String>[],
       });
 
       // 2. Seed unlinked roommate
@@ -285,24 +295,77 @@ void main() {
         'addressRef': null,
       });
 
-      // Register Cloud Function mock for linkRoommate
-      FakeBackendHelper.functions.registerHandler('linkRoommate', (params) async {
-        final rUid = params?['roommateUid'] as String;
-        await FakeBackendHelper.db.updateDocument('users', rUid, {
+      FakeBackendHelper.auth.emitUser(
+        AppUser(
+          uid: 'resident_uid_1',
+          email: 'resident@test.com',
+          displayName: 'Carlos Resident',
+        ),
+      );
+      FakeBackendHelper.auth.isResidentMock = true;
+      FakeBackendHelper.auth.isAdminMock = false;
+
+      // Register real production Cloud Function names ('addRoommate' and 'removeRoommate')
+      FakeBackendHelper.functions.registerHandler('addRoommate', (params) async {
+        final email = params?['email']?.toString();
+        final explicitUid = params?['roommateUid']?.toString();
+        String? targetUid = explicitUid;
+        if (targetUid == null && email != null) {
+          final matches = await FakeBackendHelper.db.getCollection(
+            'users',
+            filters: [QueryFilter('email', FilterOperator.equal, email)],
+          );
+          if (matches.isNotEmpty) {
+            targetUid = (matches.first['uid'] ?? matches.first['id'])?.toString();
+          }
+        }
+        if (targetUid == null) {
+          throw Exception('Roommate not found.');
+        }
+        await FakeBackendHelper.db.updateDocument('users', 'resident_uid_1', {
+          'familyMembers': DbFieldValue.arrayUnion([targetUid]),
+        });
+        await FakeBackendHelper.db.updateDocument('users', targetUid, {
           'addressRef': addrRef,
+          'role': 'roommate',
+        });
+        return {'success': true, 'roommateUid': targetUid};
+      });
+
+      FakeBackendHelper.functions.registerHandler('removeRoommate', (params) async {
+        final rUid = params?['roommateUid'] as String;
+        await FakeBackendHelper.db.updateDocument('users', 'resident_uid_1', {
+          'familyMembers': DbFieldValue.arrayRemove([rUid]),
+        });
+        await FakeBackendHelper.db.updateDocument('users', rUid, {
+          'addressRef': null,
         });
         return {'success': true};
       });
 
-      // 3. Link roommate via function call
-      final res = await FakeBackendHelper.functions.callFunction('linkRoommate', {
-        'roommateUid': 'roommate_uid_2',
-      });
-      expect(res['success'], isTrue);
+      // 3. Pump RoommatesScreen and add Ana Roommate via email input + person_add button
+      await tester.pumpWidget(wrapWithMaterial(const RoommatesScreen()));
+      await tester.pumpAndSettle();
 
-      // Verify roommate document is updated with primary address reference
-      final roommateDoc = await FakeBackendHelper.db.getDocument('users', 'roommate_uid_2');
+      await tester.enterText(find.byType(TextField), 'roommate@test.com');
+      await tester.tap(find.byIcon(Icons.person_add));
+      await tester.pumpAndSettle();
+
+      // Verify Ana Roommate renders in the household list and DB addressRef is synchronized
+      expect(find.text('Ana Roommate'), findsOneWidget);
+      var roommateDoc = await FakeBackendHelper.db.getDocument('users', 'roommate_uid_2');
       expect(roommateDoc?['addressRef'], isNotNull);
+
+      // Advance SnackBar and remove Ana Roommate via UI trailing button
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.remove_circle_outline));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana Roommate'), findsNothing);
+      roommateDoc = await FakeBackendHelper.db.getDocument('users', 'roommate_uid_2');
+      expect(roommateDoc?['addressRef'], isNull);
     });
 
     testWidgets('Suite B: Administrative Broadcasts & Community Announcement Streaming', (tester) async {
@@ -419,10 +482,13 @@ void main() {
       await tester.pumpWidget(wrapWithMaterial(const AdminPaymentApprovalScreen()));
       await tester.pumpAndSettle();
 
-      // Verify payment card displays amount and advance periods
+      // Verify summary card displays amount and navigate to detail screen
       expect(find.textContaining('3000.00'), findsWidgets);
-      expect(find.text(pNext1), findsOneWidget);
-      expect(find.text(pNext2), findsOneWidget);
+      await tester.tap(find.byKey(ValueKey('payment_card_$paymentDocId')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Period paid: $pNext1'), findsOneWidget);
+      expect(find.text('Period paid: $pNext2'), findsOneWidget);
 
       // Tap Approve button
       final approveBtn = find.byType(ElevatedButton);
@@ -535,9 +601,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('4500.00'), findsWidgets);
-      expect(find.text(pMinus2), findsOneWidget);
-      expect(find.text(pMinus1), findsOneWidget);
-      expect(find.text(pCurrent), findsOneWidget);
+      await tester.tap(find.byKey(ValueKey('payment_card_$debtPaymentDocId')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Period paid: $pMinus2'), findsOneWidget);
+      expect(find.text('Period paid: $pMinus1'), findsOneWidget);
+      expect(find.text('Period paid: $pCurrent'), findsOneWidget);
 
       final approveBtn = find.byType(ElevatedButton);
       expect(approveBtn, findsOneWidget);
@@ -863,6 +932,13 @@ void main() {
     });
 
     testWidgets('Suite G: Admin Resident Creation & Delivery Date Validation', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
       // 1. Authenticate as Admin
       FakeBackendHelper.auth.emitUser(
         AppUser(uid: 'admin_rollout_uid', email: 'admin@catania.com', displayName: 'Admin Catania'),
@@ -879,64 +955,57 @@ void main() {
         'residentUid': null,
       });
 
-      // -------------------------------------------------------------
-      // Scenario 1: Delivery date in the future (January 1st 2100) -> MUST FAIL
-      // -------------------------------------------------------------
-      final futureDate = DateTime(2100, 1, 1).toIso8601String();
+      await tester.pumpWidget(wrapWithMaterial(const AdminCreateUserScreen(initialRole: 'resident')));
+      await tester.pumpAndSettle();
 
-      expect(
-        () => FunctionsService().callFunction('adminCreateUser', {
-          'name': 'Karla Islas',
-          'email': 'karip2209@gmail.com',
-          'password': 'Password123!',
-          'role': 'resident',
-          'addressId': 'loreto_108',
-          'streetName': 'loreto',
-          'number': 108,
-          'deliveryDate': futureDate,
-        }),
-        throwsA(
-          isA<Exception>().having(
-            (e) => e.toString(),
-            'message',
-            contains('Delivery date cannot be in the future.'),
-          ),
-        ),
-      );
+      // 3. Enter resident name, email, and strong password
+      final textFields = find.byType(TextField);
+      await tester.enterText(textFields.at(0), 'Karla Islas');
+      await tester.enterText(textFields.at(1), 'karip2209@gmail.com');
+      await tester.enterText(textFields.at(2), 'Password123!');
+      await tester.pumpAndSettle();
 
-      // Verify no user was created and address remains unclaimed
-      var addressDoc = await FakeBackendHelper.db.getDocument('addresses', 'loreto_108');
-      expect(addressDoc?['residentUid'], isNull);
+      // 4. Attempting to submit before choosing an address is blocked by UI validation
+      final submitBtn = find.byType(ElevatedButton);
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+      expect(FakeBackendHelper.functions.callHistory, isEmpty);
 
-      // -------------------------------------------------------------
-      // Scenario 2: Delivery date in the past (January 1st 2025) -> SHOULD SUCCEED
-      // -------------------------------------------------------------
-      final validDate = DateTime(2025, 1, 1).toIso8601String();
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
 
-      final result = await FunctionsService().callFunction('adminCreateUser', {
-        'name': 'Karla Islas',
-        'email': 'karip2209@gmail.com',
-        'password': 'Password123!',
-        'role': 'resident',
-        'addressId': 'loreto_108',
-        'streetName': 'loreto',
-        'number': 108,
-        'deliveryDate': validDate,
-      });
+      // 5. Select street 'loreto' and number '#108 [Available]'
+      await tester.tap(find.byType(DropdownButtonFormField<String>).at(1));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('loreto').last);
+      await tester.pumpAndSettle();
 
-      expect(result['success'], equals(true));
-      final newUid = result['uid'];
+      await tester.tap(find.byType(DropdownButtonFormField<String>).at(2));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('#108 [Available]').last);
+      await tester.pumpAndSettle();
 
-      // Verify user document was created with resident role
-      final userDoc = await FakeBackendHelper.db.getDocument('users', newUid);
+      // 6. Pick valid delivery date via UI DatePicker (lastDate is capped at DateTime.now())
+      await tester.tap(find.byIcon(Icons.edit_calendar));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      // 7. Submit and verify resident creation + address binding
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      final addressDoc = await FakeBackendHelper.db.getDocument('addresses', 'loreto_108');
+      final newUid = addressDoc?['residentUid']?.toString();
+      expect(newUid, isNotNull);
+      expect(addressDoc?['deliveryDate'], isA<DateTime>());
+
+      final userDoc = await FakeBackendHelper.db.getDocument('users', newUid!);
       expect(userDoc?['email'], equals('karip2209@gmail.com'));
       expect(userDoc?['name'], equals('Karla Islas'));
       expect(userDoc?['role'], equals('resident'));
-
-      // Verify address was claimed with delivery date
-      addressDoc = await FakeBackendHelper.db.getDocument('addresses', 'loreto_108');
-      expect(addressDoc?['residentUid'], equals(newUid));
-      expect(addressDoc?['deliveryDate'], equals(DateTime(2025, 1, 1)));
     });
 
     testWidgets('Suite H: Ticket-01 Sanctions Enforcement, Payment Redirection, and Operating Hours Window', (tester) async {

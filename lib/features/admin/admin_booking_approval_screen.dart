@@ -5,7 +5,9 @@ import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminBookingApprovalScreen extends StatefulWidget {
-  const AdminBookingApprovalScreen({super.key});
+  final bool isEmbedded;
+
+  const AdminBookingApprovalScreen({super.key, this.isEmbedded = false});
 
   @override
   State<AdminBookingApprovalScreen> createState() => _AdminBookingApprovalScreenState();
@@ -197,11 +199,13 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
 
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
-      appBar: AppBar(
-        title: Text(l10n.adminBookingApprovalTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(l10n.adminBookingApprovalTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
       body: StreamBuilder<List<Map<String, dynamic>>>(
         stream: DatabaseService().streamCollection(
           'bookings',

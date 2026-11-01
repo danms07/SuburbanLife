@@ -20,8 +20,9 @@ fi
 echo "🚀 Starting Firebase Emulators & Running Automated Test Suite..."
 echo ""
 
-# Execute emulator lifecycle with automated seeding and test execution
-firebase emulators:exec --project=demo-suburban "node scripts/seed_emulator.js && flutter test --reporter=expanded test/integration/rollout_workflow_test.dart"
+# Execute emulator lifecycle with automated seeding, Cloud Functions & Security Rules verification, CLI script tests, and full Flutter suite
+firebase emulators:exec --project=demo-suburban \
+  "node scripts/seed_emulator.js && FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GCLOUD_PROJECT=demo-suburban npm --prefix functions test && npm --prefix scripts test && flutter test"
 
 echo ""
 echo "==============================================================="

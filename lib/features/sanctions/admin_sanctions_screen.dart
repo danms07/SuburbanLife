@@ -1,16 +1,25 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/temp_image_cleanup_service.dart';
 import '../../core/widgets/interactive_image_dialog.dart';
 import '../../core/widgets/storage_network_image.dart';
 import '../../l10n/app_localizations.dart';
 import '../payments/payment_service.dart';
 
 class AdminSanctionsScreen extends StatefulWidget {
-  const AdminSanctionsScreen({super.key});
+  final Future<XFile?> Function()? pickImageOverride;
+  final bool isEmbedded;
+
+  const AdminSanctionsScreen({
+    super.key,
+    this.pickImageOverride,
+    this.isEmbedded = false,
+  });
 
   @override
   State<AdminSanctionsScreen> createState() => _AdminSanctionsScreenState();
@@ -24,7 +33,9 @@ class _AdminSanctionsScreenState extends State<AdminSanctionsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _IssueSanctionModal(),
+      builder: (context) => _IssueSanctionModal(
+        pickImageOverride: widget.pickImageOverride,
+      ),
     );
   }
 
@@ -94,14 +105,16 @@ class _AdminSanctionsScreenState extends State<AdminSanctionsScreen> {
 
     return Scaffold(
       backgroundColor: AppConfig.backgroundColor,
-      appBar: AppBar(
-        title: Text(
-          l10n.adminSanctionsTitle,
-          style: const TextStyle(fontFamily: AppConfig.fontFamily),
-        ),
-        backgroundColor: AppConfig.primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(
+                l10n.adminSanctionsTitle,
+                style: const TextStyle(fontFamily: AppConfig.fontFamily),
+              ),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppConfig.primaryColor,
         foregroundColor: Colors.white,
@@ -381,7 +394,9 @@ class _AdminSanctionCard extends StatelessWidget {
 }
 
 class _IssueSanctionModal extends StatefulWidget {
-  const _IssueSanctionModal();
+  final Future<XFile?> Function()? pickImageOverride;
+
+  const _IssueSanctionModal({this.pickImageOverride});
 
   @override
   State<_IssueSanctionModal> createState() => _IssueSanctionModalState();
@@ -397,6 +412,11 @@ class _IssueSanctionModalState extends State<_IssueSanctionModal> {
 
   @override
   void dispose() {
+    final pendingEvidence = _evidenceImage;
+    _evidenceImage = null;
+    if (pendingEvidence != null) {
+      unawaited(TempImageCleanupService.deleteTempXFile(pendingEvidence));
+    }
     _reasonController.dispose();
     _amountController.dispose();
     super.dispose();
@@ -405,15 +425,36 @@ class _IssueSanctionModalState extends State<_IssueSanctionModal> {
   Future<void> _pickEvidence() async {
     try {
       XFile? picked;
-      try {
-        picked = await _picker.pickImage(source: ImageSource.camera, imageQuality: 60);
-      } catch (_) {
-        picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 60);
+      if (widget.pickImageOverride != null) {
+        picked = await widget.pickImageOverride!();
+      } else {
+        try {
+          picked = await _picker.pickImage(
+            source: ImageSource.camera,
+            maxWidth: 1600,
+            maxHeight: 1600,
+            imageQuality: 60,
+          );
+        } catch (_) {
+          picked = await _picker.pickImage(
+            source: ImageSource.gallery,
+            maxWidth: 1600,
+            maxHeight: 1600,
+            imageQuality: 60,
+          );
+        }
       }
-      if (picked != null && mounted) {
-        setState(() {
-          _evidenceImage = picked;
-        });
+      if (picked == null) return;
+      if (!mounted) {
+        unawaited(TempImageCleanupService.deleteTempXFile(picked));
+        return;
+      }
+      final previous = _evidenceImage;
+      setState(() {
+        _evidenceImage = picked;
+      });
+      if (previous != null && previous.path != picked.path) {
+        unawaited(TempImageCleanupService.deleteTempXFile(previous));
       }
     } catch (e) {
       debugPrint('Error picking evidence: $e');
@@ -461,11 +502,12 @@ class _IssueSanctionModalState extends State<_IssueSanctionModal> {
       final addressId = _selectedAddressId!;
       final addressRef = DatabaseService().createReference('addresses', addressId);
 
-      // Upload evidence photo
+      // Upload evidence photo and remove temporary local device file once uploaded
+      final evidencePhoto = _evidenceImage!;
       final storagePath = 'sanctions/$addressId/${DateTime.now().millisecondsSinceEpoch}.jpg';
       String downloadUrl;
       if (kIsWeb) {
-        final bytes = await _evidenceImage!.readAsBytes();
+        final bytes = await evidencePhoto.readAsBytes();
         downloadUrl = await StorageService().uploadFile(
           storagePath,
           bytes,
@@ -473,7 +515,7 @@ class _IssueSanctionModalState extends State<_IssueSanctionModal> {
           metadata: {'uploaderUid': currentAdminUid},
         );
       } else {
-        final file = File(_evidenceImage!.path);
+        final file = File(evidencePhoto.path);
         downloadUrl = await StorageService().uploadFile(
           storagePath,
           file,
@@ -481,6 +523,8 @@ class _IssueSanctionModalState extends State<_IssueSanctionModal> {
           metadata: {'uploaderUid': currentAdminUid},
         );
       }
+      _evidenceImage = null;
+      await TempImageCleanupService.deleteTempXFile(evidencePhoto);
 
       // Query residents living at this address to build authorizedUids array for security rules
       final residentsQuery = await DatabaseService().getCollection(

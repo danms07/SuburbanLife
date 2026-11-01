@@ -347,3 +347,243 @@ test('validateTransparencyDocInput validates visibility, fileType, and strips pa
   }, /Unsupported fileType/);
 });
 
+test('isOneTimeQrCode detects all single-use / supplier QR code variants', (t) => {
+  const { isOneTimeQrCode } = _test;
+
+  assert.equal(isOneTimeQrCode({ isOneTimeUse: true, type: 'temporary', accessCategory: 'supplier' }), true);
+  assert.equal(isOneTimeQrCode({ isOneTimeUse: true, type: 'temporary', accessCategory: 'visitor' }), true);
+  assert.equal(isOneTimeQrCode({ isOneTime: true }), true);
+  assert.equal(isOneTimeQrCode({ type: 'one_time' }), true);
+  assert.equal(isOneTimeQrCode({ accessCategory: 'supplier', type: 'temporary' }), true);
+
+  assert.equal(isOneTimeQrCode({ isOneTimeUse: false, type: 'temporary', accessCategory: 'visitor' }), false);
+  assert.equal(isOneTimeQrCode({ type: 'permanent', accessCategory: 'visitor' }), false);
+  assert.equal(isOneTimeQrCode(null), false);
+  assert.equal(isOneTimeQrCode(undefined), false);
+});
+
+test('evaluateQrValidityStatus validates active passes and rejects used, revoked, and expired passes', (t) => {
+  const { evaluateQrValidityStatus } = _test;
+
+  assert.deepEqual(evaluateQrValidityStatus({ status: 'active' }), { isValid: true, reason: null });
+  assert.deepEqual(evaluateQrValidityStatus({ status: 'valid', isValid: true }), { isValid: true, reason: null });
+
+  assert.deepEqual(
+    evaluateQrValidityStatus({ status: 'deactivated (validated)', isValid: false }),
+    { isValid: false, reason: 'QR Code has already been used.' }
+  );
+  assert.deepEqual(
+    evaluateQrValidityStatus({ status: 'used' }),
+    { isValid: false, reason: 'QR Code has already been used.' }
+  );
+  assert.deepEqual(
+    evaluateQrValidityStatus({ status: 'deactivated (revoked)' }),
+    { isValid: false, reason: 'QR Code has been revoked.' }
+  );
+  assert.deepEqual(
+    evaluateQrValidityStatus({ status: 'revoked' }),
+    { isValid: false, reason: 'QR Code has been revoked.' }
+  );
+  assert.deepEqual(
+    evaluateQrValidityStatus({ status: 'deactivated (expired)' }),
+    { isValid: false, reason: 'QR Code has expired.' }
+  );
+  assert.deepEqual(
+    evaluateQrValidityStatus({ status: 'active', isValid: false }),
+    { isValid: false, reason: 'QR Code is invalid.' }
+  );
+});
+
+test('getQrExpiryMillis and expireOutdatedQrCodes handle expiration timestamps and batch updates', async (t) => {
+  const { getQrExpiryMillis, expireOutdatedQrCodes } = _test;
+
+  const fixedDate = new Date('2026-10-04T23:59:59.000Z');
+  assert.equal(getQrExpiryMillis({ expiryTime: fixedDate }), fixedDate.getTime());
+  assert.equal(getQrExpiryMillis({ expiresAt: fixedDate.toISOString() }), fixedDate.getTime());
+  assert.equal(getQrExpiryMillis({ expiry: { toMillis: () => 123456789 } }), 123456789);
+  assert.equal(getQrExpiryMillis({ type: 'permanent' }), 0);
+
+  const updatedDocs = [];
+  const mockDocs = [
+    {
+      ref: { id: 'qr_expired_supplier' },
+      data: () => ({
+        status: 'active',
+        accessCategory: 'supplier',
+        isOneTimeUse: true,
+        expiryTime: new Date('2026-10-04T23:59:59.000Z'),
+      }),
+    },
+    {
+      ref: { id: 'qr_active_future' },
+      data: () => ({
+        status: 'active',
+        accessCategory: 'visitor',
+        expiryTime: new Date('2026-10-20T23:59:59.000Z'),
+      }),
+    },
+    {
+      ref: { id: 'qr_permanent' },
+      data: () => ({
+        status: 'active',
+        type: 'permanent',
+      }),
+    },
+  ];
+
+  const mockDb = {
+    collection: () => ({
+      where: () => ({
+        get: async () => ({
+          empty: false,
+          docs: mockDocs,
+        }),
+      }),
+    }),
+    batch: () => ({
+      update: (ref, payload) => updatedDocs.push({ id: ref.id, payload }),
+      commit: async () => {},
+    }),
+  };
+
+  const nowMillis = new Date('2026-10-12T12:00:00.000Z').getTime();
+  const count = await expireOutdatedQrCodes(mockDb, nowMillis);
+  assert.equal(count, 1);
+  assert.equal(updatedDocs.length, 1);
+  assert.equal(updatedDocs[0].id, 'qr_expired_supplier');
+  assert.deepEqual(updatedDocs[0].payload, {
+    status: 'deactivated (expired)',
+    isValid: false,
+  });
+});
+
+test('extractTimestampMillis and isSameCalendarDayInTimezone respect community timezone boundaries', (t) => {
+  const { extractTimestampMillis, isSameCalendarDayInTimezone } = _test;
+
+  const sampleDate = new Date('2026-10-20T18:30:00.000Z'); // 12:30 CST in America/Mexico_City
+  assert.equal(extractTimestampMillis(sampleDate), sampleDate.getTime());
+  assert.equal(extractTimestampMillis({ toMillis: () => 555000 }), 555000);
+  assert.equal(extractTimestampMillis({ _seconds: 42 }), 42000);
+  assert.equal(extractTimestampMillis(sampleDate.toISOString()), sampleDate.getTime());
+  assert.equal(extractTimestampMillis(null), 0);
+
+  // 10:00 AM CST vs 11:30 PM CST on 2026-10-20 (which is 2026-10-21T05:30:00Z in UTC!)
+  const morningCst = new Date('2026-10-20T16:00:00.000Z').getTime();
+  const lateNightCst = new Date('2026-10-21T05:30:00.000Z').getTime();
+  const nextMorningCst = new Date('2026-10-21T14:00:00.000Z').getTime();
+
+  assert.equal(isSameCalendarDayInTimezone(morningCst, lateNightCst, 'America/Mexico_City'), true);
+  assert.equal(isSameCalendarDayInTimezone(morningCst, nextMorningCst, 'America/Mexico_City'), false);
+});
+
+test('resolveOpenVisitLog handles explicit isInside and legacy same-day QR fallback', (t) => {
+  const { resolveOpenVisitLog } = _test;
+  const nowMillis = new Date('2026-10-20T22:00:00.000Z').getTime(); // 16:00 CST
+  const earlierTodayMillis = new Date('2026-10-20T16:00:00.000Z').getTime(); // 10:00 CST
+  const yesterdayMillis = new Date('2026-10-19T16:00:00.000Z').getTime();
+
+  // 1. Explicit isInside: true with directLogSnap
+  const directSnap = {
+    exists: true,
+    id: 'log_explicit_1',
+    ref: { id: 'log_explicit_1' },
+    data: () => ({
+      status: 'allowed',
+      timestamp: yesterdayMillis, // Even overnight stays open when explicitly flagged
+      exitTimestamp: null,
+      isInside: true,
+    }),
+  };
+  const resolvedExplicit = resolveOpenVisitLog({
+    qrData: { isInside: true, activeAccessLogId: 'log_explicit_1' },
+    directLogSnap: directSnap,
+    nowMillis,
+    timeZone: 'America/Mexico_City',
+  });
+  assert.equal(resolvedExplicit.id, 'log_explicit_1');
+
+  // 2. Legacy QR (`isInside` undefined) scanned a 2nd time on the same day -> defaults isInside to true
+  const legacySameDayLog = {
+    id: 'log_legacy_today',
+    ref: { id: 'log_legacy_today' },
+    data: () => ({
+      status: 'allowed',
+      timestamp: earlierTodayMillis,
+    }),
+  };
+  const resolvedLegacySameDay = resolveOpenVisitLog({
+    qrData: { status: 'active' }, // Legacy QR: no `isInside` property
+    candidateLogDocs: [legacySameDayLog],
+    nowMillis,
+    timeZone: 'America/Mexico_City',
+  });
+  assert.equal(resolvedLegacySameDay.id, 'log_legacy_today');
+
+  // 3. Legacy QR whose earlier visit today already recorded exitTimestamp -> treated as new entry (returns null)
+  const legacyClosedTodayLog = {
+    id: 'log_legacy_closed',
+    ref: { id: 'log_legacy_closed' },
+    data: () => ({
+      status: 'allowed',
+      timestamp: earlierTodayMillis,
+      exitTimestamp: nowMillis - 10000,
+      isInside: false,
+    }),
+  };
+  const resolvedAfterExit = resolveOpenVisitLog({
+    qrData: { status: 'active' },
+    candidateLogDocs: [legacyClosedTodayLog],
+    nowMillis,
+    timeZone: 'America/Mexico_City',
+  });
+  assert.equal(resolvedAfterExit, null);
+
+  // 4. Legacy QR with an old unclosed log from yesterday -> first scan today is an entry (returns null)
+  const legacyYesterdayLog = {
+    id: 'log_legacy_yesterday',
+    ref: { id: 'log_legacy_yesterday' },
+    data: () => ({
+      status: 'allowed',
+      timestamp: yesterdayMillis,
+    }),
+  };
+  const resolvedYesterday = resolveOpenVisitLog({
+    qrData: { status: 'active' },
+    candidateLogDocs: [legacyYesterdayLog],
+    nowMillis,
+    timeZone: 'America/Mexico_City',
+  });
+  assert.equal(resolvedYesterday, null);
+});
+
+test('firebase-admin v14 modular services (firestore, auth, messaging, storage, Timestamp, FieldValue) resolve cleanly', (t) => {
+  const { admin } = _test;
+
+  assert.equal(typeof admin.firestore, 'function');
+  assert.equal(typeof admin.auth, 'function');
+  assert.equal(typeof admin.messaging, 'function');
+  assert.equal(typeof admin.storage, 'function');
+
+  // Verify Firestore instance and static helpers
+  const db = admin.firestore();
+  assert.equal(typeof db.collection, 'function');
+  assert.equal(typeof db.runTransaction, 'function');
+  assert.equal(typeof db.batch, 'function');
+
+  const nowTs = admin.firestore.Timestamp.now();
+  assert.ok(nowTs instanceof admin.firestore.Timestamp);
+  const fromDateTs = admin.firestore.Timestamp.fromDate(new Date('2026-10-22T00:00:00Z'));
+  assert.ok(fromDateTs instanceof admin.firestore.Timestamp);
+  assert.equal(typeof admin.firestore.FieldValue.serverTimestamp, 'function');
+
+  // Verify Auth, Messaging, and Storage instances
+  const auth = admin.auth();
+  assert.equal(typeof auth.setCustomUserClaims, 'function');
+  assert.equal(typeof auth.createUser, 'function');
+
+  const messaging = admin.messaging();
+  assert.equal(typeof messaging.sendEachForMulticast, 'function');
+
+  const storage = admin.storage();
+  assert.equal(typeof storage.bucket, 'function');
+});

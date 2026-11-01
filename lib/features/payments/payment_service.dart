@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/backend/backend.dart';
+import '../../core/services/temp_image_cleanup_service.dart';
 
 class PaymentService {
+  static const double _maxReceiptDimension = 1600;
   final ImagePicker _picker = ImagePicker();
 
   Future<void> uploadPaymentReceipt(
@@ -30,12 +32,16 @@ class PaymentService {
         try {
           pickedFile = await _picker.pickImage(
             source: ImageSource.camera,
+            maxWidth: _maxReceiptDimension,
+            maxHeight: _maxReceiptDimension,
             imageQuality: 60, // High compression to reduce size
           );
         } catch (cameraError) {
           debugPrint('Camera capture fallback to gallery on web/desktop: $cameraError');
           pickedFile = await _picker.pickImage(
             source: ImageSource.gallery,
+            maxWidth: _maxReceiptDimension,
+            maxHeight: _maxReceiptDimension,
             imageQuality: 60,
           );
         }
@@ -73,6 +79,9 @@ class PaymentService {
           metadata: {'uploaderUid': uid},
         );
       }
+
+      // Remove temporary local device image once uploaded to Cloud Storage
+      await TempImageCleanupService.deleteTempXFile(pickedFile);
 
       final paymentId = DateTime.now().millisecondsSinceEpoch.toString();
       final effectivePeriods = concept == 'sanction' && periods.isEmpty ? <String>['Sanction'] : periods;
@@ -117,7 +126,10 @@ class PaymentService {
     }
   }
 
-  Future<String> recalculatePaymentStatusForAddress(dynamic addressRef) async {
+  Future<String> recalculatePaymentStatusForAddress(
+    dynamic addressRef, {
+    DateTime? now,
+  }) async {
     final String addressId = addressRef is DbReference 
         ? addressRef.id 
         : (addressRef is StringDbReference ? addressRef.id : addressRef.toString().split('/').last);
@@ -158,8 +170,8 @@ class PaymentService {
       return newStatus;
     }
     
-    final now = DateTime.now();
-    final requiredPeriods = _generateRequiredPeriods(deliveryDate, now);
+    final effectiveNow = now ?? DateTime.now();
+    final requiredPeriods = _generateRequiredPeriods(deliveryDate, effectiveNow);
     
     // Fetch global config settings for cutoff and grace periods
     int cutoffDay = 1;
@@ -215,7 +227,7 @@ class PaymentService {
       }
     }
     
-    final currentPeriodStr = "${now.year}-${now.month.toString().padLeft(2, '0')}";
+    final currentPeriodStr = "${effectiveNow.year}-${effectiveNow.month.toString().padLeft(2, '0')}";
     final graceThresholdDay = cutoffDay + graceDays;
 
     bool hasPending = false;
@@ -235,7 +247,7 @@ class PaymentService {
           hasPending = true;
         } else {
           // status is null or rejected for current month
-          if (now.day <= graceThresholdDay) {
+          if (effectiveNow.day <= graceThresholdDay) {
             hasPendingGrace = true;
           } else {
             hasUnpaidCurrent = true;
@@ -261,7 +273,7 @@ class PaymentService {
       newStatus = 'paid';
     }
 
-    final bool isWithinGracePeriod = !hasActiveSanctions && !hasUnpaidPast && !hasPendingPast && (now.day <= graceThresholdDay);
+    final bool isWithinGracePeriod = !hasActiveSanctions && !hasUnpaidPast && !hasPendingPast && (effectiveNow.day <= graceThresholdDay);
     
     await Backend.db.updateDocument('addresses', addressId, {
       'paymentStatus': newStatus,

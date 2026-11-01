@@ -8,7 +8,7 @@ Widget buildWebImageView({
   required double? width,
   required BoxFit fit,
 }) {
-  final String viewType = 'web-img-${imageUrl.hashCode}';
+  final String viewType = 'web-img-${imageUrl.hashCode}-${fit.name}';
 
   ui_web.platformViewRegistry.registerViewFactory(
     viewType,

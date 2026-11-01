@@ -11,16 +11,30 @@ class DocumentCacheService {
   factory DocumentCacheService() => _instance;
   DocumentCacheService._internal();
 
-  final CacheIoHelper _helper = getCacheIoHelper();
+  CacheIoHelper _helper = getCacheIoHelper();
+  http.Client? _httpClient;
 
-  /// Generates a sanitized cache key / filename
-  String _getCacheKey(String docId, String fileName) {
+  http.Client get _client => _httpClient ??= http.Client();
+
+  /// Generates a sanitized cache key / filename, preventing path traversal characters.
+  static String buildCacheKey(String docId, String fileName) {
+    final sanitizedId = docId.replaceAll(RegExp(r'[^\w\-]'), '_');
     final sanitizedName = fileName.replaceAll(RegExp(r'[^\w\.\-]'), '_');
-    final key = '${docId}_$sanitizedName';
-    return key;
+    return '${sanitizedId}_$sanitizedName';
   }
 
-  /// Checks whether a document is already cached locally on disk or in memory
+  @visibleForTesting
+  void configureForTesting({
+    CacheIoHelper? helper,
+    http.Client? httpClient,
+  }) {
+    _helper = helper ?? getCacheIoHelper();
+    _httpClient = httpClient;
+  }
+
+  String _getCacheKey(String docId, String fileName) => buildCacheKey(docId, fileName);
+
+  /// Checks whether a document is already cached locally on disk or in memory.
   Future<bool> isCached(String docId, String fileName) async {
     final key = _getCacheKey(docId, fileName);
     final cached = await _helper.isCached(key);
@@ -54,7 +68,7 @@ class DocumentCacheService {
 
     // 2. Download from network
     debugPrint('>>> [DocumentCacheService] Cache MISS for key="$key". Starting download from URL: $url');
-    final response = await http.get(Uri.parse(url));
+    final response = await _client.get(Uri.parse(url));
     debugPrint('>>> [DocumentCacheService] HTTP response: ${response.statusCode}, body length: ${response.bodyBytes.length} bytes');
     if (response.statusCode != 200) {
       throw Exception('Failed to download document: HTTP ${response.statusCode}');
@@ -106,7 +120,7 @@ class DocumentCacheService {
     await _helper.clearAllCache();
   }
 
-  /// Reads bytes directly from a native disk file path if on mobile/desktop
+  /// Reads bytes directly from a native disk file path if on mobile/desktop.
   Future<Uint8List?> readFileBytesFromDisk(String filePath) async {
     debugPrint('>>> [DocumentCacheService] Reading file bytes from disk: $filePath');
     return await _helper.readFileBytesFromDisk(filePath);

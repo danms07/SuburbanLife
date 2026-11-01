@@ -17,17 +17,29 @@
  *   - Detailed summary reporting
  */
 
-let admin;
-try {
-  admin = require('firebase-admin');
-} catch (e) {
+const loadSubmodule = (sub) => {
   try {
-    admin = require('../functions/node_modules/firebase-admin');
-  } catch (e2) {
-    console.error('Error: firebase-admin module not found. Run "npm install" inside scripts/ or functions/.');
-    process.exit(1);
+    return require(`firebase-admin/${sub}`);
+  } catch (e) {
+    try {
+      return require(`../functions/node_modules/firebase-admin/lib/${sub}`);
+    } catch (e2) {
+      console.error('Error: firebase-admin module not found. Run "npm install" inside scripts/ or functions/.');
+      process.exit(1);
+    }
   }
-}
+};
+const { initializeApp, getApp, getApps, cert, applicationDefault } = loadSubmodule('app');
+const { getFirestore, FieldValue, Timestamp } = loadSubmodule('firestore');
+const admin = {
+  initializeApp,
+  app: getApp,
+  get apps() {
+    return getApps();
+  },
+  credential: { cert, applicationDefault },
+  firestore: Object.assign(() => getFirestore(), { FieldValue, Timestamp }),
+};
 
 const path = require('path');
 const fs = require('fs');
@@ -41,10 +53,19 @@ const fs = require('fs');
 function extractAddressId(addressRef) {
   if (!addressRef) return null;
   if (typeof addressRef === 'string') {
-    return addressRef.startsWith('addresses/') ? addressRef.replace('addresses/', '') : addressRef;
+    const trimmed = addressRef.trim();
+    if (!trimmed) return null;
+    const parts = trimmed.split('/');
+    return parts[parts.length - 1] || null;
   }
-  if (typeof addressRef === 'object' && addressRef.id) {
-    return addressRef.id;
+  if (typeof addressRef === 'object') {
+    if (typeof addressRef.id === 'string' && addressRef.id.trim()) {
+      return addressRef.id.trim();
+    }
+    if (typeof addressRef.path === 'string' && addressRef.path.trim()) {
+      const parts = addressRef.path.trim().split('/');
+      return parts[parts.length - 1] || null;
+    }
   }
   return null;
 }

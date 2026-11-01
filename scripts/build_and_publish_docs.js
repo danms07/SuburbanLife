@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { DEFAULT_APP_NAME, DEFAULT_PROJECT_ID, BRAND_COLORS } = require('../functions/brand_config');
 
 let marked;
 try {
@@ -73,7 +74,7 @@ function selectDocumentsToParse(pipelineConfig, options = {}) {
       if (!id) {
         throw new Error('Every document entry in docs_pipeline.json must have a valid "id".');
       }
-      const visibility = String(doc.visibility || 'all').trim().toLowerCase();
+      const visibility = String(doc.visibility || 'admin').trim().toLowerCase();
       if (!ALLOWED_VISIBILITIES.includes(visibility)) {
         throw new Error(
           `Invalid visibility "${visibility}" for document "${id}". Allowed: ${ALLOWED_VISIBILITIES.join(', ')}`
@@ -219,7 +220,7 @@ async function renderDiagramToPng(browser, diagram, outputPngPath, mermaidScript
 
       await page.setContent(html, { waitUntil: 'load' });
       await page.addScriptTag({ path: mermaidScriptPath });
-      await page.evaluate(async () => {
+      await page.evaluate(async (brandColors) => {
         window.mermaid.initialize({
           startOnLoad: false,
           theme: 'base',
@@ -229,17 +230,17 @@ async function renderDiagramToPng(browser, diagram, outputPngPath, mermaidScript
             curve: 'basis',
           },
           themeVariables: {
-            primaryColor: '#EDE8F5',
-            primaryTextColor: '#1F2937',
-            primaryBorderColor: '#3D52A0',
-            lineColor: '#3D52A0',
+            primaryColor: brandColors.cardBackground || '#F5F3FF',
+            primaryTextColor: brandColors.textColor || '#1F2937',
+            primaryBorderColor: brandColors.primary || '#152540',
+            lineColor: brandColors.primary || '#152540',
             secondaryColor: '#F3F4F6',
             tertiaryColor: '#FFFFFF',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           },
         });
         await window.mermaid.run({ querySelector: '.mermaid' });
-      });
+      }, BRAND_COLORS);
 
       const wrapper = await page.$('#diagram-wrapper');
       await wrapper.screenshot({ path: outputPngPath, type: 'png' });
@@ -259,10 +260,10 @@ async function renderDiagramToPng(browser, diagram, outputPngPath, mermaidScript
     #diagram-wrapper {
       display: inline-block;
       padding: 22px 28px;
-      background: linear-gradient(180deg, #F8F9FE 0%, #EEF1FA 100%);
-      border: 2px solid #3D52A0;
+      background: linear-gradient(180deg, ${BRAND_COLORS.cardBackground || '#F5F3FF'} 0%, #EDE9FE 100%);
+      border: 2px solid ${BRAND_COLORS.primary};
       border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(61, 82, 160, 0.08);
+      box-shadow: 0 4px 12px rgba(82, 46, 96, 0.08);
     }
     pre {
       margin: 0;
@@ -312,14 +313,14 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: #1F2937;
+      color: ${BRAND_COLORS.textColor || '#1F2937'};
       line-height: 1.6;
       font-size: 11pt;
       margin: 0;
       padding: 0;
     }
     .doc-banner {
-      background: linear-gradient(135deg, #3D52A0 0%, #7091E6 100%);
+      background: linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.gradientEnd} 100%);
       color: #FFFFFF;
       padding: 20px 24px;
       border-radius: 10px;
@@ -354,15 +355,15 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
       border: 1px solid #A7F3D0;
     }
     h1 {
-      color: #3D52A0;
+      color: ${BRAND_COLORS.primary};
       font-size: 20pt;
       margin-top: 0;
       margin-bottom: 12px;
-      border-bottom: 2px solid #EDE8F5;
+      border-bottom: 2px solid ${BRAND_COLORS.cardBackground || '#F5F3FF'};
       padding-bottom: 8px;
     }
     h2 {
-      color: #3D52A0;
+      color: ${BRAND_COLORS.primary};
       font-size: 14.5pt;
       margin-top: 24px;
       margin-bottom: 10px;
@@ -397,7 +398,7 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
       margin-bottom: 4px;
     }
     a {
-      color: #3D52A0;
+      color: ${BRAND_COLORS.primary};
       text-decoration: none;
     }
     hr {
@@ -408,7 +409,7 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
     code {
       font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
       background-color: #F3F4F6;
-      color: #3D52A0;
+      color: ${BRAND_COLORS.primary};
       padding: 2px 5px;
       border-radius: 4px;
       font-size: 9.5pt;
@@ -435,7 +436,7 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
       page-break-inside: avoid;
     }
     th {
-      background-color: #3D52A0;
+      background-color: ${BRAND_COLORS.primary};
       color: #FFFFFF;
       text-align: left;
       padding: 8px 12px;
@@ -460,8 +461,8 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
       border-radius: 8px;
     }
     .alert-box {
-      border-left: 4px solid #3D52A0;
-      background-color: #F8F9FE;
+      border-left: 4px solid ${BRAND_COLORS.primary};
+      background-color: ${BRAND_COLORS.cardBackground || '#F5F3FF'};
       padding: 12px 16px;
       border-radius: 0 8px 8px 0;
       margin: 16px 0;
@@ -470,13 +471,13 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
     .alert-title {
       font-weight: 700;
       font-size: 9.5pt;
-      color: #3D52A0;
+      color: ${BRAND_COLORS.primary};
       margin-bottom: 4px;
       letter-spacing: 0.5px;
     }
     .math-formula {
-      background-color: #F8F9FE;
-      border: 1px solid #D8E0F5;
+      background-color: ${BRAND_COLORS.cardBackground || '#F5F3FF'};
+      border: 1px solid #DDD6FE;
       border-radius: 8px;
       padding: 10px 14px;
       text-align: center;
@@ -486,7 +487,7 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
 </head>
 <body>
   <div class="doc-banner">
-    <span class="doc-banner-brand">Suburban Life — Documentación Oficial</span>
+    <span class="doc-banner-brand">${escapeHtml(DEFAULT_APP_NAME)} — Documentación Oficial</span>
     ${visibilityBadge}
   </div>
   ${bodyHtml}
@@ -495,31 +496,42 @@ function buildPdfDocumentHtml({ title, visibility, bodyHtml }) {
 }
 
 /**
+ * Checks whether Firebase credentials or emulator flags are available for publishing.
+ */
+function hasFirebaseCredentials(options = {}) {
+  if (options.emulator) return true;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_JSON) return true;
+  const localKeyPath = path.resolve(__dirname, 'serviceAccountKey.json');
+  return fs.existsSync(localKeyPath);
+}
+
+/**
  * Initializes Firebase Admin SDK using environment credentials (CI) or local serviceAccountKey.json.
  */
 function initFirebaseAdmin(options = {}) {
-  const admin = require('firebase-admin');
-  if (admin.apps.length > 0) {
-    return admin.app();
+  const { initializeApp, getApp, getApps, cert } = require('firebase-admin/app');
+  if (getApps().length > 0) {
+    return getApp();
   }
 
-  const defaultProjectId = process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID || 'suburban-life-a67ab';
+  const defaultProjectId = process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID;
   const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${defaultProjectId}.firebasestorage.app`;
 
   if (options.emulator) {
     process.env.FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
     process.env.FIREBASE_STORAGE_EMULATOR_HOST = process.env.FIREBASE_STORAGE_EMULATOR_HOST || '127.0.0.1:9199';
-    return admin.initializeApp({
+    return initializeApp({
       projectId: defaultProjectId,
       storageBucket,
     });
   }
 
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  const envServiceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (envServiceAccountRaw) {
+    const serviceAccount = JSON.parse(envServiceAccountRaw);
     const projectId = serviceAccount.project_id || defaultProjectId;
-    return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+    return initializeApp({
+      credential: cert(serviceAccount),
       projectId,
       storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
     });
@@ -529,8 +541,8 @@ function initFirebaseAdmin(options = {}) {
   if (fs.existsSync(localKeyPath)) {
     const serviceAccount = JSON.parse(fs.readFileSync(localKeyPath, 'utf8'));
     const projectId = serviceAccount.project_id || defaultProjectId;
-    return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+    return initializeApp({
+      credential: cert(serviceAccount),
       projectId,
       storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
     });
@@ -547,10 +559,10 @@ function initFirebaseAdmin(options = {}) {
  */
 async function publishDocumentToTransparency(docEntry, pdfFilePath, pipelineConfig, options = {}) {
   initFirebaseAdmin(options);
-  const admin = require('firebase-admin');
-  const { FieldValue } = require('firebase-admin/firestore');
-  const db = admin.firestore();
-  const bucket = admin.storage().bucket();
+  const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+  const { getStorage } = require('firebase-admin/storage');
+  const db = getFirestore();
+  const bucket = getStorage().bucket();
 
   const fileBuffer = fs.readFileSync(pdfFilePath);
   const fileSize = fileBuffer.length;
@@ -596,23 +608,39 @@ async function publishDocumentToTransparency(docEntry, pdfFilePath, pipelineConf
     id: 'official_manuals',
     name: 'Manuales y Documentación Oficial',
     parentId: 'root',
+    visibility: 'admin',
   };
   if (docEntry.folderId && docEntry.folderId !== 'root') {
     const folderRef = db.collection('document_folders').doc(docEntry.folderId);
     const folderSnap = await folderRef.get();
+    const folderVisibility = defaultFolder.visibility || docEntry.visibility || 'admin';
     if (!folderSnap.exists) {
       await folderRef.set({
         name: docEntry.folderId === defaultFolder.id ? defaultFolder.name : docEntry.folderId,
         parentId: defaultFolder.parentId || 'root',
+        visibility: folderVisibility,
         createdAt: FieldValue.serverTimestamp(),
         createdBy: 'system_docs_pipeline',
       });
+    } else if (!folderSnap.data().visibility) {
+      await folderRef.set({ visibility: folderVisibility }, { merge: true });
     }
   }
 
-  // 3. Upsert document metadata in `documents` collection
+  // 3. Upsert document metadata in `documents` collection and clean up stale storage object if path changed
   const docRef = db.collection('documents').doc(docEntry.id);
   const existingSnap = await docRef.get();
+  if (existingSnap.exists) {
+    const prevStoragePath = existingSnap.data() && existingSnap.data().storagePath;
+    if (prevStoragePath && prevStoragePath !== storagePath) {
+      try {
+        await bucket.file(prevStoragePath).delete();
+      } catch (_) {
+        // Ignore if previous storage object was already removed
+      }
+    }
+  }
+
   const now = FieldValue.serverTimestamp();
 
   const payload = {
@@ -636,14 +664,22 @@ async function publishDocumentToTransparency(docEntry, pdfFilePath, pipelineConf
 
   await docRef.set(payload, { merge: true });
 
-  // 4. Backfill `visibility: 'all'` on any legacy documents missing the `visibility` field
+  // 4. Backfill `visibility: 'all'` on any legacy documents or folders missing the `visibility` field
   const allDocsSnap = await db.collection('documents').get();
+  const allFoldersSnap = await db.collection('document_folders').get();
   const batch = db.batch();
   let backfilledCount = 0;
   for (const d of allDocsSnap.docs) {
     const data = d.data();
     if (!data.visibility) {
       batch.update(d.ref, { visibility: 'all' });
+      backfilledCount++;
+    }
+  }
+  for (const f of allFoldersSnap.docs) {
+    const data = f.data();
+    if (!data.visibility) {
+      batch.update(f.ref, { visibility: 'all' });
       backfilledCount++;
     }
   }
@@ -751,10 +787,10 @@ async function runPipeline(cliOptions = {}) {
           displayHeaderFooter: true,
           headerTemplate: `<div style="font-size: 8px; color: #6B7280; width: 100%; padding: 0 18mm; display: flex; justify-content: space-between; font-family: sans-serif;">
             <span>${escapeHtml(docEntry.title)}</span>
-            <span>${docEntry.visibility === 'admin' ? 'CONFIDENCIAL — SOLO ADMIN' : 'SUBURBAN LIFE'}</span>
+            <span>${docEntry.visibility === 'admin' ? 'CONFIDENCIAL — SOLO ADMIN' : escapeHtml(DEFAULT_APP_NAME.toUpperCase())}</span>
           </div>`,
           footerTemplate: `<div style="font-size: 8px; color: #6B7280; width: 100%; padding: 0 18mm; display: flex; justify-content: space-between; font-family: sans-serif;">
-            <span>Suburban Life</span>
+            <span>${escapeHtml(DEFAULT_APP_NAME)}</span>
             <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
           </div>`,
           margin: {
@@ -773,9 +809,10 @@ async function runPipeline(cliOptions = {}) {
 
       let publishedInfo = null;
       if (cliOptions.publish) {
-        console.log(`  ↑ Publishing "${docEntry.title}" to Transparency section (visibility: ${docEntry.visibility})...`);
+        console.log(`  ↑ Uploading "${docEntry.outputFileName}" to Firebase Storage & Transparency section (visibility: ${docEntry.visibility})...`);
         publishedInfo = await publishDocumentToTransparency(docEntry, outputPdfPath, pipelineConfig, cliOptions);
-        console.log(`  ✓ Published to Firestore documents/${publishedInfo.docId}`);
+        console.log(`  ✓ Uploaded to Storage: ${publishedInfo.storagePath}`);
+        console.log(`  ✓ Published to Firestore: documents/${publishedInfo.docId} (visibility: ${publishedInfo.visibility})`);
       }
 
       results.push({
@@ -795,9 +832,11 @@ async function runPipeline(cliOptions = {}) {
 
 if (require.main === module) {
   const args = process.argv.slice(2);
+  const noPublish = args.includes('--no-publish') || args.includes('--local-only');
+  const emulator = args.includes('--emulator');
   const cliOptions = {
-    publish: args.includes('--publish'),
-    emulator: args.includes('--emulator'),
+    publish: !noPublish && (args.includes('--publish') || hasFirebaseCredentials({ emulator })),
+    emulator,
     all: args.includes('--all'),
     only: null,
   };
@@ -826,5 +865,8 @@ module.exports = {
   extractDiagramsFromMarkdown,
   preprocessMarkdownSyntax,
   buildPdfDocumentHtml,
+  hasFirebaseCredentials,
+  initFirebaseAdmin,
+  publishDocumentToTransparency,
   runPipeline,
 };

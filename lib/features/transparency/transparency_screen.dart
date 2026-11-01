@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,7 +16,116 @@ import 'widgets/file_explorer_breadcrumb.dart';
 import 'widgets/folder_card.dart';
 
 class TransparencyScreen extends StatefulWidget {
-  const TransparencyScreen({Key? key}) : super(key: key);
+  final bool? isAdminView;
+  final bool isEmbedded;
+
+  const TransparencyScreen({
+    super.key,
+    this.isAdminView,
+    this.isEmbedded = false,
+  });
+
+  static bool resolveEffectiveAdmin({
+    required bool? isAdminView,
+    required bool hasAdminClaim,
+    required String? firestoreRole,
+  }) {
+    if (isAdminView == false) return false;
+    bool isAdmin = hasAdminClaim;
+    if (isAdmin && firestoreRole != null && firestoreRole.toLowerCase() != 'admin') {
+      isAdmin = false;
+    }
+    return isAdmin;
+  }
+
+  static bool isNativeInAppViewer(String fileType, [String fileName = '']) {
+    final ext = fileType.toLowerCase();
+    final lowerName = fileName.toLowerCase();
+    return ext == 'md' ||
+        ext == 'txt' ||
+        lowerName.endsWith('.md') ||
+        lowerName.endsWith('.txt') ||
+        const ['png', 'jpg', 'jpeg', 'webp', 'gif'].contains(ext);
+  }
+
+  static bool canDeleteCategory(String categoryId, List<Map<String, dynamic>> documents) {
+    final count = documents
+        .where((d) => (d['category']?.toString().toLowerCase() ?? '') == categoryId.toLowerCase())
+        .length;
+    return count == 0;
+  }
+
+  static Set<String> collectAdminOnlyFolderIds(List<Map<String, dynamic>> allFolders) {
+    final ids = <String>{'official_manuals'};
+    for (final f in allFolders) {
+      if ((f['visibility'] ?? 'all').toString().toLowerCase() == 'admin') {
+        final fid = f['id']?.toString() ?? '';
+        if (fid.isNotEmpty) ids.add(fid);
+      }
+    }
+    return ids;
+  }
+
+  static List<Map<String, dynamic>> filterVisibleFolders({
+    required List<Map<String, dynamic>> allFolders,
+    required String currentFolderId,
+    required bool isAdmin,
+    Set<String>? adminOnlyFolderIds,
+  }) {
+    final restrictedIds = adminOnlyFolderIds ?? collectAdminOnlyFolderIds(allFolders);
+    return allFolders.where((f) {
+      final folderVisibility = (f['visibility'] ?? 'all').toString().toLowerCase();
+      final fid = f['id']?.toString() ?? '';
+      if (!isAdmin && (folderVisibility == 'admin' || restrictedIds.contains(fid))) {
+        return false;
+      }
+      final parent = f['parentId']?.toString() ?? 'root';
+      return parent == currentFolderId;
+    }).toList();
+  }
+
+  static List<Map<String, dynamic>> filterVisibleDocuments({
+    required List<Map<String, dynamic>> allDocs,
+    required String currentFolderId,
+    required bool isAdmin,
+    String selectedCategory = 'all',
+    String searchQuery = '',
+    Set<String>? adminOnlyFolderIds,
+  }) {
+    final restrictedIds = adminOnlyFolderIds ?? const <String>{'official_manuals'};
+    final normalizedQuery = searchQuery.trim().toLowerCase();
+    final normalizedCat = selectedCategory.toLowerCase();
+
+    return allDocs.where((doc) {
+      final docVisibility = (doc['visibility'] ?? 'all').toString().toLowerCase();
+      final docFolderId = doc['folderId']?.toString() ?? 'root';
+      if (!isAdmin && (docVisibility == 'admin' || restrictedIds.contains(docFolderId))) {
+        return false;
+      }
+
+      if (normalizedQuery.isEmpty) {
+        if (docFolderId != currentFolderId) return false;
+      }
+
+      if (normalizedCat != 'all') {
+        final cat = doc['category']?.toString().toLowerCase() ?? '';
+        if (cat != normalizedCat) return false;
+      }
+
+      if (normalizedQuery.isNotEmpty) {
+        final title = (doc['title'] ?? '').toString().toLowerCase();
+        final fileName = (doc['fileName'] ?? '').toString().toLowerCase();
+        final cat = (doc['category'] ?? '').toString().toLowerCase();
+        if (!title.contains(normalizedQuery) &&
+            !fileName.contains(normalizedQuery) &&
+            !cat.contains(normalizedQuery)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+  }
 
   @override
   State<TransparencyScreen> createState() => _TransparencyScreenState();
@@ -24,6 +134,7 @@ class TransparencyScreen extends StatefulWidget {
 class _TransparencyScreenState extends State<TransparencyScreen> {
   final AuthService _authService = AuthService();
   final DocumentCacheService _cacheService = DocumentCacheService();
+  StreamSubscription<List<Map<String, dynamic>>>? _categoriesSubscription;
 
   bool _isAdmin = false;
   bool _isCheckingAdmin = true;
@@ -49,6 +160,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   @override
   void dispose() {
+    _categoriesSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -56,7 +168,38 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   void _checkAdmin() async {
     try {
       debugPrint('>>> [TransparencyScreen] Checking if current user is admin...');
-      final isAdmin = await _authService.isAdmin();
+      if (widget.isAdminView == false) {
+        debugPrint('>>> [TransparencyScreen] Opened in resident view; forcing non-admin mode.');
+        if (mounted) {
+          setState(() {
+            _isAdmin = false;
+            _isCheckingAdmin = false;
+          });
+        }
+        return;
+      }
+
+      await _authService.reloadUserToken(forceRefresh: true);
+      final hasAdminClaim = await _authService.isAdmin();
+      String? firestoreRole;
+
+      if (hasAdminClaim) {
+        final currentUser = _authService.currentUser;
+        if (currentUser != null) {
+          final userDoc = await DatabaseService().getDocument('users', currentUser.uid);
+          firestoreRole = userDoc?['role']?.toString().toLowerCase();
+          if (firestoreRole != null && firestoreRole != 'admin') {
+            debugPrint('>>> [TransparencyScreen] Firestore role is "$firestoreRole"; overriding admin status to false.');
+          }
+        }
+      }
+
+      final isAdmin = TransparencyScreen.resolveEffectiveAdmin(
+        isAdminView: widget.isAdminView,
+        hasAdminClaim: hasAdminClaim,
+        firestoreRole: firestoreRole,
+      );
+
       debugPrint('>>> [TransparencyScreen] User admin status: $isAdmin');
       if (mounted) {
         setState(() {
@@ -76,7 +219,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   }
 
   void _listenToCategories() {
-    DatabaseService().streamCollection('document_categories').listen((docs) {
+    _categoriesSubscription?.cancel();
+    _categoriesSubscription = DatabaseService().streamCollection('document_categories').listen((docs) {
       if (docs.isEmpty) {
         _seedDefaultCategories();
         return;
@@ -158,7 +302,20 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   // --- Document Opening ---
 
-  void _checkCachedDocuments(List<Map<String, dynamic>> docs) async {
+  void _checkCachedDocuments(List<Map<String, dynamic>> docs, [List<Map<String, dynamic>> folders = const []]) async {
+    if (_isAdmin) {
+      for (var folder in folders) {
+        final folderId = folder['id']?.toString() ?? '';
+        if (folderId.isEmpty) continue;
+        if (folder['visibility'] == null && !_backfilledVisibilityIds.contains('folder_$folderId')) {
+          _backfilledVisibilityIds.add('folder_$folderId');
+          DatabaseService().updateDocument('document_folders', folderId, {'visibility': 'all'}).catchError((e) {
+            debugPrint('Error backfilling folder visibility for $folderId: $e');
+          });
+        }
+      }
+    }
+
     for (var doc in docs) {
       final docId = doc['id']?.toString() ?? '';
       if (docId.isEmpty) continue;
@@ -430,6 +587,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   await DatabaseService().addDocument('document_folders', {
                     'name': name,
                     'parentId': _currentFolderId,
+                    'visibility': 'all',
                     'createdAt': DbFieldValue.serverTimestamp(),
                     'createdBy': user?.uid ?? '',
                   });
@@ -832,6 +990,12 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         'visibility': selectedVisibility,
                         'updatedAt': DbFieldValue.serverTimestamp(),
                       });
+                      final folderId = doc['folderId']?.toString() ?? 'root';
+                      if (selectedVisibility == 'all' && folderId.isNotEmpty && folderId != 'root') {
+                        await DatabaseService().updateDocument('document_folders', folderId, {
+                          'visibility': 'all',
+                        });
+                      }
                       if (mounted) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -1034,6 +1198,12 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                       await DatabaseService().updateDocument('documents', docId, {
                         'folderId': targetFolderId,
                       });
+                      final docVis = (doc['visibility'] ?? 'all').toString().toLowerCase();
+                      if (docVis == 'all' && targetFolderId.isNotEmpty && targetFolderId != 'root') {
+                        await DatabaseService().updateDocument('document_folders', targetFolderId, {
+                          'visibility': 'all',
+                        });
+                      }
                       if (mounted) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -1459,15 +1629,17 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       },
       child: Scaffold(
         backgroundColor: AppConfig.backgroundColor,
-        appBar: AppBar(
-          title: Text(
-            l10n.transparencyDocs,
-            style: const TextStyle(fontFamily: AppConfig.fontFamily),
-          ),
-          backgroundColor: AppConfig.primaryColor,
-          foregroundColor: Colors.white,
-          elevation: 2,
-        ),
+        appBar: widget.isEmbedded
+            ? null
+            : AppBar(
+                title: Text(
+                  l10n.transparencyDocs,
+                  style: const TextStyle(fontFamily: AppConfig.fontFamily),
+                ),
+                backgroundColor: AppConfig.primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 2,
+              ),
         body: Column(
           children: [
             // Breadcrumbs Navigation Bar
@@ -1586,7 +1758,10 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     }
 
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: DatabaseService().streamCollection('document_folders'),
+      stream: DatabaseService().streamCollection(
+        'document_folders',
+        filters: _isAdmin ? null : [QueryFilter('visibility', FilterOperator.equal, 'all')],
+      ),
       builder: (context, folderSnapshot) {
         return StreamBuilder<List<Map<String, dynamic>>>(
           stream: DatabaseService().streamCollection(
@@ -1599,52 +1774,28 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
+            if (folderSnapshot.hasError) {
+              debugPrint('>>> [TransparencyScreen] folderSnapshot error: ${folderSnapshot.error}');
+            }
+            if (docSnapshot.hasError) {
+              debugPrint('>>> [TransparencyScreen] docSnapshot error: ${docSnapshot.error}');
+            }
+
             final allFolders = folderSnapshot.data ?? [];
             final allDocs = docSnapshot.data ?? [];
-            _checkCachedDocuments(allDocs);
+            _checkCachedDocuments(allDocs, allFolders);
 
-            // Filter folders for current level
-            final currentFolders = allFolders.where((f) {
-              final parent = f['parentId']?.toString() ?? 'root';
-              return parent == _currentFolderId;
-            }).toList();
+            final adminOnlyFolderIds = TransparencyScreen.collectAdminOnlyFolderIds(allFolders);
 
-            // Filter documents
-            final currentDocs = allDocs.where((doc) {
-              // 0. Visibility match (non-admins cannot see 'admin'-only documents)
-              final docVisibility = (doc['visibility'] ?? 'all').toString().toLowerCase();
-              if (!_isAdmin && docVisibility == 'admin') return false;
-
-              // 1. Folder level match (unless global search query is active)
-              if (_searchQuery.isEmpty) {
-                final folderId = doc['folderId']?.toString() ?? 'root';
-                if (folderId != _currentFolderId) return false;
-              }
-
-              // 2. Category match
-              if (_selectedCategory != 'all') {
-                final cat = doc['category']?.toString().toLowerCase() ?? '';
-                if (cat != _selectedCategory) return false;
-              }
-
-              // 3. Search query match
-              if (_searchQuery.isNotEmpty) {
-                final title = (doc['title'] ?? '').toString().toLowerCase();
-                final fileName = (doc['fileName'] ?? '').toString().toLowerCase();
-                final cat = (doc['category'] ?? '').toString().toLowerCase();
-                if (!title.contains(_searchQuery) &&
-                    !fileName.contains(_searchQuery) &&
-                    !cat.contains(_searchQuery)) {
-                  return false;
-                }
-              }
-
-              return true;
-            }).toList();
-
-            // Calculate item counts for current folders
+            // Calculate item counts and filter folders for current level
             final Map<String, int> folderItemCounts = {};
-            for (var f in currentFolders) {
+            final currentFolders = TransparencyScreen.filterVisibleFolders(
+              allFolders: allFolders,
+              currentFolderId: _currentFolderId,
+              isAdmin: _isAdmin,
+              adminOnlyFolderIds: adminOnlyFolderIds,
+            );
+            for (final f in currentFolders) {
               final fid = f['id']?.toString() ?? '';
               final childDocs = allDocs.where((d) {
                 if (!_isAdmin && (d['visibility'] ?? 'all').toString().toLowerCase() == 'admin') {
@@ -1652,9 +1803,24 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 }
                 return (d['folderId']?.toString() ?? 'root') == fid;
               }).length;
-              final childSubfolders = allFolders.where((sub) => (sub['parentId']?.toString() ?? 'root') == fid).length;
+              final childSubfolders = allFolders.where((sub) {
+                if (!_isAdmin && (sub['visibility'] ?? 'all').toString().toLowerCase() == 'admin') {
+                  return false;
+                }
+                return (sub['parentId']?.toString() ?? 'root') == fid;
+              }).length;
               folderItemCounts[fid] = childDocs + childSubfolders;
             }
+
+            // Filter documents
+            final currentDocs = TransparencyScreen.filterVisibleDocuments(
+              allDocs: allDocs,
+              currentFolderId: _currentFolderId,
+              isAdmin: _isAdmin,
+              selectedCategory: _selectedCategory,
+              searchQuery: _searchQuery,
+              adminOnlyFolderIds: adminOnlyFolderIds,
+            );
 
             if (currentFolders.isEmpty && currentDocs.isEmpty) {
               return Center(

@@ -1,195 +1,314 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:suburban_life/core/backend/backend.dart';
+import 'package:suburban_life/core/services/cache_io_helper.dart';
+import 'package:suburban_life/core/services/document_cache_service.dart';
+import 'package:suburban_life/features/transparency/document_viewer_screen.dart';
+import 'package:suburban_life/features/transparency/transparency_screen.dart';
+import 'package:suburban_life/l10n/app_localizations.dart';
+import '../../helpers/fake_backend.dart';
+
+class _InMemoryCacheIoHelper implements CacheIoHelper {
+  final Map<String, Uint8List> store = {};
+
+  @override
+  Future<bool> isCached(String key) async => store.containsKey(key);
+
+  @override
+  Future<Uint8List?> getCachedBytes(String key) async => store[key];
+
+  @override
+  Future<void> saveCachedBytes(String key, Uint8List bytes) async {
+    store[key] = bytes;
+  }
+
+  @override
+  Future<String?> getCachedFilePath(String key) async =>
+      store.containsKey(key) ? '/virtual_cache/$key' : null;
+
+  @override
+  Future<void> removeCachedFile(String key) async {
+    store.remove(key);
+  }
+
+  @override
+  Future<void> clearAllCache() async {
+    store.clear();
+  }
+
+  @override
+  Future<Uint8List?> readFileBytesFromDisk(String filePath) async => null;
+}
+
+Widget _wrapWithL10n(Widget child) {
+  return MaterialApp(
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: const [Locale('en'), Locale('es')],
+    locale: const Locale('en'),
+    home: child,
+  );
+}
 
 void main() {
-  group('Transparency File Explorer - Virtual Hierarchy Logic', () {
+  late _InMemoryCacheIoHelper memoryCache;
+  String? copiedClipboardText;
+
+  setUp(() {
+    FakeBackendHelper.setUp();
+    memoryCache = _InMemoryCacheIoHelper();
+    DocumentCacheService().configureForTesting(helper: memoryCache);
+    copiedClipboardText = null;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        final args = call.arguments as Map<dynamic, dynamic>?;
+        copiedClipboardText = args?['text']?.toString();
+      }
+      return null;
+    });
+  });
+
+  tearDown(() {
+    DocumentCacheService().configureForTesting();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
+  });
+
+  group('TransparencyScreen - Production Static Filtering & Role Logic', () {
     final sampleFolders = [
-      {
-        'id': 'folder-finances',
-        'name': 'Finances',
-        'parentId': 'root',
-      },
-      {
-        'id': 'folder-finances-2026',
-        'name': '2026',
-        'parentId': 'folder-finances',
-      },
-      {
-        'id': 'folder-normatives',
-        'name': 'Normatives & Bylaws',
-        'parentId': 'root',
-      },
+      {'id': 'official_manuals', 'name': 'Official Manuals', 'parentId': 'root', 'visibility': 'admin'},
+      {'id': 'community_rules', 'name': 'Reglamentos', 'parentId': 'root', 'visibility': 'all'},
+      {'id': 'finances_2026', 'name': '2026', 'parentId': 'community_rules', 'visibility': 'all'},
     ];
 
     final sampleDocs = [
       {
-        'id': 'doc-1',
+        'id': 'admin_manual',
+        'title': 'Admin Guide',
+        'fileName': 'admin.pdf',
+        'fileType': 'pdf',
+        'folderId': 'official_manuals',
+        'category': 'manuals',
+        'visibility': 'admin',
+      },
+      {
+        'id': 'internal_note',
+        'title': 'Internal Note in Admin Folder',
+        'fileName': 'note.txt',
+        'fileType': 'txt',
+        'folderId': 'official_manuals',
+        'category': 'communiques',
+        'visibility': 'all',
+      },
+      {
+        'id': 'public_bylaws',
         'title': 'Internal Bylaws 2026',
         'fileName': 'reglamento_2026.md',
         'fileType': 'md',
-        'folderId': 'folder-normatives',
+        'folderId': 'community_rules',
         'category': 'normatives',
-      },
-      {
-        'id': 'doc-2',
-        'title': 'Q1 Financial Summary',
-        'fileName': 'summary_q1.pdf',
-        'fileType': 'pdf',
-        'folderId': 'folder-finances-2026',
-        'category': 'financial',
-      },
-      {
-        'id': 'doc-3',
-        'title': 'General Community Notice',
-        'fileName': 'notice.txt',
-        'fileType': 'txt',
-        'folderId': 'root',
-        'category': 'communiques',
+        'visibility': 'all',
       },
     ];
 
-    test('Filters folders at root level', () {
-      final rootFolders = sampleFolders.where((f) => f['parentId'] == 'root').toList();
-      expect(rootFolders.length, 2);
-      expect(rootFolders.map((f) => f['id']), containsAll(['folder-finances', 'folder-normatives']));
+    test('isNativeInAppViewer distinguishes .md, .txt, and images from external binaries', () {
+      expect(TransparencyScreen.isNativeInAppViewer('md'), isTrue);
+      expect(TransparencyScreen.isNativeInAppViewer('txt'), isTrue);
+      expect(TransparencyScreen.isNativeInAppViewer('', 'readme.md'), isTrue);
+      expect(TransparencyScreen.isNativeInAppViewer('png'), isTrue);
+      expect(TransparencyScreen.isNativeInAppViewer('pdf'), isFalse);
+      expect(TransparencyScreen.isNativeInAppViewer('xlsx'), isFalse);
     });
 
-    test('Filters subfolders inside Finances', () {
-      final subfolders = sampleFolders.where((f) => f['parentId'] == 'folder-finances').toList();
-      expect(subfolders.length, 1);
-      expect(subfolders.first['id'], 'folder-finances-2026');
+    test('canDeleteCategory blocks deletion when active documents reference the category', () {
+      expect(TransparencyScreen.canDeleteCategory('normatives', sampleDocs), isFalse);
+      expect(TransparencyScreen.canDeleteCategory('contracts', sampleDocs), isTrue);
     });
 
-    test('Filters documents inside specific virtual folder', () {
-      final docsInNormatives = sampleDocs.where((d) => d['folderId'] == 'folder-normatives').toList();
-      expect(docsInNormatives.length, 1);
-      expect(docsInNormatives.first['title'], 'Internal Bylaws 2026');
+    test('hides admin-only folders and their contents from residents while showing them to admins', () {
+      final restrictedIds = TransparencyScreen.collectAdminOnlyFolderIds(sampleFolders);
 
-      final docsInRoot = sampleDocs.where((d) => d['folderId'] == 'root').toList();
-      expect(docsInRoot.length, 1);
-      expect(docsInRoot.first['title'], 'General Community Notice');
+      final residentFolders = TransparencyScreen.filterVisibleFolders(
+        allFolders: sampleFolders,
+        currentFolderId: 'root',
+        isAdmin: false,
+        adminOnlyFolderIds: restrictedIds,
+      );
+      expect(residentFolders.map((f) => f['id']), equals(['community_rules']));
+
+      final residentSearchDocs = TransparencyScreen.filterVisibleDocuments(
+        allDocs: sampleDocs,
+        currentFolderId: 'root',
+        isAdmin: false,
+        searchQuery: 'note',
+        adminOnlyFolderIds: restrictedIds,
+      );
+      expect(residentSearchDocs, isEmpty);
+
+      final adminFolders = TransparencyScreen.filterVisibleFolders(
+        allFolders: sampleFolders,
+        currentFolderId: 'root',
+        isAdmin: true,
+        adminOnlyFolderIds: restrictedIds,
+      );
+      expect(adminFolders.map((f) => f['id']), containsAll(['official_manuals', 'community_rules']));
     });
 
-    test('Moving a document to another folder updates folderId virtually without touching storage', () {
-      final mutableDoc = Map<String, dynamic>.from(sampleDocs[2]);
-      expect(mutableDoc['folderId'], 'root');
-
-      // Admin moves notice.txt into folder-normatives
-      mutableDoc['folderId'] = 'folder-normatives';
-      expect(mutableDoc['folderId'], 'folder-normatives');
-
-      final docsInNormativesAfterMove = [
-        sampleDocs[0],
-        mutableDoc,
-      ].where((d) => d['folderId'] == 'folder-normatives').toList();
-
-      expect(docsInNormativesAfterMove.length, 2);
+    test('resolveEffectiveAdmin enforces resident view override and Firestore role check', () {
+      expect(
+        TransparencyScreen.resolveEffectiveAdmin(
+          isAdminView: false,
+          hasAdminClaim: true,
+          firestoreRole: 'admin',
+        ),
+        isFalse,
+      );
+      expect(
+        TransparencyScreen.resolveEffectiveAdmin(
+          isAdminView: null,
+          hasAdminClaim: true,
+          firestoreRole: 'resident',
+        ),
+        isFalse,
+      );
+      expect(
+        TransparencyScreen.resolveEffectiveAdmin(
+          isAdminView: true,
+          hasAdminClaim: true,
+          firestoreRole: 'admin',
+        ),
+        isTrue,
+      );
     });
+  });
 
-    test('Identifies native in-app viewable file types (.md, .txt, images) vs external files (.pdf)', () {
-      bool isNativeInAppViewer(String fileType) {
-        final ext = fileType.toLowerCase();
-        return ext == 'md' || ext == 'txt' || ['png', 'jpg', 'jpeg', 'webp', 'gif'].contains(ext);
-      }
-
-      expect(isNativeInAppViewer('md'), isTrue);
-      expect(isNativeInAppViewer('txt'), isTrue);
-      expect(isNativeInAppViewer('png'), isTrue);
-      expect(isNativeInAppViewer('jpg'), isTrue);
-      expect(isNativeInAppViewer('pdf'), isFalse);
-      expect(isNativeInAppViewer('docx'), isFalse);
-      expect(isNativeInAppViewer('xlsx'), isFalse);
-    });
-
-    test('Changing a document category updates category attribute', () {
-      final mutableDoc = Map<String, dynamic>.from(sampleDocs[0]);
-      expect(mutableDoc['category'], 'normatives');
-
-      // Admin updates category to contracts
-      mutableDoc['category'] = 'contracts';
-      expect(mutableDoc['category'], 'contracts');
-    });
-
-    test('Blocks deletion of categories that have active documents assigned', () {
-      bool canDeleteCategory(String categoryId, List<Map<String, dynamic>> documents) {
-        final count = documents.where(
-          (d) => (d['category']?.toString().toLowerCase() ?? '') == categoryId.toLowerCase(),
-        ).length;
-        return count == 0;
-      }
-
-      // 'normatives' is in use by doc-1 -> MUST BE BLOCKED
-      expect(canDeleteCategory('normatives', sampleDocs), isFalse);
-
-      // 'financial' is in use by doc-2 -> MUST BE BLOCKED
-      expect(canDeleteCategory('financial', sampleDocs), isFalse);
-
-      // 'contracts' has 0 documents -> ALLOWED
-      expect(canDeleteCategory('contracts', sampleDocs), isTrue);
-
-      // 'unknown_cat' has 0 documents -> ALLOWED
-      expect(canDeleteCategory('unknown_cat', sampleDocs), isTrue);
-    });
-
-    test('Filters documents by visibility for non-admin vs admin users', () {
-      final visibilityDocs = [
-        {
-          'id': 'admin_user_manual_es',
-          'title': 'Manual de Usuario del Administrador',
-          'fileName': 'Manual_Usuario_Administrador_ES.pdf',
-          'fileType': 'pdf',
-          'folderId': 'folder-manuals',
-          'category': 'manuals',
-          'visibility': 'admin',
-        },
-        {
-          'id': 'technical_overview_es',
-          'title': 'Descripción Técnica General',
-          'fileName': 'Descripcion_Tecnica_General_ES.pdf',
-          'fileType': 'pdf',
-          'folderId': 'folder-manuals',
-          'category': 'manuals',
-          'visibility': 'all',
-        },
-        {
-          'id': 'legacy_doc',
-          'title': 'Legacy Document Without Visibility Field',
-          'fileName': 'legacy.pdf',
-          'fileType': 'pdf',
-          'folderId': 'folder-manuals',
-          'category': 'normatives',
-        },
-      ];
-
-      List<Map<String, dynamic>> filterForUser(List<Map<String, dynamic>> docs, {required bool isAdmin}) {
-        return docs.where((doc) {
-          final docVisibility = (doc['visibility'] ?? 'all').toString().toLowerCase();
-          if (!isAdmin && docVisibility == 'admin') return false;
-          return true;
-        }).toList();
-      }
-
-      // Non-admin resident only sees 'all' and legacy documents (not 'admin')
-      final residentVisible = filterForUser(visibilityDocs, isAdmin: false);
-      expect(residentVisible.length, 2);
-      expect(residentVisible.map((d) => d['id']), isNot(contains('admin_user_manual_es')));
-      expect(residentVisible.map((d) => d['id']), containsAll(['technical_overview_es', 'legacy_doc']));
-
-      // Admin sees all 3 documents including 'admin'-only manual
-      final adminVisible = filterForUser(visibilityDocs, isAdmin: true);
-      expect(adminVisible.length, 3);
-      expect(adminVisible.map((d) => d['id']), contains('admin_user_manual_es'));
-    });
-
-    test('Changing a document visibility updates visibility attribute between all and admin', () {
-      final mutableDoc = <String, dynamic>{
-        'id': 'doc-manual',
-        'title': 'Admin Guide',
+  group('TransparencyScreen & DocumentViewerScreen - Widget Flows', () {
+    testWidgets('resident view hides admin-only items, navigates folders, searches, and disposes cleanly', (tester) async {
+      FakeBackendHelper.auth.isAdminMock = true; // Even with stale claim, isAdminView: false forces resident mode!
+      FakeBackendHelper.db.seedDocument('document_categories', 'normatives', {'name': 'Normatives'});
+      FakeBackendHelper.db.seedDocument('document_folders', 'official_manuals', {
+        'name': 'Secret Admin Folder',
+        'parentId': 'root',
+        'visibility': 'admin',
+      });
+      FakeBackendHelper.db.seedDocument('document_folders', 'rules_folder', {
+        'name': 'Community Rules',
+        'parentId': 'root',
         'visibility': 'all',
-      };
-      expect(mutableDoc['visibility'], 'all');
+      });
+      FakeBackendHelper.db.seedDocument('documents', 'doc_secret', {
+        'title': 'Confidential Admin Manual',
+        'fileName': 'secret.pdf',
+        'fileType': 'pdf',
+        'folderId': 'root',
+        'category': 'normatives',
+        'visibility': 'admin',
+        'url': 'https://fake-storage.local/secret.pdf',
+      });
+      FakeBackendHelper.db.seedDocument('documents', 'doc_rules', {
+        'title': 'Pool Rules 2026',
+        'fileName': 'pool_rules.md',
+        'fileType': 'md',
+        'folderId': 'rules_folder',
+        'category': 'normatives',
+        'visibility': 'all',
+        'url': 'https://fake-storage.local/pool_rules.md',
+      });
 
-      mutableDoc['visibility'] = 'admin';
-      expect(mutableDoc['visibility'], 'admin');
+      await tester.pumpWidget(_wrapWithL10n(const TransparencyScreen(isAdminView: false)));
+      await tester.pumpAndSettle();
+
+      // Admin FABs and admin-only items must be hidden
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(find.text('Secret Admin Folder'), findsNothing);
+      expect(find.text('Confidential Admin Manual'), findsNothing);
+      expect(find.text('Community Rules'), findsOneWidget);
+
+      // Navigate into Community Rules folder
+      await tester.tap(find.text('Community Rules'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pool Rules 2026'), findsOneWidget);
+
+      // Return to root via breadcrumb, then search globally
+      await tester.tap(find.byIcon(Icons.home_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Pool Rules 2026'), findsNothing);
+
+      await tester.enterText(find.byType(TextField), 'pool');
+      await tester.pumpAndSettle();
+      expect(find.text('Pool Rules 2026'), findsOneWidget);
+
+      // Unmount widget and emit category update after dispose to prove subscription was cancelled
+      await tester.pumpWidget(const SizedBox.shrink());
+      FakeBackendHelper.db.seedDocument('document_categories', 'extra_cat', {'name': 'Extra'});
+      await tester.pump();
+    });
+
+    testWidgets('admin view renders FABs and creates a new virtual folder', (tester) async {
+      FakeBackendHelper.auth.emitUser(AppUser(uid: 'admin_1', email: 'admin@test.com'));
+      FakeBackendHelper.auth.isAdminMock = true;
+      FakeBackendHelper.db.seedDocument('users', 'admin_1', {'role': 'admin'});
+      FakeBackendHelper.db.seedDocument('document_categories', 'normatives', {'name': 'Normatives'});
+
+      await tester.pumpWidget(_wrapWithL10n(const TransparencyScreen(isAdminView: true)));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.create_new_folder), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.create_new_folder));
+      await tester.pumpAndSettle();
+
+      final dialogTextField = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(dialogTextField, '2026 Financial Reports');
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+
+      final folders = await FakeBackendHelper.db.getCollection('document_folders');
+      expect(folders.any((f) => f['name'] == '2026 Financial Reports'), isTrue);
+      expect(find.text('2026 Financial Reports'), findsOneWidget);
+    });
+
+    testWidgets('DocumentViewerScreen renders cached Markdown content and copies text', (tester) async {
+      const markdownText = '# Community Bylaws\n\nQuiet hours start at 10:00 PM.';
+      final key = DocumentCacheService.buildCacheKey('doc_md_1', 'bylaws.md');
+      await memoryCache.saveCachedBytes(key, Uint8List.fromList(utf8.encode(markdownText)));
+
+      await tester.pumpWidget(
+        _wrapWithL10n(
+          DocumentViewerScreen(
+            docId: 'doc_md_1',
+            title: 'Community Bylaws',
+            fileName: 'bylaws.md',
+            fileType: 'md',
+            url: 'https://fake-storage.local/bylaws.md',
+            category: 'normatives',
+            publicationDate: DateTime(2026, 4, 1),
+            fileSize: 2048,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('NORMATIVES'), findsOneWidget);
+      expect(find.text('2.0 KB'), findsOneWidget);
+      expect(find.textContaining('Quiet hours start at 10:00 PM.'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.text_increase));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.copy));
+      await tester.pumpAndSettle();
+      expect(copiedClipboardText, equals(markdownText));
     });
   });
 }

@@ -1121,7 +1121,7 @@ abstract class AppLocalizations {
   /// No description provided for @adminSettingsMenu.
   ///
   /// In en, this message translates to:
-  /// **'Maintenance Settings'**
+  /// **'General Settings'**
   String get adminSettingsMenu;
 
   /// No description provided for @resignAdminRole.
@@ -4021,6 +4021,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Document visibility updated successfully'**
   String get documentVisibilityChanged;
+
+  /// No description provided for @accessControlSettingsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Access Control & QR'**
+  String get accessControlSettingsSection;
+
+  /// No description provided for @scanOnExitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan on exit'**
+  String get scanOnExitTitle;
+
+  /// No description provided for @scanOnExitSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Require security guards to scan visitor and supplier QR passes again when leaving to record exit timestamps.'**
+  String get scanOnExitSubtitle;
+
+  /// No description provided for @exitScanHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor Exit Ready'**
+  String get exitScanHeader;
+
+  /// No description provided for @registerExitButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Register Exit'**
+  String get registerExitButton;
+
+  /// No description provided for @exitRegisteredSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor exit registered successfully.'**
+  String get exitRegisteredSuccess;
+
+  /// No description provided for @exitNotesOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit notes (optional)'**
+  String get exitNotesOptional;
+
+  /// No description provided for @entryTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry Time'**
+  String get entryTimeLabel;
+
+  /// No description provided for @exitTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Time'**
+  String get exitTimeLabel;
+
+  /// No description provided for @entryPhotosLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Entry Verification Photos'**
+  String get entryPhotosLabel;
+
+  /// No description provided for @qrStatusInside.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside'**
+  String get qrStatusInside;
+
+  /// No description provided for @currentlyInsideKpi.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently Inside'**
+  String get currentlyInsideKpi;
+
+  /// No description provided for @currentlyInsideFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently Inside'**
+  String get currentlyInsideFilter;
+
+  /// No description provided for @visitorInsideBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside'**
+  String get visitorInsideBadge;
+
+  /// No description provided for @exitPendingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Inside (No exit recorded)'**
+  String get exitPendingLabel;
+
+  /// No description provided for @exitGuardLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Guard'**
+  String get exitGuardLabel;
+
+  /// No description provided for @exitNotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Notes'**
+  String get exitNotesLabel;
+
+  /// No description provided for @rotateImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate Image'**
+  String get rotateImage;
+
+  /// No description provided for @dateOfPaymentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of payment'**
+  String get dateOfPaymentLabel;
+
+  /// No description provided for @periodPaidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Period paid'**
+  String get periodPaidLabel;
+
+  /// No description provided for @adminOverviewMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Overview'**
+  String get adminOverviewMenu;
+
+  /// No description provided for @adminOverviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approvals and live community status'**
+  String get adminOverviewSubtitle;
+
+  /// No description provided for @adminPendingReviewsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending Approvals'**
+  String get adminPendingReviewsSection;
+
+  /// No description provided for @adminCommunityStatsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Live Community Status'**
+  String get adminCommunityStatsSection;
+
+  /// No description provided for @adminQuickAccessSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortcuts'**
+  String get adminQuickAccessSection;
+
+  /// No description provided for @adminShortcutUserDirectory.
+  ///
+  /// In en, this message translates to:
+  /// **'User Directory'**
+  String get adminShortcutUserDirectory;
+
+  /// No description provided for @adminShortcutSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get adminShortcutSettings;
+
+  /// No description provided for @adminActiveSanctionsStat.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Sanctions'**
+  String get adminActiveSanctionsStat;
+
+  /// No description provided for @adminVisitorsCurrentlyInsideStat.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitors currently inside'**
+  String get adminVisitorsCurrentlyInsideStat;
+
+  /// No description provided for @adminPendingItemsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Up to date} =1{1 pending} other{{count} pending}}'**
+  String adminPendingItemsCount(int count);
+
+  /// No description provided for @adminGroupUserManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'User Management'**
+  String get adminGroupUserManagement;
+
+  /// No description provided for @adminGroupResidentialManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Residential Management'**
+  String get adminGroupResidentialManagement;
+
+  /// No description provided for @adminGroupFinance.
+  ///
+  /// In en, this message translates to:
+  /// **'Finance'**
+  String get adminGroupFinance;
+
+  /// No description provided for @adminGroupTransparencyCommunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Transparency & Community'**
+  String get adminGroupTransparencyCommunity;
+
+  /// No description provided for @adminGroupGeneralSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'General Settings'**
+  String get adminGroupGeneralSettings;
+
+  /// No description provided for @settingsAutoSaveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Switches and general settings are saved automatically'**
+  String get settingsAutoSaveHint;
+
+  /// No description provided for @settingsAutoSavingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving...'**
+  String get settingsAutoSavingLabel;
+
+  /// No description provided for @settingsAutoSavedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get settingsAutoSavedLabel;
+
+  /// No description provided for @saveSmtpConfigButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save SMTP Server'**
+  String get saveSmtpConfigButton;
+
+  /// No description provided for @saveEmailTemplateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Email Template'**
+  String get saveEmailTemplateButton;
+
+  /// No description provided for @noCustomRejectionReasonsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No custom reason templates configured. Default templates are always active.'**
+  String get noCustomRejectionReasonsHint;
+
+  /// No description provided for @userActionsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account & Property Actions'**
+  String get userActionsSectionTitle;
+
+  /// No description provided for @userDangerZoneSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensitive Actions'**
+  String get userDangerZoneSectionTitle;
+
+  /// No description provided for @paymentStandingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Standing'**
+  String get paymentStandingLabel;
 }
 
 class _AppLocalizationsDelegate

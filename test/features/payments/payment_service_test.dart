@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/features/payments/payment_service.dart';
 import '../../helpers/fake_backend.dart';
@@ -522,6 +524,122 @@ void main() {
       final status = await paymentService.recalculatePaymentStatusForAddress('addr_concept_test');
       // Should still be restricted because p1 maintenance quota was never paid!
       expect(status, equals('restricted'));
+    });
+  });
+
+  group('PaymentService - Deterministic Clock Boundaries & uploadPaymentReceipt', () {
+    test('enforces exact cutoffDay + gracePeriodDays day boundary via injectable now parameter', () async {
+      FakeBackendHelper.db.seedDocument('config', 'app_settings', {
+        'paymentCutoffDay': 5,
+        'gracePeriodDays': 6, // Threshold day = 11
+      });
+
+      FakeBackendHelper.db.seedDocument('addresses', 'addr_boundary', {
+        'id': 'addr_boundary',
+        'streetName': 'Turin',
+        'number': 11,
+        'deliveryDate': DateTime(2026, 9, 1),
+        'paymentStatus': 'paid',
+      });
+
+      final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_boundary');
+      FakeBackendHelper.db.seedDocument('payments', 'pay_sep', {
+        'addressRef': addrRef,
+        'periods': ['2026-09'],
+        'status': 'approved',
+      });
+
+      // On October 11 (exact threshold day = 5 + 6): unpaid October is still pending inside grace period
+      final statusDay11 = await paymentService.recalculatePaymentStatusForAddress(
+        addrRef,
+        now: DateTime(2026, 10, 11, 23, 59),
+      );
+      expect(statusDay11, equals('pending'));
+      final docDay11 = await FakeBackendHelper.db.getDocument('addresses', 'addr_boundary');
+      expect(docDay11?['isWithinGracePeriod'], isTrue);
+
+      // On October 12 (one day past threshold): unpaid October immediately transitions to restricted
+      final statusDay12 = await paymentService.recalculatePaymentStatusForAddress(
+        addrRef,
+        now: DateTime(2026, 10, 12, 0, 1),
+      );
+      expect(statusDay12, equals('restricted'));
+      final docDay12 = await FakeBackendHelper.db.getDocument('addresses', 'addr_boundary');
+      expect(docDay12?['isWithinGracePeriod'], isFalse);
+    });
+
+    test('uploadPaymentReceipt uploads receipt, deletes temp XFile, creates payment doc, and transitions sanction to pending_review', () async {
+      final tempDir = await Directory.systemTemp.createTemp('pay_svc_upload_');
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_up');
+      FakeBackendHelper.db.seedDocument('addresses', 'addr_up', {
+        'id': 'addr_up',
+        'streetName': 'Napoli',
+        'number': 30,
+        'deliveryDate': null,
+        'paymentStatus': 'restricted',
+      });
+      FakeBackendHelper.db.seedDocument('users', 'res_up', {
+        'uid': 'res_up',
+        'name': 'Uploader',
+        'addressRef': addrRef,
+      });
+      FakeBackendHelper.db.seedDocument('sanctions', 'sanc_up_1', {
+        'id': 'sanc_up_1',
+        'addressRef': addrRef,
+        'status': 'active',
+        'amount': 450.0,
+      });
+
+      final tempFile = File('${tempDir.path}/image_picker_receipt.jpg');
+      await tempFile.writeAsBytes([0xFF, 0xD8, 0xFF, 0xD9]);
+
+      await paymentService.uploadPaymentReceipt(
+        'res_up',
+        const [],
+        450.0,
+        folio: 'SAN-999',
+        concept: 'sanction',
+        sanctionId: 'sanc_up_1',
+        paymentDate: DateTime(2026, 10, 25),
+        pickedFile: XFile(tempFile.path),
+      );
+
+      expect(await tempFile.exists(), isFalse);
+      expect(
+        FakeBackendHelper.storage.uploadedFiles.keys.any(
+          (k) => k.startsWith('payments/res_up/'),
+        ),
+        isTrue,
+      );
+
+      final payments = await FakeBackendHelper.db.getCollection('payments');
+      expect(payments, hasLength(1));
+      expect(payments.first['concept'], equals('sanction'));
+      expect(payments.first['periods'], equals(['Sanction']));
+      expect(payments.first['folio'], equals('SAN-999'));
+      expect(payments.first['status'], equals('pending'));
+
+      final updatedSanction = await FakeBackendHelper.db.getDocument('sanctions', 'sanc_up_1');
+      expect(updatedSanction?['status'], equals('pending_review'));
+      expect(updatedSanction?['paymentId'], equals(payments.first['id']));
+    });
+
+    test('uploadPaymentReceipt rejects invalid inputs and records telemetry to Crashlytics', () async {
+      await expectLater(
+        () => paymentService.uploadPaymentReceipt('res_x', const [], 500.0),
+        throwsException,
+      );
+      await expectLater(
+        () => paymentService.uploadPaymentReceipt('res_x', const ['2026-10'], 0.0),
+        throwsException,
+      );
+      expect(FakeBackendHelper.crashlytics.recordedErrors.length, equals(2));
     });
   });
 }

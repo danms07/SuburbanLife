@@ -535,7 +535,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get manageFacilitiesMenu => 'Manage Amenities';
 
   @override
-  String get adminSettingsMenu => 'Maintenance Settings';
+  String get adminSettingsMenu => 'General Settings';
 
   @override
   String get resignAdminRole => 'Resign Admin Role';
@@ -2182,4 +2182,149 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get documentVisibilityChanged =>
       'Document visibility updated successfully';
+
+  @override
+  String get accessControlSettingsSection => 'Access Control & QR';
+
+  @override
+  String get scanOnExitTitle => 'Scan on exit';
+
+  @override
+  String get scanOnExitSubtitle =>
+      'Require security guards to scan visitor and supplier QR passes again when leaving to record exit timestamps.';
+
+  @override
+  String get exitScanHeader => 'Visitor Exit Ready';
+
+  @override
+  String get registerExitButton => 'Register Exit';
+
+  @override
+  String get exitRegisteredSuccess => 'Visitor exit registered successfully.';
+
+  @override
+  String get exitNotesOptional => 'Exit notes (optional)';
+
+  @override
+  String get entryTimeLabel => 'Entry Time';
+
+  @override
+  String get exitTimeLabel => 'Exit Time';
+
+  @override
+  String get entryPhotosLabel => 'Entry Verification Photos';
+
+  @override
+  String get qrStatusInside => 'Inside';
+
+  @override
+  String get currentlyInsideKpi => 'Currently Inside';
+
+  @override
+  String get currentlyInsideFilter => 'Currently Inside';
+
+  @override
+  String get visitorInsideBadge => 'Inside';
+
+  @override
+  String get exitPendingLabel => 'Inside (No exit recorded)';
+
+  @override
+  String get exitGuardLabel => 'Exit Guard';
+
+  @override
+  String get exitNotesLabel => 'Exit Notes';
+
+  @override
+  String get rotateImage => 'Rotate Image';
+
+  @override
+  String get dateOfPaymentLabel => 'Date of payment';
+
+  @override
+  String get periodPaidLabel => 'Period paid';
+
+  @override
+  String get adminOverviewMenu => 'Overview';
+
+  @override
+  String get adminOverviewSubtitle =>
+      'Pending approvals and live community status';
+
+  @override
+  String get adminPendingReviewsSection => 'Pending Approvals';
+
+  @override
+  String get adminCommunityStatsSection => 'Live Community Status';
+
+  @override
+  String get adminQuickAccessSection => 'Shortcuts';
+
+  @override
+  String get adminShortcutUserDirectory => 'User Directory';
+
+  @override
+  String get adminShortcutSettings => 'Settings';
+
+  @override
+  String get adminActiveSanctionsStat => 'Active Sanctions';
+
+  @override
+  String get adminVisitorsCurrentlyInsideStat => 'Visitors currently inside';
+
+  @override
+  String adminPendingItemsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count pending',
+      one: '1 pending',
+      zero: 'Up to date',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get adminGroupUserManagement => 'User Management';
+
+  @override
+  String get adminGroupResidentialManagement => 'Residential Management';
+
+  @override
+  String get adminGroupFinance => 'Finance';
+
+  @override
+  String get adminGroupTransparencyCommunity => 'Transparency & Community';
+
+  @override
+  String get adminGroupGeneralSettings => 'General Settings';
+
+  @override
+  String get settingsAutoSaveHint =>
+      'Switches and general settings are saved automatically';
+
+  @override
+  String get settingsAutoSavingLabel => 'Saving...';
+
+  @override
+  String get settingsAutoSavedLabel => 'Saved';
+
+  @override
+  String get saveSmtpConfigButton => 'Save SMTP Server';
+
+  @override
+  String get saveEmailTemplateButton => 'Save Email Template';
+
+  @override
+  String get noCustomRejectionReasonsHint =>
+      'No custom reason templates configured. Default templates are always active.';
+
+  @override
+  String get userActionsSectionTitle => 'Account & Property Actions';
+
+  @override
+  String get userDangerZoneSectionTitle => 'Sensitive Actions';
+
+  @override
+  String get paymentStandingLabel => 'Payment Standing';
 }
