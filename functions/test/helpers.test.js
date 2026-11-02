@@ -587,3 +587,27 @@ test('firebase-admin v14 modular services (firestore, auth, messaging, storage, 
   const storage = admin.storage();
   assert.equal(typeof storage.bucket, 'function');
 });
+
+test('package-lock.json files only reference public registry.npmjs.org tarball URLs for Cloud Build compatibility', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  const lockfilePaths = [
+    path.resolve(__dirname, '../package-lock.json'),
+    path.resolve(__dirname, '../../scripts/package-lock.json'),
+  ];
+
+  for (const lockPath of lockfilePaths) {
+    const lockJson = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    const packages = lockJson.packages || {};
+    for (const [pkgKey, meta] of Object.entries(packages)) {
+      if (meta && typeof meta.resolved === 'string') {
+        assert.ok(
+          meta.resolved.startsWith('https://registry.npmjs.org/'),
+          `Non-public registry URL found in ${path.relative(process.cwd(), lockPath)} for "${pkgKey}": ${meta.resolved}`
+        );
+      }
+    }
+  }
+});
+
