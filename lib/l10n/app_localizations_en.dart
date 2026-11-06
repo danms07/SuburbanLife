@@ -2327,4 +2327,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paymentStandingLabel => 'Payment Standing';
+
+  @override
+  String get unsupportedDocumentType =>
+      'Unsupported file type. Allowed formats: PDF, Word, Excel, PowerPoint, TXT, Markdown, CSV, and images.';
+
+  @override
+  String get documentExceedsMaxSize =>
+      'File exceeds the 10 MB maximum size limit.';
 }

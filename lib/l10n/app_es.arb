@@ -891,7 +891,9 @@
   "noCustomRejectionReasonsHint": "No hay motivos personalizados configurados. Las plantillas predeterminadas siempre están activas.",
   "userActionsSectionTitle": "Acciones de Cuenta y Propiedad",
   "userDangerZoneSectionTitle": "Acciones Sensibles",
-  "paymentStandingLabel": "Estatus de Pago"
+  "paymentStandingLabel": "Estatus de Pago",
+  "unsupportedDocumentType": "Tipo de archivo no admitido. Formatos permitidos: PDF, Word, Excel, PowerPoint, TXT, Markdown, CSV e imágenes.",
+  "documentExceedsMaxSize": "El archivo supera el límite máximo de 10 MB."
 }
 
 

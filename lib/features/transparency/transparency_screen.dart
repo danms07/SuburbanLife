@@ -25,6 +25,61 @@ class TransparencyScreen extends StatefulWidget {
     this.isEmbedded = false,
   });
 
+  /// Maximum allowed upload size (10 MB), aligned with Cloud Storage & Functions limits.
+  static const int maxUploadSizeBytes = 10 * 1024 * 1024;
+
+  /// Explicit allow-list of Transparency document and image file extensions.
+  static const List<String> allowedUploadExtensions = [
+    'pdf',
+    'md',
+    'txt',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'csv',
+    'png',
+    'jpg',
+    'jpeg',
+    'webp',
+    'gif',
+  ];
+
+  /// Explicit `<input type="file" accept="...">` value for Web uploads.
+  /// Avoids `*/*`, `audio/*`, and `video/*` so mobile Chromium/Edge browsers on
+  /// Android 13+ launch the system `ACTION_GET_CONTENT` document picker without
+  /// demanding `RECORD_AUDIO` or full media-storage permissions.
+  static const String webUploadAcceptAttribute =
+      '.pdf,.md,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.png,.jpg,.jpeg,.webp,.gif,'
+      'application/pdf,text/markdown,text/plain,text/csv,'
+      'application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,'
+      'application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,'
+      'application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+  /// Strips directory traversal segments and unsafe characters from uploaded filenames.
+  static String sanitizeUploadFileName(String rawFileName) {
+    final normalized = rawFileName.trim().replaceAll('\\', '/');
+    final baseName = normalized.split('/').last.trim();
+    final sanitized = baseName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    if (sanitized.isEmpty || sanitized == '.' || sanitized == '..') {
+      return '';
+    }
+    return sanitized;
+  }
+
+  /// Validates that [fileName] has an extension in [allowedUploadExtensions].
+  static bool isAllowedUploadExtension(String fileName) {
+    final sanitized = sanitizeUploadFileName(fileName);
+    final dotIndex = sanitized.lastIndexOf('.');
+    if (dotIndex <= 0 || dotIndex == sanitized.length - 1) {
+      return false;
+    }
+    final ext = sanitized.substring(dotIndex + 1).toLowerCase();
+    return allowedUploadExtensions.contains(ext);
+  }
+
   static bool resolveEffectiveAdmin({
     required bool? isAdminView,
     required bool hasAdminClaim,
@@ -627,7 +682,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     try {
       if (kIsWeb) {
         debugPrint('>>> [_uploadDocument] Web platform: launching html.FileUploadInputElement...');
-        final uploadInput = html.FileUploadInputElement()..accept = '*/*';
+        final uploadInput = html.FileUploadInputElement()
+          ..accept = TransparencyScreen.webUploadAcceptAttribute;
         uploadInput.click();
 
         await uploadInput.onChange.first;
@@ -637,8 +693,28 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         }
 
         final file = uploadInput.files!.first;
-        selectedFileName = file.name;
+        selectedFileName = TransparencyScreen.sanitizeUploadFileName(file.name);
         fileSize = file.size;
+
+        if (!TransparencyScreen.isAllowedUploadExtension(selectedFileName)) {
+          debugPrint('>>> [_uploadDocument] Rejected unsupported file extension: "$selectedFileName"');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.unsupportedDocumentType)),
+            );
+          }
+          return;
+        }
+
+        if (fileSize > TransparencyScreen.maxUploadSizeBytes) {
+          debugPrint('>>> [_uploadDocument] Rejected oversized Web file: $fileSize bytes');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.documentExceedsMaxSize)),
+            );
+          }
+          return;
+        }
 
         final reader = html.FileReader();
         reader.readAsArrayBuffer(file);
@@ -658,7 +734,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       } else {
         debugPrint('>>> [_uploadDocument] Native platform: launching FilePicker...');
         final result = await FilePicker.pickFiles(
-          type: FileType.any,
+          type: FileType.custom,
+          allowedExtensions: TransparencyScreen.allowedUploadExtensions,
           withData: true,
         );
         debugPrint('>>> [_uploadDocument] FilePicker result: $result (files: ${result?.files.length})');
@@ -669,8 +746,29 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         }
 
         final file = result.files.first;
-        selectedFileName = file.name;
+        selectedFileName = TransparencyScreen.sanitizeUploadFileName(file.name);
         fileSize = file.size;
+
+        if (!TransparencyScreen.isAllowedUploadExtension(selectedFileName)) {
+          debugPrint('>>> [_uploadDocument] Rejected unsupported file extension: "$selectedFileName"');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.unsupportedDocumentType)),
+            );
+          }
+          return;
+        }
+
+        if (fileSize > TransparencyScreen.maxUploadSizeBytes) {
+          debugPrint('>>> [_uploadDocument] Rejected oversized Native file: $fileSize bytes');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.documentExceedsMaxSize)),
+            );
+          }
+          return;
+        }
+
         rawBytes = file.bytes;
 
         if ((rawBytes == null || rawBytes.isEmpty) && file.path != null) {
@@ -699,6 +797,17 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       return;
     }
 
+    if (rawBytes.length > TransparencyScreen.maxUploadSizeBytes) {
+      debugPrint('>>> [_uploadDocument] ERROR: Raw bytes exceed maxUploadSizeBytes (${rawBytes.length}).');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.documentExceedsMaxSize)),
+        );
+      }
+      return;
+    }
+
+    // TODO(security): Integrate server-side malware scanning and CDR active-content stripping for uploaded binary documents.
     final titleController = TextEditingController(text: selectedFileName);
     final availableCategories = _categories.where((c) => c['id'] != 'all').toList();
     if (availableCategories.isEmpty) {

@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-01 (Adaptive AdminShellScreen NavDrawer workspace, collapsible auto-saving AdminSettingsScreen, dedicated AdminUserDetailScreen, mobile wrapping filter chips & search summary bars, and version bump to 1.0.22+23)*
+*Last Verified/Updated: 2026-11-05 (Transparency upload explicit document/image MIME & extension allow-list fixing mobile Edge/Chromium Android permission errors, filename sanitization, 10 MB upload cap validation, and version bump to 1.0.23+24)*
 
 Current state of project files and folders:
 
@@ -12,7 +12,6 @@ Current state of project files and folders:
     - `icon/`: Launcher and branding icon assets.
         - `app_launcher_icon.png`: Dedicated icon asset for mobile app launchers (Android, iOS, Web).
         - `app_logo.png`: Dedicated branding logo asset used across in-app UI surfaces (navigation drawer header, QR share cards).
-        - `app_logo_1.png`: Alternate branding logo asset backup.
         - `app_icon.png`: Legacy master high-resolution icon asset.
 - `docs/`: Technical plans, pipeline configuration, and documentation archives.
     - `docs_pipeline.json`: Declarative manifest specifying which Markdown documents must be parsed (`"parse": true/false`), their target folder/category in the Transparency module, output PDF filename, and role visibility (`"visibility": "admin" | "all"`).
@@ -98,7 +97,7 @@ Current state of project files and folders:
             - `qr_service.dart`: Service for streaming user QR codes, resolving expired/validated statuses, checking active inside visitor status (`isVisitorInside`), and revoking active passes.
             - `qr_scanner_screen.dart`: Security guard QR capture with camera selector (back/front switch), `MobileScanner` unmounting when inactive to release camera/GPU memory, automatic entry vs. fast exit scan detection (`isExit`), interactive entry photo viewers & single-tap `Register Exit` flow on departure, vertical step-by-step bounded ID/plate evidence verification layout (`1600px` max dimension) with immediate local temp photo deletion after Cloud Storage upload (and on retake, `Scan Again`, or screen disposal, plus startup stale picker sweep), server-side atomic validation/access logging via `validateAndRegisterQrAccess`, and automatic navigation back to the guard main screen (`Navigator.pop`) upon completing access or exit registration.
         - `transparency/`: Transparency documents module emulating a file explorer with virtual directory tree, local caching, native rendering, role-based visibility controls (`all` vs `admin`), document category re-assignment, and category management with in-use deletion protection.
-            - `transparency_screen.dart`: Main File Explorer screen with folder hierarchy navigation, breadcrumbs, search, category filter, role-aware and view-aware (`isAdminView`) visibility filtering (`visibility: 'all' | 'admin'`, cross-checking Firestore `users/{uid}.role` and strictly hiding `official_manuals` and admin-only folders/documents from non-admin views), document open delegation, category management, and admin folder/file/visibility management.
+            - `transparency_screen.dart`: Main File Explorer screen with folder hierarchy navigation, breadcrumbs, search, category filter, role-aware and view-aware (`isAdminView`) visibility filtering (`visibility: 'all' | 'admin'`, cross-checking Firestore `users/{uid}.role` and strictly hiding `official_manuals` and admin-only folders/documents from non-admin views), document open delegation, category management, and admin folder/file/visibility management (with explicit document/image MIME & extension allow-list avoiding `*/*` mobile browser permission errors, filename sanitization, and 10 MB size cap).
             - `document_viewer_screen.dart`: Native in-app viewer for Markdown (`.md`) and plain text (`.txt`) documents with font resizing and sharing.
             - `widgets/`:
                 - `file_explorer_breadcrumb.dart`: Interactive breadcrumb navigation widget.
@@ -150,7 +149,7 @@ Current state of project files and folders:
             - `qr_service_test.dart`: QR stream sorting, status normalization, expiration resolution, `isVisitorInside` detection, and code invalidation tests.
             - `qr_exit_scanner_and_settings_test.dart`: Widget tests for `AdminSettingsScreen` 5 expandable/collapsible cards, real-time auto-save (`Scan on exit`, timezone dropdown, SMTP switch) vs. isolated manual Save buttons (`save_smtp_config_button` and `save_email_template_button`), Spanish localization, `ManageQrScreen` live `INSIDE` badge rendering, and `QrScannerScreen` fast exit verification flow without photo capture and return navigation to the guard main screen.
         - `sanctions/sanctions_screens_test.dart`: Widget tests for `SanctionsScreen` (resident sanction display and direct `Pay Sanction` navigation to `PaymentScreen`) and `AdminSanctionsScreen` (issuing new sanctions with infraction photo upload and waiving active sanctions).
-        - `transparency/transparency_explorer_test.dart`: Production `TransparencyScreen` and `DocumentViewerScreen` widget tests covering role-based `visibility == 'admin'` document/folder filtering, virtual folder navigation, category management, stream subscription disposal, and Markdown viewer font scaling.
+        - `transparency/transparency_explorer_test.dart`: Production `TransparencyScreen` and `DocumentViewerScreen` widget and unit tests covering role-based `visibility == 'admin'` document/folder filtering, upload `accept` allow-list & filename traversal sanitization, virtual folder navigation, category management, stream subscription disposal, and Markdown viewer font scaling.
     - `integration/`:
         - `rollout_workflow_test.dart`: Headless end-to-end workflow test suite exercising real `PaymentService`, `BookingService`, and UI screens across roommate linking (Suite A), announcements (Suite B), multi-period advance payments (Suite C), past due debt recovery with feature gating (Suite D), partial settlement restriction persistence & grace period pending unrestricted access (Suite E), facility booking full lifecycle (Suite F), admin resident creation with delivery date validation (Suite G), and sanctions enforcement, payment redirection, and facility operating hours window (Suite H).
     - `helpers/fake_backend.dart`: High-fidelity in-memory BaaS fake service locator supporting compound `QueryFilter` operators, `QuerySort`, `limit`/`startAfter` cursor pagination, `DbFieldValue` mutations, and custom Storage/Functions test handlers.

@@ -2360,4 +2360,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get paymentStandingLabel => 'Estatus de Pago';
+
+  @override
+  String get unsupportedDocumentType =>
+      'Tipo de archivo no admitido. Formatos permitidos: PDF, Word, Excel, PowerPoint, TXT, Markdown, CSV e imágenes.';
+
+  @override
+  String get documentExceedsMaxSize =>
+      'El archivo supera el límite máximo de 10 MB.';
 }

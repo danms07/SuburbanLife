@@ -188,6 +188,43 @@ void main() {
         isTrue,
       );
     });
+
+    test('webUploadAcceptAttribute avoids wildcard */*, audio/*, and video/* to prevent mobile browser permission errors', () {
+      const accept = TransparencyScreen.webUploadAcceptAttribute;
+      expect(accept.contains('*/*'), isFalse);
+      expect(accept.contains('audio/'), isFalse);
+      expect(accept.contains('video/'), isFalse);
+      expect(accept.contains('.pdf'), isTrue);
+      expect(accept.contains('application/pdf'), isTrue);
+      expect(accept.contains('.docx'), isTrue);
+      expect(accept.contains('.xlsx'), isTrue);
+      expect(accept.contains('.md'), isTrue);
+      expect(accept.contains('.png'), isTrue);
+      expect(TransparencyScreen.maxUploadSizeBytes, equals(10 * 1024 * 1024));
+    });
+
+    test('sanitizeUploadFileName strips path traversal and isAllowedUploadExtension enforces allow-list', () {
+      expect(
+        TransparencyScreen.sanitizeUploadFileName('../../etc/Presupuesto 2026.PDF'),
+        equals('Presupuesto_2026.PDF'),
+      );
+      expect(
+        TransparencyScreen.sanitizeUploadFileName(r'C:\Users\Admin\Documents\acta_final.docx'),
+        equals('acta_final.docx'),
+      );
+      expect(TransparencyScreen.sanitizeUploadFileName('..'), isEmpty);
+      expect(TransparencyScreen.sanitizeUploadFileName('   '), isEmpty);
+
+      expect(TransparencyScreen.isAllowedUploadExtension('Presupuesto_2026.PDF'), isTrue);
+      expect(TransparencyScreen.isAllowedUploadExtension('reglamento.md'), isTrue);
+      expect(TransparencyScreen.isAllowedUploadExtension('reporte.xlsx'), isTrue);
+      expect(TransparencyScreen.isAllowedUploadExtension('evidencia.webp'), isTrue);
+
+      expect(TransparencyScreen.isAllowedUploadExtension('recording.mp3'), isFalse);
+      expect(TransparencyScreen.isAllowedUploadExtension('script.html'), isFalse);
+      expect(TransparencyScreen.isAllowedUploadExtension('installer.apk'), isFalse);
+      expect(TransparencyScreen.isAllowedUploadExtension('README'), isFalse);
+    });
   });
 
   group('TransparencyScreen & DocumentViewerScreen - Widget Flows', () {

@@ -4285,6 +4285,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Payment Standing'**
   String get paymentStandingLabel;
+
+  /// No description provided for @unsupportedDocumentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported file type. Allowed formats: PDF, Word, Excel, PowerPoint, TXT, Markdown, CSV, and images.'**
+  String get unsupportedDocumentType;
+
+  /// No description provided for @documentExceedsMaxSize.
+  ///
+  /// In en, this message translates to:
+  /// **'File exceeds the 10 MB maximum size limit.'**
+  String get documentExceedsMaxSize;
 }
 
 class _AppLocalizationsDelegate

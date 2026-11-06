@@ -1024,7 +1024,9 @@
   "noCustomRejectionReasonsHint": "No custom reason templates configured. Default templates are always active.",
   "userActionsSectionTitle": "Account & Property Actions",
   "userDangerZoneSectionTitle": "Sensitive Actions",
-  "paymentStandingLabel": "Payment Standing"
+  "paymentStandingLabel": "Payment Standing",
+  "unsupportedDocumentType": "Unsupported file type. Allowed formats: PDF, Word, Excel, PowerPoint, TXT, Markdown, CSV, and images.",
+  "documentExceedsMaxSize": "File exceeds the 10 MB maximum size limit."
 }
 
 
