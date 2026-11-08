@@ -1,0 +1,18 @@
+{
+  "lifecycle": {
+    "rule": [
+      {
+        "action": {
+          "type": "Delete"
+        },
+        "condition": {
+          "age": 62,
+          "matchesPrefix": [
+            "visitor_ids/",
+            "visitor_plates/"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -2464,4 +2464,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String bookingQuotaExceededError(String period, int limit) {
     return 'Cuota alcanzada: Su domicilio ya utilizó las $limit reservas ($period) permitidas para esta amenidad.';
   }
+
+  @override
+  String get accessLogsRetentionBanner =>
+      'Política de eliminación automática: Los registros de acceso y las fotografías de verificación se eliminan permanentemente después de 2 meses (60 días).';
+
+  @override
+  String get qrPassRetentionBanner =>
+      'Los pases QR inactivos (vencidos, usados o revocados) se eliminan automáticamente después de 7 días. Los pases permanentes activos no vencen.';
 }

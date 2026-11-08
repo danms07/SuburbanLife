@@ -498,6 +498,10 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
                     ),
                   ),
                 ],
+                // 0. Data Retention Policy Banner
+                _buildRetentionBanner(context, l10n),
+                const SizedBox(height: 12),
+
                 // 1. Filter Section Card
                 _buildFilterCard(context, l10n, isDesktop, hasActiveFilter),
                 const SizedBox(height: 16),
@@ -546,6 +550,42 @@ class _AdminAccessLogsScreenState extends State<AdminAccessLogsScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRetentionBanner(BuildContext context, AppLocalizations l10n) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('access_logs_retention_banner'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.auto_delete_outlined,
+            size: 20,
+            color: colorScheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              l10n.accessLogsRetentionBanner,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: colorScheme.onSurface.withValues(alpha: 0.85),
+                fontFamily: AppConfig.fontFamily,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

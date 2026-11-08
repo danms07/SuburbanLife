@@ -122,11 +122,25 @@ function createMockAdminEnvironment(initialCollections = {}) {
       case 'array-contains':
         return Array.isArray(fieldVal) && fieldVal.includes(targetVal);
       case '>=':
-        return fieldVal >= targetVal;
       case '<=':
-        return fieldVal <= targetVal;
-      case '<':
-        return fieldVal < targetVal;
+      case '<': {
+        if (fieldVal === undefined || fieldVal === null) return false;
+        const normalizeComparable = (val) => {
+          if (val && typeof val === 'object') {
+            if (typeof val.toMillis === 'function') return val.toMillis();
+            if (val instanceof Date) return val.getTime();
+            if (typeof val._seconds === 'number') {
+              return val._seconds * 1000 + Math.floor((val._nanoseconds || 0) / 1e6);
+            }
+          }
+          return val;
+        };
+        const left = normalizeComparable(fieldVal);
+        const right = normalizeComparable(targetVal);
+        if (filter.op === '>=') return left >= right;
+        if (filter.op === '<=') return left <= right;
+        return left < right;
+      }
       default:
         return true;
     }
@@ -256,6 +270,7 @@ function createMockAdminEnvironment(initialCollections = {}) {
     },
   };
 
+  const deletedStoragePaths = [];
   const storageMock = {
     bucket() {
       return {
@@ -264,6 +279,18 @@ function createMockAdminEnvironment(initialCollections = {}) {
           return {
             async save(buffer, options) {
               savedStorageFiles.set(storagePath, { buffer, options });
+            },
+            async delete(options = {}) {
+              deletedStoragePaths.push({ storagePath, options });
+              if (!savedStorageFiles.has(storagePath)) {
+                if (options && options.ignoreNotFound) {
+                  return;
+                }
+                const err = new Error(`Not Found: ${storagePath}`);
+                err.code = 404;
+                throw err;
+              }
+              savedStorageFiles.delete(storagePath);
             },
           };
         },
@@ -280,6 +307,7 @@ function createMockAdminEnvironment(initialCollections = {}) {
     createdAuthUsers,
     deletedAuthUids,
     savedStorageFiles,
+    deletedStoragePaths,
     makeDocRef,
   };
 }
@@ -938,3 +966,280 @@ test('createBooking enforces household calendar-period quota (daily/monthly/year
   });
   assert.equal(b3.success, true);
 });
+
+test('validateAndRegisterQrAccess stamps 60d access_logs expireAt, holds qr_codes expireAt null while inside, and stamps 7d QR TTL upon exit or denial', async (t) => {
+  const env = createMockAdminEnvironment({
+    config: {
+      app_settings: {
+        scanOnExitEnabled: true,
+        timeZone: 'America/Mexico_City',
+      },
+    },
+    users: {
+      res_ttl_1: {
+        uid: 'res_ttl_1',
+        name: 'Resident TTL',
+        role: 'resident',
+      },
+      guard_ttl_1: {
+        uid: 'guard_ttl_1',
+        name: 'Guard Uno',
+        role: 'guard',
+      },
+    },
+  });
+
+  const futureExpiry = new Date(Date.now() + 12 * 3600 * 1000);
+  await env.makeDocRef('qr_codes', 'qr_supplier_exit').set({
+    creatorUid: 'res_ttl_1',
+    guestName: 'Acme Plumbing',
+    accessCategory: 'supplier',
+    isOneTimeUse: true,
+    type: 'temporary',
+    status: 'active',
+    expiryTime: futureExpiry,
+    expireAt: _test.admin.firestore.Timestamp.fromMillis(
+      futureExpiry.getTime() + _test.QR_CODE_RETENTION_MS
+    ),
+  });
+
+  const pastExpiry = new Date(Date.now() - 2 * 3600 * 1000);
+  await env.makeDocRef('qr_codes', 'qr_expired_denied').set({
+    creatorUid: 'res_ttl_1',
+    guestName: 'Late Visitor',
+    accessCategory: 'visitor',
+    type: 'temporary',
+    status: 'active',
+    expiryTime: pastExpiry,
+  });
+
+  installMockAdmin(t, env);
+  const validateWrapped = fft.wrap(cloudFunctions.validateAndRegisterQrAccess);
+  const guardAuth = { uid: 'guard_ttl_1', token: { guard: true } };
+
+  // 1. Entry scan on 1x supplier pass with scanOnExitEnabled=true:
+  //    access_logs gets 60d expireAt; qr_codes stays active with expireAt=null while inside
+  const entryRes = await validateWrapped({
+    data: {
+      qrId: 'qr_supplier_exit',
+      mode: 'validate_and_register',
+      visitorIdPhotoUrl:
+        'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/visitor_ids%2Fqr_supplier_exit_1.jpg?alt=media',
+      visitorPlatePhotoUrl:
+        'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/visitor_plates%2Fqr_supplier_exit_1.jpg?alt=media',
+    },
+    auth: guardAuth,
+  });
+  assert.equal(entryRes.granted, true);
+  assert.equal(entryRes.isExit, false);
+
+  const qrDuringVisit = (await env.makeDocRef('qr_codes', 'qr_supplier_exit').get()).data();
+  assert.equal(qrDuringVisit.isInside, true);
+  assert.equal(qrDuringVisit.expireAt, null);
+
+  const openLogId = qrDuringVisit.activeAccessLogId;
+  assert.ok(openLogId);
+  const entryLogData = (await env.makeDocRef('access_logs', openLogId).get()).data();
+  const entryTsMillis = _test.extractTimestampMillis(entryLogData.timestamp);
+  assert.ok(
+    Math.abs(entryLogData.expireAt.toMillis() - (entryTsMillis + _test.ACCESS_LOG_RETENTION_MS)) < 2000
+  );
+
+  // 2. Exit scan: refreshes access_logs.expireAt to exitTimestamp + 60d AND stamps 7d expireAt on 1x supplier QR
+  const exitRes = await validateWrapped({
+    data: {
+      qrId: 'qr_supplier_exit',
+      mode: 'validate_and_register',
+      reason: 'Completed repair',
+    },
+    auth: guardAuth,
+  });
+  assert.equal(exitRes.granted, true);
+  assert.equal(exitRes.isExit, true);
+
+  const closedLogData = (await env.makeDocRef('access_logs', openLogId).get()).data();
+  assert.equal(closedLogData.isInside, false);
+  const exitTsMillis = _test.extractTimestampMillis(closedLogData.exitTimestamp);
+  assert.ok(
+    Math.abs(closedLogData.expireAt.toMillis() - (exitTsMillis + _test.ACCESS_LOG_RETENTION_MS)) < 2000
+  );
+
+  const qrAfterExit = (await env.makeDocRef('qr_codes', 'qr_supplier_exit').get()).data();
+  assert.equal(qrAfterExit.status, 'deactivated (validated)');
+  assert.equal(qrAfterExit.isInside, false);
+  const usedAtMillis = _test.extractTimestampMillis(qrAfterExit.usedAt);
+  assert.ok(
+    Math.abs(qrAfterExit.expireAt.toMillis() - (usedAtMillis + _test.QR_CODE_RETENTION_MS)) < 2000
+  );
+
+  // 3. Denied scan on expired QR: stamps 60d expireAt on denied access_log & 7d expireAt on qr_codes
+  const deniedRes = await validateWrapped({
+    data: {
+      qrId: 'qr_expired_denied',
+      mode: 'validate_and_register',
+    },
+    auth: guardAuth,
+  });
+  assert.equal(deniedRes.granted, false);
+
+  const expiredQrAfterScan = (await env.makeDocRef('qr_codes', 'qr_expired_denied').get()).data();
+  assert.equal(expiredQrAfterScan.status, 'deactivated (expired)');
+  assert.equal(
+    expiredQrAfterScan.expireAt.toMillis(),
+    pastExpiry.getTime() + _test.QR_CODE_RETENTION_MS
+  );
+
+  const allLogs = Array.from(env.store.get('access_logs').values());
+  const deniedLog = allLogs.find((l) => l.qrCodeId === 'qr_expired_denied');
+  assert.ok(deniedLog);
+  assert.equal(deniedLog.status, 'denied');
+  const deniedTsMillis = _test.extractTimestampMillis(deniedLog.timestamp);
+  assert.ok(
+    Math.abs(deniedLog.expireAt.toMillis() - (deniedTsMillis + _test.ACCESS_LOG_RETENTION_MS)) < 2000
+  );
+});
+
+test('onAccessLogDeleted cascades visitor_ids/ & visitor_plates/ deletions, ignores 404s, blocks out-of-scope paths, and heals open-visit QR state', async (t) => {
+  const env = createMockAdminEnvironment();
+  installMockAdmin(t, env);
+
+  const bucket = env.storageMock.bucket();
+  await bucket.file('visitor_ids/qr_open_1_id.jpg').save(Buffer.from('id-bytes'));
+  await bucket.file('documents/admin_only/protected.pdf').save(Buffer.from('secret-doc'));
+
+  await env.makeDocRef('qr_codes', 'qr_open_1').set({
+    status: 'deactivated (expired)',
+    isInside: true,
+    activeAccessLogId: 'log_ttl_expired_1',
+    expireAt: null,
+  });
+
+  await cloudFunctions.onAccessLogDeleted.run({
+    params: { logId: 'log_ttl_expired_1' },
+    data: {
+      data: () => ({
+        qrCodeId: 'qr_open_1',
+        status: 'allowed',
+        isInside: true,
+        visitorIdPhotoUrl:
+          'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/visitor_ids%2Fqr_open_1_id.jpg?alt=media',
+        // Missing object in Storage -> must succeed idempotently via ignoreNotFound: true
+        visitorPlatePhotoUrl:
+          'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/visitor_plates%2Falready_gone.jpg?alt=media',
+      }),
+    },
+  });
+
+  // 1. visitor_ids file was deleted and missing visitor_plates file did not throw
+  assert.equal(env.savedStorageFiles.has('visitor_ids/qr_open_1_id.jpg'), false);
+  assert.deepEqual(
+    env.deletedStoragePaths.map((d) => d.storagePath),
+    ['visitor_ids/qr_open_1_id.jpg', 'visitor_plates/already_gone.jpg']
+  );
+
+  // 2. Linked QR pass with stale isInside=true was healed and received a 7-day expireAt
+  const healedQr = (await env.makeDocRef('qr_codes', 'qr_open_1').get()).data();
+  assert.equal(healedQr.isInside, false);
+  assert.equal(healedQr.activeAccessLogId, null);
+  assert.ok(healedQr.expireAt && typeof healedQr.expireAt.toMillis === 'function');
+
+  // 3. Out-of-scope URL (documents/admin_only/protected.pdf) is strictly ignored and never deleted
+  await cloudFunctions.onAccessLogDeleted.run({
+    params: { logId: 'log_malicious_url' },
+    data: {
+      data: () => ({
+        visitorIdPhotoUrl:
+          'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/documents%2Fadmin_only%2Fprotected.pdf?alt=media',
+        visitorPlatePhotoUrl: 'visitor_ids/../documents/admin_only/protected.pdf',
+      }),
+    },
+  });
+  assert.equal(env.savedStorageFiles.has('documents/admin_only/protected.pdf'), true);
+});
+
+test('purgeExpiredAccessLogs and purgeExpiredQrCodes delete expired records while preserving recent logs, active permanent passes, and open visits', async (t) => {
+  const env = createMockAdminEnvironment();
+  installMockAdmin(t, env);
+
+  const nowMillis = Date.UTC(2026, 11, 1, 6, 0, 0);
+  const Timestamp = _test.admin.firestore.Timestamp;
+  const bucket = env.storageMock.bucket();
+
+  await bucket.file('visitor_ids/old_ttl_id.jpg').save(Buffer.from('old1'));
+  await bucket.file('visitor_plates/legacy_old_plate.jpg').save(Buffer.from('old2'));
+  await bucket.file('visitor_ids/recent_id.jpg').save(Buffer.from('recent'));
+
+  // Access logs:
+  // 1) Expired via expireAt
+  await env.makeDocRef('access_logs', 'log_expired_ttl').set({
+    status: 'allowed',
+    timestamp: Timestamp.fromMillis(nowMillis - 65 * 24 * 60 * 60 * 1000),
+    expireAt: Timestamp.fromMillis(nowMillis - 5 * 24 * 60 * 60 * 1000),
+    visitorIdPhotoUrl: 'visitor_ids/old_ttl_id.jpg',
+  });
+  // 2) Legacy expired log without expireAt (61 days old)
+  await env.makeDocRef('access_logs', 'log_legacy_61d').set({
+    status: 'allowed',
+    timestamp: Timestamp.fromMillis(nowMillis - 61 * 24 * 60 * 60 * 1000),
+    visitorPlatePhotoUrl: 'visitor_plates/legacy_old_plate.jpg',
+  });
+  // 3) Recent log (15 days old) -> must be preserved
+  await env.makeDocRef('access_logs', 'log_recent_15d').set({
+    status: 'allowed',
+    timestamp: Timestamp.fromMillis(nowMillis - 15 * 24 * 60 * 60 * 1000),
+    expireAt: Timestamp.fromMillis(nowMillis + 45 * 24 * 60 * 60 * 1000),
+    visitorIdPhotoUrl: 'visitor_ids/recent_id.jpg',
+  });
+
+  const deletedLogCount = await _test.purgeExpiredAccessLogs(env.dbMock, bucket, nowMillis);
+  assert.equal(deletedLogCount, 2);
+  assert.equal((await env.makeDocRef('access_logs', 'log_expired_ttl').get()).exists, false);
+  assert.equal((await env.makeDocRef('access_logs', 'log_legacy_61d').get()).exists, false);
+  assert.equal((await env.makeDocRef('access_logs', 'log_recent_15d').get()).exists, true);
+  assert.equal(env.savedStorageFiles.has('visitor_ids/old_ttl_id.jpg'), false);
+  assert.equal(env.savedStorageFiles.has('visitor_plates/legacy_old_plate.jpg'), false);
+  assert.equal(env.savedStorageFiles.has('visitor_ids/recent_id.jpg'), true);
+
+  // QR codes:
+  // 1) Revoked 8 days ago (expired TTL) -> delete
+  await env.makeDocRef('qr_codes', 'qr_revoked_8d').set({
+    status: 'deactivated (revoked)',
+    deactivatedAt: Timestamp.fromMillis(nowMillis - 8 * 24 * 60 * 60 * 1000),
+    expireAt: Timestamp.fromMillis(nowMillis - 1 * 24 * 60 * 60 * 1000),
+  });
+  // 2) Legacy validated 10 days ago without expireAt -> delete
+  await env.makeDocRef('qr_codes', 'qr_legacy_used_10d').set({
+    status: 'used',
+    usedAt: nowMillis - 10 * 24 * 60 * 60 * 1000,
+  });
+  // 3) Legacy revoked 2 days ago without expireAt -> keep & backfill expireAt
+  await env.makeDocRef('qr_codes', 'qr_legacy_revoked_2d').set({
+    status: 'revoked',
+    timestamp: nowMillis - 2 * 24 * 60 * 60 * 1000,
+  });
+  // 4) Active permanent pass -> keep forever (expireAt remains null/unset)
+  await env.makeDocRef('qr_codes', 'qr_perm_active').set({
+    status: 'active',
+    type: 'permanent',
+    expireAt: null,
+  });
+  // 5) Expired pass whose visitor is still inside -> keep!
+  await env.makeDocRef('qr_codes', 'qr_inside_protected').set({
+    status: 'deactivated (expired)',
+    isInside: true,
+    expireAt: Timestamp.fromMillis(nowMillis - 2 * 24 * 60 * 60 * 1000),
+  });
+
+  const deletedQrCount = await _test.purgeExpiredQrCodes(env.dbMock, nowMillis);
+  assert.equal(deletedQrCount, 2);
+
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_revoked_8d').get()).exists, false);
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_legacy_used_10d').get()).exists, false);
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_perm_active').get()).exists, true);
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_inside_protected').get()).exists, true);
+
+  const backfilledQr = (await env.makeDocRef('qr_codes', 'qr_legacy_revoked_2d').get()).data();
+  assert.ok(backfilledQr.expireAt && typeof backfilledQr.expireAt.toMillis === 'function');
+});
+
+

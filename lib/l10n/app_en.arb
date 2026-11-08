@@ -1115,5 +1115,7 @@
       "period": { "type": "String" },
       "limit": { "type": "int" }
     }
-  }
+  },
+  "accessLogsRetentionBanner": "Auto-removal policy: Access logs and visitor verification photos are permanently deleted after 2 months (60 days).",
+  "qrPassRetentionBanner": "Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire."
 }

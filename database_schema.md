@@ -33,7 +33,9 @@ erDiagram
         string vehiclePlates
         number passengers
         string type "'permanent' | 'temporary'"
-        timestamp expiry
+        timestamp expiryTime
+        timestamp deactivatedAt "Optional terminal status timestamp"
+        timestamp expireAt "Optional 7-day TTL timestamp (null when active permanent or inside)"
         string status "'active' | 'deactivated'"
         boolean isInside "True while visitor is inside"
         string activeAccessLogId "Open access_logs doc ID"
@@ -43,10 +45,10 @@ erDiagram
         string bookingId PK
         string facilityId FK
         string userUid FK
-        timestamp startTime
-        timestamp endTime
         string addressId FK "Household address ID"
         reference addressRef FK "Link to addresses"
+        timestamp startTime
+        timestamp endTime
         string status "'pending review' | 'rejected' | 'approved' | 'closed' | 'cancelled'"
         string notes
         string rejectionReason "Optional rejection rationale from admin"
@@ -71,6 +73,7 @@ erDiagram
         string creatorUid FK
         timestamp timestamp "Entry timestamp"
         timestamp exitTimestamp "Optional exit timestamp"
+        timestamp expireAt "60-day TTL timestamp (entry + 60d, or exit + 60d)"
         boolean isInside "True while visitor has not scanned out"
         string exitGuardUid "Optional guard UID who registered exit"
         string exitGuardName "Optional guard name on exit"
@@ -107,11 +110,11 @@ erDiagram
         string restrictionType "'unrestricted' | 'cooldown' | 'quota'"
         string cooldownUnit "'unrestricted' | 'hours' | 'days' | 'months' | 'years'"
         number cooldownValue
+        string quotaPeriod "'unrestricted' | 'daily' | 'monthly' | 'yearly'"
+        number quotaLimit
     }
     config {
         string documentId PK "app_settings | smtp_settings"
-        string quotaPeriod "'unrestricted' | 'daily' | 'monthly' | 'yearly'"
-        number quotaLimit
         number paymentCutoffDay
         number gracePeriodDays
         boolean scanOnExitEnabled "Enable QR scan on exit"
@@ -126,10 +129,10 @@ erDiagram
     addresses ||--o| users : "claims primary resident"
     qr_codes }o--|| users : "created by"
     bookings }o--|| users : "booked by"
+    bookings }o--o| addresses : "belongs to household"
     bookings }o--|| facilities : "reserves"
     announcements }o--|| users : "created by"
     access_logs }o--|| qr_codes : "validates"
-    bookings }o--o| addresses : "belongs to household"
     access_logs }o--|| users : "verified by guard"
     payments }o--|| addresses : "paid for"
     ownership_claims }o--|| users : "claimed by"
@@ -172,7 +175,9 @@ erDiagram
 - `vehiclePlates`: string (Optional, for vehicles)
 - `passengers`: number (Optional, for vehicles)
 - `type`: string ('permanent', 'temporary')
-- `expiry`: timestamp (for temporary)
+- `expiryTime`: timestamp | null (Expiration timestamp for temporary/supplier passes; null for permanent passes)
+- `deactivatedAt`: timestamp | null (Optional timestamp recorded when a pass is expired, validated, or revoked)
+- `expireAt`: timestamp | null (Firestore TTL timestamp set to 7 days after expiration/deactivation; held `null` for active permanent passes and while `isInside == true`)
 - `status`: string ("active", "deactivated (validated|revoked|expired)")
 - `isInside`: boolean (Optional; true when visitor has entered and has not yet scanned out while `scanOnExitEnabled` is active. Legacy same-day allowed logs without `isInside` default to `true` upon second scan on the same day.)
 - `activeAccessLogId`: string | null (Optional ID of the currently open `access_logs` entry for O(1) transactional exit updates)
@@ -243,6 +248,7 @@ erDiagram
 - `creatorUid`: string
 - `timestamp`: timestamp (Entry timestamp)
 - `exitTimestamp`: timestamp | null (Optional timestamp recorded when visitor scans out)
+- `expireAt`: timestamp (Firestore TTL timestamp set to `timestamp + 60 days` on entry, refreshed to `exitTimestamp + 60 days` when an exit scan is recorded; triggers `onAccessLogDeleted` to delete `visitor_ids/` and `visitor_plates/` media)
 - `isInside`: boolean (True while visitor is currently inside; false once exited or denied)
 - `exitGuardUid`: string (Optional UID of guard who registered visitor exit)
 - `exitGuardName`: string (Optional name of guard who registered visitor exit)
@@ -372,16 +378,16 @@ The application requires specific composite indexes to execute queries without d
   - `facilityId` (Ascending)
   - `startTime` (Ascending)
   - `status` (Ascending)
+- **Index 10 (Household Cooldown & Quota Facility Check)**:
+  - `facilityId` (Ascending)
+  - `addressId` (Ascending)
+  - `startTime` (Ascending)
 
 ### `payments` Collection
 - **Index 1 (Address Payments by Period)**:
   - `addressRef` (Ascending)
   - `period` (Descending)
 - **Index 2 (Resident Payments by Timestamp)**:
-- **Index 10 (Household Cooldown & Quota Facility Check)**:
-  - `facilityId` (Ascending)
-  - `addressId` (Ascending)
-  - `startTime` (Ascending)
   - `residentUid` (Ascending)
   - `timestamp` (Descending)
 - **Index 3 (Uploader Payments by Creation)**:
@@ -445,3 +451,18 @@ The application requires specific composite indexes to execute queries without d
 - **Index 1 (User Directory Role Filter by Name)**:
   - `role` (Ascending)
   - `name` (Ascending)
+
+---
+
+## Firestore TTL Policies & Single-Field Index Exemptions
+
+To prevent unbounded growth of gatehouse audit logs, visitor identification photos, and inactive QR passes while avoiding sequential timestamp index hotspots, two native Firestore Time-to-Live (TTL) policies are configured alongside single-field index exemptions (`"indexes": []` in `firestore.indexes.json` `fieldOverrides`):
+
+1. **`access_logs.expireAt` (60-Day Retention)**:
+   - **Single-Field Index Exemption**: Collection group `access_logs`, field `expireAt` (`"indexes": []`).
+   - **TTL Policy**: Enabled on `access_logs.expireAt`. Stamped at `timestamp + 60 days` on entry and refreshed to `exitTimestamp + 60 days` when an exit scan is recorded.
+   - **Cascading Cleanup**: Deletion of an `access_logs` document (via Firestore TTL, daily `purgeExpiredAccessLogs` sweep, or manual deletion) triggers `onAccessLogDeleted`, which deletes allow-listed Cloud Storage objects under `visitor_ids/` and `visitor_plates/` and heals any open-visit `qr_codes` state (`isInside: false`). An independent 62-day GCS Object Lifecycle rule (`storage_lifecycle.json`) removes orphaned uploads under `visitor_ids/` and `visitor_plates/`.
+2. **`qr_codes.expireAt` (7-Day Post-Deactivation Retention)**:
+   - **Single-Field Index Exemption**: Collection group `qr_codes`, field `expireAt` (`"indexes": []`).
+   - **TTL Policy**: Enabled on `qr_codes.expireAt`. Stamped at `expiryTime + 7 days` for temporary passes, `validatedAt + 7 days` (or `exitTimestamp + 7 days` when Scan on Exit completes) for single-use supplier passes, and `deactivatedAt + 7 days` for resident-revoked passes. Active permanent passes (`type == 'permanent'`) keep `expireAt: null`, and passes with an open visit (`isInside == true`) hold `expireAt: null` until exit or log cleanup.
+

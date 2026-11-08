@@ -158,11 +158,12 @@ flowchart TD
 
 ### 4.3 Firebase Cloud Storage (Almacenamiento Seguro de Archivos)
 * **Función**: Bóveda de almacenamiento de archivos en la nube con cifrado en reposo.
-* **Operación**: Almacena documentos de acreditación de propiedad, comprobantes de pago de mantenimiento, fotografías de identificación y placas tomadas en caseta, archivos de transparencia e imágenes de avisos.
+* **Operación**: Almacena documentos de acreditación de propiedad, comprobantes de pago de mantenimiento, fotografías de identificación y placas tomadas en caseta (resguardadas con una regla de ciclo de vida de objetos en GCS de 62 días sobre `visitor_ids/` y `visitor_plates/`), archivos de transparencia e imágenes de avisos.
 
 ### 4.4 Cloud Functions para Firebase (Lógica del Servidor)
 * **Función**: Ejecuta procesos de negocio críticos en contenedores aislados en el servidor, garantizando que operaciones sensibles no dependan del dispositivo del usuario:
-  * **Validación Atómica de Accesos QR** (`validateAndRegisterQrAccess`): Verifica reglas de acceso y escribe el registro en la bitácora en una única transacción protegida.
+  * **Validación Atómica de Accesos QR** (`validateAndRegisterQrAccess`): Verifica reglas de acceso, asigna marcas `expireAt` de 60 días en `access_logs` y de 7 días en pases `qr_codes` finalizados, y escribe el registro en la bitácora en una única transacción protegida.
+  * **Depuración en Cascada de Evidencia Fotográfica y QR** (`onAccessLogDeleted` y `checkMonthlyPaymentStatuses`): Elimina de Cloud Storage las fotografías asociadas en `visitor_ids/` y `visitor_plates/` cuando un registro de `access_logs` expira por TTL (o se elimina), restablece el estado de visitas abiertas en `qr_codes` y ejecuta barridos diarios de respaldo para registros históricos.
   * **Traducción Automática con IA** (`translateAnnouncement`): Conecta de forma segura y sin claves manuales con Google Vertex AI (Gemini) para traducir boletines entre español e inglés.
   * **Recalculación Automática de Estatus de Pago** (`onPaymentWritten`): Actualiza el estatus de la vivienda inmediatamente después de que un administrador aprueba un comprobante.
   * **Creación Masiva de Residentes y Direcciones** (`adminBulkImportResidents`, `adminBulkImportAddresses`): Procesa archivos CSV en el servidor, asignando roles y generando contraseñas seguras.
@@ -272,6 +273,9 @@ El ejercicio de los Derechos ARCO puede realizarse ante la Administración del C
 
 ### 6.4 Retención Automática, Eliminación de Cuenta y Purga de Datos
 
+* **Políticas Automáticas de Retención en Caseta**:
+  * **Depuración a los 60 Días de Bitácora y Fotografías de Visitantes**: Los documentos de `access_logs` y sus fotografías de identificación y placas vehiculares (`visitor_ids/**` y `visitor_plates/**`) se eliminan automáticamente **60 días** después del ingreso (o 60 días después de la salida registrada) mediante la política nativa TTL de Firestore (`expireAt`), el trigger en cascada `onAccessLogDeleted`, barridos diarios de respaldo y una regla de ciclo de vida de objetos en Cloud Storage de 62 días (`storage_lifecycle.json`).
+  * **Depuración a los 7 Días de Pases QR Inactivos**: Los pases QR temporales vencidos, de proveedor ya validados y revocados (`qr_codes`) se eliminan automáticamente **7 días** después de su vencimiento o desactivación, mientras que los pases permanentes activos no vencen salvo que sean revocados.
 * **Mecanismos de Eliminación**: El usuario puede solicitar la eliminación de su cuenta en cualquier momento mediante el botón **"Eliminar Cuenta"** dentro de la app o solicitándolo a la Administración.
 * **Purga Definitiva e Irreversible**: Al ejecutarse la eliminación, las credenciales en Firebase Authentication, el registro del usuario en Cloud Firestore y sus archivos de acreditación en Cloud Storage son **destruidos de forma permanente e irrecuperable**.
 

@@ -72,6 +72,8 @@ class QrService {
   Future<void> invalidateQrCode(String qrId) async {
     await Backend.db.updateDocument('qr_codes', qrId, {
       'status': 'deactivated (revoked)',
+      'deactivatedAt': DbFieldValue.serverTimestamp(),
+      'expireAt': DateTime.now().add(const Duration(days: 7)),
     });
   }
 }

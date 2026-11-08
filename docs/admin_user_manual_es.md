@@ -326,6 +326,9 @@ Cada tarjeta de registro muestra:
 * **Metadatos del Ingreso**: Nombre del Visitante, Domicilio de Destino, Residente que Invita, Guardia que Verificó, Detalles del Vehículo (`AUTO` / `MOTOCICLETA`, Placas y Número de Pasajeros) y Motivo o Notas de Caseta.
 * **Evidencia Fotográfica Interactiva**: Toca **Ver Foto de Identificación** (`visitorIdPhotoUrl`) o **Ver Foto de Placas** (`visitorPlatePhotoUrl`) para inspeccionar en pantalla completa con zoom las fotografías capturadas en caseta.
 
+> [!NOTE]
+> **Política de Eliminación Automática de 2 Meses (60 Días)**: Para proteger la privacidad de los visitantes y optimizar el almacenamiento en la nube, los registros de `access_logs` y sus fotografías de identificación y placas asociadas (`visitor_ids/**` y `visitor_plates/**`) se eliminan de forma automática y permanente **60 días** después de la fecha de entrada (o 60 días después de la salida registrada cuando **Escanear para salir** está activo).
+
 ### 6.3 Generar Acceso QR para Visitantes
 **Navegación:** Panel de Administración $\rightarrow$ **Generar Acceso QR** (`QrGeneratorScreen`)
 
@@ -336,6 +339,7 @@ Los administradores pueden generar pases QR para visitantes o proveedores direct
   * **Proveedor (`supplier`)**: Se configura automáticamente como un pase de **un solo uso** válido hasta las `23:59:59` del día de su creación.
 * **Tipo de Vehículo y Detalles**: Selecciona **Automóvil**, **Motocicleta** o **Peatón**. Para vehículos, permite registrar **Placas** y **Número de Pasajeros**.
 * **Compartir Tarjeta QR con Marca**: Una vez generado el código, puedes descargar o compartir una tarjeta visual con el logotipo de Suburban Life lista para enviarse al visitante.
+* **Limpieza Automática de 7 Días para Pases QR Inactivos**: Los pases QR finalizados (temporales vencidos, de proveedor ya utilizados y revocados) se eliminan automáticamente **7 días** después de su vencimiento o desactivación, mientras que los **pases permanentes activos** no vencen salvo que sean revocados manualmente.
 
 ---
 

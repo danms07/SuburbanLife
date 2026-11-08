@@ -39,15 +39,32 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: Text(l10n.noQrCodes));
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: _buildRetentionBanner(context, l10n),
+                      ),
+                      Expanded(
+                        child: Center(child: Text(l10n.noQrCodes)),
+                      ),
+                    ],
+                  );
                 }
 
                 final qrCodes = snapshot.data!;
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: qrCodes.length,
-                  itemBuilder: (context, index) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                      child: _buildRetentionBanner(context, l10n),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        itemCount: qrCodes.length,
+                        itemBuilder: (context, index) {
                     final qr = qrCodes[index];
                     final timestamp = qr['timestamp'] != null 
                       ? DateTime.fromMillisecondsSinceEpoch(qr['timestamp']) 
@@ -116,9 +133,12 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
                               )
                             : null,
                       ),
-                    );
-                  },
-                );
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
               },
             ),
       floatingActionButton: FloatingActionButton(
@@ -131,6 +151,42 @@ class _ManageQrScreenState extends State<ManageQrScreen> {
             MaterialPageRoute(builder: (context) => const QrGeneratorScreen()),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildRetentionBanner(BuildContext context, AppLocalizations l10n) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('qr_codes_retention_banner'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.primary.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.auto_delete_outlined,
+            size: 20,
+            color: colorScheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              l10n.qrPassRetentionBanner,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: colorScheme.onSurface.withValues(alpha: 0.85),
+                fontFamily: AppConfig.fontFamily,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

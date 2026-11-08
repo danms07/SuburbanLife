@@ -326,6 +326,9 @@ Each log card displays:
 * **Entry Metadata**: Visitor Name, Destination Address, Invited by Resident, Verified by Guard, Vehicle Details (`CAR` / `MOTORCYCLE`, License Plates, and Passenger Count), and Guard Reason / Notes.
 * **Interactive Photo Evidence**: Tap **View Visitor ID Photo** (`visitorIdPhotoUrl`) or **View Plate Photo** (`visitorPlatePhotoUrl`) to inspect the captured identification and vehicle license plate photos in a full-screen pinch-to-zoom dialog.
 
+> [!NOTE]
+> **Automated 2-Month (60-Day) Retention Policy**: To protect visitor privacy and optimize cloud storage, `access_logs` records and their associated ID and license plate photos (`visitor_ids/**` and `visitor_plates/**`) are automatically and permanently deleted **60 days** after the entry timestamp (or 60 days after the recorded exit timestamp when **Scan on exit** is enabled).
+
 ### 6.3 Generate Visitor QR Access
 **Navigation:** Admin Panel $\rightarrow$ **Generate QR Access** (`QrGeneratorScreen`)
 
@@ -336,6 +339,7 @@ Administrators can generate visitor or supplier QR passes directly from the Admi
   * **Supplier / Contractor (`supplier`)**: Automatically configured as a **one-time-use** pass valid until `23:59:59` on the day of creation.
 * **Vehicle & Entry Details**: Select **Car**, **Motorcycle**, or **Walking**. For vehicles, specify **License Plates** and **Passenger Count**.
 * **Share Branded QR Card**: Once generated, export or share a high-contrast branded Suburban Life QR pass image directly with the visitor.
+* **Automated 7-Day Cleanup for Inactive QR Passes**: Terminal QR passes (expired temporary passes, validated single-use supplier passes, and revoked passes) are automatically removed **7 days** after expiration or deactivation, while **active permanent passes** never expire unless manually revoked.
 
 ---
 

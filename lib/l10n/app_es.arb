@@ -982,5 +982,7 @@
       "period": { "type": "String" },
       "limit": { "type": "int" }
     }
-  }
+  },
+  "accessLogsRetentionBanner": "Política de eliminación automática: Los registros de acceso y las fotografías de verificación se eliminan permanentemente después de 2 meses (60 días).",
+  "qrPassRetentionBanner": "Los pases QR inactivos (vencidos, usados o revocados) se eliminan automáticamente después de 7 días. Los pases permanentes activos no vencen."
 }

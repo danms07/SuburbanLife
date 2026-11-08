@@ -14,7 +14,7 @@ A white-label residential management platform built using **Flutter** and **Fire
 - **Facility Booking Policies, Cooldowns & Quotas**: Household-scoped (`addressRef`) booking policies supporting either a waiting **Cooldown Period** (`hours | days | months | years` measured from booking end to next booking start) or a calendar **Booking Quota** (`daily | monthly | yearly` max bookings per household in the community timezone), alongside advance anticipation windows, daily operating hours boundaries (`openingTime` - `closingTime`), live quota usage badges, anonymous confirmed-only schedule calendar streaming, custom rejection rationale, atomic rejected-booking resubmission, and preset approval instruction templates.
 - **Rich Media & Emoji Community Announcements**: Broadcast announcements featuring high-resolution banner images, interactive full-screen viewer, quick-access announcement emojis, audience filtering (Everyone / Residents), and keyless Gemini AI Spanish-to-English translations.
 - **Collapsible Auto-Saving Admin Settings & SMTP Email Service**: Expandable/collapsible settings cards with real-time auto-save for switches and general settings, plus dedicated manual saving and handshake testing for SMTP server credentials and custom welcome email templates.
-- **QR-based Visitor Access, Optional Exit Scanning & Audit Logs**: Live validation logs, memory-bounded ID and license plate photo capture on entry with automatic local device cleanup immediately after Cloud Storage upload, optional admin-configurable **Scan on exit** (`Escanear para salir`) mode with fast one-tap guard departure logging (supporting automatic entry/exit detection and legacy same-day QR passes), live **INSIDE** badges on resident QR passes, and an administrator audit screen with **Currently Inside** KPIs, entry/exit timestamps, adaptive multi-filter exploration (wrapping `ChoiceChip`s on mobile), wrapping search summary bars, and 20-event batches for unfiltered browsing.
+- **QR-based Visitor Access, Optional Exit Scanning, Audit Logs & Automated TTL Retention**: Live validation logs, memory-bounded ID and license plate photo capture on entry with automatic local device cleanup immediately after Cloud Storage upload, automated **60-day TTL retention** for `access_logs` and linked Cloud Storage photos (`visitor_ids/**` and `visitor_plates/**` via `onAccessLogDeleted`, daily fallback sweeps, and a 62-day GCS Object Lifecycle safety net), automated **7-day TTL cleanup** for expired/validated/revoked QR passes (preserving active permanent passes and open visits), optional admin-configurable **Scan on exit** (`Escanear para salir`) mode with fast one-tap guard departure logging (supporting automatic entry/exit detection and legacy same-day QR passes), live **INSIDE** badges on resident QR passes, and an administrator audit screen with **Currently Inside** KPIs, entry/exit timestamps, adaptive multi-filter exploration (wrapping `ChoiceChip`s on mobile), wrapping search summary bars, and 20-event batches for unfiltered browsing.
 - **User Directory & Account Management**: Unified user and security guard directory with whole-database query search (by street, name, or email), street dropdown and adaptive role filtering (`SegmentedButton` on wide viewports and wrapping `ChoiceChip`s on mobile), wrapping search summary bars, 20-user batched query pagination for unfiltered browsing, and compact button-free summary cards that open a dedicated **User Account Details** screen separating standard actions (password resets, role toggling, delivery date editing) from sensitive actions (address unbinding and account removals).
 - **Facility Booking & Document Viewers**: Seamless management of common spaces and important residential files.
 
@@ -67,6 +67,25 @@ The app includes automated global exception trapping and error reporting via `Cr
 - **Graceful Web Fallback**: On Web (where Crashlytics is currently unsupported or limited), calls are absorbed seamlessly with structured `debugPrint` logs, preventing runtime crashes while keeping the codebase ready for Web Crashlytics support.
 - **Collection Gating**: Error reporting is disabled automatically in debug and Firebase Emulator environments (`kDebugMode` or `useFirebaseEmulator: true`).
 - **User Association**: Crashlytics user identifiers (`setUserIdentifier`) are synced with Firebase Auth state transitions.
+
+### 5. Enable Gatehouse Data Retention (Firestore TTL & Storage Lifecycle)
+Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, and inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation. After deploying indexes, rules, and Cloud Functions, enable native Firestore TTL and the GCS Object Lifecycle safety net once per environment:
+```bash
+firebase deploy --only firestore:indexes,firestore:rules,functions
+
+gcloud firestore fields ttls update expireAt \
+  --collection-group=access_logs \
+  --enable-ttl \
+  --project=<PROJECT_ID>
+
+gcloud firestore fields ttls update expireAt \
+  --collection-group=qr_codes \
+  --enable-ttl \
+  --project=<PROJECT_ID>
+
+gcloud storage buckets update gs://<STORAGE_BUCKET> \
+  --lifecycle-file=storage_lifecycle.json
+```
 
 ---
 

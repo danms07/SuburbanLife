@@ -229,6 +229,30 @@ void main() {
       expect(find.byKey(const ValueKey('qr_inside_badge_qr_inside')), findsOneWidget);
       expect(find.byKey(const ValueKey('qr_inside_badge_qr_outside')), findsNothing);
       expect(find.text('INSIDE'), findsOneWidget);
+      expect(find.byKey(const Key('qr_codes_retention_banner')), findsOneWidget);
+      expect(
+        find.text(
+          'Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('renders Spanish 7-day retention banner even when QR list is empty', (tester) async {
+      FakeBackendHelper.auth.emitUser(
+        AppUser(uid: 'resident_empty', email: 'empty@catania.mx', displayName: 'Resident Empty'),
+      );
+
+      await tester.pumpWidget(wrapWithApp(const ManageQrScreen(), locale: const Locale('es')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('qr_codes_retention_banner')), findsOneWidget);
+      expect(
+        find.text(
+          'Los pases QR inactivos (vencidos, usados o revocados) se eliminan automáticamente después de 7 días. Los pases permanentes activos no vencen.',
+        ),
+        findsOneWidget,
+      );
     });
   });
 

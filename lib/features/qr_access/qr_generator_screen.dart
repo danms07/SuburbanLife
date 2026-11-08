@@ -67,6 +67,7 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       'passengers': passengers,
       'type': actualType,
       'expiryTime': actualExpiry,
+      'expireAt': actualExpiry?.add(const Duration(days: 7)),
       'status': 'active',
       'timestamp': DateTime.now().millisecondsSinceEpoch,
     };

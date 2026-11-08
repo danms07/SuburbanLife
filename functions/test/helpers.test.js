@@ -429,6 +429,15 @@ test('getQrExpiryMillis and expireOutdatedQrCodes handle expiration timestamps a
         type: 'permanent',
       }),
     },
+    {
+      ref: { id: 'qr_expired_but_inside' },
+      data: () => ({
+        status: 'active',
+        accessCategory: 'visitor',
+        isInside: true,
+        expiryTime: new Date('2026-10-10T23:59:59.000Z'),
+      }),
+    },
   ];
 
   const mockDb = {
@@ -448,13 +457,25 @@ test('getQrExpiryMillis and expireOutdatedQrCodes handle expiration timestamps a
 
   const nowMillis = new Date('2026-10-12T12:00:00.000Z').getTime();
   const count = await expireOutdatedQrCodes(mockDb, nowMillis);
-  assert.equal(count, 1);
-  assert.equal(updatedDocs.length, 1);
+  assert.equal(count, 2);
+  assert.equal(updatedDocs.length, 2);
+
   assert.equal(updatedDocs[0].id, 'qr_expired_supplier');
-  assert.deepEqual(updatedDocs[0].payload, {
-    status: 'deactivated (expired)',
-    isValid: false,
-  });
+  assert.equal(updatedDocs[0].payload.status, 'deactivated (expired)');
+  assert.equal(updatedDocs[0].payload.isValid, false);
+  assert.equal(updatedDocs[0].payload.deactivatedAt.toMillis(), nowMillis);
+  // 7 days after 2026-10-04T23:59:59.000Z
+  assert.equal(
+    updatedDocs[0].payload.expireAt.toMillis(),
+    new Date('2026-10-04T23:59:59.000Z').getTime() + 7 * 24 * 60 * 60 * 1000
+  );
+
+  // Open-visit pass transitions to deactivated (expired) so new entries are blocked,
+  // while holding expireAt = null until the visitor exits
+  assert.equal(updatedDocs[1].id, 'qr_expired_but_inside');
+  assert.equal(updatedDocs[1].payload.status, 'deactivated (expired)');
+  assert.equal(updatedDocs[1].payload.isValid, false);
+  assert.equal(updatedDocs[1].payload.expireAt, null);
 });
 
 test('extractTimestampMillis and isSameCalendarDayInTimezone respect community timezone boundaries', (t) => {
@@ -824,3 +845,180 @@ test('validateHouseholdBookingRestriction enforces symmetric endTime->startTime 
     })
   );
 });
+
+test('computeAccessLogExpireAtMillis and computeQrCodeExpireAtMillis apply exact 60-day and 7-day windows', () => {
+  const {
+    ACCESS_LOG_RETENTION_DAYS,
+    ACCESS_LOG_RETENTION_MS,
+    QR_CODE_RETENTION_DAYS,
+    QR_CODE_RETENTION_MS,
+    computeAccessLogExpireAtMillis,
+    computeQrCodeExpireAtMillis,
+  } = _test;
+
+  assert.equal(ACCESS_LOG_RETENTION_DAYS, 60);
+  assert.equal(QR_CODE_RETENTION_DAYS, 7);
+
+  const baseMs = Date.UTC(2026, 10, 1, 12, 0, 0);
+  assert.equal(computeAccessLogExpireAtMillis(baseMs), baseMs + ACCESS_LOG_RETENTION_MS);
+  assert.equal(computeAccessLogExpireAtMillis(new Date(baseMs)), baseMs + 60 * 24 * 60 * 60 * 1000);
+  assert.equal(computeQrCodeExpireAtMillis(baseMs), baseMs + QR_CODE_RETENTION_MS);
+  assert.equal(computeQrCodeExpireAtMillis(new Date(baseMs)), baseMs + 7 * 24 * 60 * 60 * 1000);
+});
+
+test('extractVisitorMediaStoragePath extracts valid visitor_ids/ & visitor_plates/ paths and blocks traversal or out-of-scope folders', () => {
+  const { extractVisitorMediaStoragePath } = _test;
+
+  // 1. Valid Firebase Storage REST download URLs (production & emulator)
+  assert.equal(
+    extractVisitorMediaStoragePath(
+      'https://firebasestorage.googleapis.com/v0/b/suburban-life.appspot.com/o/visitor_ids%2Fqr_123_1700000000.jpg?alt=media&token=abc-123'
+    ),
+    'visitor_ids/qr_123_1700000000.jpg'
+  );
+  assert.equal(
+    extractVisitorMediaStoragePath(
+      'http://127.0.0.1:9199/v0/b/demo-suburban.appspot.com/o/visitor_plates%2Fqr_999%2Fplate_photo.jpg?alt=media'
+    ),
+    'visitor_plates/qr_999/plate_photo.jpg'
+  );
+
+  // 2. Valid gs:// URIs and direct bucket-relative paths
+  assert.equal(
+    extractVisitorMediaStoragePath('gs://suburban-life.appspot.com/visitor_ids/qr_abc_1.jpg'),
+    'visitor_ids/qr_abc_1.jpg'
+  );
+  assert.equal(
+    extractVisitorMediaStoragePath('visitor_plates/qr_abc_2.png'),
+    'visitor_plates/qr_abc_2.png'
+  );
+
+  // 3. Rejects path traversal, double-encoded traversal, null bytes, and prefix spoofing
+  assert.equal(
+    extractVisitorMediaStoragePath(
+      'https://firebasestorage.googleapis.com/v0/b/suburban-life.appspot.com/o/visitor_ids%2F..%2Fdocuments%2Fbylaws.pdf?alt=media'
+    ),
+    null
+  );
+  assert.equal(
+    extractVisitorMediaStoragePath('visitor_ids/%2e%2e/payments/receipt.jpg'),
+    null
+  );
+  assert.equal(extractVisitorMediaStoragePath('visitor_ids/qr_1\0.jpg'), null);
+  assert.equal(extractVisitorMediaStoragePath('visitor_ids_evil/photo.jpg'), null);
+  assert.equal(extractVisitorMediaStoragePath('visitor_ids/'), null);
+
+  // 4. Rejects other sensitive Storage folders (documents/, payments/, sanctions/)
+  assert.equal(
+    extractVisitorMediaStoragePath(
+      'https://firebasestorage.googleapis.com/v0/b/suburban-life.appspot.com/o/documents%2Fadmin_only%2Fbudget.pdf?alt=media'
+    ),
+    null
+  );
+  assert.equal(extractVisitorMediaStoragePath('payments/addr_1/receipt.jpg'), null);
+  assert.equal(extractVisitorMediaStoragePath('sanctions/addr_1/evidence.jpg'), null);
+  assert.equal(extractVisitorMediaStoragePath(null), null);
+  assert.equal(extractVisitorMediaStoragePath(''), null);
+});
+
+test('evaluateQrCleanupAction purges terminal QR passes after 7 days while preserving permanent and open-visit passes', () => {
+  const { evaluateQrCleanupAction, QR_CODE_RETENTION_MS } = _test;
+  const nowMillis = Date.UTC(2026, 10, 20, 12, 0, 0);
+
+  // 1. Active permanent pass -> keep forever
+  assert.deepEqual(
+    evaluateQrCleanupAction({ status: 'active', type: 'permanent', expireAt: null }, nowMillis),
+    { action: 'keep' }
+  );
+
+  // 2. Active temporary pass not yet expired -> keep
+  assert.deepEqual(
+    evaluateQrCleanupAction(
+      {
+        status: 'active',
+        type: 'temporary',
+        expiryTime: new Date(nowMillis + 3600_000),
+      },
+      nowMillis
+    ),
+    { action: 'keep' }
+  );
+
+  // 3. Expired or revoked pass whose visitor is STILL INSIDE -> never delete!
+  assert.deepEqual(
+    evaluateQrCleanupAction(
+      {
+        status: 'deactivated (expired)',
+        isInside: true,
+        deactivatedAt: new Date(nowMillis - 10 * 24 * 60 * 60 * 1000),
+        expireAt: new Date(nowMillis - 3 * 24 * 60 * 60 * 1000),
+      },
+      nowMillis
+    ),
+    { action: 'keep' }
+  );
+
+  // 4. Revoked pass 8 days after deactivatedAt -> delete
+  assert.deepEqual(
+    evaluateQrCleanupAction(
+      {
+        status: 'deactivated (revoked)',
+        deactivatedAt: new Date(nowMillis - 8 * 24 * 60 * 60 * 1000),
+      },
+      nowMillis
+    ),
+    { action: 'delete' }
+  );
+
+  // 5. Validated 1x supplier pass 3 days ago (legacy doc missing expireAt) -> backfill stamp_ttl
+  const usedAt = nowMillis - 3 * 24 * 60 * 60 * 1000;
+  const backfillAction = evaluateQrCleanupAction(
+    {
+      status: 'deactivated (validated)',
+      usedAt,
+    },
+    nowMillis
+  );
+  assert.equal(backfillAction.action, 'stamp_ttl');
+  assert.equal(backfillAction.expireAtMillis, usedAt + QR_CODE_RETENTION_MS);
+
+  // 6. Legacy 'active' temporary pass whose expiryTime passed 9 days ago -> delete
+  assert.deepEqual(
+    evaluateQrCleanupAction(
+      {
+        status: 'active',
+        type: 'temporary',
+        expiryTime: new Date(nowMillis - 9 * 24 * 60 * 60 * 1000),
+      },
+      nowMillis
+    ),
+    { action: 'delete' }
+  );
+});
+
+test('Static Config Audit: storage_lifecycle.json and firestore.indexes.json configure 62-day media safety net and expireAt exemptions', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  const lifecyclePath = path.resolve(__dirname, '../../storage_lifecycle.json');
+  const lifecycleJson = JSON.parse(fs.readFileSync(lifecyclePath, 'utf8'));
+  assert.ok(Array.isArray(lifecycleJson.lifecycle?.rule));
+  const deleteRule = lifecycleJson.lifecycle.rule[0];
+  assert.equal(deleteRule.action.type, 'Delete');
+  assert.equal(deleteRule.condition.age, 62);
+  assert.deepEqual(deleteRule.condition.matchesPrefix, ['visitor_ids/', 'visitor_plates/']);
+
+  const indexesPath = path.resolve(__dirname, '../../firestore.indexes.json');
+  const indexesJson = JSON.parse(fs.readFileSync(indexesPath, 'utf8'));
+  const accessLogTtlOverride = indexesJson.fieldOverrides.find(
+    (f) => f.collectionGroup === 'access_logs' && f.fieldPath === 'expireAt'
+  );
+  const qrTtlOverride = indexesJson.fieldOverrides.find(
+    (f) => f.collectionGroup === 'qr_codes' && f.fieldPath === 'expireAt'
+  );
+  assert.deepEqual(accessLogTtlOverride?.indexes, []);
+  assert.deepEqual(qrTtlOverride?.indexes, []);
+});
+
+
+

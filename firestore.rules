@@ -96,13 +96,16 @@ service cloud.firestore {
         isAuthenticated() && 
         request.resource.data.creatorUid == request.auth.uid &&
         request.resource.data.status in ['active', 'valid'] &&
+        (!('expireAt' in request.resource.data) || request.resource.data.expireAt == null || request.resource.data.expireAt is timestamp) &&
         userHasPaidAddress(request.auth.uid)
       );
       allow update: if isAdmin() || (
         isAuthenticated() && 
         resource.data.creatorUid == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-        request.resource.data.status in ['revoked', 'deactivated (revoked)']
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deactivatedAt', 'expireAt']) &&
+        request.resource.data.status in ['revoked', 'deactivated (revoked)'] &&
+        (!('deactivatedAt' in request.resource.data) || request.resource.data.deactivatedAt is timestamp) &&
+        (!('expireAt' in request.resource.data) || request.resource.data.expireAt is timestamp)
       );
       allow delete: if isAdmin() || (isAuthenticated() && resource.data.creatorUid == request.auth.uid);
     }
@@ -111,10 +114,10 @@ service cloud.firestore {
       allow read: if isAdmin() || (
         isAuthenticated() && (
           resource.data.userUid == request.auth.uid ||
+          ('addressId' in resource.data && resource.data.addressId is string && isCallerAddressResident(resource.data.addressId)) ||
           resource.data.isConfirmed == true ||
           resource.data.status in ['approved (upcoming)', 'approved (in use)', 'closed', 'confirmed']
         )
-          ('addressId' in resource.data && resource.data.addressId is string && isCallerAddressResident(resource.data.addressId)) ||
       );
       allow write: if isAdmin();
     }

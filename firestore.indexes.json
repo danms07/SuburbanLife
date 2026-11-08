@@ -256,5 +256,16 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "access_logs",
+      "fieldPath": "expireAt",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "qr_codes",
+      "fieldPath": "expireAt",
+      "indexes": []
+    }
+  ]
 }

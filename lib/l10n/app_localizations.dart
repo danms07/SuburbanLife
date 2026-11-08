@@ -4441,6 +4441,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quota reached: Your household has already used all {limit} allowed ({period}) bookings for this amenity.'**
   String bookingQuotaExceededError(String period, int limit);
+
+  /// No description provided for @accessLogsRetentionBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-removal policy: Access logs and visitor verification photos are permanently deleted after 2 months (60 days).'**
+  String get accessLogsRetentionBanner;
+
+  /// No description provided for @qrPassRetentionBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire.'**
+  String get qrPassRetentionBanner;
 }
 
 class _AppLocalizationsDelegate

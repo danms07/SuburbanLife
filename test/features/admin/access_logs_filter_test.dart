@@ -606,6 +606,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final esBannerFinder = find.byKey(const Key('access_logs_retention_banner'));
+      expect(esBannerFinder, findsOneWidget);
+      expect(tester.getRect(esBannerFinder).right, lessThanOrEqualTo(360.0));
+      expect(
+        find.text(
+          'Política de eliminación automática: Los registros de acceso y las fotografías de verificación se eliminan permanentemente después de 2 meses (60 días).',
+        ),
+        findsOneWidget,
+      );
+
       for (final typeKey in ['all', 'visitor', 'supplier']) {
         final chipFinder = find.byKey(ValueKey('visitor_type_chip_$typeKey'));
         expect(chipFinder, findsOneWidget);
@@ -614,12 +624,35 @@ void main() {
         expect(rect.right, lessThanOrEqualTo(360.0));
       }
 
-      await tester.tap(find.byKey(const ValueKey('visitor_type_chip_supplier')));
+      final supplierChipFinder = find.byKey(const ValueKey('visitor_type_chip_supplier'));
+      await tester.ensureVisible(supplierChipFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(supplierChipFinder);
       await tester.pumpAndSettle();
 
       final badgeFinder = find.text('Búsqueda en base de datos activa');
       expect(badgeFinder, findsOneWidget);
       expect(tester.getRect(badgeFinder).right, lessThanOrEqualTo(360.0));
+    });
+
+    testWidgets('Renders English 60-day auto-removal retention banner in AdminAccessLogsScreen', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          locale: Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: AdminAccessLogsScreen(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('access_logs_retention_banner')), findsOneWidget);
+      expect(
+        find.text(
+          'Auto-removal policy: Access logs and visitor verification photos are permanently deleted after 2 months (60 days).',
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

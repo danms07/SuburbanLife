@@ -42,7 +42,10 @@ We process your information to:
 *   Data is stored using secure Backend-as-a-Service (BaaS) infrastructure with industry-standard database encryption and access controls.
 *   We do not sell your personal data to third parties. Telemetry data shared with Google Analytics and Firebase Crashlytics is used strictly for diagnostic and operational improvements.
 
-### 6. Account Deletion and Unrecoverability
+### 6. Data Retention, Account Deletion, and Unrecoverability
+*   **Automated Gatehouse Data Retention (60 Days & 7 Days)**:
+    *   **Access Logs & Visitor Verification Photos (`60 Days` / 2 Months)**: Gatehouse entry/exit logs (`access_logs`) and associated visitor identification and license plate verification photos (`visitor_ids/**` and `visitor_plates/**` in Cloud Storage) are automatically and permanently deleted **60 days** after the entry timestamp (or 60 days after the recorded exit timestamp when exit scanning is enabled).
+    *   **Inactive QR Passes (`7 Days`)**: Terminal QR passes (expired temporary passes, validated single-use supplier passes, and revoked passes) are automatically and permanently deleted **7 days** after expiration or deactivation. Active permanent passes remain valid until revoked by the resident or administrator.
 *   **Deletion Methods**: Users can purge their account at any time either directly via the in-app **"Delete Account"** option or by contacting the Condominium Administration.
 *   **Irreversible Action**: Upon triggering an account deletion, your profile credentials, personal data, and ownership proof documents are permanently and definitively deleted from active databases and file storage. **Deleted data cannot be recovered under any circumstances.**
 
@@ -89,7 +92,10 @@ Procesamos la información recopilada para:
 *   La información se almacena en infraestructura de nube segura (BaaS) con estándares de cifrado y controles de acceso restringidos.
 *   No vendemos ni comercializamos sus datos personales. Los datos analíticos compartidos con Google Analytics y Firebase Crashlytics se emplean únicamente para mantenimiento técnico e investigación de fallas.
 
-### 6. Eliminación de Cuenta e Irrecuperabilidad de Datos
+### 6. Retención de Datos, Eliminación de Cuenta e Irrecuperabilidad
+*   **Política Automática de Retención en Caseta (60 Días y 7 Días)**:
+    *   **Bitácora de Accesos y Fotografías de Verificación (`60 Días` / 2 Meses)**: Los registros de entrada y salida en caseta (`access_logs`), así como las fotografías de identificaciones y placas vehiculares asociadas (`visitor_ids/**` y `visitor_plates/**` en Cloud Storage), se eliminan de forma automática y permanente **60 días** después de la fecha de ingreso (o 60 días después de la salida registrada cuando el escaneo de salida está activo).
+    *   **Pases QR Inactivos (`7 Días`)**: Los códigos QR finalizados (pases temporales vencidos, pases de proveedor de un solo uso ya validados y pases revocados) se eliminan de forma automática y permanente **7 días** después de su vencimiento o desactivación. Los pases permanentes activos no vencen mientras no sean revocados.
 *   **Mecanismos de Eliminación**: Los usuarios pueden solicitar la baja de su cuenta en cualquier momento a través de la opción **"Eliminar Cuenta"** dentro de la aplicación o poniéndose en contacto directo con la Administración del Condominio.
 *   **Acción Irreversible**: Al procesar la eliminación de la cuenta, sus credenciales, registros personales y expedientes de propiedad se borrarán de manera permanente y definitiva. **No habrá forma de recuperar los datos eliminados bajo ninguna circunstancia.**
 

@@ -1,5 +1,5 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { onDocumentCreated, onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentWritten, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { initializeApp, getApp, getApps, cert, applicationDefault } = require('firebase-admin/app');
 const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestore');
@@ -9,6 +9,7 @@ const { getStorage } = require('firebase-admin/storage');
 const { GoogleGenAI } = require('@google/genai');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const path = require('path');
 
 const admin = {
   initializeApp,
@@ -570,7 +571,6 @@ exports.createBooking = onCall(callableOptions, async (request) => {
           }
         }
       }
-    }
 
       validateHouseholdBookingRestriction({
         facData,
@@ -579,6 +579,7 @@ exports.createBooking = onCall(callableOptions, async (request) => {
         householdBookings: Array.from(householdBookingsMap.values()),
         timeZone,
       });
+    }
 
     // 3. Clashes validation (Capacity & Quantity check): bounded time range
     const quantity = facData.quantity || 1;
@@ -592,8 +593,8 @@ exports.createBooking = onCall(callableOptions, async (request) => {
 
     const events = [];
     for (const doc of clashes.docs) {
-      const b = doc.data();
       if (doc.id === resubmitBookingId) continue;
+      const b = doc.data();
       // Ignore cancelled or rejected bookings
       if (b.status === 'cancelled' || b.status === 'rejected') {
         continue;
@@ -665,9 +666,9 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       bookingId: bookingRef.id,
       facilityId,
       userUid: uid,
-      startTime,
       addressId: callerAddressId || null,
       addressRef: callerAddressRef || null,
+      startTime,
       endTime,
       status: 'pending review',
       isConfirmed: false,
@@ -782,7 +783,6 @@ function getNowInTimezone(timeZone = 'America/Mexico_City') {
  * Helper: Validates facility booking anticipation and daily operating hours windows.
  */
 function validateFacilityBooking({ facData, startTime, endTime, timeZone = 'America/Mexico_City', now = Date.now() }) {
-  if (!facData) return;
   if (
     typeof startTime !== 'number' ||
     typeof endTime !== 'number' ||
@@ -792,6 +792,7 @@ function validateFacilityBooking({ facData, startTime, endTime, timeZone = 'Amer
   ) {
     throw new HttpsError('invalid-argument', 'End time must be after start time.');
   }
+  if (!facData) return;
 
   // 1. Anticipation window
   const anticipationUnit = facData.anticipationUnit || 'unrestricted';
@@ -844,7 +845,6 @@ function validateFacilityBooking({ facData, startTime, endTime, timeZone = 'Amer
   }
 }
 
-/**
 /**
  * Normalizes a facility document's booking restriction configuration, preserving
  * backward compatibility with legacy documents that only specify cooldownUnit/cooldownValue.
@@ -1037,6 +1037,7 @@ function validateHouseholdBookingRestriction({
   return restriction;
 }
 
+/**
  * Helper: Validates that a delivery date is valid and not in the future.
  * Returns parsed Date object, or null if no deliveryDate was provided.
  */
@@ -1255,6 +1256,25 @@ exports.checkMonthlyPaymentStatuses = onSchedule({
     }
   } catch (qrError) {
     console.error('Error expiring outdated QR codes in scheduled job:', qrError);
+  }
+
+  try {
+    const purgedQrCount = await purgeExpiredQrCodes(db);
+    if (purgedQrCount > 0) {
+      console.log(`Purged ${purgedQrCount} terminal QR codes past 7-day retention.`);
+    }
+  } catch (qrPurgeError) {
+    console.error('Error purging expired QR codes in scheduled job:', qrPurgeError);
+  }
+
+  try {
+    const bucket = admin.storage().bucket();
+    const purgedLogsCount = await purgeExpiredAccessLogs(db, bucket);
+    if (purgedLogsCount > 0) {
+      console.log(`Purged ${purgedLogsCount} access logs and associated media past 60-day retention.`);
+    }
+  } catch (logPurgeError) {
+    console.error('Error purging expired access logs in scheduled job:', logPurgeError);
   }
 });
 
@@ -2436,8 +2456,179 @@ function getQrExpiryMillis(qrData) {
   return 0;
 }
 
+const ACCESS_LOG_RETENTION_DAYS = 60;
+const ACCESS_LOG_RETENTION_MS = ACCESS_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const QR_CODE_RETENTION_DAYS = 7;
+const QR_CODE_RETENTION_MS = QR_CODE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const ALLOWED_VISITOR_MEDIA_PREFIXES = ['visitor_ids/', 'visitor_plates/'];
+const TERMINAL_QR_STATUSES = [
+  'deactivated (expired)',
+  'expired',
+  'deactivated (validated)',
+  'used',
+  'deactivated (revoked)',
+  'revoked',
+  'deactivated',
+];
+
 /**
- * Marks active QR codes whose expiration time has passed as 'deactivated (expired)'.
+ * Computes the millisecond expiration timestamp for an access log (+60 days).
+ */
+function computeAccessLogExpireAtMillis(baseInput = Date.now()) {
+  const baseMillis =
+    typeof baseInput === 'number' ? baseInput : (extractTimestampMillis(baseInput) || Date.now());
+  return baseMillis + ACCESS_LOG_RETENTION_MS;
+}
+
+/**
+ * Computes the millisecond expiration timestamp for a terminal QR code (+7 days).
+ */
+function computeQrCodeExpireAtMillis(baseInput = Date.now()) {
+  const baseMillis =
+    typeof baseInput === 'number' ? baseInput : (extractTimestampMillis(baseInput) || Date.now());
+  return baseMillis + QR_CODE_RETENTION_MS;
+}
+
+/**
+ * Safely extracts and validates a Cloud Storage object path strictly within
+ * `visitor_ids/` or `visitor_plates/`. Rejects traversal sequences, null bytes,
+ * backslashes, and paths outside visitor media directories.
+ */
+function extractVisitorMediaStoragePath(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return null;
+  const trimmed = rawUrl.trim();
+  if (!trimmed || trimmed.includes('\0') || /%00/i.test(trimmed)) {
+    return null;
+  }
+
+  let candidate = null;
+  try {
+    if (/^https?:\/\//i.test(trimmed)) {
+      const parsed = new URL(trimmed);
+      const restMatch = parsed.pathname.match(/^\/v0\/b\/[^/]+\/o\/(.+)$/);
+      if (restMatch) {
+        candidate = decodeURIComponent(restMatch[1]);
+      } else if (parsed.hostname === 'storage.googleapis.com') {
+        const gcsMatch = parsed.pathname.match(/^\/[^/]+\/(.+)$/);
+        if (gcsMatch) {
+          candidate = decodeURIComponent(gcsMatch[1]);
+        }
+      } else if (
+        parsed.pathname.startsWith('/visitor_ids/') ||
+        parsed.pathname.startsWith('/visitor_plates/')
+      ) {
+        candidate = decodeURIComponent(parsed.pathname.slice(1));
+      }
+    } else if (/^gs:\/\//i.test(trimmed)) {
+      const gsMatch = trimmed.match(/^gs:\/\/[^/]+\/(.+)$/);
+      if (gsMatch) {
+        candidate = decodeURIComponent(gsMatch[1]);
+      }
+    } else if (!trimmed.includes('://')) {
+      candidate = decodeURIComponent(trimmed);
+    }
+  } catch (_) {
+    return null;
+  }
+
+  if (!candidate || typeof candidate !== 'string') return null;
+  if (
+    candidate.includes('\0') ||
+    candidate.includes('\\') ||
+    candidate.startsWith('/') ||
+    candidate.endsWith('/')
+  ) {
+    return null;
+  }
+
+  const segments = candidate.split('/');
+  if (segments.some((seg) => !seg || seg === '.' || seg === '..')) {
+    return null;
+  }
+
+  const normalized = path.posix.normalize(candidate);
+  if (normalized !== candidate) {
+    return null;
+  }
+
+  const matchedPrefix = ALLOWED_VISITOR_MEDIA_PREFIXES.find((prefix) =>
+    normalized.startsWith(prefix)
+  );
+  if (!matchedPrefix) {
+    return null;
+  }
+
+  const relativeName = normalized.slice(matchedPrefix.length);
+  if (!relativeName || !path.posix.basename(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+/**
+ * Returns true if a QR code document is in a terminal (inactive) status.
+ */
+function isTerminalQrStatus(qrData) {
+  if (!qrData || typeof qrData !== 'object') return false;
+  const rawStatus = typeof qrData.status === 'string' ? qrData.status.trim().toLowerCase() : 'active';
+  if (TERMINAL_QR_STATUSES.includes(rawStatus)) {
+    return true;
+  }
+  return qrData.isValid === false;
+}
+
+/**
+ * Determines the retention action ('keep' | 'delete' | 'stamp_ttl') for a QR code document.
+ * - Preserves any pass with an active open visit (`isInside === true`).
+ * - Preserves active permanent passes and non-expired temporary passes.
+ * - Deletes terminal passes once their 7-day retention window has elapsed.
+ * - Backfills `expireAt` on legacy terminal passes missing an explicit TTL field.
+ */
+function evaluateQrCleanupAction(qrData, nowMillis = Date.now()) {
+  if (!qrData || typeof qrData !== 'object') {
+    return { action: 'keep' };
+  }
+  if (qrData.isInside === true) {
+    return { action: 'keep' };
+  }
+
+  const expMillis = getQrExpiryMillis(qrData);
+  const terminal = isTerminalQrStatus(qrData);
+
+  if (!terminal) {
+    if (expMillis > 0 && nowMillis >= computeQrCodeExpireAtMillis(expMillis)) {
+      return { action: 'delete' };
+    }
+    return { action: 'keep' };
+  }
+
+  const expireAtMillis = extractTimestampMillis(qrData.expireAt);
+  if (expireAtMillis > 0) {
+    return nowMillis >= expireAtMillis ? { action: 'delete' } : { action: 'keep' };
+  }
+
+  const refMillis =
+    extractTimestampMillis(qrData.deactivatedAt) ||
+    extractTimestampMillis(qrData.usedAt) ||
+    extractTimestampMillis(qrData.revokedAt) ||
+    expMillis;
+
+  if (refMillis > 0) {
+    const targetExpireAt = computeQrCodeExpireAtMillis(refMillis);
+    if (nowMillis >= targetExpireAt) {
+      return { action: 'delete' };
+    }
+    return { action: 'stamp_ttl', expireAtMillis: targetExpireAt };
+  }
+
+  // Legacy terminal pass with no terminal/expiry timestamp: grant a 7-day window from first sweep
+  return { action: 'stamp_ttl', expireAtMillis: computeQrCodeExpireAtMillis(nowMillis) };
+}
+
+/**
+ * Marks active QR codes whose expiration time has passed as 'deactivated (expired)'
+ * and stamps their 7-day TTL `expireAt` (unless a visitor is currently inside).
  */
 async function expireOutdatedQrCodes(db, nowMillis = Date.now()) {
   const activeSnap = await db.collection('qr_codes').where('status', '==', 'active').get();
@@ -2455,6 +2646,10 @@ async function expireOutdatedQrCodes(db, nowMillis = Date.now()) {
       batch.update(doc.ref, {
         status: 'deactivated (expired)',
         isValid: false,
+        deactivatedAt: admin.firestore.Timestamp.fromMillis(nowMillis),
+        expireAt: data.isInside === true
+          ? null
+          : admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(expMillis)),
       });
       expiredCount++;
       opCount++;
@@ -2476,6 +2671,230 @@ async function expireOutdatedQrCodes(db, nowMillis = Date.now()) {
 
   return expiredCount;
 }
+
+/**
+ * Purges terminal QR codes (`expired`, `validated`, `revoked`) whose 7-day retention
+ * period has elapsed, and stamps `expireAt` on legacy terminal documents missing TTL metadata.
+ */
+async function purgeExpiredQrCodes(db, nowMillis = Date.now()) {
+  const terminalSnap = await db
+    .collection('qr_codes')
+    .where('status', 'in', TERMINAL_QR_STATUSES)
+    .get();
+  if (terminalSnap.empty) return 0;
+
+  let deletedCount = 0;
+  let batch = db.batch();
+  let opCount = 0;
+  const batches = [];
+
+  for (const doc of terminalSnap.docs) {
+    const data = doc.data() || {};
+    const decision = evaluateQrCleanupAction(data, nowMillis);
+    if (decision.action === 'delete') {
+      batch.delete(doc.ref);
+      deletedCount++;
+      opCount++;
+    } else if (decision.action === 'stamp_ttl' && decision.expireAtMillis > 0) {
+      batch.update(doc.ref, {
+        expireAt: admin.firestore.Timestamp.fromMillis(decision.expireAtMillis),
+      });
+      opCount++;
+    }
+
+    if (opCount === 500) {
+      batches.push(batch);
+      batch = db.batch();
+      opCount = 0;
+    }
+  }
+
+  if (opCount > 0) {
+    batches.push(batch);
+  }
+
+  for (const b of batches) {
+    await b.commit();
+  }
+
+  return deletedCount;
+}
+
+/**
+ * Cascading cleanup executed when an `access_logs` document expires or is deleted:
+ * 1. Deletes allow-listed `visitor_ids/` and `visitor_plates/` Cloud Storage files idempotently.
+ * 2. Self-heals the linked `qr_codes` document if it was still marked `isInside: true` for this log.
+ */
+async function cleanupDeletedAccessLogResources({
+  db,
+  bucket,
+  logId,
+  logData,
+  nowMillis = Date.now(),
+}) {
+  if (!logData || typeof logData !== 'object') {
+    return { deletedFilesCount: 0, qrHealed: false };
+  }
+
+  const mediaPaths = new Set();
+  const idPath = extractVisitorMediaStoragePath(logData.visitorIdPhotoUrl);
+  if (idPath) mediaPaths.add(idPath);
+  const platePath = extractVisitorMediaStoragePath(logData.visitorPlatePhotoUrl);
+  if (platePath) mediaPaths.add(platePath);
+
+  let deletedFilesCount = 0;
+  if (bucket && mediaPaths.size > 0) {
+    for (const storagePath of mediaPaths) {
+      try {
+        await bucket.file(storagePath).delete({ ignoreNotFound: true });
+        deletedFilesCount++;
+      } catch (err) {
+        const code = err && (err.code || err.status);
+        if (code !== 404 && code !== 'storage/object-not-found') {
+          console.error(`Error deleting visitor media for access log ${logId}:`, code || 'unknown');
+        }
+      }
+    }
+  }
+
+  let qrHealed = false;
+  const rawQrId = logData.qrCodeId || logData.qrId;
+  const qrCodeId = typeof rawQrId === 'string' ? rawQrId.trim() : '';
+  if (db && logData.isInside === true && qrCodeId) {
+    try {
+      const qrRef = db.collection('qr_codes').doc(qrCodeId);
+      await db.runTransaction(async (transaction) => {
+        const qrSnap = await transaction.get(qrRef);
+        if (!qrSnap.exists) return;
+        const qrData = qrSnap.data() || {};
+        if (
+          qrData.isInside === true &&
+          (!qrData.activeAccessLogId || qrData.activeAccessLogId === logId)
+        ) {
+          const expMillis = getQrExpiryMillis(qrData);
+          const qrPatch = {
+            isInside: false,
+            activeAccessLogId: null,
+          };
+
+          if (isOneTimeQrCode(qrData) && !isTerminalQrStatus(qrData)) {
+            qrPatch.status = 'deactivated (validated)';
+            qrPatch.isValid = false;
+            qrPatch.deactivatedAt = admin.firestore.Timestamp.fromMillis(nowMillis);
+            qrPatch.expireAt = admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(nowMillis));
+          } else if (expMillis > 0 && nowMillis > expMillis) {
+            if (!isTerminalQrStatus(qrData)) {
+              qrPatch.status = 'deactivated (expired)';
+              qrPatch.isValid = false;
+              qrPatch.deactivatedAt = admin.firestore.Timestamp.fromMillis(nowMillis);
+            }
+            qrPatch.expireAt = admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(nowMillis));
+          } else if (isTerminalQrStatus(qrData) && !qrData.expireAt) {
+            qrPatch.expireAt = admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(nowMillis));
+          } else if (expMillis > nowMillis) {
+            qrPatch.expireAt = admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(expMillis));
+          }
+
+          transaction.update(qrRef, qrPatch);
+          qrHealed = true;
+        }
+      });
+    } catch (qrErr) {
+      console.error(`Error healing QR inside state for deleted access log ${logId}:`, qrErr.message || 'unknown');
+    }
+  }
+
+  return { deletedFilesCount, qrHealed };
+}
+
+/**
+ * Daily fallback job that deletes `access_logs` older than 60 days (including legacy
+ * documents without `expireAt`) and cleans up their associated Cloud Storage media.
+ */
+async function purgeExpiredAccessLogs(
+  db,
+  bucket,
+  nowMillis = Date.now(),
+  batchLimit = 250,
+  maxBatches = 4
+) {
+  const cutoffMillis = nowMillis - ACCESS_LOG_RETENTION_MS;
+  const cutoffTimestamp = admin.firestore.Timestamp.fromMillis(cutoffMillis);
+  const skippedIds = new Set();
+  let totalDeleted = 0;
+
+  for (let i = 0; i < maxBatches; i++) {
+    const snap = await db
+      .collection('access_logs')
+      .where('timestamp', '<=', cutoffTimestamp)
+      .limit(batchLimit)
+      .get();
+    if (snap.empty) break;
+
+    const eligibleDocs = [];
+    for (const doc of snap.docs) {
+      if (skippedIds.has(doc.id)) continue;
+      const data = doc.data() || {};
+      const expireAtMillis = extractTimestampMillis(data.expireAt);
+      if (expireAtMillis > 0) {
+        if (nowMillis >= expireAtMillis) {
+          eligibleDocs.push(doc);
+        } else {
+          skippedIds.add(doc.id);
+        }
+      } else {
+        const refMillis =
+          extractTimestampMillis(data.exitTimestamp) || extractTimestampMillis(data.timestamp);
+        if (refMillis > 0 && nowMillis >= refMillis + ACCESS_LOG_RETENTION_MS) {
+          eligibleDocs.push(doc);
+        } else {
+          skippedIds.add(doc.id);
+        }
+      }
+    }
+
+    if (eligibleDocs.length === 0) break;
+
+    for (const doc of eligibleDocs) {
+      await cleanupDeletedAccessLogResources({
+        db,
+        bucket,
+        logId: doc.id,
+        logData: doc.data() || {},
+        nowMillis,
+      });
+    }
+
+    const batch = db.batch();
+    for (const doc of eligibleDocs) {
+      batch.delete(doc.ref);
+    }
+    await batch.commit();
+    totalDeleted += eligibleDocs.length;
+
+    if (snap.size < batchLimit) break;
+  }
+
+  return totalDeleted;
+}
+
+/**
+ * Firestore Trigger: Cleans up linked visitor ID/plate photos in Cloud Storage and
+ * heals open `qr_codes` state whenever an `access_logs` document is deleted (via TTL or Admin).
+ */
+exports.onAccessLogDeleted = onDocumentDeleted('access_logs/{logId}', async (event) => {
+  const logData = event.data ? event.data.data() : null;
+  if (!logData) return;
+
+  const db = admin.firestore();
+  const bucket = admin.storage().bucket();
+  await cleanupDeletedAccessLogResources({
+    db,
+    bucket,
+    logId: event.params.logId,
+    logData,
+  });
+});
 
 /**
  * Extracts a millisecond epoch timestamp from Firestore Timestamp, Date, number, ISO string, or serialized map.
@@ -2573,7 +2992,8 @@ function resolveOpenVisitLog({
  * - Temporary pass expiration against server clock on entry
  * - Linked resident address paymentStatus == 'paid' on entry
  * - Single-use pass invalidation upon entry (or upon exit when `scanOnExitEnabled` is active)
- * - Atomic audit entry / exit timestamp update in access_logs
+ * - Atomic audit entry / exit timestamp and 60-day `expireAt` TTL update in access_logs
+ * - 7-day `expireAt` TTL stamping on terminal qr_codes (held null while `isInside == true`)
  */
 exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) => {
   if (!request.auth || (!request.auth.token.guard && !request.auth.token.admin)) {
@@ -2623,6 +3043,7 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
     const qrData = qrSnap.data();
     const now = admin.firestore.Timestamp.now();
     const nowMillis = now.toMillis();
+    const accessLogExpireAt = admin.firestore.Timestamp.fromMillis(computeAccessLogExpireAtMillis(nowMillis));
 
     // Resolve Resident and Address data
     let residentName = '';
@@ -2737,10 +3158,11 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           };
         }
 
-        // Register exit on the open access log (or self-heal if missing)
+        // Register exit on the open access log and extend 60-day TTL from exit time
         if (openLogSnap) {
           transaction.update(openLogSnap.ref, {
             exitTimestamp: FieldValue.serverTimestamp(),
+            expireAt: accessLogExpireAt,
             isInside: false,
             exitGuardUid: guardUid,
             exitGuardName: guardName,
@@ -2756,9 +3178,25 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           qrExitUpdates.status = 'deactivated (validated)';
           qrExitUpdates.isValid = false;
           qrExitUpdates.usedAt = FieldValue.serverTimestamp();
-        } else if (expMillis > 0 && nowMillis > expMillis && qrData.status === 'active') {
-          qrExitUpdates.status = 'deactivated (expired)';
-          qrExitUpdates.isValid = false;
+          qrExitUpdates.deactivatedAt = FieldValue.serverTimestamp();
+          qrExitUpdates.expireAt = admin.firestore.Timestamp.fromMillis(
+            computeQrCodeExpireAtMillis(nowMillis)
+          );
+        } else if (expMillis > 0 && nowMillis > expMillis) {
+          if (qrData.status === 'active') {
+            qrExitUpdates.status = 'deactivated (expired)';
+            qrExitUpdates.isValid = false;
+            qrExitUpdates.deactivatedAt = FieldValue.serverTimestamp();
+          }
+          qrExitUpdates.expireAt = admin.firestore.Timestamp.fromMillis(
+            computeQrCodeExpireAtMillis(Math.max(expMillis, nowMillis))
+          );
+        } else if (expMillis > nowMillis) {
+          qrExitUpdates.expireAt = admin.firestore.Timestamp.fromMillis(
+            computeQrCodeExpireAtMillis(expMillis)
+          );
+        } else {
+          qrExitUpdates.expireAt = null;
         }
         transaction.update(qrRef, qrExitUpdates);
 
@@ -2798,6 +3236,7 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           addressRef: addressRef,
           timestamp: FieldValue.serverTimestamp(),
           exitTimestamp: null,
+          expireAt: accessLogExpireAt,
           isInside: false,
           visitorIdPhotoUrl: visitorIdPhotoUrl || '',
           visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
@@ -2821,6 +3260,8 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
         transaction.update(qrRef, {
           status: 'deactivated (expired)',
           isValid: false,
+          deactivatedAt: FieldValue.serverTimestamp(),
+          expireAt: admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(expMillis)),
         });
       }
 
@@ -2843,6 +3284,7 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           addressRef: addressRef,
           timestamp: FieldValue.serverTimestamp(),
           exitTimestamp: null,
+          expireAt: accessLogExpireAt,
           isInside: false,
           visitorIdPhotoUrl: visitorIdPhotoUrl || '',
           visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
@@ -2881,6 +3323,7 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           addressRef: addressRef,
           timestamp: FieldValue.serverTimestamp(),
           exitTimestamp: null,
+          expireAt: accessLogExpireAt,
           isInside: false,
           visitorIdPhotoUrl: visitorIdPhotoUrl || '',
           visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
@@ -2918,12 +3361,15 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
         transaction.update(qrRef, {
           isInside: true,
           activeAccessLogId: logRef.id,
+          expireAt: null,
         });
       } else if (isOneTime) {
         transaction.update(qrRef, {
           status: 'deactivated (validated)',
           isValid: false,
           usedAt: FieldValue.serverTimestamp(),
+          deactivatedAt: FieldValue.serverTimestamp(),
+          expireAt: admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(nowMillis)),
           isInside: false,
           activeAccessLogId: null,
         });
@@ -2931,6 +3377,9 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
         transaction.update(qrRef, {
           isInside: false,
           activeAccessLogId: null,
+          expireAt: expMillis > 0
+            ? admin.firestore.Timestamp.fromMillis(computeQrCodeExpireAtMillis(expMillis))
+            : null,
         });
       }
     }
@@ -2953,6 +3402,7 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
       addressRef: addressRef,
       timestamp: FieldValue.serverTimestamp(),
       exitTimestamp: null,
+      expireAt: accessLogExpireAt,
       isInside: markInside,
       visitorIdPhotoUrl: visitorIdPhotoUrl || '',
       visitorPlatePhotoUrl: visitorPlatePhotoUrl || '',
@@ -2969,8 +3419,6 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
     };
   });
 });
-
-const path = require('path');
 
 const ALLOWED_DOCUMENT_VISIBILITIES = ['all', 'admin'];
 const ALLOWED_DOCUMENT_FILE_TYPES = ['pdf', 'md', 'txt', 'docx', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'webp'];
@@ -3175,6 +3623,10 @@ exports._test = {
   getNowInTimezone,
   validateDeliveryDate,
   validateFacilityBooking,
+  resolveFacilityRestriction,
+  isCountedBookingForRestriction,
+  addCooldownOffset,
+  validateHouseholdBookingRestriction,
   recalculateAddressPaymentStatus,
   validateTransparencyDocInput,
   isEmulator,
@@ -3190,10 +3642,19 @@ exports._test = {
   extractTimestampMillis,
   isSameCalendarDayInTimezone,
   resolveOpenVisitLog,
+  ACCESS_LOG_RETENTION_DAYS,
+  ACCESS_LOG_RETENTION_MS,
+  QR_CODE_RETENTION_DAYS,
+  QR_CODE_RETENTION_MS,
+  TERMINAL_QR_STATUSES,
+  computeAccessLogExpireAtMillis,
+  computeQrCodeExpireAtMillis,
+  extractVisitorMediaStoragePath,
+  isTerminalQrStatus,
+  evaluateQrCleanupAction,
+  purgeExpiredQrCodes,
+  cleanupDeletedAccessLogResources,
+  purgeExpiredAccessLogs,
   admin,
 };
 
-  resolveFacilityRestriction,
-  isCountedBookingForRestriction,
-  addCooldownOffset,
-  validateHouseholdBookingRestriction,

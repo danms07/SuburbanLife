@@ -68,18 +68,33 @@ void main() {
   });
 
   group('QrService - invalidateQrCode', () {
-    test('updates document status to "deactivated (revoked)"', () async {
+    test('updates document status to "deactivated (revoked)" and stamps deactivatedAt + 7-day expireAt', () async {
       FakeBackendHelper.db.seedDocument('qr_codes', 'qr_active', {
         'id': 'qr_active',
         'creatorUid': 'user_1',
         'guestName': 'David',
         'status': 'active',
+        'expireAt': null,
       });
 
+      final before = DateTime.now();
       await qrService.invalidateQrCode('qr_active');
+      final after = DateTime.now();
 
       final updated = await FakeBackendHelper.db.getDocument('qr_codes', 'qr_active');
       expect(updated?['status'], equals('deactivated (revoked)'));
+      expect(updated?['deactivatedAt'], isNotNull);
+
+      final expireAt = updated?['expireAt'] as DateTime?;
+      expect(expireAt, isNotNull);
+      expect(
+        expireAt!.isAfter(before.add(const Duration(days: 7)).subtract(const Duration(seconds: 2))),
+        isTrue,
+      );
+      expect(
+        expireAt.isBefore(after.add(const Duration(days: 7, seconds: 2))),
+        isTrue,
+      );
     });
   });
 

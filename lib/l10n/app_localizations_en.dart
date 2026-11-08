@@ -2430,4 +2430,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String bookingQuotaExceededError(String period, int limit) {
     return 'Quota reached: Your household has already used all $limit allowed ($period) bookings for this amenity.';
   }
+
+  @override
+  String get accessLogsRetentionBanner =>
+      'Auto-removal policy: Access logs and visitor verification photos are permanently deleted after 2 months (60 days).';
+
+  @override
+  String get qrPassRetentionBanner =>
+      'Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire.';
 }

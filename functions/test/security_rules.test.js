@@ -68,6 +68,12 @@ test('Static Audit: firestore.rules enforces RBAC, field-level immutability, and
   const bookingsBlock = extractMatchBlock(source, 'match /bookings/{bookingId}');
   assert.match(bookingsBlock, /isCallerAddressResident\(resource\.data\.addressId\)/);
   assert.match(bookingsBlock, /allow write:\s*if isAdmin\(\);/);
+
+  // 7. QR codes collection: resident revocation restricts keys to status, deactivatedAt, and expireAt timestamps
+  const qrBlock = extractMatchBlock(source, 'match /qr_codes/{qrId}');
+  assert.match(qrBlock, /request\.resource\.data\.expireAt\s*==\s*null\s*\|\|\s*request\.resource\.data\.expireAt\s+is\s+timestamp/);
+  assert.match(qrBlock, /hasOnly\(\['status',\s*'deactivatedAt',\s*'expireAt'\]\)/);
+  assert.match(qrBlock, /request\.resource\.data\.deactivatedAt\s+is\s+timestamp/);
 });
 
 test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list, /sanctions/ coverage, and path ownership', () => {

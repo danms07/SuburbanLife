@@ -159,12 +159,13 @@ flowchart TD
 
 ### 4.3 Firebase Cloud Storage (Secure File Hosting)
 * **Role**: Encrypted cloud file vault for multimedia and binary documents.
-* **Function**: Securely stores ownership proof files (deed scans), payment receipts, gate verification photos (visitor IDs and vehicle license plates), transparency files, and announcement media.
+* **Function**: Securely stores ownership proof files (deed scans), payment receipts, gate verification photos (visitor IDs and vehicle license plates, protected by a 62-day GCS Object Lifecycle safety net on `visitor_ids/` and `visitor_plates/`), transparency files, and announcement media.
 
 ### 4.4 Cloud Functions for Firebase (Serverless Logic)
 * **Role**: Secure server-side execution environment for business-critical operations.
 * **Function**: Executes server-side code in isolated micro-containers in response to user actions or database events without running a persistent server:
-  * **Atomic QR Access Validation** (`validateAndRegisterQrAccess`): Evaluates access rules and writes the access log in a single secure cloud transaction.
+  * **Atomic QR Access Validation** (`validateAndRegisterQrAccess`): Evaluates access rules, stamps 60-day `expireAt` TTL metadata on `access_logs` and 7-day `expireAt` TTL metadata on terminal `qr_codes`, and writes the access log in a single secure cloud transaction.
+  * **Cascading Gatehouse Media & QR Cleanup** (`onAccessLogDeleted` & `checkMonthlyPaymentStatuses`): Deletes allow-listed `visitor_ids/` and `visitor_plates/` Cloud Storage files when `access_logs` documents expire via Firestore TTL (or are deleted), heals open-visit QR state, and runs daily fallback sweeps for legacy records.
   * **AI Announcement Translation** (`translateAnnouncement`): Calls Google Vertex AI (Gemini) keylessly to translate community bulletins between Spanish and English.
   * **Payment Recalculation Trigger** (`onPaymentWritten`): Automatically re-evaluates house payment status whenever a payment receipt is approved.
   * **Bulk Account & Address Creation** (`adminBulkImportResidents`, `adminBulkImportAddresses`): Creates accounts, assigns custom claims, and generates complex passwords securely in bulk.
@@ -277,6 +278,9 @@ Users can exercise their ARCO rights directly through their Condominium Administ
 
 ### 6.4 Automated Data Retention, Account Deletion & Data Purging
 
+* **Automated Gatehouse Retention Policies**:
+  * **60-Day Access Log & Visitor Photo Purge**: Gatehouse `access_logs` documents and their associated ID and license plate photos (`visitor_ids/**` and `visitor_plates/**`) are automatically purged **60 days** after entry (or 60 days after exit when exit scanning is enabled) via native Firestore TTL (`expireAt`), cascading `onAccessLogDeleted` Cloud Function deletion, daily scheduled fallback sweeps, and a 62-day Cloud Storage Object Lifecycle rule (`storage_lifecycle.json`).
+  * **7-Day Inactive QR Pass Purge**: Expired temporary passes, validated single-use supplier passes, and revoked QR passes (`qr_codes`) are automatically deleted **7 days** after expiration or deactivation, while active permanent passes never expire unless revoked.
 * **Self-Service & Admin Deletion**: Users can delete their account directly within the app via the **"Delete Account"** button or by requesting deletion from an administrator.
 * **Permanent & Irreversible Purge**: When an account is deleted, the user's credentials in Firebase Authentication, user document in Cloud Firestore, and ownership proof files in Cloud Storage are **permanently and irreversibly destroyed**.
 
