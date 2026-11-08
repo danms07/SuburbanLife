@@ -74,14 +74,37 @@ test('Static Audit: firestore.rules enforces RBAC, field-level immutability, and
   assert.match(qrBlock, /request\.resource\.data\.expireAt\s*==\s*null\s*\|\|\s*request\.resource\.data\.expireAt\s+is\s+timestamp/);
   assert.match(qrBlock, /hasOnly\(\['status',\s*'deactivatedAt',\s*'expireAt'\]\)/);
   assert.match(qrBlock, /request\.resource\.data\.deactivatedAt\s+is\s+timestamp/);
+
+  // 8. Booking attachments collection: isolated to admin, booking owner, or household roommate (never readable merely because booking isConfirmed)
+  const bookingAttBlock = extractMatchBlock(source, 'match /booking_attachments/{bookingId}');
+  assert.match(bookingAttBlock, /resource\.data\.userUid\s*==\s*request\.auth\.uid/);
+  assert.match(bookingAttBlock, /isCallerAddressResident\(resource\.data\.addressId\)/);
+  assert.doesNotMatch(bookingAttBlock, /isConfirmed/);
+  assert.match(bookingAttBlock, /allow write:\s*if isAdmin\(\);/);
 });
 
-test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list, /sanctions/ coverage, and path ownership', () => {
+test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list (excluding SVG), /sanctions/, /facility_documents/, and /booking_attachments/ coverage', () => {
   const source = fs.readFileSync(STORAGE_RULES_PATH, 'utf8');
 
   assert.match(source, /request\.resource\.size\s*<\s*10\s*\*\s*1024\s*\*\s*1024/);
   assert.match(source, /request\.resource\.contentType\.matches\('image\/\.\*'\)/);
   assert.match(source, /request\.resource\.contentType\s*==\s*'application\/pdf'/);
+  assert.doesNotMatch(source, /svg/);
+
+  const facilityDocsHelperIdx = source.indexOf('function isAllowedFacilityOrBookingDoc()');
+  assert.notEqual(facilityDocsHelperIdx, -1);
+  assert.match(source, /'application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document'/);
+  assert.match(source, /'application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet'/);
+  assert.match(source, /'image\/webp'/);
+
+  const facilityDocsBlock = extractMatchBlock(source, 'match /facility_documents/{facilityId}/{allPaths=**}');
+  assert.match(facilityDocsBlock, /allow read:\s*if isAuthenticated\(\);/);
+  assert.match(facilityDocsBlock, /isAdmin\(\)\s*&&\s*isValidUploadSize\(\)\s*&&\s*isAllowedFacilityOrBookingDoc\(\)/);
+  assert.match(facilityDocsBlock, /allow delete:\s*if isAdmin\(\);/);
+
+  const bookingAttStorageBlock = extractMatchBlock(source, 'match /booking_attachments/{userId}/{allPaths=**}');
+  assert.match(bookingAttStorageBlock, /request\.auth\.uid\s*==\s*userId/);
+  assert.match(bookingAttStorageBlock, /isValidUploadSize\(\)\s*&&\s*isAllowedFacilityOrBookingDoc\(\)/);
 
   const adminDocsBlock = extractMatchBlock(source, 'match /documents/admin_only/{allPaths=**}');
   assert.match(adminDocsBlock, /allow read,\s*write:\s*if isAdmin\(\);/);
@@ -178,12 +201,25 @@ test('Live Emulator Audit: evaluates Firestore Security Rules against unauthenti
     token: 'owner',
     body: { uid: 'rules_res_1', name: 'Rule Resident', email: 'r@test.local', role: 'resident' },
   });
+  await restRequest('PATCH', 'users/rules_neighbor_1', {
+    token: 'owner',
+    body: { uid: 'rules_neighbor_1', name: 'Neighbor Resident', email: 'n@test.local', role: 'resident' },
+  });
   await restRequest('PATCH', 'sanctions/rules_sanc_1', {
     token: 'owner',
     body: { id: 'rules_sanc_1', residentUid: 'rules_res_1', authorizedUids: ['rules_res_1'], status: 'active', amount: 300 },
   });
+  await restRequest('PATCH', 'bookings/rules_bk_1', {
+    token: 'owner',
+    body: { id: 'rules_bk_1', userUid: 'rules_res_1', status: 'approved (upcoming)', isConfirmed: true },
+  });
+  await restRequest('PATCH', 'booking_attachments/rules_bk_1', {
+    token: 'owner',
+    body: { bookingId: 'rules_bk_1', userUid: 'rules_res_1', facilityId: 'clubhouse' },
+  });
 
   const residentJwt = buildLocalEmulatorJwt('rules_res_1', { resident: true });
+  const neighborJwt = buildLocalEmulatorJwt('rules_neighbor_1', { resident: true });
   const adminJwt = buildLocalEmulatorJwt('rules_admin_1', { admin: true });
 
   // 1. Unauthenticated access is denied
@@ -223,5 +259,18 @@ test('Live Emulator Audit: evaluates Firestore Security Rules against unauthenti
       body: { status: 'pending_review', paymentId: 'pay_123' },
     }),
     200
+  );
+
+  // 6. Neighbor can read confirmed slot in bookings/rules_bk_1, but is strictly denied (403) on booking_attachments/rules_bk_1
+  assert.equal(await restRequest('GET', 'bookings/rules_bk_1', { token: neighborJwt }), 200);
+  assert.equal(await restRequest('GET', 'booking_attachments/rules_bk_1', { token: neighborJwt }), 403);
+  assert.equal(await restRequest('GET', 'booking_attachments/rules_bk_1', { token: residentJwt }), 200);
+  assert.equal(await restRequest('GET', 'booking_attachments/rules_bk_1', { token: adminJwt }), 200);
+  assert.equal(
+    await restRequest('PATCH', 'booking_attachments/rules_bk_1', {
+      token: residentJwt,
+      body: { bookingId: 'rules_bk_1', userUid: 'rules_res_1', facilityId: 'tampered' },
+    }),
+    403
   );
 });

@@ -4453,6 +4453,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire.'**
   String get qrPassRetentionBanner;
+
+  /// No description provided for @facilityDocsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Amenity Documentation'**
+  String get facilityDocsSectionTitle;
+
+  /// No description provided for @facilityDocsSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload forms or rules (PDF, Word, Excel, JPG, PNG, WEBP — max 10 MB each).'**
+  String get facilityDocsSectionSubtitle;
+
+  /// No description provided for @addFacilityDocumentButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Document'**
+  String get addFacilityDocumentButton;
+
+  /// No description provided for @noFacilityDocumentsAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents configured for this amenity.'**
+  String get noFacilityDocumentsAdded;
+
+  /// No description provided for @facilityDocTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Title'**
+  String get facilityDocTitleLabel;
+
+  /// No description provided for @facilityDocModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Requirement Type'**
+  String get facilityDocModeLabel;
+
+  /// No description provided for @facilityDocModeMandatory.
+  ///
+  /// In en, this message translates to:
+  /// **'Required return (resident must attach)'**
+  String get facilityDocModeMandatory;
+
+  /// No description provided for @facilityDocModeOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional return (attachment optional)'**
+  String get facilityDocModeOptional;
+
+  /// No description provided for @facilityDocModeInformative.
+  ///
+  /// In en, this message translates to:
+  /// **'Informative only (download/read only)'**
+  String get facilityDocModeInformative;
+
+  /// No description provided for @facilityDocBadgeMandatory.
+  ///
+  /// In en, this message translates to:
+  /// **'Required Return'**
+  String get facilityDocBadgeMandatory;
+
+  /// No description provided for @facilityDocBadgeOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional Return'**
+  String get facilityDocBadgeOptional;
+
+  /// No description provided for @facilityDocBadgeInformative.
+  ///
+  /// In en, this message translates to:
+  /// **'Informative'**
+  String get facilityDocBadgeInformative;
+
+  /// No description provided for @facilitySubtitleDocs.
+  ///
+  /// In en, this message translates to:
+  /// **'Docs: {total}'**
+  String facilitySubtitleDocs(int total);
+
+  /// No description provided for @facilitySubtitleDocsWithMandatory.
+  ///
+  /// In en, this message translates to:
+  /// **'Docs: {total} ({mandatory} required)'**
+  String facilitySubtitleDocsWithMandatory(int total, int mandatory);
+
+  /// No description provided for @bookingDocsInstructionBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Download the amenity documents below. Items marked as Required Return must be completed and attached to submit your booking.'**
+  String get bookingDocsInstructionBanner;
+
+  /// No description provided for @downloadFacilityDocumentButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download / View'**
+  String get downloadFacilityDocumentButton;
+
+  /// No description provided for @attachCompletedFileButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach File'**
+  String get attachCompletedFileButton;
+
+  /// No description provided for @takeDocumentPhotoButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Take Photo'**
+  String get takeDocumentPhotoButton;
+
+  /// No description provided for @replaceAttachedFileButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get replaceAttachedFileButton;
+
+  /// No description provided for @removeAttachedFileTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove attachment'**
+  String get removeAttachedFileTooltip;
+
+  /// No description provided for @missingMandatoryDocumentsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please attach all required documents before submitting: {titles}'**
+  String missingMandatoryDocumentsError(String titles);
+
+  /// No description provided for @invalidDocumentContentError.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected file content does not match its file extension or is corrupted.'**
+  String get invalidDocumentContentError;
+
+  /// No description provided for @bookingAttachmentsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted Documentation'**
+  String get bookingAttachmentsSectionTitle;
+
+  /// No description provided for @noBookingAttachmentsSubmitted.
+  ///
+  /// In en, this message translates to:
+  /// **'No attachments submitted.'**
+  String get noBookingAttachmentsSubmitted;
+
+  /// No description provided for @viewBookingAttachmentButton.
+  ///
+  /// In en, this message translates to:
+  /// **'View / Download'**
+  String get viewBookingAttachmentButton;
+
+  /// No description provided for @bookingAttachmentsCountBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} attachment(s)'**
+  String bookingAttachmentsCountBadge(int count);
+
+  /// No description provided for @bookingAttachmentsPurgedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachments automatically removed 30 days after booking completion per privacy policy.'**
+  String get bookingAttachmentsPurgedNotice;
+
+  /// No description provided for @bookingAttachmentsRetentionHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled).'**
+  String get bookingAttachmentsRetentionHelper;
 }
 
 class _AppLocalizationsDelegate

@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/document_transfer_helper.dart';
 import '../../l10n/app_localizations.dart';
+import '../booking/booking_service.dart';
+import '../booking/facility_document_models.dart';
+import '../booking/widgets/facility_documents_section.dart';
 
 class AdminBookingApprovalScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -14,6 +18,7 @@ class AdminBookingApprovalScreen extends StatefulWidget {
 }
 
 class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen> {
+  final BookingService _bookingService = BookingService();
   bool _isProcessing = false;
 
   void _approveBooking(String bookingId, [String presetMsg = '']) async {
@@ -156,7 +161,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
 
     try {
       final reason = notesController.text.trim();
-      debugPrint('>>> [AdminBookingApproval] Rejecting booking: $bookingId, reason: $reason');
+      debugPrint('>>> [AdminBookingApproval] Rejecting booking: $bookingId');
       await DatabaseService().updateDocument('bookings', bookingId, {
         'status': 'rejected',
         'isConfirmed': false,
@@ -247,6 +252,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
               return _BookingApprovalCard(
                 key: ValueKey(booking['id'] ?? index),
                 booking: booking,
+                bookingService: _bookingService,
                 isProcessing: _isProcessing,
                 onApprove: (preset) => _approveBooking(booking['id'], preset),
                 onReject: () => _rejectBooking(booking['id']),
@@ -261,6 +267,7 @@ class _AdminBookingApprovalScreenState extends State<AdminBookingApprovalScreen>
 
 class _BookingApprovalCard extends StatelessWidget {
   final Map<String, dynamic> booking;
+  final BookingService bookingService;
   final bool isProcessing;
   final void Function(String presetMessage) onApprove;
   final VoidCallback onReject;
@@ -268,6 +275,7 @@ class _BookingApprovalCard extends StatelessWidget {
   const _BookingApprovalCard({
     super.key,
     required this.booking,
+    required this.bookingService,
     required this.isProcessing,
     required this.onApprove,
     required this.onReject,
@@ -292,8 +300,10 @@ class _BookingApprovalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final bookingId = booking['id']?.toString() ?? '';
     final facilityId = booking['facilityId']?.toString() ?? 'unknown';
     final userUid = booking['userUid']?.toString() ?? '';
+    final hasAttachments = booking['hasAttachments'] == true;
 
     DateTime start;
     DateTime end;
@@ -322,6 +332,8 @@ class _BookingApprovalCard extends StatelessWidget {
         final facDoc = facilitySnapshot.data;
         final name = _getFacilityName(l10n, facilityId, facDoc);
         final presetMsg = facDoc?['presetApprovalMessage']?.toString() ?? '';
+        final facTemplates = FacilityDocumentTemplate.parseList(facDoc?['facilityDocuments']);
+        final facilityAcceptsAttachments = facTemplates.any((t) => t.requirementMode.acceptsAttachment);
 
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -354,141 +366,244 @@ class _BookingApprovalCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.orange.shade300),
-                  ),
-                  child: Text(
-                    l10n.pendingReview.toUpperCase(),
-                    style: TextStyle(
-                      color: Colors.orange.shade800,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.orange.shade300),
+                      ),
+                      child: Text(
+                        l10n.pendingReview.toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.orange.shade800,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            const Divider(height: 20),
+                const Divider(height: 20),
 
-            // Date & Time Slot
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 18, color: Colors.grey.shade700),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${DateFormat('EEEE, MMM dd, yyyy').format(start)} • ${DateFormat('hh:mm a').format(start)} - ${DateFormat('hh:mm a').format(end)}',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                  ),
+                // Date & Time Slot
+                Row(
+                  children: [
+                    Icon(Icons.access_time, size: 18, color: Colors.grey.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${DateFormat('EEEE, MMM dd, yyyy').format(start)} • ${DateFormat('hh:mm a').format(start)} - ${DateFormat('hh:mm a').format(end)}',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-            // Applicant Information
-            StreamBuilder<Map<String, dynamic>?>(
-              stream: DatabaseService().streamDocument('users', userUid),
-              builder: (context, userSnapshot) {
-                final userDoc = userSnapshot.data;
-                final name = userDoc?['name']?.toString() ?? userUid;
-                final email = userDoc?['email']?.toString() ?? '';
-                final phone = userDoc?['phoneNumber']?.toString() ?? '';
+                // Applicant Information
+                StreamBuilder<Map<String, dynamic>?>(
+                  stream: DatabaseService().streamDocument('users', userUid),
+                  builder: (context, userSnapshot) {
+                    final userDoc = userSnapshot.data;
+                    final applicantName = userDoc?['name']?.toString() ?? userUid;
+                    final email = userDoc?['email']?.toString() ?? '';
+                    final phone = userDoc?['phoneNumber']?.toString() ?? '';
 
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.person_outline, size: 16, color: Colors.grey.shade700),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              '${l10n.applicant}: $name',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          Row(
+                            children: [
+                              Icon(Icons.person_outline, size: 16, color: Colors.grey.shade700),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${l10n.applicant}: $applicantName',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
+                          if (email.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.email_outlined, size: 16, color: Colors.grey.shade600),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    email,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (phone.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.phone_outlined, size: 16, color: Colors.grey.shade600),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    phone,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
-                      if (email.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.email_outlined, size: 16, color: Colors.grey.shade600),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                email,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (phone.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.phone_outlined, size: 16, color: Colors.grey.shade600),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                phone,
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Actions: Approve & Reject
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: isProcessing ? null : onReject,
-                  icon: const Icon(Icons.close, size: 18, color: Colors.redAccent),
-                  label: Text(l10n.reject, style: const TextStyle(color: Colors.redAccent)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.redAccent),
-                  ),
+                    );
+                  },
                 ),
-                ElevatedButton.icon(
-                  onPressed: isProcessing ? null : () => onApprove(presetMsg),
-                  icon: const Icon(Icons.check, size: 18),
-                  label: Text(l10n.approve),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConfig.secondaryColor,
-                    foregroundColor: Colors.white,
+
+                // Submitted Documentation Section
+                if ((hasAttachments || facilityAcceptsAttachments) && bookingId.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  StreamBuilder<List<SubmittedBookingAttachment>>(
+                    stream: bookingService.streamBookingAttachments(bookingId),
+                    builder: (context, attSnapshot) {
+                      final attachments = attSnapshot.data ?? const <SubmittedBookingAttachment>[];
+                      if (attachments.isEmpty && !hasAttachments) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppConfig.primaryColor.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.attach_file, size: 16, color: AppConfig.primaryColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  l10n.bookingAttachmentsSectionTitle,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: AppConfig.primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (attachments.isEmpty)
+                              Text(
+                                l10n.noBookingAttachmentsSubmitted,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                  color: Colors.grey.shade600,
+                                ),
+                              )
+                            else
+                              ...attachments.map((att) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    alignment: WrapAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            DocumentTransferHelper.iconForExtension(att.fileType),
+                                            size: 18,
+                                            color: AppConfig.primaryColor,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Flexible(
+                                            child: Text(
+                                              '${att.title} (${att.fileName})',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          FacilityDocumentsSection.buildModeBadge(l10n, att.requirementMode),
+                                        ],
+                                      ),
+                                      OutlinedButton.icon(
+                                        key: ValueKey('approval_view_attachment_${bookingId}_${att.facilityDocId}'),
+                                        onPressed: () {
+                                          DocumentTransferHelper.openOrDownloadDocument(
+                                            context: context,
+                                            cacheId: 'batt_${bookingId}_${att.facilityDocId}',
+                                            url: att.url,
+                                            fileName: att.fileName,
+                                            title: att.title,
+                                          );
+                                        },
+                                        icon: const Icon(Icons.open_in_new, size: 15),
+                                        label: Text(
+                                          l10n.viewBookingAttachmentButton,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                          ],
+                        ),
+                      );
+                    },
                   ),
+                ],
+
+                const SizedBox(height: 16),
+
+                // Actions: Approve & Reject
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: isProcessing ? null : onReject,
+                      icon: const Icon(Icons.close, size: 18, color: Colors.redAccent),
+                      label: Text(l10n.reject, style: const TextStyle(color: Colors.redAccent)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.redAccent),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: isProcessing ? null : () => onApprove(presetMsg),
+                      icon: const Icon(Icons.check, size: 18),
+                      label: Text(l10n.approve),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppConfig.secondaryColor,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
       },
     );
   }

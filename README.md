@@ -11,7 +11,7 @@ A white-label residential management platform built using **Flutter** and **Fire
 - **Bulk Resident & Address Import via CSV**: Administrator bulk creation with temporary passwords and automated claim granting.
 - **Address-Level Sanctions System**: Neighborhood infraction issuance with photographic evidence, automated standing restrictions, resident fine history with interactive photo zoom, and direct payment flows.
 - **Enhanced Payment Form, Receipt Review & Rejection Recovery**: Strict validation for folio, concept (quota vs sanction), and payment date, advance periods toggle with checklist view, persistent missing-field warnings, admin approval cards with proof-of-payment thumbnails that open in a full-screen viewer with 20% padding and 90-degree rotation controls, customizable admin rejection reason pool, and one-tap recovery pre-filling for rejected payments.
-- **Facility Booking Policies, Cooldowns & Quotas**: Household-scoped (`addressRef`) booking policies supporting either a waiting **Cooldown Period** (`hours | days | months | years` measured from booking end to next booking start) or a calendar **Booking Quota** (`daily | monthly | yearly` max bookings per household in the community timezone), alongside advance anticipation windows, daily operating hours boundaries (`openingTime` - `closingTime`), live quota usage badges, anonymous confirmed-only schedule calendar streaming, custom rejection rationale, atomic rejected-booking resubmission, and preset approval instruction templates.
+- **Facility Booking Policies, Cooldowns, Quotas & Documentation Attachments**: Household-scoped (`addressRef`) booking policies supporting either a waiting **Cooldown Period** (`hours | days | months | years` measured from booking end to next booking start) or a calendar **Booking Quota** (`daily | monthly | yearly` max bookings per household in the community timezone), configurable **Amenity Documentation** templates (`mandatory_return`, `optional_return`, or `informative` across `PDF`, `Word`, `Excel`, `JPG`, `PNG`, `WEBP` up to 10 MB with magic-byte verification and `Content-Disposition: attachment`), resident document download and completed-file/photo attachment slots isolated in `booking_attachments/{bookingId}` with automated **30-day post-booking TTL cleanup**, advance anticipation windows, daily operating hours boundaries (`openingTime` - `closingTime`), live quota usage badges, anonymous confirmed-only schedule calendar streaming, admin attachment inspection, custom rejection rationale, atomic rejected-booking resubmission (with attachment replacement), and preset approval instruction templates.
 - **Rich Media & Emoji Community Announcements**: Broadcast announcements featuring high-resolution banner images, interactive full-screen viewer, quick-access announcement emojis, audience filtering (Everyone / Residents), and keyless Gemini AI Spanish-to-English translations.
 - **Collapsible Auto-Saving Admin Settings & SMTP Email Service**: Expandable/collapsible settings cards with real-time auto-save for switches and general settings, plus dedicated manual saving and handshake testing for SMTP server credentials and custom welcome email templates.
 - **QR-based Visitor Access, Optional Exit Scanning, Audit Logs & Automated TTL Retention**: Live validation logs, memory-bounded ID and license plate photo capture on entry with automatic local device cleanup immediately after Cloud Storage upload, automated **60-day TTL retention** for `access_logs` and linked Cloud Storage photos (`visitor_ids/**` and `visitor_plates/**` via `onAccessLogDeleted`, daily fallback sweeps, and a 62-day GCS Object Lifecycle safety net), automated **7-day TTL cleanup** for expired/validated/revoked QR passes (preserving active permanent passes and open visits), optional admin-configurable **Scan on exit** (`Escanear para salir`) mode with fast one-tap guard departure logging (supporting automatic entry/exit detection and legacy same-day QR passes), live **INSIDE** badges on resident QR passes, and an administrator audit screen with **Currently Inside** KPIs, entry/exit timestamps, adaptive multi-filter exploration (wrapping `ChoiceChip`s on mobile), wrapping search summary bars, and 20-event batches for unfiltered browsing.
@@ -68,10 +68,10 @@ The app includes automated global exception trapping and error reporting via `Cr
 - **Collection Gating**: Error reporting is disabled automatically in debug and Firebase Emulator environments (`kDebugMode` or `useFirebaseEmulator: true`).
 - **User Association**: Crashlytics user identifiers (`setUserIdentifier`) are synced with Firebase Auth state transitions.
 
-### 5. Enable Gatehouse Data Retention (Firestore TTL & Storage Lifecycle)
-Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, and inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation. After deploying indexes, rules, and Cloud Functions, enable native Firestore TTL and the GCS Object Lifecycle safety net once per environment:
+### 5. Enable Gatehouse & Booking Attachment Data Retention (Firestore TTL & Storage Lifecycle)
+Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation, and resident booking attachments (`booking_attachments` and `booking_attachments/**`) are purged **30 days** after the booking's scheduled end time. After deploying indexes, rules, and Cloud Functions, enable native Firestore TTL and the GCS Object Lifecycle safety net once per environment:
 ```bash
-firebase deploy --only firestore:indexes,firestore:rules,functions
+firebase deploy --only firestore:indexes,firestore:rules,storage,functions
 
 gcloud firestore fields ttls update expireAt \
   --collection-group=access_logs \
@@ -80,6 +80,11 @@ gcloud firestore fields ttls update expireAt \
 
 gcloud firestore fields ttls update expireAt \
   --collection-group=qr_codes \
+  --enable-ttl \
+  --project=<PROJECT_ID>
+
+gcloud firestore fields ttls update expireAt \
+  --collection-group=booking_attachments \
   --enable-ttl \
   --project=<PROJECT_ID>
 

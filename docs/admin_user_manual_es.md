@@ -370,6 +370,12 @@ Puedes **Crear** una nueva instalación desde el formulario superior, **Editar**
    * Elige **Sin restricción**, o solicita un mínimo de **Horas**, **Días** o **Semanas** de anticipación (ej. *48 Horas* de anticipación para reservar el Salón de Eventos).
 6. **Instrucciones Predeterminadas de Aprobación (`presetApprovalMessage`)**:
    * Texto plantilla opcional (como reglas de depósito en garantía, entrega de llaves o lineamientos de limpieza) que se pre-llenará automáticamente cada vez que un administrador apruebe una reserva de esta instalación.
+7. **Documentación de la Amenidad (`facilityDocuments`)**:
+   * Permite adjuntar formatos, cartas responsivas, listas de invitados o reglamentos (`PDF`, `DOC`, `DOCX`, `XLS`, `XLSX`, `JPG`, `JPEG`, `PNG`, `WEBP` — máximo **10 MB** por archivo).
+   * Asigna un **Tipo de Requisito** a cada documento:
+     * **Devolución obligatoria (`mandatory_return`)**: El residente debe descargar el formato, llenarlo y adjuntar el archivo firmado (o tomar fotografía) antes de poder enviar su solicitud de reserva.
+     * **Devolución opcional (`optional_return`)**: El residente puede descargar el archivo y adjuntar opcionalmente su documento completado.
+     * **Solo informativo (`informative`)**: Documento de consulta/descarga (ej. reglamento de alberca o ruido) que no solicita adjunto de vuelta.
 
 ---
 
@@ -377,10 +383,10 @@ Puedes **Crear** una nueva instalación desde el formulario superior, **Editar**
 **Navegación:** Panel de Administración $\rightarrow$ **Revisar Reservas** (`AdminBookingApprovalScreen`)
 
 Cuando un residente solicita una reserva, esta ingresa a la cola `pending review`:
-1. Revisa la tarjeta de la solicitud, que incluye el **Nombre de la Instalación**, **Fecha y Horario Solicitado** y la **Tarjeta de Contacto del Solicitante** (**Nombre**, **Correo** y **Teléfono**).
+1. Revisa la tarjeta de la solicitud, que incluye el **Nombre de la Instalación**, **Fecha y Horario Solicitado**, la **Tarjeta de Contacto del Solicitante** (**Nombre**, **Correo** y **Teléfono**) y, cuando el residente envió documentos, la sección **Documentación Enviada** con botones **Ver / Descargar** para inspeccionar cada archivo antes de tomar una decisión.
 2. Elige una acción:
    * **Aprobar**: Abre el **Diálogo de Aprobación de Reserva**, pre-llenado con las **Instrucciones Predeterminadas de Aprobación** de esa instalación. Puedes personalizar el mensaje para ese residente antes de confirmar. Al aprobar, la reserva pasa a estatus `approved` y tus instrucciones quedan visibles para el residente en su pantalla *Mis Reservas*.
-   * **Rechazar**: Solicita ingresar un **Motivo de Rechazo**, cambia el estatus a `rejected` y libera el horario para otros vecinos.
+   * **Rechazar**: Solicita ingresar un **Motivo de Rechazo**, cambia el estatus a `rejected` y libera el horario para otros vecinos. El residente podrá editar y reenviar su solicitud rechazada (incluyendo reemplazar cualquier documento adjunto incompleto o sin firma).
 
 ---
 

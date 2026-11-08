@@ -122,6 +122,16 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /booking_attachments/{bookingId} {
+      allow read: if isAdmin() || (
+        isAuthenticated() && (
+          resource.data.userUid == request.auth.uid ||
+          ('addressId' in resource.data && resource.data.addressId is string && isCallerAddressResident(resource.data.addressId))
+        )
+      );
+      allow write: if isAdmin();
+    }
+
     match /sanctions/{sanctionId} {
       allow read: if isAdmin() || (
         isAuthenticated() && (

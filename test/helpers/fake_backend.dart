@@ -403,11 +403,13 @@ class FakeAuthService implements AuthService {
 /// In-memory implementation of [StorageService] for testing.
 class FakeStorageService implements StorageService {
   final Map<String, dynamic> uploadedFiles = {};
+  final Map<String, Map<String, dynamic>> uploadedOptions = {};
   final List<String> deletedUrls = [];
   Future<String> Function(String path, dynamic fileData)? uploadHandler;
 
   void clear() {
     uploadedFiles.clear();
+    uploadedOptions.clear();
     deletedUrls.clear();
     uploadHandler = null;
   }
@@ -417,8 +419,14 @@ class FakeStorageService implements StorageService {
     String path,
     dynamic fileData, {
     String? contentType,
+    String? contentDisposition,
     Map<String, String>? metadata,
   }) async {
+    uploadedOptions[path] = {
+      'contentType': contentType,
+      'contentDisposition': contentDisposition,
+      'metadata': metadata,
+    };
     if (uploadHandler != null) {
       return uploadHandler!(path, fileData);
     }

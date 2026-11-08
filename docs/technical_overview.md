@@ -62,7 +62,7 @@ flowchart TD
 ### 2.1 For Residents and Household Members
 
 * **Digital QR Access Passes**: Residents can generate instant QR codes for expected visitors, recurring guests, or delivery suppliers. Passes can be configured as **one-time use** or **temporary (with specific expiration dates and times)**, including optional vehicle details (car, motorcycle, license plate) and passenger counts.
-* **Amenity & Facility Reservations**: Residents can browse and reserve community amenities (such as event rooms, swimming pool areas, barbecue grills, or sports equipment). The system prevents scheduling conflicts in real time, enforces household-level cooldown waiting periods (`hours`, `days`, `months`, or `years`) or calendar booking quotas (`daily`, `monthly`, or `yearly`), and manages booking approval workflows.
+* **Amenity & Facility Reservations**: Residents can browse and reserve community amenities (such as event rooms, swimming pool areas, barbecue grills, or sports equipment), download required facility forms or bylaws, and attach completed/signed documents or camera photos directly to their booking request. The system prevents scheduling conflicts in real time, enforces household-level cooldown waiting periods (`hours`, `days`, `months`, or `years`) or calendar booking quotas (`daily`, `monthly`, or `yearly`), isolates submitted attachments from neighbors, and manages booking approval workflows.
 * **Maintenance Fee Tracking & Proof Submission**: Residents can view their current balance status (Paid, Pending, Reviewing, Restricted), review past payment history, and upload digital photos of bank deposit slips or transfer receipts (coming soon) directly from their mobile camera or photo gallery.
 * **Community Bulletins & Announcements**: An interactive multimedia board delivers official administrative announcements with rich images, formatted notices, and automatic bilingual translation (English and Spanish).
 * **Document Transparency Portal**: An in-app virtual file explorer allows verified residents to view official condominium documents, such as neighborhood bylaws, meeting minutes, monthly balance sheets, and maintenance schedules, with offline caching for quick access.
@@ -82,7 +82,7 @@ flowchart TD
 * **Property Ownership Verification Queue**: Administrators review deed or handover documentation submitted by new residents to confirm genuine homeownership before assigning primary resident privileges.
 * **Payment Approval & Financial Matrix**: Administrative staff can review submitted payment receipts, approve or reject them with feedback, and export complete monthly payment status matrices (CSV) for accounting records.
 * **Bulk Data Import via CSV**: Administrators can provision hundreds of addresses or resident accounts in seconds using spreadsheet files (CSV), with automated welcome emails and cryptographically secure passwords.
-* **Amenity & Facility Configuration**: Board members can configure available amenities, mark facilities as single-booking or multi-unit, set operating hours and advance notice rules, and define fair-use household cooldown periods or daily/monthly/yearly booking quotas.
+* **Amenity & Facility Configuration**: Board members can configure available amenities, mark facilities as single-booking or multi-unit, set operating hours and advance notice rules, define fair-use household cooldown periods or daily/monthly/yearly booking quotas, and attach required/optional/informative facility documents (`PDF`, `Word`, `Excel`, `JPG`, `PNG`, `WEBP` up to 10 MB).
 * **Automated Bilingual Bulletins with AI**: Administrators can post news bulletins in Spanish or English; the system automatically translates titles and descriptions using server-side Google Gemini AI without exposing sensitive keys.
 * **Custom SMTP Email Notifications**: Automated welcome emails with login credentials and community updates are dispatched via the administration's configured SMTP server.
 
@@ -148,24 +148,24 @@ flowchart TD
   * `users`: Resident, guard, and administrator profiles and contact details.
   * `addresses`: Physical properties, homeowner links, delivery dates, and monthly payment statuses.
   * `qr_codes`: Access passes, guest names, vehicle plates, and validity rules.
-  * `bookings`: Common amenity schedules, booking intervals, and approval statuses.
+  * `bookings` & `booking_attachments`: Common amenity schedules, booking intervals, approval statuses, and household-isolated resident booking attachments.
   * `announcements`: Community bulletins, banner URLs, read receipts, and bilingual translations.
   * `documents` & `document_folders`: Directory tree and metadata for community governance files.
   * `access_logs`: Checkpoint audit history, guard entries, and verification photo links.
   * `payments`: Maintenance receipts, payment periods (`YYYY-MM`), amounts, and approval states.
   * `ownership_claims`: Deed validation submissions awaiting administrative review.
-  * `facilities`: Configurable list of community amenities and capacity settings.
+  * `facilities`: Configurable list of community amenities, capacity settings, and downloadable document templates.
   * `config`: Payment cutoff day parameters, grace periods, and Administrator configuration.
 
 ### 4.3 Firebase Cloud Storage (Secure File Hosting)
 * **Role**: Encrypted cloud file vault for multimedia and binary documents.
-* **Function**: Securely stores ownership proof files (deed scans), payment receipts, gate verification photos (visitor IDs and vehicle license plates, protected by a 62-day GCS Object Lifecycle safety net on `visitor_ids/` and `visitor_plates/`), transparency files, and announcement media.
+* **Function**: Securely stores ownership proof files (deed scans), payment receipts, gate verification photos (visitor IDs and vehicle license plates, protected by a 62-day GCS Object Lifecycle safety net on `visitor_ids/` and `visitor_plates/`), amenity templates (`facility_documents/`), household-isolated booking attachments (`booking_attachments/`, with `Content-Disposition: attachment` and a 125-day GCS Object Lifecycle safety net), transparency files, and announcement media.
 
 ### 4.4 Cloud Functions for Firebase (Serverless Logic)
 * **Role**: Secure server-side execution environment for business-critical operations.
 * **Function**: Executes server-side code in isolated micro-containers in response to user actions or database events without running a persistent server:
   * **Atomic QR Access Validation** (`validateAndRegisterQrAccess`): Evaluates access rules, stamps 60-day `expireAt` TTL metadata on `access_logs` and 7-day `expireAt` TTL metadata on terminal `qr_codes`, and writes the access log in a single secure cloud transaction.
-  * **Cascading Gatehouse Media & QR Cleanup** (`onAccessLogDeleted` & `checkMonthlyPaymentStatuses`): Deletes allow-listed `visitor_ids/` and `visitor_plates/` Cloud Storage files when `access_logs` documents expire via Firestore TTL (or are deleted), heals open-visit QR state, and runs daily fallback sweeps for legacy records.
+  * **Cascading Gatehouse & Booking Attachment Cleanup** (`onAccessLogDeleted`, `onBookingAttachmentDeleted` & `checkMonthlyPaymentStatuses`): Deletes allow-listed `visitor_ids/`, `visitor_plates/`, and `booking_attachments/` Cloud Storage files when `access_logs` or `booking_attachments` documents expire via Firestore TTL (or are cancelled/deleted), heals open-visit QR state, and runs daily fallback sweeps.
   * **AI Announcement Translation** (`translateAnnouncement`): Calls Google Vertex AI (Gemini) keylessly to translate community bulletins between Spanish and English.
   * **Payment Recalculation Trigger** (`onPaymentWritten`): Automatically re-evaluates house payment status whenever a payment receipt is approved.
   * **Bulk Account & Address Creation** (`adminBulkImportResidents`, `adminBulkImportAddresses`): Creates accounts, assigns custom claims, and generates complex passwords securely in bulk.
@@ -257,6 +257,7 @@ To provide community access control, fee management, and safety services, the ap
 | **Financial Records** | Maintenance fee receipts (images), payment amounts, payment dates. | Reconciling monthly community dues and updating account standing. |
 | **Visitor Access** | Guest names, vehicle types, license plate numbers, authorized time slots. | Generating QR access passes and pre-authorizing gate entry. |
 | **Gate Checkpoint Logs** | Check-in timestamps, validation status (Allowed/Denied), verification photos of visitor IDs or license plates. | Preserving community safety and creating a verifiable gate access audit trail. |
+| **Amenity Attachments** | Signed reservation forms, waivers, guest lists, or photos attached to bookings. | Verifying compliance with facility rules before administrative approval. |
 | **Technical Telemetry** | Anonymous crash logs, performance diagnostics (via Crashlytics/Analytics). | Identifying bugs, preventing application crashes, and optimizing performance. |
 
 ### 6.2 How Information is Processed & Used
@@ -278,9 +279,10 @@ Users can exercise their ARCO rights directly through their Condominium Administ
 
 ### 6.4 Automated Data Retention, Account Deletion & Data Purging
 
-* **Automated Gatehouse Retention Policies**:
+* **Automated Gatehouse & Booking Attachment Retention Policies**:
   * **60-Day Access Log & Visitor Photo Purge**: Gatehouse `access_logs` documents and their associated ID and license plate photos (`visitor_ids/**` and `visitor_plates/**`) are automatically purged **60 days** after entry (or 60 days after exit when exit scanning is enabled) via native Firestore TTL (`expireAt`), cascading `onAccessLogDeleted` Cloud Function deletion, daily scheduled fallback sweeps, and a 62-day Cloud Storage Object Lifecycle rule (`storage_lifecycle.json`).
   * **7-Day Inactive QR Pass Purge**: Expired temporary passes, validated single-use supplier passes, and revoked QR passes (`qr_codes`) are automatically deleted **7 days** after expiration or deactivation, while active permanent passes never expire unless revoked.
+  * **30-Day Post-Booking Attachment Purge**: Resident booking attachments (`booking_attachments` and `booking_attachments/**`) are deleted immediately if a booking is cancelled and automatically purged **30 days** after the booking's scheduled end time via native Firestore TTL (`expireAt`), cascading `onBookingAttachmentDeleted` Cloud Function deletion, daily scheduled fallback sweeps, and a 125-day Cloud Storage Object Lifecycle safety net.
 * **Self-Service & Admin Deletion**: Users can delete their account directly within the app via the **"Delete Account"** button or by requesting deletion from an administrator.
 * **Permanent & Irreversible Purge**: When an account is deleted, the user's credentials in Firebase Authentication, user document in Cloud Firestore, and ownership proof files in Cloud Storage are **permanently and irreversibly destroyed**.
 

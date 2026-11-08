@@ -266,6 +266,11 @@
       "collectionGroup": "qr_codes",
       "fieldPath": "expireAt",
       "indexes": []
+    },
+    {
+      "collectionGroup": "booking_attachments",
+      "fieldPath": "expireAt",
+      "indexes": []
     }
   ]
 }

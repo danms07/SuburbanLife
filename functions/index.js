@@ -474,6 +474,7 @@ exports.createBooking = onCall(callableOptions, async (request) => {
 
     // 0b. If resubmitting a rejected booking, verify ownership and status
     let existingBookingRef = null;
+    let existingAttachments = [];
     if (resubmitBookingId) {
       existingBookingRef = admin.firestore().collection('bookings').doc(resubmitBookingId);
       const existingSnap = await existingBookingRef.get();
@@ -491,6 +492,14 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       }
       if (existingData.facilityId && existingData.facilityId !== facilityId) {
         throw new HttpsError('invalid-argument', 'Cannot change facility when resubmitting a booking.');
+      }
+      const existingAttSnap = await admin
+        .firestore()
+        .collection('booking_attachments')
+        .doc(resubmitBookingId)
+        .get();
+      if (existingAttSnap.exists && Array.isArray(existingAttSnap.data()?.attachments)) {
+        existingAttachments = existingAttSnap.data().attachments;
       }
     }
 
@@ -510,6 +519,19 @@ exports.createBooking = onCall(callableOptions, async (request) => {
     } catch (e) {}
 
     validateFacilityBooking({ facData, startTime, endTime, timeZone, now: Date.now() });
+
+    // 1b. Validate mandatory & optional amenity document attachments
+    const bucket = admin.storage().bucket();
+    const effectiveRawAttachments =
+      rawData.attachments !== undefined ? rawData.attachments : existingAttachments;
+    const normalizedAttachments = await validateAndNormalizeBookingAttachments({
+      rawAttachments: effectiveRawAttachments,
+      facilityDocuments: facData.facilityDocuments,
+      callerUid: uid,
+      existingAttachments,
+      bucket,
+      nowMillis: Date.now(),
+    });
 
     // 2. Household Cooldown / Quota validation
     const restriction = resolveFacilityRestriction(facData);
@@ -633,6 +655,11 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       );
     }
 
+    const nowMillis = Date.now();
+    const expireAtTimestamp = admin.firestore.Timestamp.fromMillis(
+      computeBookingAttachmentExpireAtMillis(endTime)
+    );
+
     // 4. Persist booking (update rejected booking or create new booking)
     if (existingBookingRef) {
       const updatedPatch = {
@@ -644,9 +671,45 @@ exports.createBooking = onCall(callableOptions, async (request) => {
         isConfirmed: false,
         rejectionReason: '',
         notes: '',
-        updatedAt: Date.now(),
+        hasAttachments: normalizedAttachments.length > 0,
+        attachmentCount: normalizedAttachments.length,
+        attachmentsPurgedAt: null,
+        updatedAt: nowMillis,
       };
       await existingBookingRef.update(updatedPatch);
+
+      const attRef = admin.firestore().collection('booking_attachments').doc(resubmitBookingId);
+      if (normalizedAttachments.length > 0) {
+        await attRef.set({
+          bookingId: resubmitBookingId,
+          facilityId,
+          userUid: uid,
+          addressId: callerAddressId || null,
+          bookingEndTime: endTime,
+          attachments: normalizedAttachments,
+          updatedAt: nowMillis,
+          expireAt: expireAtTimestamp,
+        }, { merge: true });
+      } else if (existingAttachments.length > 0) {
+        await attRef.delete();
+      }
+
+      // Delete any superseded Cloud Storage attachments replaced during resubmission
+      const retainedPaths = new Set(normalizedAttachments.map((a) => a.storagePath));
+      for (const oldAtt of existingAttachments) {
+        const oldPath = extractBookingAttachmentStoragePath(oldAtt?.storagePath || oldAtt?.url);
+        if (oldPath && !retainedPaths.has(oldPath) && bucket && typeof bucket.file === 'function') {
+          try {
+            await bucket.file(oldPath).delete({ ignoreNotFound: true });
+          } catch (delErr) {
+            const code = delErr && (delErr.code || delErr.status);
+            if (code !== 404 && code !== 'storage/object-not-found') {
+              console.error(`Error deleting superseded booking attachment for ${resubmitBookingId}:`, code || 'unknown');
+            }
+          }
+        }
+      }
+
       return {
         success: true,
         bookingId: resubmitBookingId,
@@ -674,10 +737,27 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       isConfirmed: false,
       approvalMessage: '',
       rejectionReason: '',
-      timestamp: Date.now(),
+      hasAttachments: normalizedAttachments.length > 0,
+      attachmentCount: normalizedAttachments.length,
+      attachmentsPurgedAt: null,
+      timestamp: nowMillis,
     };
 
     await bookingRef.set(bookingData);
+
+    if (normalizedAttachments.length > 0) {
+      await admin.firestore().collection('booking_attachments').doc(bookingRef.id).set({
+        bookingId: bookingRef.id,
+        facilityId,
+        userUid: uid,
+        addressId: callerAddressId || null,
+        bookingEndTime: endTime,
+        attachments: normalizedAttachments,
+        createdAt: nowMillis,
+        updatedAt: nowMillis,
+        expireAt: expireAtTimestamp,
+      });
+    }
 
     return { success: true, bookingId: bookingRef.id, booking: bookingData };
   } catch (error) {
@@ -697,7 +777,8 @@ exports.cancelBooking = onCall(callableOptions, async (request) => {
   }
 
   try {
-    const bookingRef = admin.firestore().collection('bookings').doc(bookingId);
+    const db = admin.firestore();
+    const bookingRef = db.collection('bookings').doc(bookingId);
     const bookingDoc = await bookingRef.get();
 
     if (!bookingDoc.exists) {
@@ -705,18 +786,43 @@ exports.cancelBooking = onCall(callableOptions, async (request) => {
     }
 
     const b = bookingDoc.data();
-    if (b.userUid !== request.auth.uid && request.auth.token.admin !== true) {
+    let sameHousehold = false;
+    if (b.addressId && request.auth.uid !== b.userUid && request.auth.token.admin !== true) {
+      const callerSnap = await db.collection('users').doc(request.auth.uid).get();
+      const callerAddrRef = callerSnap.exists ? callerSnap.data()?.addressRef : null;
+      const callerAddrId = callerAddrRef
+        ? (callerAddrRef.id || String(callerAddrRef.path || '').split('/').pop() || null)
+        : null;
+      sameHousehold = Boolean(callerAddrId && callerAddrId === b.addressId);
+    }
+
+    if (b.userUid !== request.auth.uid && !sameHousehold && request.auth.token.admin !== true) {
       throw new HttpsError('permission-denied', 'You do not have permission to cancel this booking.');
     }
 
+    const nowMillis = Date.now();
     await bookingRef.update({ status: 'cancelled' });
 
+    // Immediately purge any resident booking attachments from Cloud Storage and booking_attachments
+    const attRef = db.collection('booking_attachments').doc(bookingId);
+    const attSnap = await attRef.get();
+    if (attSnap.exists) {
+      await cleanupDeletedBookingAttachmentResources({
+        db,
+        bucket: admin.storage().bucket(),
+        bookingId,
+        attachmentDocData: attSnap.data() || {},
+        nowMillis,
+      });
+      await attRef.delete();
+    }
+
     // Notify admins via an announcement or notification log
-    await admin.firestore().collection('announcements').add({
+    await db.collection('announcements').add({
       title: 'Booking Cancelled',
       content: `Booking ${bookingId} has been cancelled by user ${request.auth.uid}.`,
       creatorUid: 'system',
-      timestamp: Date.now(),
+      timestamp: nowMillis,
       targetAudience: 'admin',
       readBy: []
     });
@@ -1275,6 +1381,16 @@ exports.checkMonthlyPaymentStatuses = onSchedule({
     }
   } catch (logPurgeError) {
     console.error('Error purging expired access logs in scheduled job:', logPurgeError);
+  }
+
+  try {
+    const bucket = admin.storage().bucket();
+    const purgedBookingAttCount = await purgeExpiredBookingAttachments(db, bucket);
+    if (purgedBookingAttCount > 0) {
+      console.log(`Purged ${purgedBookingAttCount} booking attachment records past 30-day post-booking retention.`);
+    }
+  } catch (attPurgeError) {
+    console.error('Error purging expired booking attachments in scheduled job:', attPurgeError);
   }
 });
 
@@ -2896,6 +3012,514 @@ exports.onAccessLogDeleted = onDocumentDeleted('access_logs/{logId}', async (eve
   });
 });
 
+const BOOKING_ATTACHMENT_RETENTION_DAYS = 30;
+const BOOKING_ATTACHMENT_RETENTION_MS = BOOKING_ATTACHMENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+const ALLOWED_BOOKING_DOC_EXTENSIONS = [
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+];
+const MAX_BOOKING_ATTACHMENTS_COUNT = 10;
+const MAX_BOOKING_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+/**
+ * Computes the millisecond expiration timestamp for booking attachments (+30 days after booking endTime).
+ */
+function computeBookingAttachmentExpireAtMillis(endTimeInput = Date.now()) {
+  const endMillis =
+    typeof endTimeInput === 'number' ? endTimeInput : (extractTimestampMillis(endTimeInput) || Date.now());
+  return endMillis + BOOKING_ATTACHMENT_RETENTION_MS;
+}
+
+/**
+ * Validates file header magic bytes against the declared allow-listed extension.
+ * Rejects spoofed content (e.g., HTML/SVG/JS renamed to .pdf or .png).
+ */
+function validateDocumentMagicBytes(buffer, extension) {
+  if (!buffer || !(Buffer.isBuffer(buffer) || buffer instanceof Uint8Array)) {
+    return false;
+  }
+  const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+  const ext = String(extension || '').trim().toLowerCase().replace(/^\./, '');
+
+  switch (ext) {
+    case 'pdf':
+      return bytes.length >= 5 && bytes.subarray(0, 5).toString('ascii') === '%PDF-';
+    case 'png':
+      return (
+        bytes.length >= 8 &&
+        bytes[0] === 0x89 &&
+        bytes[1] === 0x50 &&
+        bytes[2] === 0x4e &&
+        bytes[3] === 0x47 &&
+        bytes[4] === 0x0d &&
+        bytes[5] === 0x0a &&
+        bytes[6] === 0x1a &&
+        bytes[7] === 0x0a
+      );
+    case 'jpg':
+    case 'jpeg':
+      return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    case 'webp':
+      return (
+        bytes.length >= 12 &&
+        bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
+        bytes.subarray(8, 12).toString('ascii') === 'WEBP'
+      );
+    case 'docx':
+    case 'xlsx':
+      // OOXML ZIP archive header (PK\x03\x04)
+      return (
+        bytes.length >= 4 &&
+        bytes[0] === 0x50 &&
+        bytes[1] === 0x4b &&
+        bytes[2] === 0x03 &&
+        bytes[3] === 0x04
+      );
+    case 'doc':
+    case 'xls':
+      // OLE2 Compound File Binary signature
+      return (
+        bytes.length >= 8 &&
+        bytes[0] === 0xd0 &&
+        bytes[1] === 0xcf &&
+        bytes[2] === 0x11 &&
+        bytes[3] === 0xe0 &&
+        bytes[4] === 0xa1 &&
+        bytes[5] === 0xb1 &&
+        bytes[6] === 0x1a &&
+        bytes[7] === 0xe1
+      );
+    default:
+      return false;
+  }
+}
+
+/**
+ * Safely extracts and validates a Cloud Storage object path strictly within
+ * `booking_attachments/<uid>/<filename>`. Rejects traversal sequences, null bytes,
+ * backslashes, extra nesting, and paths outside `booking_attachments/`.
+ */
+function extractBookingAttachmentStoragePath(rawInput) {
+  if (!rawInput || typeof rawInput !== 'string') return null;
+  const trimmed = rawInput.trim();
+  if (!trimmed || trimmed.includes('\0') || /%00/i.test(trimmed)) {
+    return null;
+  }
+
+  let candidate = null;
+  try {
+    if (/^https?:\/\//i.test(trimmed)) {
+      const parsed = new URL(trimmed);
+      const restMatch = parsed.pathname.match(/^\/v0\/b\/[^/]+\/o\/(.+)$/);
+      if (restMatch) {
+        candidate = decodeURIComponent(restMatch[1]);
+      } else if (parsed.hostname === 'storage.googleapis.com') {
+        const gcsMatch = parsed.pathname.match(/^\/[^/]+\/(.+)$/);
+        if (gcsMatch) {
+          candidate = decodeURIComponent(gcsMatch[1]);
+        }
+      } else if (parsed.pathname.startsWith('/booking_attachments/')) {
+        candidate = decodeURIComponent(parsed.pathname.slice(1));
+      }
+    } else if (/^gs:\/\//i.test(trimmed)) {
+      const gsMatch = trimmed.match(/^gs:\/\/[^/]+\/(.+)$/);
+      if (gsMatch) {
+        candidate = decodeURIComponent(gsMatch[1]);
+      }
+    } else if (!trimmed.includes('://')) {
+      candidate = decodeURIComponent(trimmed);
+    }
+  } catch (_) {
+    return null;
+  }
+
+  if (!candidate || typeof candidate !== 'string') return null;
+  if (
+    candidate.includes('\0') ||
+    candidate.includes('\\') ||
+    candidate.startsWith('/') ||
+    candidate.endsWith('/')
+  ) {
+    return null;
+  }
+
+  const segments = candidate.split('/');
+  if (segments.length !== 3 || segments[0] !== 'booking_attachments') {
+    return null;
+  }
+  if (segments.some((seg) => !seg || seg === '.' || seg === '..')) {
+    return null;
+  }
+
+  const normalized = path.posix.normalize(candidate);
+  if (normalized !== candidate) {
+    return null;
+  }
+
+  if (!/^booking_attachments\/[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9._-]{1,200}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+/**
+ * Validates and normalizes resident booking attachments against the facility's
+ * configured `facilityDocuments` requirements (`mandatory_return`, `optional_return`, `informative`).
+ * Verifies ownership of `booking_attachments/<callerUid>/...` paths and inspects Storage magic bytes.
+ */
+async function validateAndNormalizeBookingAttachments({
+  rawAttachments,
+  facilityDocuments,
+  callerUid,
+  existingAttachments = [],
+  bucket = null,
+  nowMillis = Date.now(),
+}) {
+  const templates = Array.isArray(facilityDocuments) ? facilityDocuments : [];
+  const templateById = new Map();
+  for (const rawTpl of templates) {
+    if (!rawTpl || typeof rawTpl !== 'object') continue;
+    const docId = String(rawTpl.docId || '').trim();
+    if (!docId) continue;
+    const rawMode = String(rawTpl.requirementMode || 'informative').trim().toLowerCase();
+    const requirementMode = ['mandatory_return', 'optional_return', 'informative'].includes(rawMode)
+      ? rawMode
+      : 'informative';
+    templateById.set(docId, {
+      docId,
+      title: String(rawTpl.title || rawTpl.fileName || docId).trim().slice(0, 200),
+      requirementMode,
+    });
+  }
+
+  if (rawAttachments !== undefined && rawAttachments !== null && !Array.isArray(rawAttachments)) {
+    throw new HttpsError('invalid-argument', 'Booking attachments must be an array.');
+  }
+  const incomingList = Array.isArray(rawAttachments) ? rawAttachments : [];
+  if (incomingList.length > MAX_BOOKING_ATTACHMENTS_COUNT) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Too many booking attachments (maximum ${MAX_BOOKING_ATTACHMENTS_COUNT}).`
+    );
+  }
+
+  const existingPaths = new Set();
+  if (Array.isArray(existingAttachments)) {
+    for (const prev of existingAttachments) {
+      const prevPath = extractBookingAttachmentStoragePath(prev?.storagePath || prev?.url);
+      if (prevPath) existingPaths.add(prevPath);
+    }
+  }
+
+  const seenDocIds = new Set();
+  const normalized = [];
+
+  for (const item of incomingList) {
+    if (!item || typeof item !== 'object') {
+      throw new HttpsError('invalid-argument', 'Each booking attachment must be an object.');
+    }
+
+    const facilityDocId = String(item.facilityDocId || '').trim();
+    if (!facilityDocId || facilityDocId.length > 128) {
+      throw new HttpsError('invalid-argument', 'Attachment is missing a valid facilityDocId.');
+    }
+    const template = templateById.get(facilityDocId);
+    if (!template) {
+      throw new HttpsError(
+        'invalid-argument',
+        `Attachment references unknown facility document "${facilityDocId}".`
+      );
+    }
+    if (template.requirementMode === 'informative') {
+      throw new HttpsError(
+        'invalid-argument',
+        `Facility document "${template.title}" is informative-only and does not accept uploads.`
+      );
+    }
+    if (seenDocIds.has(facilityDocId)) {
+      throw new HttpsError(
+        'invalid-argument',
+        `Duplicate attachment provided for facility document "${template.title}".`
+      );
+    }
+    seenDocIds.add(facilityDocId);
+
+    const baseName = path.posix.basename(String(item.fileName || '').trim());
+    const safeFileName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!safeFileName || safeFileName === '.' || safeFileName === '..' || safeFileName.length > 200) {
+      throw new HttpsError('invalid-argument', 'Attachment fileName is invalid.');
+    }
+
+    const extFromName = safeFileName.includes('.')
+      ? safeFileName.split('.').pop().toLowerCase()
+      : '';
+    const fileType = String(item.fileType || extFromName || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^\./, '');
+    if (!ALLOWED_BOOKING_DOC_EXTENSIONS.includes(fileType)) {
+      throw new HttpsError(
+        'invalid-argument',
+        `Unsupported attachment fileType "${fileType}". Allowed: ${ALLOWED_BOOKING_DOC_EXTENSIONS.join(', ')}.`
+      );
+    }
+    if (extFromName) {
+      const normalizedExtFromName = extFromName === 'jpeg' ? 'jpg' : extFromName;
+      const normalizedDeclared = fileType === 'jpeg' ? 'jpg' : fileType;
+      if (normalizedExtFromName !== normalizedDeclared) {
+        throw new HttpsError('invalid-argument', 'Attachment fileName extension does not match fileType.');
+      }
+    }
+
+    const numericSize = Number(item.fileSize);
+    if (!Number.isFinite(numericSize) || numericSize <= 0 || numericSize > MAX_BOOKING_ATTACHMENT_SIZE_BYTES) {
+      throw new HttpsError('invalid-argument', 'Attachment fileSize must be between 1 byte and 10 MB.');
+    }
+
+    const cleanUrl = String(item.url || '').trim();
+    if (
+      !cleanUrl ||
+      cleanUrl.length > 2048 ||
+      !(
+        cleanUrl.startsWith('https://') ||
+        cleanUrl.startsWith('http://127.0.0.1:') ||
+        cleanUrl.startsWith('http://localhost:')
+      )
+    ) {
+      throw new HttpsError('invalid-argument', 'Attachment URL must be a valid Storage download URL.');
+    }
+
+    const cleanStoragePath = extractBookingAttachmentStoragePath(item.storagePath || cleanUrl);
+    if (!cleanStoragePath) {
+      throw new HttpsError('invalid-argument', 'Attachment storagePath is invalid or outside booking_attachments/.');
+    }
+
+    const isCallerOwnedPath = cleanStoragePath.startsWith(`booking_attachments/${callerUid}/`);
+    const isUnchangedExistingPath = existingPaths.has(cleanStoragePath);
+    if (!isCallerOwnedPath && !isUnchangedExistingPath) {
+      throw new HttpsError(
+        'permission-denied',
+        'Attachment storagePath must belong to the authenticated caller.'
+      );
+    }
+
+    // TODO(security): Integrate with an antivirus API and CDR tool to scan and strip active macros/scripts from untrusted resident uploads.
+    if (!isUnchangedExistingPath && bucket && typeof bucket.file === 'function') {
+      const fileRef = bucket.file(cleanStoragePath);
+      if (fileRef && typeof fileRef.download === 'function') {
+        let headerBuf;
+        try {
+          const [downloaded] = await fileRef.download({ start: 0, end: 15 });
+          headerBuf = downloaded;
+        } catch (dlErr) {
+          const code = dlErr && (dlErr.code || dlErr.status);
+          if (code === 404 || code === 'storage/object-not-found') {
+            throw new HttpsError('invalid-argument', 'Uploaded attachment file was not found in Cloud Storage.');
+          }
+          throw dlErr;
+        }
+
+        if (!validateDocumentMagicBytes(headerBuf, fileType)) {
+          if (typeof fileRef.delete === 'function') {
+            await fileRef.delete({ ignoreNotFound: true }).catch(() => {});
+          }
+          throw new HttpsError(
+            'invalid-argument',
+            `Attachment content does not match declared file type (${fileType}).`
+          );
+        }
+      }
+    }
+
+    const uploadedAtNum = Number(item.uploadedAt);
+    normalized.push({
+      facilityDocId,
+      title: template.title,
+      requirementMode: template.requirementMode,
+      fileName: safeFileName,
+      fileType,
+      fileSize: Math.floor(numericSize),
+      url: cleanUrl,
+      storagePath: cleanStoragePath,
+      uploadedAt: Number.isFinite(uploadedAtNum) && uploadedAtNum > 0
+        ? Math.floor(uploadedAtNum)
+        : nowMillis,
+    });
+  }
+
+  for (const template of templateById.values()) {
+    if (template.requirementMode === 'mandatory_return' && !seenDocIds.has(template.docId)) {
+      throw new HttpsError(
+        'failed-precondition',
+        `Missing mandatory document attachment: ${template.title}`
+      );
+    }
+  }
+
+  return normalized;
+}
+
+/**
+ * Cascading cleanup executed when a `booking_attachments` document is deleted
+ * (via cancellation, Firestore TTL, daily scheduled sweep, or admin action):
+ * 1. Deletes allow-listed `booking_attachments/<uid>/<file>` Storage objects idempotently.
+ * 2. Marks `attachmentsPurgedAt` on `bookings/{bookingId}` if the parent booking still exists.
+ */
+async function cleanupDeletedBookingAttachmentResources({
+  db,
+  bucket,
+  bookingId,
+  attachmentDocData,
+  nowMillis = Date.now(),
+}) {
+  if (!attachmentDocData || typeof attachmentDocData !== 'object') {
+    return { deletedFilesCount: 0, bookingUpdated: false };
+  }
+
+  const rawList = Array.isArray(attachmentDocData.attachments)
+    ? attachmentDocData.attachments
+    : [];
+  const storagePaths = new Set();
+  for (const att of rawList) {
+    const cleanPath = extractBookingAttachmentStoragePath(att?.storagePath || att?.url);
+    if (cleanPath) storagePaths.add(cleanPath);
+  }
+
+  let deletedFilesCount = 0;
+  if (bucket && typeof bucket.file === 'function' && storagePaths.size > 0) {
+    for (const storagePath of storagePaths) {
+      try {
+        await bucket.file(storagePath).delete({ ignoreNotFound: true });
+        deletedFilesCount++;
+      } catch (err) {
+        const code = err && (err.code || err.status);
+        if (code !== 404 && code !== 'storage/object-not-found') {
+          console.error(`Error deleting booking attachment file for booking ${bookingId}:`, code || 'unknown');
+        }
+      }
+    }
+  }
+
+  let bookingUpdated = false;
+  if (db && bookingId && typeof bookingId === 'string') {
+    try {
+      const bookingRef = db.collection('bookings').doc(bookingId);
+      const bookingSnap = await bookingRef.get();
+      if (bookingSnap.exists) {
+        const bData = bookingSnap.data() || {};
+        if (!bData.attachmentsPurgedAt) {
+          await bookingRef.update({ attachmentsPurgedAt: nowMillis });
+          bookingUpdated = true;
+        }
+      }
+    } catch (bErr) {
+      console.error(`Error updating attachmentsPurgedAt for booking ${bookingId}:`, bErr.message || 'unknown');
+    }
+  }
+
+  return { deletedFilesCount, bookingUpdated };
+}
+
+/**
+ * Daily fallback job that deletes `booking_attachments` whose booking `endTime + 30 days`
+ * retention window has elapsed, cleaning up their Cloud Storage files and stamping
+ * `attachmentsPurgedAt` on the parent `bookings/{bookingId}` document.
+ */
+async function purgeExpiredBookingAttachments(
+  db,
+  bucket,
+  nowMillis = Date.now(),
+  batchLimit = 250,
+  maxBatches = 4
+) {
+  const cutoffEndTimeMillis = nowMillis - BOOKING_ATTACHMENT_RETENTION_MS;
+  const skippedIds = new Set();
+  let totalDeleted = 0;
+
+  for (let i = 0; i < maxBatches; i++) {
+    const snap = await db
+      .collection('booking_attachments')
+      .where('bookingEndTime', '<=', cutoffEndTimeMillis)
+      .limit(batchLimit)
+      .get();
+    if (snap.empty) break;
+
+    const eligibleDocs = [];
+    for (const doc of snap.docs) {
+      if (skippedIds.has(doc.id)) continue;
+      const data = doc.data() || {};
+      const expireAtMillis = extractTimestampMillis(data.expireAt);
+      if (expireAtMillis > 0) {
+        if (nowMillis >= expireAtMillis) {
+          eligibleDocs.push(doc);
+        } else {
+          skippedIds.add(doc.id);
+        }
+      } else {
+        const endMillis = extractTimestampMillis(data.bookingEndTime);
+        if (endMillis > 0 && nowMillis >= endMillis + BOOKING_ATTACHMENT_RETENTION_MS) {
+          eligibleDocs.push(doc);
+        } else {
+          skippedIds.add(doc.id);
+        }
+      }
+    }
+
+    if (eligibleDocs.length === 0) break;
+
+    for (const doc of eligibleDocs) {
+      await cleanupDeletedBookingAttachmentResources({
+        db,
+        bucket,
+        bookingId: doc.id,
+        attachmentDocData: doc.data() || {},
+        nowMillis,
+      });
+    }
+
+    const batch = db.batch();
+    for (const doc of eligibleDocs) {
+      batch.delete(doc.ref);
+    }
+    await batch.commit();
+    totalDeleted += eligibleDocs.length;
+
+    if (snap.size < batchLimit) break;
+  }
+
+  return totalDeleted;
+}
+
+/**
+ * Firestore Trigger: Cleans up linked resident booking attachments in Cloud Storage
+ * and stamps `attachmentsPurgedAt` whenever a `booking_attachments/{bookingId}` document
+ * is deleted (via Firestore TTL, cancellation, or Admin).
+ */
+exports.onBookingAttachmentDeleted = onDocumentDeleted(
+  'booking_attachments/{bookingId}',
+  async (event) => {
+    const attachmentDocData = event.data ? event.data.data() : null;
+    if (!attachmentDocData) return;
+
+    const db = admin.firestore();
+    const bucket = admin.storage().bucket();
+    await cleanupDeletedBookingAttachmentResources({
+      db,
+      bucket,
+      bookingId: event.params.bookingId,
+      attachmentDocData,
+    });
+  }
+);
+
 /**
  * Extracts a millisecond epoch timestamp from Firestore Timestamp, Date, number, ISO string, or serialized map.
  */
@@ -3655,6 +4279,17 @@ exports._test = {
   purgeExpiredQrCodes,
   cleanupDeletedAccessLogResources,
   purgeExpiredAccessLogs,
+  BOOKING_ATTACHMENT_RETENTION_DAYS,
+  BOOKING_ATTACHMENT_RETENTION_MS,
+  ALLOWED_BOOKING_DOC_EXTENSIONS,
+  MAX_BOOKING_ATTACHMENTS_COUNT,
+  MAX_BOOKING_ATTACHMENT_SIZE_BYTES,
+  computeBookingAttachmentExpireAtMillis,
+  validateDocumentMagicBytes,
+  extractBookingAttachmentStoragePath,
+  validateAndNormalizeBookingAttachments,
+  cleanupDeletedBookingAttachmentResources,
+  purgeExpiredBookingAttachments,
   admin,
 };
 

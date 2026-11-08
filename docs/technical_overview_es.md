@@ -62,7 +62,7 @@ flowchart TD
 ### 2.1 Para Residentes y Miembros del Hogar
 
 * **Pases Digitales de Acceso QR**: Los residentes pueden generar códigos QR al instante para visitantes esperados, familiares recurrentes o proveedores de servicios y paquetería. Los pases pueden configurarse como **de un solo uso** o **temporales (con fecha y hora de vencimiento específicas)**, agregando datos opcionales del vehículo (automóvil, motocicleta, número de placa) y número de pasajeros.
-* **Reserva de Amenidades y Áreas Comunes**: Los residentes pueden consultar y reservar espacios compartidos (salón de eventos, alberca, asadores o equipo recreativo). El sistema valida la disponibilidad en tiempo real para evitar empalmes de horarios, aplica periodos de espera (*cooldown* en horas, días, meses o años) o cuotas calendario de reservas (diarias, mensuales o anuales) por domicilio, y gestiona los flujos de aprobación.
+* **Reserva de Amenidades y Áreas Comunes**: Los residentes pueden consultar y reservar espacios compartidos (salón de eventos, alberca, asadores o equipo recreativo), descargar los formatos o reglamentos requeridos por la instalación y adjuntar documentos llenados/firmados o fotografías directamente en su solicitud de reserva. El sistema valida la disponibilidad en tiempo real para evitar empalmes de horarios, aplica periodos de espera (*cooldown* en horas, días, meses o años) o cuotas calendario de reservas (diarias, mensuales o anuales) por domicilio, aísla los archivos adjuntos frente a otros vecinos y gestiona los flujos de aprobación.
 * **Seguimiento de Cuotas de Mantenimiento y Carga de Comprobantes**: Los residentes pueden verificar el estado de su cuenta (Al día / Pagado, Pendiente, En Revisión o Restringido), consultar el historial mensual de cuotas y subir fotografías de fichas de depósito o transferencias bancarias (próximamente) directamente desde la cámara o galería del teléfono.
 * **Tablero de Avisos Comunitarios**: Un muro interactivo muestra comunicados oficiales de la administración con imágenes de alta resolución, formato destacado y traducción automática bilingüe (español e inglés).
 * **Portal de Transparencia Documental**: Un explorador de archivos virtual integrado permite a los residentes autorizados consultar reglamentos internos, minutas de asambleas, estados financieros y calendarios de obras con soporte para guardado en memoria local sin re-descargas innecesarias.
@@ -82,7 +82,7 @@ flowchart TD
 * **Validación de Títulos y Entrega de Propiedades**: Los administradores revisan las actas de entrega o escrituras enviadas por nuevos residentes para validar la posesión legal antes de otorgar privilegios de titular residencial.
 * **Aprobación de Comprobantes y Matriz Financiera**: El equipo administrativo revisa los pagos subidos, aprueba o rechaza comprobantes con retroalimentación y exporta la matriz de cobranza mensual completa en formato CSV para la contabilidad del condominio.
 * **Carga Masiva de Datos mediante CSV**: Facilita la creación masiva de cientos de direcciones o cuentas de residentes en segundos a través de archivos de hoja de cálculo (CSV), generando contraseñas seguras y enviando correos de bienvenida automáticamente.
-* **Configuración Dinámica de Amenidades**: Permite dar de alta espacios comunes, definir si son de uso exclusivo o de capacidad múltiple, establecer horarios y anticipación mínima, y aplicar tiempos de espera o cuotas diarias/mensuales/anuales por domicilio.
+* **Configuración Dinámica de Amenidades**: Permite dar de alta espacios comunes, definir si son de uso exclusivo o de capacidad múltiple, establecer horarios y anticipación mínima, aplicar tiempos de espera o cuotas diarias/mensuales/anuales por domicilio, y cargar formatos obligatorios, opcionales o informativos (`PDF`, `Word`, `Excel`, `JPG`, `PNG`, `WEBP` hasta 10 MB).
 * **Publicación de Avisos Asistida por Inteligencia Artificial**: Los administradores pueden redactar boletines en español o inglés; el sistema traduce automáticamente los títulos y contenidos mediante Google Gemini AI sin exponer claves confidenciales.
 * **Servicio de Correo SMTP Personalizado**: Envío automatizado de credenciales de acceso e información de bienvenida a través del servidor de correo institucional del condominio.
 
@@ -147,23 +147,23 @@ flowchart TD
   * `users`: Perfiles de residentes, guardias y administradores.
   * `addresses`: Catálogo de viviendas, propietarios vinculados y estatus de cuota mensual.
   * `qr_codes`: Pases de acceso generados, nombres de invitados y vigencias.
-  * `bookings`: Calendario de reservas de áreas comunes y estados de aprobación.
+  * `bookings` y `booking_attachments`: Calendario de reservas de áreas comunes, estados de aprobación y adjuntos de reserva aislados por hogar.
   * `announcements`: Boletines comunitarios, imágenes y traducciones bilingües.
   * `documents` y `document_folders`: Estructura jerárquica de archivos normativos y financieros.
   * `access_logs`: Historial de accesos en caseta con fotos y registros de guardia.
   * `payments`: Comprobantes de pago cargados, periodos mensuales (`AAAA-MM`) e importes.
   * `ownership_claims`: Solicitudes de vinculación de propiedad en revisión.
-  * `facilities`: Catálogo de amenidades configurables.
+  * `facilities`: Catálogo de amenidades configurables y plantillas documentales descargables.
   * `config`: Parámetros de corte de pago, días de gracia y configuración del Administrador.
 
 ### 4.3 Firebase Cloud Storage (Almacenamiento Seguro de Archivos)
 * **Función**: Bóveda de almacenamiento de archivos en la nube con cifrado en reposo.
-* **Operación**: Almacena documentos de acreditación de propiedad, comprobantes de pago de mantenimiento, fotografías de identificación y placas tomadas en caseta (resguardadas con una regla de ciclo de vida de objetos en GCS de 62 días sobre `visitor_ids/` y `visitor_plates/`), archivos de transparencia e imágenes de avisos.
+* **Operación**: Almacena documentos de acreditación de propiedad, comprobantes de pago de mantenimiento, fotografías de identificación y placas tomadas en caseta (resguardadas con una regla de ciclo de vida de objetos en GCS de 62 días sobre `visitor_ids/` y `visitor_plates/`), plantillas de amenidades (`facility_documents/`), adjuntos de reserva aislados por hogar (`booking_attachments/`, con encabezado `Content-Disposition: attachment` y regla de respaldo en GCS a los 125 días), archivos de transparencia e imágenes de avisos.
 
 ### 4.4 Cloud Functions para Firebase (Lógica del Servidor)
 * **Función**: Ejecuta procesos de negocio críticos en contenedores aislados en el servidor, garantizando que operaciones sensibles no dependan del dispositivo del usuario:
   * **Validación Atómica de Accesos QR** (`validateAndRegisterQrAccess`): Verifica reglas de acceso, asigna marcas `expireAt` de 60 días en `access_logs` y de 7 días en pases `qr_codes` finalizados, y escribe el registro en la bitácora en una única transacción protegida.
-  * **Depuración en Cascada de Evidencia Fotográfica y QR** (`onAccessLogDeleted` y `checkMonthlyPaymentStatuses`): Elimina de Cloud Storage las fotografías asociadas en `visitor_ids/` y `visitor_plates/` cuando un registro de `access_logs` expira por TTL (o se elimina), restablece el estado de visitas abiertas en `qr_codes` y ejecuta barridos diarios de respaldo para registros históricos.
+  * **Depuración en Cascada de Evidencia Fotográfica, QR y Adjuntos de Reserva** (`onAccessLogDeleted`, `onBookingAttachmentDeleted` y `checkMonthlyPaymentStatuses`): Elimina de Cloud Storage los archivos en `visitor_ids/`, `visitor_plates/` y `booking_attachments/` cuando los documentos expiran por TTL (o se cancelan/eliminan), restablece el estado de visitas abiertas en `qr_codes` y ejecuta barridos diarios de respaldo.
   * **Traducción Automática con IA** (`translateAnnouncement`): Conecta de forma segura y sin claves manuales con Google Vertex AI (Gemini) para traducir boletines entre español e inglés.
   * **Recalculación Automática de Estatus de Pago** (`onPaymentWritten`): Actualiza el estatus de la vivienda inmediatamente después de que un administrador aprueba un comprobante.
   * **Creación Masiva de Residentes y Direcciones** (`adminBulkImportResidents`, `adminBulkImportAddresses`): Procesa archivos CSV en el servidor, asignando roles y generando contraseñas seguras.
@@ -252,6 +252,7 @@ Para prestar los servicios de control de acceso, administración condominal y se
 | **Registros Financieros** | Comprobantes de pago (imágenes), montos, fechas y periodos de cuota. | Conciliación de cuotas de mantenimiento y actualización de saldos. |
 | **Control de Visitas** | Nombres de invitados, tipo de vehículo, placas, horarios autorizados. | Generación de pases QR de acceso y preautorización en caseta. |
 | **Bitácora de Caseta** | Marcas de tiempo de ingreso, resultado (Permitido/Denegado), fotos de identificación o placa. | Preservar la seguridad comunitaria y contar con auditoría de accesos. |
+| **Adjuntos de Reserva** | Formatos firmados, cartas responsivas, listas de invitados o fotos adjuntas a reservas. | Validar el cumplimiento de requisitos de la amenidad previo a su aprobación. |
 | **Telemetría Técnica** | Registros de fallas anónimos y diagnósticos de rendimiento (Crashlytics/Analytics). | Identificar errores de software, prevenir cierres imprevistos y optimizar la app. |
 
 ### 6.2 ¿Cómo se Procesa y Utiliza la Información?
@@ -273,9 +274,10 @@ El ejercicio de los Derechos ARCO puede realizarse ante la Administración del C
 
 ### 6.4 Retención Automática, Eliminación de Cuenta y Purga de Datos
 
-* **Políticas Automáticas de Retención en Caseta**:
+* **Políticas Automáticas de Retención en Caseta y Reservas**:
   * **Depuración a los 60 Días de Bitácora y Fotografías de Visitantes**: Los documentos de `access_logs` y sus fotografías de identificación y placas vehiculares (`visitor_ids/**` y `visitor_plates/**`) se eliminan automáticamente **60 días** después del ingreso (o 60 días después de la salida registrada) mediante la política nativa TTL de Firestore (`expireAt`), el trigger en cascada `onAccessLogDeleted`, barridos diarios de respaldo y una regla de ciclo de vida de objetos en Cloud Storage de 62 días (`storage_lifecycle.json`).
   * **Depuración a los 7 Días de Pases QR Inactivos**: Los pases QR temporales vencidos, de proveedor ya validados y revocados (`qr_codes`) se eliminan automáticamente **7 días** después de su vencimiento o desactivación, mientras que los pases permanentes activos no vencen salvo que sean revocados.
+  * **Depuración a los 30 Días Posterior a la Reserva de Adjuntos**: Los archivos adjuntos enviados por residentes en sus reservas (`booking_attachments` y `booking_attachments/**`) se eliminan de inmediato si se cancela la reserva y se purgan automáticamente **30 días** después de finalizar el horario reservado mediante TTL nativo de Firestore (`expireAt`), el trigger `onBookingAttachmentDeleted`, barridos diarios de respaldo y una regla de ciclo de vida en Cloud Storage de 125 días.
 * **Mecanismos de Eliminación**: El usuario puede solicitar la eliminación de su cuenta en cualquier momento mediante el botón **"Eliminar Cuenta"** dentro de la app o solicitándolo a la Administración.
 * **Purga Definitiva e Irreversible**: Al ejecutarse la eliminación, las credenciales en Firebase Authentication, el registro del usuario en Cloud Firestore y sus archivos de acreditación en Cloud Storage son **destruidos de forma permanente e irrecuperable**.
 

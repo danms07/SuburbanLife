@@ -370,6 +370,12 @@ You can **Create** a new facility using the top form, **Edit** any existing faci
    * Choose **Unrestricted**, or require a minimum number of **Hours**, **Days**, or **Weeks** in advance (e.g., *48 Hours* advance notice required to book the Event Hall).
 6. **Preset Approval Instructions (`presetApprovalMessage`)**:
    * Optional template text (such as security deposit instructions, key pickup rules, or cleaning checklists) that automatically pre-fills the approval message box whenever an administrator approves a booking for this facility.
+7. **Amenity Documentation (`facilityDocuments`)**:
+   * Upload optional forms, contracts, guest-list templates, or facility rules (`PDF`, `DOC`, `DOCX`, `XLS`, `XLSX`, `JPG`, `JPEG`, `PNG`, `WEBP` — up to **10 MB** per file).
+   * Assign a **Requirement Mode** to each document:
+     * **Required Return (`mandatory_return`)**: Residents must download, complete, and attach the signed/filled file (or camera photo) before they can submit a booking request.
+     * **Optional Return (`optional_return`)**: Residents can download the file and optionally attach a completed copy to their booking.
+     * **Informative Only (`informative`)**: Reference/read-only document (such as pool or noise bylaws) with no upload slot required.
 
 ---
 
@@ -377,10 +383,10 @@ You can **Create** a new facility using the top form, **Edit** any existing faci
 **Navigation:** Admin Panel $\rightarrow$ **Review Bookings** (`AdminBookingApprovalScreen`)
 
 When a resident requests a reservation, it enters the `pending review` queue:
-1. Inspect the booking card, which displays the **Facility Name**, **Requested Date & Time Window**, and an **Applicant Contact Card** (**Name**, **Email**, and **Phone Number**).
+1. Inspect the booking card, which displays the **Facility Name**, **Requested Date & Time Window**, an **Applicant Contact Card** (**Name**, **Email**, and **Phone Number**), and—whenever documents were attached—a **Submitted Documentation** section with **View / Download** buttons to inspect each resident attachment before deciding.
 2. Choose an action:
    * **Approve**: Opens the **Approve Booking Dialog**, pre-populated with the facility's **Preset Approval Instructions**. You can customize the instructions for this specific resident before confirming. Approving transitions the booking to `approved` and makes your instructions visible to the resident in their *My Bookings* screen.
-   * **Reject**: Prompts you to enter a **Rejection Reason**, transitions the booking to `rejected`, and frees the time slot for other residents.
+   * **Reject**: Prompts you to enter a **Rejection Reason**, transitions the booking to `rejected`, and frees the time slot for other residents. Residents can edit and resubmit a rejected booking (including replacing any incomplete or unsigned attachment).
 
 ---
 

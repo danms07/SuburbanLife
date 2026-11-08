@@ -996,7 +996,7 @@ test('evaluateQrCleanupAction purges terminal QR passes after 7 days while prese
   );
 });
 
-test('Static Config Audit: storage_lifecycle.json and firestore.indexes.json configure 62-day media safety net and expireAt exemptions', () => {
+test('Static Config Audit: storage_lifecycle.json and firestore.indexes.json configure 62-day media safety net, 125-day booking attachment safety net, and expireAt exemptions', () => {
   const fs = require('node:fs');
   const path = require('node:path');
 
@@ -1008,6 +1008,11 @@ test('Static Config Audit: storage_lifecycle.json and firestore.indexes.json con
   assert.equal(deleteRule.condition.age, 62);
   assert.deepEqual(deleteRule.condition.matchesPrefix, ['visitor_ids/', 'visitor_plates/']);
 
+  const bookingAttRule = lifecycleJson.lifecycle.rule[1];
+  assert.equal(bookingAttRule.action.type, 'Delete');
+  assert.equal(bookingAttRule.condition.age, 125);
+  assert.deepEqual(bookingAttRule.condition.matchesPrefix, ['booking_attachments/']);
+
   const indexesPath = path.resolve(__dirname, '../../firestore.indexes.json');
   const indexesJson = JSON.parse(fs.readFileSync(indexesPath, 'utf8'));
   const accessLogTtlOverride = indexesJson.fieldOverrides.find(
@@ -1016,9 +1021,107 @@ test('Static Config Audit: storage_lifecycle.json and firestore.indexes.json con
   const qrTtlOverride = indexesJson.fieldOverrides.find(
     (f) => f.collectionGroup === 'qr_codes' && f.fieldPath === 'expireAt'
   );
+  const bookingAttTtlOverride = indexesJson.fieldOverrides.find(
+    (f) => f.collectionGroup === 'booking_attachments' && f.fieldPath === 'expireAt'
+  );
   assert.deepEqual(accessLogTtlOverride?.indexes, []);
   assert.deepEqual(qrTtlOverride?.indexes, []);
+  assert.deepEqual(bookingAttTtlOverride?.indexes, []);
 });
 
+test('computeBookingAttachmentExpireAtMillis computes exact 30-day post-endTime retention window', () => {
+  const {
+    computeBookingAttachmentExpireAtMillis,
+    BOOKING_ATTACHMENT_RETENTION_DAYS,
+    BOOKING_ATTACHMENT_RETENTION_MS,
+  } = _test;
 
+  assert.equal(BOOKING_ATTACHMENT_RETENTION_DAYS, 30);
+  assert.equal(BOOKING_ATTACHMENT_RETENTION_MS, 30 * 24 * 60 * 60 * 1000);
 
+  const bookingEndMillis = Date.UTC(2027, 7, 15, 20, 0, 0);
+  assert.equal(
+    computeBookingAttachmentExpireAtMillis(bookingEndMillis),
+    bookingEndMillis + 30 * 24 * 60 * 60 * 1000
+  );
+  assert.equal(
+    computeBookingAttachmentExpireAtMillis(new Date(bookingEndMillis)),
+    bookingEndMillis + 30 * 24 * 60 * 60 * 1000
+  );
+});
+
+test('validateDocumentMagicBytes accepts authentic PDF/Office/Raster headers and rejects spoofed HTML/SVG/Executables', () => {
+  const { validateDocumentMagicBytes } = _test;
+
+  // Authentic headers
+  assert.equal(validateDocumentMagicBytes(Buffer.from('%PDF-1.7\n...'), 'pdf'), true);
+  assert.equal(
+    validateDocumentMagicBytes(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]),
+      'png'
+    ),
+    true
+  );
+  assert.equal(validateDocumentMagicBytes(Buffer.from([0xff, 0xd8, 0xff, 0xe0]), 'jpg'), true);
+  assert.equal(validateDocumentMagicBytes(Buffer.from([0xff, 0xd8, 0xff, 0xe1]), 'jpeg'), true);
+  assert.equal(validateDocumentMagicBytes(Buffer.from('RIFF\x24\x00\x00\x00WEBPVP8 '), 'webp'), true);
+  assert.equal(
+    validateDocumentMagicBytes(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]), 'docx'),
+    true
+  );
+  assert.equal(
+    validateDocumentMagicBytes(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00]), 'xlsx'),
+    true
+  );
+  assert.equal(
+    validateDocumentMagicBytes(
+      Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00]),
+      'doc'
+    ),
+    true
+  );
+  assert.equal(
+    validateDocumentMagicBytes(
+      Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00]),
+      'xls'
+    ),
+    true
+  );
+
+  // Spoofed or disallowed payloads
+  assert.equal(validateDocumentMagicBytes(Buffer.from('<html><script>alert(1)</script>'), 'pdf'), false);
+  assert.equal(validateDocumentMagicBytes(Buffer.from('<svg onload="alert(1)">'), 'png'), false);
+  assert.equal(validateDocumentMagicBytes(Buffer.from('<svg onload="alert(1)">'), 'svg'), false);
+  assert.equal(validateDocumentMagicBytes(Buffer.from('MZ\x90\x00'), 'exe'), false);
+  assert.equal(validateDocumentMagicBytes(Buffer.from('%PDF'), 'pdf'), false); // truncated
+  assert.equal(validateDocumentMagicBytes(null, 'pdf'), false);
+});
+
+test('extractBookingAttachmentStoragePath extracts valid booking_attachments/<uid>/<file> paths and blocks traversal or out-of-scope prefixes', () => {
+  const { extractBookingAttachmentStoragePath } = _test;
+
+  assert.equal(
+    extractBookingAttachmentStoragePath(
+      'https://firebasestorage.googleapis.com/v0/b/suburban-life.appspot.com/o/booking_attachments%2Fres_uid_1%2F1710000_abcd.pdf?alt=media&token=xyz'
+    ),
+    'booking_attachments/res_uid_1/1710000_abcd.pdf'
+  );
+  assert.equal(
+    extractBookingAttachmentStoragePath('gs://suburban-life.appspot.com/booking_attachments/res_uid_1/signed_form.docx'),
+    'booking_attachments/res_uid_1/signed_form.docx'
+  );
+  assert.equal(
+    extractBookingAttachmentStoragePath('booking_attachments/res_uid_1/photo_1.jpg'),
+    'booking_attachments/res_uid_1/photo_1.jpg'
+  );
+
+  // Reject traversal, extra nesting, null bytes, and other folders
+  assert.equal(extractBookingAttachmentStoragePath('booking_attachments/../documents/admin_only/secret.pdf'), null);
+  assert.equal(extractBookingAttachmentStoragePath('booking_attachments/res_uid_1/../../payments/p1.pdf'), null);
+  assert.equal(extractBookingAttachmentStoragePath('booking_attachments/res_uid_1/sub/extra.pdf'), null);
+  assert.equal(extractBookingAttachmentStoragePath('booking_attachments/res_uid_1/evil\0.pdf'), null);
+  assert.equal(extractBookingAttachmentStoragePath('facility_documents/pool/template.pdf'), null);
+  assert.equal(extractBookingAttachmentStoragePath('documents/admin_only/secret.pdf'), null);
+  assert.equal(extractBookingAttachmentStoragePath(''), null);
+  assert.equal(extractBookingAttachmentStoragePath(null), null);
+});

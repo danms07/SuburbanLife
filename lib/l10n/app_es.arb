@@ -984,5 +984,54 @@
     }
   },
   "accessLogsRetentionBanner": "Política de eliminación automática: Los registros de acceso y las fotografías de verificación se eliminan permanentemente después de 2 meses (60 días).",
-  "qrPassRetentionBanner": "Los pases QR inactivos (vencidos, usados o revocados) se eliminan automáticamente después de 7 días. Los pases permanentes activos no vencen."
+  "qrPassRetentionBanner": "Los pases QR inactivos (vencidos, usados o revocados) se eliminan automáticamente después de 7 días. Los pases permanentes activos no vencen.",
+  "facilityDocsSectionTitle": "Documentación de la Amenidad",
+  "facilityDocsSectionSubtitle": "Suba formatos o reglamentos (PDF, Word, Excel, JPG, PNG, WEBP — máx. 10 MB c/u).",
+  "addFacilityDocumentButton": "Agregar Documento",
+  "noFacilityDocumentsAdded": "No hay documentos configurados para esta amenidad.",
+  "facilityDocTitleLabel": "Título del Documento",
+  "facilityDocModeLabel": "Tipo de Requisito",
+  "facilityDocModeMandatory": "Devolución obligatoria (residente debe adjuntar)",
+  "facilityDocModeOptional": "Devolución opcional (adjunto opcional)",
+  "facilityDocModeInformative": "Solo informativo (descarga/lectura)",
+  "facilityDocBadgeMandatory": "Devolución Obligatoria",
+  "facilityDocBadgeOptional": "Devolución Opcional",
+  "facilityDocBadgeInformative": "Informativo",
+  "facilitySubtitleDocs": "Docs: {total}",
+  "@facilitySubtitleDocs": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "facilitySubtitleDocsWithMandatory": "Docs: {total} ({mandatory} obligatorio(s))",
+  "@facilitySubtitleDocsWithMandatory": {
+    "placeholders": {
+      "total": { "type": "int" },
+      "mandatory": { "type": "int" }
+    }
+  },
+  "bookingDocsInstructionBanner": "Descargue los documentos de la amenidad a continuación. Los marcados como Devolución Obligatoria deben llenarse y adjuntarse para enviar su reserva.",
+  "downloadFacilityDocumentButton": "Descargar / Ver",
+  "attachCompletedFileButton": "Adjuntar Archivo",
+  "takeDocumentPhotoButton": "Tomar Foto",
+  "replaceAttachedFileButton": "Reemplazar",
+  "removeAttachedFileTooltip": "Quitar adjunto",
+  "missingMandatoryDocumentsError": "Por favor adjunte todos los documentos obligatorios antes de enviar: {titles}",
+  "@missingMandatoryDocumentsError": {
+    "placeholders": {
+      "titles": { "type": "String" }
+    }
+  },
+  "invalidDocumentContentError": "El contenido del archivo seleccionado no coincide con su extensión o está dañado.",
+  "bookingAttachmentsSectionTitle": "Documentación Enviada",
+  "noBookingAttachmentsSubmitted": "Sin archivos adjuntos.",
+  "viewBookingAttachmentButton": "Ver / Descargar",
+  "bookingAttachmentsCountBadge": "{count} adjunto(s)",
+  "@bookingAttachmentsCountBadge": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bookingAttachmentsPurgedNotice": "Los archivos adjuntos se eliminaron automáticamente 30 días después de finalizar la reserva conforme al aviso de privacidad.",
+  "bookingAttachmentsRetentionHelper": "Aviso de privacidad: Los adjuntos de reserva solo son visibles para su hogar y la administración, y se eliminan automáticamente 30 días después de finalizar la reserva (o de inmediato si se cancela)."
 }

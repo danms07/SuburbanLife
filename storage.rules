@@ -23,6 +23,20 @@ service firebase.storage {
          request.resource.contentType == 'application/pdf');
     }
 
+    function isAllowedFacilityOrBookingDoc() {
+      return request.resource != null &&
+        request.resource.contentType in [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
+    }
+
     match /documents/admin_only/{allPaths=**} {
       allow read, write: if isAdmin();
     }
@@ -39,6 +53,20 @@ service firebase.storage {
     match /announcements/{allPaths=**} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
+    }
+
+    match /facility_documents/{facilityId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidUploadSize() && isAllowedFacilityOrBookingDoc();
+      allow delete: if isAdmin();
+    }
+
+    match /booking_attachments/{userId}/{allPaths=**} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow create, update: if (isAdmin() || (isAuthenticated() && request.auth.uid == userId)) &&
+        isValidUploadSize() &&
+        isAllowedFacilityOrBookingDoc();
+      allow delete: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
     }
 
     match /sanctions/{addressId}/{allPaths=**} {

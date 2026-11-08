@@ -50,8 +50,20 @@ erDiagram
         timestamp startTime
         timestamp endTime
         string status "'pending review' | 'rejected' | 'approved' | 'closed' | 'cancelled'"
+        boolean hasAttachments "True when resident submitted attachments"
+        number attachmentCount "Count of submitted attachments"
+        number attachmentsPurgedAt "Optional epoch ms when 30d TTL purged files"
         string notes
         string rejectionReason "Optional rejection rationale from admin"
+    }
+    booking_attachments {
+        string bookingId PK "1:1 with bookings/{bookingId}"
+        string facilityId FK
+        string userUid FK
+        string addressId FK "Household isolation scope"
+        number bookingEndTime "Epoch ms indexed for fallback sweep"
+        timestamp expireAt "30-day post-endTime TTL timestamp"
+        array attachments "Submitted file metadata & URLs"
     }
     announcements {
         string announcementId PK
@@ -112,6 +124,7 @@ erDiagram
         number cooldownValue
         string quotaPeriod "'unrestricted' | 'daily' | 'monthly' | 'yearly'"
         number quotaLimit
+        array facilityDocuments "Optional facility document templates"
     }
     config {
         string documentId PK "app_settings | smtp_settings"
@@ -131,6 +144,7 @@ erDiagram
     bookings }o--|| users : "booked by"
     bookings }o--o| addresses : "belongs to household"
     bookings }o--|| facilities : "reserves"
+    booking_attachments |o--|| bookings : "isolates attachments for"
     announcements }o--|| users : "created by"
     access_logs }o--|| qr_codes : "validates"
     access_logs }o--|| users : "verified by guard"
@@ -193,9 +207,32 @@ erDiagram
 - `endTime`: timestamp
 - `status`: string ("pending review", "rejected", "cancelled", "approved (upcoming)", "approved (in use)", "closed")
 - `isConfirmed`: boolean (True for approved/closed bookings; allows public calendar availability query)
+- `hasAttachments`: boolean (True when the booking has resident-submitted documentation stored in `booking_attachments/{bookingId}`)
+- `attachmentCount`: number (Count of resident-submitted files; keeps `bookings` free of private Storage URLs so neighbor schedule queries never leak PII)
+- `attachmentsPurgedAt`: number (Optional epoch ms recorded when `booking_attachments/{bookingId}` and Cloud Storage files are purged 30 days after `endTime`)
 - `notes`: string
 - `rejectionReason`: string (Optional rationale provided by administrator upon rejection)
 - `approvalMessage`: string (Custom instructions/next steps provided by administrator or populated from facility preset)
+
+### `booking_attachments` (Collection — Household & Admin Isolated)
+- `bookingId`: string (Document ID, 1:1 with `bookings/{bookingId}`)
+- `facilityId`: string
+- `userUid`: string (UID of the resident who submitted the booking)
+- `addressId`: string | null (Physical household address ID enabling primary resident and linked roommates via `isCallerAddressResident(addressId)` to inspect or resubmit attachments, while strictly blocking other neighbors)
+- `bookingEndTime`: number (Booking `endTime` in epoch milliseconds, single-field indexed for `purgeExpiredBookingAttachments` fallback queries without indexing `expireAt`)
+- `expireAt`: timestamp (Firestore TTL timestamp set to `endTime + 30 days`; exempted from single-field indexing to prevent sequential write hotspots)
+- `attachments`: array of maps:
+    - `facilityDocId`: string (Matches `facilities.facilityDocuments[].docId`)
+    - `title`: string
+    - `requirementMode`: string (`'mandatory_return'` | `'optional_return'`)
+    - `fileName`: string (Sanitized display filename)
+    - `fileType`: string (`'pdf'` | `'doc'` | `'docx'` | `'xls'` | `'xlsx'` | `'jpg'` | `'jpeg'` | `'png'` | `'webp'`)
+    - `fileSize`: number (Bytes, max 10 MB)
+    - `url`: string (Firebase Storage download URL under `booking_attachments/{uid}/...`)
+    - `storagePath`: string (Validated `booking_attachments/{uid}/<random_token>.<ext>` path)
+    - `uploadedAt`: number (Epoch milliseconds)
+- `createdAt`: timestamp
+- `updatedAt`: timestamp
 
 ### `announcements` (Collection)
 - `announcementId`: string (Document ID)
@@ -317,6 +354,7 @@ erDiagram
 - `openingTime`: string (Daily opening hour in 24-hour HH:mm format, e.g. '08:00', default '00:00')
 - `closingTime`: string (Daily closing hour in 24-hour HH:mm format, e.g. '21:00', default '23:59')
 - `presetApprovalMessage`: string (Optional default instructions/next steps for approved bookings)
+- `facilityDocuments`: array of maps (Optional facility templates/forms/rules uploaded by administrators under `facility_documents/{facilityId}/<token>.<ext>`; each item contains `docId`, `title`, `requirementMode` in `'mandatory_return' | 'optional_return' | 'informative'`, `fileName`, `fileType`, `fileSize`, `url`, `storagePath`, and `uploadedAt`)
 
 ### `config` (Collection)
 #### `app_settings` (Document)
@@ -456,7 +494,7 @@ The application requires specific composite indexes to execute queries without d
 
 ## Firestore TTL Policies & Single-Field Index Exemptions
 
-To prevent unbounded growth of gatehouse audit logs, visitor identification photos, and inactive QR passes while avoiding sequential timestamp index hotspots, two native Firestore Time-to-Live (TTL) policies are configured alongside single-field index exemptions (`"indexes": []` in `firestore.indexes.json` `fieldOverrides`):
+To prevent unbounded growth of gatehouse audit logs, visitor identification photos, inactive QR passes, and resident booking attachments while avoiding sequential timestamp index hotspots, three native Firestore Time-to-Live (TTL) policies are configured alongside single-field index exemptions (`"indexes": []` in `firestore.indexes.json` `fieldOverrides`):
 
 1. **`access_logs.expireAt` (60-Day Retention)**:
    - **Single-Field Index Exemption**: Collection group `access_logs`, field `expireAt` (`"indexes": []`).
@@ -465,4 +503,8 @@ To prevent unbounded growth of gatehouse audit logs, visitor identification phot
 2. **`qr_codes.expireAt` (7-Day Post-Deactivation Retention)**:
    - **Single-Field Index Exemption**: Collection group `qr_codes`, field `expireAt` (`"indexes": []`).
    - **TTL Policy**: Enabled on `qr_codes.expireAt`. Stamped at `expiryTime + 7 days` for temporary passes, `validatedAt + 7 days` (or `exitTimestamp + 7 days` when Scan on Exit completes) for single-use supplier passes, and `deactivatedAt + 7 days` for resident-revoked passes. Active permanent passes (`type == 'permanent'`) keep `expireAt: null`, and passes with an open visit (`isInside == true`) hold `expireAt: null` until exit or log cleanup.
+3. **`booking_attachments.expireAt` (30-Day Post-Booking Retention)**:
+   - **Single-Field Index Exemption**: Collection group `booking_attachments`, field `expireAt` (`"indexes": []`).
+   - **TTL Policy**: Enabled on `booking_attachments.expireAt`. Stamped at `endTime + 30 days` when `createBooking` persists resident attachments (and deleted immediately if `cancelBooking` is called).
+   - **Cascading Cleanup**: Deletion of `booking_attachments/{bookingId}` (via Firestore TTL, daily `purgeExpiredBookingAttachments` sweep querying indexed `bookingEndTime <= now - 30d`, or `cancelBooking`) triggers `onBookingAttachmentDeleted`, which deletes allow-listed Cloud Storage files under `booking_attachments/` and stamps `bookings/{bookingId}.attachmentsPurgedAt`. An independent 125-day GCS Object Lifecycle rule (`storage_lifecycle.json`) removes any orphaned uploads under `booking_attachments/`.
 

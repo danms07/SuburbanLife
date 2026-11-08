@@ -413,10 +413,17 @@ class FirebaseStorageService implements StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   @override
-  Future<String> uploadFile(String path, dynamic fileData, {String? contentType, Map<String, String>? metadata}) async {
+  Future<String> uploadFile(
+    String path,
+    dynamic fileData, {
+    String? contentType,
+    String? contentDisposition,
+    Map<String, String>? metadata,
+  }) async {
     final ref = _storage.ref().child(path);
     final settableMetadata = SettableMetadata(
       contentType: contentType,
+      contentDisposition: contentDisposition,
       customMetadata: metadata,
     );
     if (fileData is Uint8List) {

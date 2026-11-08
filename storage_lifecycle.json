@@ -12,6 +12,17 @@
             "visitor_plates/"
           ]
         }
+      },
+      {
+        "action": {
+          "type": "Delete"
+        },
+        "condition": {
+          "age": 125,
+          "matchesPrefix": [
+            "booking_attachments/"
+          ]
+        }
       }
     ]
   }

@@ -2472,4 +2472,105 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get qrPassRetentionBanner =>
       'Los pases QR inactivos (vencidos, usados o revocados) se eliminan automáticamente después de 7 días. Los pases permanentes activos no vencen.';
+
+  @override
+  String get facilityDocsSectionTitle => 'Documentación de la Amenidad';
+
+  @override
+  String get facilityDocsSectionSubtitle =>
+      'Suba formatos o reglamentos (PDF, Word, Excel, JPG, PNG, WEBP — máx. 10 MB c/u).';
+
+  @override
+  String get addFacilityDocumentButton => 'Agregar Documento';
+
+  @override
+  String get noFacilityDocumentsAdded =>
+      'No hay documentos configurados para esta amenidad.';
+
+  @override
+  String get facilityDocTitleLabel => 'Título del Documento';
+
+  @override
+  String get facilityDocModeLabel => 'Tipo de Requisito';
+
+  @override
+  String get facilityDocModeMandatory =>
+      'Devolución obligatoria (residente debe adjuntar)';
+
+  @override
+  String get facilityDocModeOptional =>
+      'Devolución opcional (adjunto opcional)';
+
+  @override
+  String get facilityDocModeInformative =>
+      'Solo informativo (descarga/lectura)';
+
+  @override
+  String get facilityDocBadgeMandatory => 'Devolución Obligatoria';
+
+  @override
+  String get facilityDocBadgeOptional => 'Devolución Opcional';
+
+  @override
+  String get facilityDocBadgeInformative => 'Informativo';
+
+  @override
+  String facilitySubtitleDocs(int total) {
+    return 'Docs: $total';
+  }
+
+  @override
+  String facilitySubtitleDocsWithMandatory(int total, int mandatory) {
+    return 'Docs: $total ($mandatory obligatorio(s))';
+  }
+
+  @override
+  String get bookingDocsInstructionBanner =>
+      'Descargue los documentos de la amenidad a continuación. Los marcados como Devolución Obligatoria deben llenarse y adjuntarse para enviar su reserva.';
+
+  @override
+  String get downloadFacilityDocumentButton => 'Descargar / Ver';
+
+  @override
+  String get attachCompletedFileButton => 'Adjuntar Archivo';
+
+  @override
+  String get takeDocumentPhotoButton => 'Tomar Foto';
+
+  @override
+  String get replaceAttachedFileButton => 'Reemplazar';
+
+  @override
+  String get removeAttachedFileTooltip => 'Quitar adjunto';
+
+  @override
+  String missingMandatoryDocumentsError(String titles) {
+    return 'Por favor adjunte todos los documentos obligatorios antes de enviar: $titles';
+  }
+
+  @override
+  String get invalidDocumentContentError =>
+      'El contenido del archivo seleccionado no coincide con su extensión o está dañado.';
+
+  @override
+  String get bookingAttachmentsSectionTitle => 'Documentación Enviada';
+
+  @override
+  String get noBookingAttachmentsSubmitted => 'Sin archivos adjuntos.';
+
+  @override
+  String get viewBookingAttachmentButton => 'Ver / Descargar';
+
+  @override
+  String bookingAttachmentsCountBadge(int count) {
+    return '$count adjunto(s)';
+  }
+
+  @override
+  String get bookingAttachmentsPurgedNotice =>
+      'Los archivos adjuntos se eliminaron automáticamente 30 días después de finalizar la reserva conforme al aviso de privacidad.';
+
+  @override
+  String get bookingAttachmentsRetentionHelper =>
+      'Aviso de privacidad: Los adjuntos de reserva solo son visibles para su hogar y la administración, y se eliminan automáticamente 30 días después de finalizar la reserva (o de inmediato si se cancela).';
 }

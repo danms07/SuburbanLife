@@ -155,7 +155,13 @@ abstract class DatabaseService {
 abstract class StorageService {
   factory StorageService() => Backend.storage;
 
-  Future<String> uploadFile(String path, dynamic fileData, {String? contentType, Map<String, String>? metadata});
+  Future<String> uploadFile(
+    String path,
+    dynamic fileData, {
+    String? contentType,
+    String? contentDisposition,
+    Map<String, String>? metadata,
+  });
   Future<String> getDownloadUrl(String path);
   Future<void> deleteFileFromUrl(String url);
 }

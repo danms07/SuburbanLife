@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:suburban_life/core/services/document_transfer_helper.dart';
 import 'package:suburban_life/features/admin/admin_booking_approval_screen.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
 
-Widget _wrapWithL10n(Widget child) {
+Widget _wrapWithL10n(Widget child, {Locale locale = const Locale('en')}) {
   return MaterialApp(
     localizationsDelegates: const [
       AppLocalizations.delegate,
@@ -14,7 +15,7 @@ Widget _wrapWithL10n(Widget child) {
       GlobalCupertinoLocalizations.delegate,
     ],
     supportedLocales: const [Locale('en'), Locale('es')],
-    locale: const Locale('en'),
+    locale: locale,
     home: child,
   );
 }
@@ -22,6 +23,11 @@ Widget _wrapWithL10n(Widget child) {
 void main() {
   setUp(() {
     FakeBackendHelper.setUp();
+    DocumentTransferHelper.resetOverridesForTesting();
+  });
+
+  tearDown(() {
+    DocumentTransferHelper.resetOverridesForTesting();
   });
 
   group('AdminBookingApprovalScreen - Widget & State Transitions', () {
@@ -140,6 +146,76 @@ void main() {
       expect(updated['isConfirmed'], isFalse);
       expect(updated['rejectionReason'], equals('Scheduled maintenance window'));
       expect(updated['notes'], equals('Scheduled maintenance window'));
+    });
+
+    testWidgets('streams submitted resident attachments from booking_attachments and opens document on View/Download', (tester) async {
+      String? openedUrl;
+      String? openedFileName;
+      DocumentTransferHelper.setOverridesForTesting(
+        openOrDownload: ({
+          required context,
+          required cacheId,
+          required url,
+          required fileName,
+          required title,
+        }) async {
+          openedUrl = url;
+          openedFileName = fileName;
+        },
+      );
+
+      FakeBackendHelper.db.seedDocument('facilities', 'salon', {
+        'name': 'Clubhouse Hall',
+      });
+      FakeBackendHelper.db.seedDocument('users', 'res_att', {
+        'name': 'Sofia Resident',
+      });
+      FakeBackendHelper.db.seedDocument('bookings', 'bk_with_docs', {
+        'facilityId': 'salon',
+        'userUid': 'res_att',
+        'status': 'pending review',
+        'isConfirmed': false,
+        'hasAttachments': true,
+        'attachmentCount': 1,
+        'startTime': DateTime(2026, 7, 10, 14, 0),
+        'endTime': DateTime(2026, 7, 10, 18, 0),
+      });
+      FakeBackendHelper.db.seedDocument('booking_attachments', 'bk_with_docs', {
+        'bookingId': 'bk_with_docs',
+        'facilityId': 'salon',
+        'userUid': 'res_att',
+        'attachments': [
+          {
+            'facilityDocId': 'doc_contract',
+            'title': 'Signed Event Contract',
+            'requirementMode': 'mandatory_return',
+            'fileName': 'sofia_signed_contract.pdf',
+            'fileType': 'pdf',
+            'fileSize': 51200,
+            'url': 'https://fake.storage/booking_attachments/res_att/contract.pdf',
+            'storagePath': 'booking_attachments/res_att/contract.pdf',
+            'uploadedAt': 1700000000000,
+          },
+        ],
+      });
+
+      await tester.pumpWidget(_wrapWithL10n(const AdminBookingApprovalScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Submitted Documentation'), findsOneWidget);
+      expect(find.textContaining('Signed Event Contract'), findsOneWidget);
+      expect(find.textContaining('sofia_signed_contract.pdf'), findsOneWidget);
+      expect(find.text('Required Return'), findsOneWidget);
+
+      final viewBtn = find.byKey(
+        const ValueKey('approval_view_attachment_bk_with_docs_doc_contract'),
+      );
+      await tester.ensureVisible(viewBtn);
+      await tester.tap(viewBtn);
+      await tester.pumpAndSettle();
+
+      expect(openedUrl, equals('https://fake.storage/booking_attachments/res_att/contract.pdf'));
+      expect(openedFileName, equals('sofia_signed_contract.pdf'));
     });
   });
 }

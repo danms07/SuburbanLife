@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../../core/backend/backend.dart';
+import '../../core/services/document_transfer_helper.dart';
+import 'facility_document_models.dart';
 
 class BookingRestrictionConfig {
   final String restrictionType; // 'unrestricted' | 'cooldown' | 'quota'
@@ -354,6 +357,7 @@ class BookingService {
     DateTime startTime,
     DateTime endTime, {
     String? resubmitBookingId,
+    List<Map<String, dynamic>>? attachments,
   }) async {
     try {
       final payload = <String, dynamic>{
@@ -364,11 +368,135 @@ class BookingService {
       if (resubmitBookingId != null && resubmitBookingId.trim().isNotEmpty) {
         payload['resubmitBookingId'] = resubmitBookingId.trim();
       }
+      if (attachments != null) {
+        payload['attachments'] = attachments;
+      }
       await Backend.functions.callFunction('createBooking', payload);
     } catch (e, stack) {
       Backend.crashlytics.recordError(e, stack, reason: 'BookingService.createBooking');
       throw Exception('Failed to create booking: $e');
     }
+  }
+
+  /// Uploads any newly selected draft files to `booking_attachments/{userUid}/...` with
+  /// `Content-Disposition: attachment`, invokes `createBooking`, and automatically deletes
+  /// newly uploaded Storage objects if the server rejects or fails the booking.
+  Future<void> uploadAndCreateBooking({
+    required String facilityId,
+    required String userUid,
+    String? addressId,
+    required DateTime startTime,
+    required DateTime endTime,
+    required List<FacilityDocumentTemplate> templates,
+    required Map<String, DraftBookingAttachment> draftsByDocId,
+    String? resubmitBookingId,
+  }) async {
+    final newlyUploadedUrls = <String>[];
+    final attachmentMaps = <Map<String, dynamic>>[];
+
+    try {
+      for (final template in templates) {
+        if (!template.requirementMode.acceptsAttachment) continue;
+        final draft = draftsByDocId[template.docId];
+        if (draft == null) continue;
+
+        if (draft.isAlreadyUploaded) {
+          attachmentMaps.add(
+            SubmittedBookingAttachment(
+              facilityDocId: template.docId,
+              title: template.title,
+              requirementMode: template.requirementMode,
+              fileName: draft.fileName,
+              fileType: draft.fileType,
+              fileSize: draft.fileSize,
+              url: draft.existingUrl!,
+              storagePath: draft.existingStoragePath!,
+              uploadedAt: draft.existingUploadedAt ?? DateTime.now().millisecondsSinceEpoch,
+            ).toMap(),
+          );
+          continue;
+        }
+
+        final bytes = draft.bytes;
+        if (bytes == null || bytes.isEmpty) continue;
+
+        final storagePath = DocumentTransferHelper.buildStoragePath(
+          prefix: 'booking_attachments',
+          scopeId: userUid,
+          extension: draft.fileType,
+        );
+        final contentType =
+            draft.contentType.isNotEmpty ? draft.contentType : DocumentTransferHelper.resolveMimeType(draft.fileType);
+        final downloadUrl = await Backend.storage.uploadFile(
+          storagePath,
+          bytes,
+          contentType: contentType,
+          contentDisposition: DocumentTransferHelper.buildContentDisposition(draft.fileName),
+          metadata: {
+            'uploaderUid': userUid,
+            if (addressId != null && addressId.trim().isNotEmpty) 'addressId': addressId.trim(),
+          },
+        );
+        newlyUploadedUrls.add(downloadUrl);
+        await draft.disposeTempCapture();
+
+        attachmentMaps.add(
+          SubmittedBookingAttachment(
+            facilityDocId: template.docId,
+            title: template.title,
+            requirementMode: template.requirementMode,
+            fileName: draft.fileName,
+            fileType: draft.fileType,
+            fileSize: draft.fileSize,
+            url: downloadUrl,
+            storagePath: storagePath,
+            uploadedAt: DateTime.now().millisecondsSinceEpoch,
+          ).toMap(),
+        );
+      }
+
+      await createBooking(
+        facilityId,
+        startTime,
+        endTime,
+        resubmitBookingId: resubmitBookingId,
+        attachments: attachmentMaps,
+      );
+    } catch (e) {
+      await rollbackUploadedUrls(newlyUploadedUrls);
+      rethrow;
+    }
+  }
+
+  /// Best-effort deletion of newly uploaded Storage files when a booking submission aborts.
+  Future<void> rollbackUploadedUrls(List<String> urls) async {
+    for (final url in urls) {
+      if (url.trim().isEmpty) continue;
+      try {
+        await Backend.storage.deleteFileFromUrl(url);
+      } catch (err) {
+        debugPrint('>>> [BookingService] Non-fatal Storage rollback warning: ${err.runtimeType}');
+      }
+    }
+  }
+
+  /// Streams isolated resident booking attachments from `booking_attachments/{bookingId}`.
+  Stream<List<SubmittedBookingAttachment>> streamBookingAttachments(String bookingId) {
+    final cleanId = bookingId.trim();
+    if (cleanId.isEmpty) {
+      return Stream.value(const []);
+    }
+    return Backend.db
+        .streamDocument('booking_attachments', cleanId)
+        .map((doc) => SubmittedBookingAttachment.parseList(doc?['attachments']));
+  }
+
+  /// Fetches isolated resident booking attachments once from `booking_attachments/{bookingId}`.
+  Future<List<SubmittedBookingAttachment>> getBookingAttachments(String bookingId) async {
+    final cleanId = bookingId.trim();
+    if (cleanId.isEmpty) return const [];
+    final doc = await Backend.db.getDocument('booking_attachments', cleanId);
+    return SubmittedBookingAttachment.parseList(doc?['attachments']);
   }
 
   Future<void> cancelBooking(String bookingId) async {

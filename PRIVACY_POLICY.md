@@ -21,6 +21,7 @@ Suburban Life is a white-label residential management platform. To facilitate ho
 *   **Property Information**: Street name, house number, and active linked physical addresses.
 *   **Property Ownership Verification**: Photos of deeds or handover documents, along with property delivery/handover dates, stored in secure cloud infrastructure.
 *   **Payment Verification**: Maintenance fee receipts (images) and payment history logs.
+*   **Amenity Booking Documentation**: Completed reservation forms, signed waivers, guest lists, or photos attached by residents when requesting facilities that require documentation (accessible strictly to the submitting household and Condominium Administrators).
 *   **Visitor Access Logs**: Guest names, access categories, authorized times, guest vehicle details (license plate numbers), and security check-in timestamp logs.
 *   **Security Scanning Verification**: Temporary photos of visitor ID cards or vehicles captured by security guards at check-in points to confirm identity.
 *   **Usage Stats & Crash Reporting**: Automated usage metrics, performance telemetry, and crash diagnostics (via Google Analytics and Firebase Crashlytics on Android/iOS platforms) to identify bugs, ensure stability, and continuously improve app performance.
@@ -43,9 +44,10 @@ We process your information to:
 *   We do not sell your personal data to third parties. Telemetry data shared with Google Analytics and Firebase Crashlytics is used strictly for diagnostic and operational improvements.
 
 ### 6. Data Retention, Account Deletion, and Unrecoverability
-*   **Automated Gatehouse Data Retention (60 Days & 7 Days)**:
+*   **Automated Gatehouse & Booking Attachment Retention (60 Days, 7 Days & 30 Days)**:
     *   **Access Logs & Visitor Verification Photos (`60 Days` / 2 Months)**: Gatehouse entry/exit logs (`access_logs`) and associated visitor identification and license plate verification photos (`visitor_ids/**` and `visitor_plates/**` in Cloud Storage) are automatically and permanently deleted **60 days** after the entry timestamp (or 60 days after the recorded exit timestamp when exit scanning is enabled).
     *   **Inactive QR Passes (`7 Days`)**: Terminal QR passes (expired temporary passes, validated single-use supplier passes, and revoked passes) are automatically and permanently deleted **7 days** after expiration or deactivation. Active permanent passes remain valid until revoked by the resident or administrator.
+    *   **Amenity Booking Attachments (`30 Days` Post-Booking)**: Resident-submitted booking attachments (`booking_attachments` and `booking_attachments/**` in Cloud Storage) are isolated to the submitting household and Condominium Administration, deleted immediately if the booking is cancelled, and automatically and permanently deleted **30 days** after the booking's scheduled end time.
 *   **Deletion Methods**: Users can purge their account at any time either directly via the in-app **"Delete Account"** option or by contacting the Condominium Administration.
 *   **Irreversible Action**: Upon triggering an account deletion, your profile credentials, personal data, and ownership proof documents are permanently and definitively deleted from active databases and file storage. **Deleted data cannot be recovered under any circumstances.**
 
@@ -71,6 +73,7 @@ Suburban Life es una plataforma de gestión residencial. Para facilitar el regis
 *   **Información de la Propiedad**: Nombre de la calle, número de casa y vinculación de inmuebles físicos.
 *   **Verificación de Propiedad**: Fotografías de escrituras o actas de entrega, junto con fechas de entrega de la propiedad cargadas a almacenamiento en la nube seguro.
 *   **Verificación de Pagos**: Comprobantes de pago de mantenimiento (imágenes) e historial de cuotas mensuales.
+*   **Documentación de Reserva de Amenidades**: Formatos llenados, cartas responsivas firmadas, listas de invitados o fotografías adjuntadas por los residentes al reservar instalaciones que requieren documentación (visibles únicamente para el hogar solicitante y la Administración del Condominio).
 *   **Registro de Visitantes**: Nombres de invitados, categorías de acceso, vigencias autorizadas, placas de vehículos y marcas de tiempo de ingreso en caseta.
 *   **Verificación de Seguridad**: Fotografías temporales de identificaciones de visitantes o vehículos tomadas por los guardias en caseta para confirmar la identidad del visitante.
 *   **Estadísticas de Uso y Reportes de Fallas**: Métricas automatizadas de uso, telemetría de rendimiento y diagnósticos de fallas (a través de Google Analytics y Firebase Crashlytics en Android e iOS) con el fin exclusivo de solucionar errores, corregir fallas y mejorar la estabilidad de la aplicación.
@@ -93,9 +96,10 @@ Procesamos la información recopilada para:
 *   No vendemos ni comercializamos sus datos personales. Los datos analíticos compartidos con Google Analytics y Firebase Crashlytics se emplean únicamente para mantenimiento técnico e investigación de fallas.
 
 ### 6. Retención de Datos, Eliminación de Cuenta e Irrecuperabilidad
-*   **Política Automática de Retención en Caseta (60 Días y 7 Días)**:
+*   **Política Automática de Retención en Caseta y Reservas (60 Días, 7 Días y 30 Días)**:
     *   **Bitácora de Accesos y Fotografías de Verificación (`60 Días` / 2 Meses)**: Los registros de entrada y salida en caseta (`access_logs`), así como las fotografías de identificaciones y placas vehiculares asociadas (`visitor_ids/**` y `visitor_plates/**` en Cloud Storage), se eliminan de forma automática y permanente **60 días** después de la fecha de ingreso (o 60 días después de la salida registrada cuando el escaneo de salida está activo).
     *   **Pases QR Inactivos (`7 Días`)**: Los códigos QR finalizados (pases temporales vencidos, pases de proveedor de un solo uso ya validados y pases revocados) se eliminan de forma automática y permanente **7 días** después de su vencimiento o desactivación. Los pases permanentes activos no vencen mientras no sean revocados.
+    *   **Adjuntos de Reserva de Amenidades (`30 Días` Posterior al Evento)**: Los documentos adjuntados por los residentes en sus solicitudes de reserva (`booking_attachments` y `booking_attachments/**` en Cloud Storage) están aislados exclusivamente para su hogar y la Administración, se eliminan de inmediato si la reserva es cancelada y se purgan de forma automática y permanente **30 días** después de finalizar el horario reservado.
 *   **Mecanismos de Eliminación**: Los usuarios pueden solicitar la baja de su cuenta en cualquier momento a través de la opción **"Eliminar Cuenta"** dentro de la aplicación o poniéndose en contacto directo con la Administración del Condominio.
 *   **Acción Irreversible**: Al procesar la eliminación de la cuenta, sus credenciales, registros personales y expedientes de propiedad se borrarán de manera permanente y definitiva. **No habrá forma de recuperar los datos eliminados bajo ninguna circunstancia.**
 

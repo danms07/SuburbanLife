@@ -1,6 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suburban_life/core/backend/backend.dart';
+import 'package:suburban_life/core/services/document_transfer_helper.dart';
 import 'package:suburban_life/features/admin/admin_facilities_screen.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
@@ -8,6 +10,7 @@ import '../../helpers/fake_backend.dart';
 void main() {
   setUp(() {
     FakeBackendHelper.setUp();
+    DocumentTransferHelper.resetOverridesForTesting();
     FakeBackendHelper.auth.emitUser(
       AppUser(
         uid: 'admin_test_uid',
@@ -16,6 +19,10 @@ void main() {
       ),
     );
     FakeBackendHelper.auth.isAdminMock = true;
+  });
+
+  tearDown(() {
+    DocumentTransferHelper.resetOverridesForTesting();
   });
 
   Widget wrapWithMaterial(Widget child, {Locale? locale}) {
@@ -218,7 +225,7 @@ void main() {
       expect(find.textContaining('Limit: 3 (daily)'), findsOneWidget);
     });
 
-    testWidgets('Deletes facility when delete icon is tapped', (tester) async {
+    testWidgets('Deletes facility and cleans up any facilityDocuments Storage URLs when delete icon is tapped', (tester) async {
       FakeBackendHelper.db.seedDocument('facilities', 'gym', {
         'id': 'gym',
         'name': 'Gym Facility',
@@ -226,18 +233,129 @@ void main() {
         'quantity': 1,
         'cooldownUnit': 'unrestricted',
         'cooldownValue': 0,
+        'facilityDocuments': [
+          {
+            'docId': 'doc_gym_waiver',
+            'title': 'Gym Waiver',
+            'requirementMode': 'mandatory_return',
+            'fileName': 'waiver.pdf',
+            'fileType': 'pdf',
+            'fileSize': 1024,
+            'url': 'https://fake.storage/facility_documents/gym/waiver.pdf',
+            'storagePath': 'facility_documents/gym/waiver.pdf',
+            'uploadedAt': 1700000000000,
+          },
+        ],
       });
 
       await tester.pumpWidget(wrapWithMaterial(const AdminFacilitiesScreen()));
       await tester.pumpAndSettle();
 
       expect(find.text('Gym Facility'), findsOneWidget);
+      expect(find.textContaining('Docs: 1 (1 required)'), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.delete_outline));
       await tester.pumpAndSettle();
 
       final doc = await FakeBackendHelper.db.getDocument('facilities', 'gym');
       expect(doc, isNull);
+      expect(
+        FakeBackendHelper.storage.deletedUrls,
+        contains('https://fake.storage/facility_documents/gym/waiver.pdf'),
+      );
+    });
+
+    testWidgets('Edit dialog stages new documents, leaves Storage untouched on Cancel, and uploads/deletes properly on Save', (tester) async {
+      FakeBackendHelper.db.seedDocument('facilities', 'event_room', {
+        'id': 'event_room',
+        'name': 'Event Room',
+        'isUnique': true,
+        'quantity': 1,
+        'cooldownUnit': 'unrestricted',
+        'cooldownValue': 0,
+        'facilityDocuments': [
+          {
+            'docId': 'doc_old_rules',
+            'title': 'Old Rules',
+            'requirementMode': 'informative',
+            'fileName': 'old_rules.pdf',
+            'fileType': 'pdf',
+            'fileSize': 2048,
+            'url': 'https://fake.storage/facility_documents/event_room/old_rules.pdf',
+            'storagePath': 'facility_documents/event_room/old_rules.pdf',
+            'uploadedAt': 1700000000000,
+          },
+        ],
+      });
+
+      DocumentTransferHelper.setOverridesForTesting(
+        pickDocument: (ctx) async => PickedDocumentData(
+          sanitizedFileName: 'deposit_agreement.pdf',
+          extension: 'pdf',
+          contentType: 'application/pdf',
+          fileSize: 16,
+          bytes: Uint8List.fromList('%PDF-1.7 deposit'.codeUnits),
+        ),
+      );
+
+      await tester.pumpWidget(wrapWithMaterial(const AdminFacilitiesScreen()));
+      await tester.pumpAndSettle();
+
+      // 1. Open Edit dialog, remove existing doc and stage a new doc, then tap Cancel -> NO Storage changes!
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+
+      final removeOldBtn = find.byKey(const ValueKey('edit_remove_doc_doc_old_rules'));
+      await tester.ensureVisible(removeOldBtn);
+      await tester.tap(removeOldBtn);
+      await tester.pumpAndSettle();
+
+      final addDocBtn = find.byKey(const ValueKey('edit_add_facility_doc_button'));
+      await tester.ensureVisible(addDocBtn);
+      await tester.tap(addDocBtn);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(FakeBackendHelper.storage.deletedUrls, isEmpty);
+      expect(FakeBackendHelper.storage.uploadedFiles, isEmpty);
+      final unchangedDoc = await FakeBackendHelper.db.getDocument('facilities', 'event_room');
+      expect((unchangedDoc?['facilityDocuments'] as List).length, equals(1));
+
+      // 2. Re-open Edit dialog, remove old doc, add new mandatory doc, and tap Save -> uploads new & deletes removed!
+      await tester.tap(find.byIcon(Icons.edit_outlined));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(removeOldBtn);
+      await tester.tap(removeOldBtn);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(addDocBtn);
+      await tester.tap(addDocBtn);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(
+        FakeBackendHelper.storage.deletedUrls,
+        contains('https://fake.storage/facility_documents/event_room/old_rules.pdf'),
+      );
+      expect(FakeBackendHelper.storage.uploadedFiles.length, equals(1));
+      final uploadedEntry = FakeBackendHelper.storage.uploadedOptions.entries.single;
+      expect(uploadedEntry.key, startsWith('facility_documents/event_room/'));
+      expect(
+        uploadedEntry.value['contentDisposition'],
+        equals('attachment; filename="deposit_agreement.pdf"'),
+      );
+
+      final savedDoc = await FakeBackendHelper.db.getDocument('facilities', 'event_room');
+      final savedDocsList = savedDoc?['facilityDocuments'] as List;
+      expect(savedDocsList.length, equals(1));
+      expect(savedDocsList.first['title'], equals('deposit agreement'));
+      expect(savedDocsList.first['requirementMode'], equals('mandatory_return'));
+      expect(find.textContaining('Docs: 1 (1 required)'), findsOneWidget);
     });
   });
 }

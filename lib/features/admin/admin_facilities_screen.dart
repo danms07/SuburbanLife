@@ -1,8 +1,129 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/document_transfer_helper.dart';
 import '../../l10n/app_localizations.dart';
 import '../booking/booking_service.dart';
+import '../booking/facility_document_models.dart';
+
+class _EditableFacilityDocItem {
+  final String docId;
+  final TextEditingController titleController;
+  FacilityDocRequirementMode requirementMode;
+  final String fileName;
+  final String fileType;
+  final String contentType;
+  final int fileSize;
+  final Uint8List? pendingBytes;
+  final String? existingUrl;
+  final String? existingStoragePath;
+  final int uploadedAt;
+
+  _EditableFacilityDocItem({
+    required this.docId,
+    required String initialTitle,
+    required this.requirementMode,
+    required this.fileName,
+    required this.fileType,
+    required this.contentType,
+    required this.fileSize,
+    this.pendingBytes,
+    this.existingUrl,
+    this.existingStoragePath,
+    required this.uploadedAt,
+  }) : titleController = TextEditingController(text: initialTitle);
+
+  factory _EditableFacilityDocItem.fromTemplate(FacilityDocumentTemplate template) {
+    return _EditableFacilityDocItem(
+      docId: template.docId,
+      initialTitle: template.title,
+      requirementMode: template.requirementMode,
+      fileName: template.fileName,
+      fileType: template.fileType,
+      contentType: DocumentTransferHelper.resolveMimeType(template.fileType) ?? '',
+      fileSize: template.fileSize,
+      existingUrl: template.url,
+      existingStoragePath: template.storagePath,
+      uploadedAt: template.uploadedAt,
+    );
+  }
+
+  factory _EditableFacilityDocItem.fromPicked(PickedDocumentData picked) {
+    return _EditableFacilityDocItem(
+      docId: 'fdoc_${DocumentTransferHelper.generateSecureRandomHex(8)}',
+      initialTitle: DocumentTransferHelper.defaultTitleFromFileName(picked.sanitizedFileName),
+      requirementMode: FacilityDocRequirementMode.mandatoryReturn,
+      fileName: picked.sanitizedFileName,
+      fileType: picked.extension,
+      contentType: picked.contentType,
+      fileSize: picked.fileSize,
+      pendingBytes: picked.bytes,
+      uploadedAt: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  void dispose() {
+    titleController.dispose();
+  }
+}
+
+class _StagedDocSnapshot {
+  final String docId;
+  final String title;
+  final FacilityDocRequirementMode requirementMode;
+  final String fileName;
+  final String fileType;
+  final String contentType;
+  final int fileSize;
+  final Uint8List? pendingBytes;
+  final String? existingUrl;
+  final String? existingStoragePath;
+  final int uploadedAt;
+
+  const _StagedDocSnapshot({
+    required this.docId,
+    required this.title,
+    required this.requirementMode,
+    required this.fileName,
+    required this.fileType,
+    required this.contentType,
+    required this.fileSize,
+    this.pendingBytes,
+    this.existingUrl,
+    this.existingStoragePath,
+    required this.uploadedAt,
+  });
+
+  factory _StagedDocSnapshot.fromItem(_EditableFacilityDocItem item) {
+    final trimmedTitle = item.titleController.text.trim();
+    return _StagedDocSnapshot(
+      docId: item.docId,
+      title: trimmedTitle.isNotEmpty ? trimmedTitle : item.fileName,
+      requirementMode: item.requirementMode,
+      fileName: item.fileName,
+      fileType: item.fileType,
+      contentType: item.contentType,
+      fileSize: item.fileSize,
+      pendingBytes: item.pendingBytes,
+      existingUrl: item.existingUrl,
+      existingStoragePath: item.existingStoragePath,
+      uploadedAt: item.uploadedAt,
+    );
+  }
+}
+
+class _EditFacilityResult {
+  final Map<String, dynamic> fieldsPayload;
+  final List<_StagedDocSnapshot> stagedDocs;
+  final List<String> removedStorageUrls;
+
+  const _EditFacilityResult({
+    required this.fieldsPayload,
+    required this.stagedDocs,
+    required this.removedStorageUrls,
+  });
+}
 
 class AdminFacilitiesScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -19,6 +140,7 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
   final _quotaLimitController = TextEditingController(text: '1');
   final _anticipationValueController = TextEditingController(text: '1');
   final _presetApprovalMessageController = TextEditingController();
+  final List<_EditableFacilityDocItem> _addDocItems = [];
 
   bool _isUnique = true;
   int _quantity = 1;
@@ -37,6 +159,9 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
     _quotaLimitController.dispose();
     _anticipationValueController.dispose();
     _presetApprovalMessageController.dispose();
+    for (final item in _addDocItems) {
+      item.dispose();
+    }
     super.dispose();
   }
 
@@ -101,6 +226,86 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
     return parsed;
   }
 
+  Future<List<Map<String, dynamic>>> _uploadStagedFacilityDocs(
+    String facilityId,
+    List<_StagedDocSnapshot> snapshots,
+  ) async {
+    final newlyUploadedUrls = <String>[];
+    final serialized = <Map<String, dynamic>>[];
+
+    try {
+      for (final snap in snapshots) {
+        if (snap.pendingBytes != null) {
+          final storagePath = DocumentTransferHelper.buildStoragePath(
+            prefix: 'facility_documents',
+            scopeId: facilityId,
+            extension: snap.fileType,
+          );
+          final contentType = snap.contentType.isNotEmpty
+              ? snap.contentType
+              : DocumentTransferHelper.resolveMimeType(snap.fileType);
+          final downloadUrl = await StorageService().uploadFile(
+            storagePath,
+            snap.pendingBytes!,
+            contentType: contentType,
+            contentDisposition: DocumentTransferHelper.buildContentDisposition(snap.fileName),
+            metadata: {'facilityId': facilityId},
+          );
+          newlyUploadedUrls.add(downloadUrl);
+
+          serialized.add(
+            FacilityDocumentTemplate(
+              docId: snap.docId,
+              title: snap.title,
+              requirementMode: snap.requirementMode,
+              fileName: snap.fileName,
+              fileType: snap.fileType,
+              fileSize: snap.fileSize,
+              url: downloadUrl,
+              storagePath: storagePath,
+              uploadedAt: snap.uploadedAt,
+            ).toMap(),
+          );
+        } else if (snap.existingUrl != null && snap.existingUrl!.isNotEmpty) {
+          serialized.add(
+            FacilityDocumentTemplate(
+              docId: snap.docId,
+              title: snap.title,
+              requirementMode: snap.requirementMode,
+              fileName: snap.fileName,
+              fileType: snap.fileType,
+              fileSize: snap.fileSize,
+              url: snap.existingUrl!,
+              storagePath: snap.existingStoragePath ?? '',
+              uploadedAt: snap.uploadedAt,
+            ).toMap(),
+          );
+        }
+      }
+      return serialized;
+    } catch (e) {
+      for (final url in newlyUploadedUrls) {
+        try {
+          await StorageService().deleteFileFromUrl(url);
+        } catch (cleanupErr) {
+          debugPrint('Non-fatal facility doc rollback warning: ${cleanupErr.runtimeType}');
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _deleteStorageUrlsBestEffort(Iterable<String> urls) async {
+    for (final url in urls) {
+      if (url.trim().isEmpty) continue;
+      try {
+        await StorageService().deleteFileFromUrl(url);
+      } catch (e) {
+        debugPrint('Non-fatal facility template deletion warning: ${e.runtimeType}');
+      }
+    }
+  }
+
   void _addFacility() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
@@ -118,6 +323,8 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
       );
       return;
     }
+
+    final stagedSnapshots = _addDocItems.map(_StagedDocSnapshot.fromItem).toList();
 
     setState(() {
       _isLoading = true;
@@ -138,8 +345,14 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
         'openingTime': _formatTimeOfDay(_openingTime),
         'closingTime': _formatTimeOfDay(_closingTime),
         'presetApprovalMessage': _presetApprovalMessageController.text.trim(),
+        'facilityDocuments': const <Map<String, dynamic>>[],
       });
-      await DatabaseService().updateDocument('facilities', docId, {'id': docId});
+
+      final uploadedDocs = await _uploadStagedFacilityDocs(docId, stagedSnapshots);
+      await DatabaseService().updateDocument('facilities', docId, {
+        'id': docId,
+        'facilityDocuments': uploadedDocs,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,7 +365,11 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
       _quotaLimitController.text = '1';
       _anticipationValueController.text = '1';
       _presetApprovalMessageController.clear();
+      for (final item in _addDocItems) {
+        item.dispose();
+      }
       setState(() {
+        _addDocItems.clear();
         _isUnique = true;
         _quantity = 1;
         _restrictionType = 'unrestricted';
@@ -330,23 +547,196 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
     );
   }
 
+  static Widget _buildFacilityDocsEditor({
+    required BuildContext context,
+    required AppLocalizations l10n,
+    required List<_EditableFacilityDocItem> items,
+    required VoidCallback onAddPressed,
+    required void Function(int index, FacilityDocRequirementMode mode) onModeChanged,
+    required void Function(int index) onRemovePressed,
+    required String keyPrefix,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.folder_open_outlined, size: 18, color: AppConfig.primaryColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.facilityDocsSectionTitle,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ],
+              ),
+              OutlinedButton.icon(
+                key: ValueKey('${keyPrefix}_add_facility_doc_button'),
+                onPressed: onAddPressed,
+                icon: const Icon(Icons.upload_file_outlined, size: 16),
+                label: Text(l10n.addFacilityDocumentButton, style: const TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.facilityDocsSectionSubtitle,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (items.isEmpty)
+            Text(
+              l10n.noFacilityDocumentsAdded,
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+              ),
+            )
+          else
+            ...List.generate(items.length, (index) {
+              final item = items[index];
+              final wireMode = item.requirementMode.toWireString();
+              return Container(
+                key: ValueKey('${keyPrefix}_doc_item_${item.docId}'),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppConfig.primaryColor.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          DocumentTransferHelper.iconForExtension(item.fileType),
+                          size: 18,
+                          color: AppConfig.primaryColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '${item.fileName} (${DocumentTransferHelper.formatFileSize(item.fileSize)})',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (item.existingUrl != null && item.existingUrl!.isNotEmpty)
+                          IconButton(
+                            key: ValueKey('${keyPrefix}_preview_doc_${item.docId}'),
+                            icon: const Icon(Icons.open_in_new, size: 18, color: AppConfig.primaryColor),
+                            visualDensity: VisualDensity.compact,
+                            tooltip: l10n.downloadFacilityDocumentButton,
+                            onPressed: () {
+                              DocumentTransferHelper.openOrDownloadDocument(
+                                context: context,
+                                cacheId: 'fdoc_${item.docId}',
+                                url: item.existingUrl!,
+                                fileName: item.fileName,
+                                title: item.titleController.text.trim(),
+                              );
+                            },
+                          ),
+                        IconButton(
+                          key: ValueKey('${keyPrefix}_remove_doc_${item.docId}'),
+                          icon: const Icon(Icons.close, size: 18, color: Colors.redAccent),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: l10n.removeAttachedFileTooltip,
+                          onPressed: () => onRemovePressed(index),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      key: ValueKey('${keyPrefix}_doc_title_${item.docId}'),
+                      controller: item.titleController,
+                      decoration: InputDecoration(
+                        labelText: l10n.facilityDocTitleLabel,
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('${keyPrefix}_doc_mode_${item.docId}_$wireMode'),
+                      initialValue: wireMode,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: l10n.facilityDocModeLabel,
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'mandatory_return',
+                          child: Text(l10n.facilityDocModeMandatory, overflow: TextOverflow.ellipsis),
+                        ),
+                        DropdownMenuItem(
+                          value: 'optional_return',
+                          child: Text(l10n.facilityDocModeOptional, overflow: TextOverflow.ellipsis),
+                        ),
+                        DropdownMenuItem(
+                          value: 'informative',
+                          child: Text(l10n.facilityDocModeInformative, overflow: TextOverflow.ellipsis),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          onModeChanged(index, FacilityDocRequirementMode.fromWireString(val));
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   void _editFacility(Map<String, dynamic> doc) async {
     final l10n = AppLocalizations.of(context)!;
     final facilityId = doc['id'] as String;
 
-    final updatedPayload = await showDialog<Map<String, dynamic>>(
+    final editResult = await showDialog<_EditFacilityResult>(
       context: context,
       builder: (_) => _EditFacilityDialog(doc: doc),
     );
 
-    if (updatedPayload == null) return;
+    if (editResult == null) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
+      final serializedDocs = await _uploadStagedFacilityDocs(facilityId, editResult.stagedDocs);
+      final updatedPayload = <String, dynamic>{
+        ...editResult.fieldsPayload,
+        'facilityDocuments': serializedDocs,
+      };
       await DatabaseService().updateDocument('facilities', facilityId, updatedPayload);
+      await _deleteStorageUrlsBestEffort(editResult.removedStorageUrls);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -370,9 +760,12 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
     }
   }
 
-  void _deleteFacility(String id) async {
+  void _deleteFacility(Map<String, dynamic> doc) async {
+    final id = doc['id'] as String;
+    final existingDocs = FacilityDocumentTemplate.parseList(doc['facilityDocuments']);
     try {
       await DatabaseService().deleteDocument('facilities', id);
+      await _deleteStorageUrlsBestEffort(existingDocs.map((d) => d.url));
     } catch (e, stack) {
       debugPrint('Error deleting facility: $e');
       Backend.crashlytics.recordError(e, stack, reason: 'AdminFacilitiesScreen._deleteFacility');
@@ -393,6 +786,7 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
     final anticipationUnit = (doc['anticipationUnit'] ?? 'unrestricted').toString();
     final anticipationValue = (doc['anticipationValue'] as num?)?.toInt() ?? 0;
     final restriction = BookingService.resolveRestriction(doc);
+    final templates = FacilityDocumentTemplate.parseList(doc['facilityDocuments']);
 
     final parts = <String>[
       isUnique ? l10n.facilityCapacityUnique : l10n.facilityCapacityMulti(qty),
@@ -428,6 +822,15 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
       parts.add(l10n.facilityLimitUnrestricted);
     }
 
+    if (templates.isNotEmpty) {
+      final mandatoryCount = templates.where((t) => t.requirementMode.isMandatory).length;
+      parts.add(
+        mandatoryCount > 0
+            ? l10n.facilitySubtitleDocsWithMandatory(templates.length, mandatoryCount)
+            : l10n.facilitySubtitleDocs(templates.length),
+      );
+    }
+
     return parts.join(' | ');
   }
 
@@ -459,7 +862,7 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
                 ),
                 children: [
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 420),
+                    constraints: const BoxConstraints(maxHeight: 460),
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Column(
@@ -626,6 +1029,34 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
                               isDense: true,
                             ),
                           ),
+                          const SizedBox(height: 12),
+
+                          // Amenity Documentation Editor
+                          _buildFacilityDocsEditor(
+                            context: context,
+                            l10n: l10n,
+                            items: _addDocItems,
+                            onAddPressed: () async {
+                              final picked = await DocumentTransferHelper.pickAllowedDocument(context);
+                              if (picked != null && mounted) {
+                                setState(() {
+                                  _addDocItems.add(_EditableFacilityDocItem.fromPicked(picked));
+                                });
+                              }
+                            },
+                            onModeChanged: (idx, mode) {
+                              setState(() {
+                                _addDocItems[idx].requirementMode = mode;
+                              });
+                            },
+                            onRemovePressed: (idx) {
+                              setState(() {
+                                final removed = _addDocItems.removeAt(idx);
+                                removed.dispose();
+                              });
+                            },
+                            keyPrefix: 'add',
+                          ),
                           const SizedBox(height: 14),
 
                           ElevatedButton(
@@ -685,7 +1116,7 @@ class _AdminFacilitiesScreenState extends State<AdminFacilitiesScreen> {
                             ),
                             IconButton(
                               icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                              onPressed: () => _deleteFacility(doc['id'] as String),
+                              onPressed: () => _deleteFacility(doc),
                             ),
                           ],
                         ),
@@ -717,6 +1148,8 @@ class _EditFacilityDialogState extends State<_EditFacilityDialog> {
   late final TextEditingController _quotaLimitController;
   late final TextEditingController _anticipationValueController;
   late final TextEditingController _presetApprovalController;
+  late final List<_EditableFacilityDocItem> _docItems;
+  final List<String> _removedStorageUrls = [];
 
   late bool _isUnique;
   late int _quantity;
@@ -748,6 +1181,10 @@ class _EditFacilityDialogState extends State<_EditFacilityDialog> {
       text: doc['presetApprovalMessage']?.toString() ?? '',
     );
 
+    _docItems = FacilityDocumentTemplate.parseList(doc['facilityDocuments'])
+        .map(_EditableFacilityDocItem.fromTemplate)
+        .toList();
+
     _isUnique = doc['isUnique'] == true;
     _quantity = (doc['quantity'] as num?)?.toInt() ?? 1;
     _restrictionType = resolved.restrictionType;
@@ -771,6 +1208,9 @@ class _EditFacilityDialogState extends State<_EditFacilityDialog> {
     _quotaLimitController.dispose();
     _anticipationValueController.dispose();
     _presetApprovalController.dispose();
+    for (final item in _docItems) {
+      item.dispose();
+    }
     super.dispose();
   }
 
@@ -798,22 +1238,30 @@ class _EditFacilityDialogState extends State<_EditFacilityDialog> {
     final newQuotaLimit = _AdminFacilitiesScreenState._parsePositiveInt(_quotaLimitController.text);
     final newAnticipationVal = _AdminFacilitiesScreenState._parsePositiveInt(_anticipationValueController.text);
     final updatedPresetMsg = _presetApprovalController.text.trim();
+    final snapshots = _docItems.map(_StagedDocSnapshot.fromItem).toList();
 
-    Navigator.pop<Map<String, dynamic>>(context, {
-      'name': updatedName,
-      'isUnique': _isUnique,
-      'quantity': _isUnique ? 1 : _quantity,
-      'restrictionType': _restrictionType,
-      'cooldownUnit': _restrictionType == 'cooldown' ? _cooldownUnit : 'unrestricted',
-      'cooldownValue': _restrictionType == 'cooldown' ? newCooldownVal : 0,
-      'quotaPeriod': _restrictionType == 'quota' ? _quotaPeriod : 'unrestricted',
-      'quotaLimit': _restrictionType == 'quota' ? newQuotaLimit : 0,
-      'anticipationUnit': _anticipationUnit,
-      'anticipationValue': _anticipationUnit == 'unrestricted' ? 0 : newAnticipationVal,
-      'openingTime': _AdminFacilitiesScreenState._formatTimeOfDay(_editOpening),
-      'closingTime': _AdminFacilitiesScreenState._formatTimeOfDay(_editClosing),
-      'presetApprovalMessage': updatedPresetMsg,
-    });
+    Navigator.pop<_EditFacilityResult>(
+      context,
+      _EditFacilityResult(
+        fieldsPayload: {
+          'name': updatedName,
+          'isUnique': _isUnique,
+          'quantity': _isUnique ? 1 : _quantity,
+          'restrictionType': _restrictionType,
+          'cooldownUnit': _restrictionType == 'cooldown' ? _cooldownUnit : 'unrestricted',
+          'cooldownValue': _restrictionType == 'cooldown' ? newCooldownVal : 0,
+          'quotaPeriod': _restrictionType == 'quota' ? _quotaPeriod : 'unrestricted',
+          'quotaLimit': _restrictionType == 'quota' ? newQuotaLimit : 0,
+          'anticipationUnit': _anticipationUnit,
+          'anticipationValue': _anticipationUnit == 'unrestricted' ? 0 : newAnticipationVal,
+          'openingTime': _AdminFacilitiesScreenState._formatTimeOfDay(_editOpening),
+          'closingTime': _AdminFacilitiesScreenState._formatTimeOfDay(_editClosing),
+          'presetApprovalMessage': updatedPresetMsg,
+        },
+        stagedDocs: snapshots,
+        removedStorageUrls: List<String>.from(_removedStorageUrls),
+      ),
+    );
   }
 
   @override
@@ -822,7 +1270,7 @@ class _EditFacilityDialogState extends State<_EditFacilityDialog> {
     return AlertDialog(
       title: Text(l10n.editFacilityTitle),
       content: SizedBox(
-        width: 460,
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -986,6 +1434,35 @@ class _EditFacilityDialogState extends State<_EditFacilityDialog> {
                   isDense: true,
                 ),
               ),
+              const SizedBox(height: 12),
+              _AdminFacilitiesScreenState._buildFacilityDocsEditor(
+                context: context,
+                l10n: l10n,
+                items: _docItems,
+                onAddPressed: () async {
+                  final picked = await DocumentTransferHelper.pickAllowedDocument(context);
+                  if (picked != null && mounted) {
+                    setState(() {
+                      _docItems.add(_EditableFacilityDocItem.fromPicked(picked));
+                    });
+                  }
+                },
+                onModeChanged: (idx, mode) {
+                  setState(() {
+                    _docItems[idx].requirementMode = mode;
+                  });
+                },
+                onRemovePressed: (idx) {
+                  setState(() {
+                    final removed = _docItems.removeAt(idx);
+                    if (removed.existingUrl != null && removed.existingUrl!.isNotEmpty) {
+                      _removedStorageUrls.add(removed.existingUrl!);
+                    }
+                    removed.dispose();
+                  });
+                },
+                keyPrefix: 'edit',
+              ),
             ],
           ),
         ),
@@ -1007,4 +1484,3 @@ class _EditFacilityDialogState extends State<_EditFacilityDialog> {
     );
   }
 }
-

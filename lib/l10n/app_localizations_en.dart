@@ -2438,4 +2438,104 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get qrPassRetentionBanner =>
       'Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire.';
+
+  @override
+  String get facilityDocsSectionTitle => 'Amenity Documentation';
+
+  @override
+  String get facilityDocsSectionSubtitle =>
+      'Upload forms or rules (PDF, Word, Excel, JPG, PNG, WEBP — max 10 MB each).';
+
+  @override
+  String get addFacilityDocumentButton => 'Add Document';
+
+  @override
+  String get noFacilityDocumentsAdded =>
+      'No documents configured for this amenity.';
+
+  @override
+  String get facilityDocTitleLabel => 'Document Title';
+
+  @override
+  String get facilityDocModeLabel => 'Requirement Type';
+
+  @override
+  String get facilityDocModeMandatory =>
+      'Required return (resident must attach)';
+
+  @override
+  String get facilityDocModeOptional => 'Optional return (attachment optional)';
+
+  @override
+  String get facilityDocModeInformative =>
+      'Informative only (download/read only)';
+
+  @override
+  String get facilityDocBadgeMandatory => 'Required Return';
+
+  @override
+  String get facilityDocBadgeOptional => 'Optional Return';
+
+  @override
+  String get facilityDocBadgeInformative => 'Informative';
+
+  @override
+  String facilitySubtitleDocs(int total) {
+    return 'Docs: $total';
+  }
+
+  @override
+  String facilitySubtitleDocsWithMandatory(int total, int mandatory) {
+    return 'Docs: $total ($mandatory required)';
+  }
+
+  @override
+  String get bookingDocsInstructionBanner =>
+      'Download the amenity documents below. Items marked as Required Return must be completed and attached to submit your booking.';
+
+  @override
+  String get downloadFacilityDocumentButton => 'Download / View';
+
+  @override
+  String get attachCompletedFileButton => 'Attach File';
+
+  @override
+  String get takeDocumentPhotoButton => 'Take Photo';
+
+  @override
+  String get replaceAttachedFileButton => 'Replace';
+
+  @override
+  String get removeAttachedFileTooltip => 'Remove attachment';
+
+  @override
+  String missingMandatoryDocumentsError(String titles) {
+    return 'Please attach all required documents before submitting: $titles';
+  }
+
+  @override
+  String get invalidDocumentContentError =>
+      'The selected file content does not match its file extension or is corrupted.';
+
+  @override
+  String get bookingAttachmentsSectionTitle => 'Submitted Documentation';
+
+  @override
+  String get noBookingAttachmentsSubmitted => 'No attachments submitted.';
+
+  @override
+  String get viewBookingAttachmentButton => 'View / Download';
+
+  @override
+  String bookingAttachmentsCountBadge(int count) {
+    return '$count attachment(s)';
+  }
+
+  @override
+  String get bookingAttachmentsPurgedNotice =>
+      'Attachments automatically removed 30 days after booking completion per privacy policy.';
+
+  @override
+  String get bookingAttachmentsRetentionHelper =>
+      'Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled).';
 }

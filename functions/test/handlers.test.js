@@ -280,6 +280,21 @@ function createMockAdminEnvironment(initialCollections = {}) {
             async save(buffer, options) {
               savedStorageFiles.set(storagePath, { buffer, options });
             },
+            async download(options = {}) {
+              if (!savedStorageFiles.has(storagePath)) {
+                const err = new Error(`Not Found: ${storagePath}`);
+                err.code = 404;
+                throw err;
+              }
+              const entry = savedStorageFiles.get(storagePath);
+              const buf = Buffer.isBuffer(entry.buffer)
+                ? entry.buffer
+                : Buffer.from(entry.buffer || '');
+              const start = typeof options.start === 'number' ? options.start : 0;
+              const end =
+                typeof options.end === 'number' ? options.end + 1 : buf.length;
+              return [buf.subarray(start, end)];
+            },
             async delete(options = {}) {
               deletedStoragePaths.push({ storagePath, options });
               if (!savedStorageFiles.has(storagePath)) {
@@ -1242,4 +1257,372 @@ test('purgeExpiredAccessLogs and purgeExpiredQrCodes delete expired records whil
   assert.ok(backfilledQr.expireAt && typeof backfilledQr.expireAt.toMillis === 'function');
 });
 
+test('createBooking validates mandatory/optional/informative facilityDocuments, verifies Storage magic bytes, isolates booking_attachments, cleans up superseded files on resubmit, and purges on cancelBooking', async (t) => {
+  const env = createMockAdminEnvironment();
+  const addrRef = env.makeDocRef('addresses', 'addr_doc_1');
+  await env.makeDocRef('config', 'app_settings').set({ timeZone: 'UTC' });
+  await addrRef.set({
+    id: 'addr_doc_1',
+    streetName: 'Taormina',
+    number: 9,
+    paymentStatus: 'paid',
+    hasActiveSanctions: false,
+  });
+  await env.makeDocRef('users', 'res_doc_1').set({
+    uid: 'res_doc_1',
+    name: 'Doc Resident',
+    role: 'resident',
+    addressRef: addrRef,
+  });
+  await env.makeDocRef('users', 'room_doc_1').set({
+    uid: 'room_doc_1',
+    name: 'Doc Roommate',
+    role: 'roommate',
+    addressRef: addrRef,
+  });
 
+  await env.makeDocRef('facilities', 'salon_eventos').set({
+    id: 'salon_eventos',
+    name: 'Event Hall',
+    quantity: 2,
+    openingTime: '08:00',
+    closingTime: '22:00',
+    anticipationUnit: 'unrestricted',
+    anticipationValue: 0,
+    facilityDocuments: [
+      {
+        docId: 'doc_liability',
+        title: 'Signed Liability Waiver',
+        requirementMode: 'mandatory_return',
+        fileName: 'liability_waiver.pdf',
+        fileType: 'pdf',
+        fileSize: 24500,
+        url: 'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/facility_documents%2Fsalon_eventos%2Fwaiver.pdf?alt=media',
+        storagePath: 'facility_documents/salon_eventos/waiver.pdf',
+      },
+      {
+        docId: 'doc_guests',
+        title: 'Guest List Spreadsheet',
+        requirementMode: 'optional_return',
+        fileName: 'guest_list.xlsx',
+        fileType: 'xlsx',
+        fileSize: 12000,
+        url: 'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/facility_documents%2Fsalon_eventos%2Fguests.xlsx?alt=media',
+        storagePath: 'facility_documents/salon_eventos/guests.xlsx',
+      },
+      {
+        docId: 'doc_bylaws',
+        title: 'Noise Rules Reference',
+        requirementMode: 'informative',
+        fileName: 'noise_rules.pdf',
+        fileType: 'pdf',
+        fileSize: 18000,
+        url: 'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/facility_documents%2Fsalon_eventos%2Fnoise.pdf?alt=media',
+        storagePath: 'facility_documents/salon_eventos/noise.pdf',
+      },
+    ],
+  });
+
+  installMockAdmin(t, env);
+  const bucket = env.storageMock.bucket();
+  const createWrapped = fft.wrap(cloudFunctions.createBooking);
+  const cancelWrapped = fft.wrap(cloudFunctions.cancelBooking);
+  const resAuth = { uid: 'res_doc_1', token: { resident: true } };
+  const roomAuth = { uid: 'room_doc_1', token: { roommate: true } };
+
+  const startMs = Date.UTC(2027, 8, 10, 14, 0, 0);
+  const endMs = Date.UTC(2027, 8, 10, 18, 0, 0);
+
+  // 1. Missing mandatory_return attachment -> blocked with failed-precondition
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: { facilityId: 'salon_eventos', startTime: startMs, endTime: endMs, attachments: [] },
+      auth: resAuth,
+    }),
+    'failed-precondition'
+  );
+
+  // 2. Attempting to upload against an informative-only document -> invalid-argument
+  const validPdfPath = 'booking_attachments/res_doc_1/1700001_waiver_v1.pdf';
+  await bucket.file(validPdfPath).save(Buffer.from('%PDF-1.7\nSigned by resident'));
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: {
+        facilityId: 'salon_eventos',
+        startTime: startMs,
+        endTime: endMs,
+        attachments: [
+          {
+            facilityDocId: 'doc_bylaws',
+            fileName: 'noise.pdf',
+            fileType: 'pdf',
+            fileSize: 120,
+            url: `https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/${encodeURIComponent(validPdfPath)}?alt=media`,
+            storagePath: validPdfPath,
+          },
+        ],
+      },
+      auth: resAuth,
+    }),
+    'invalid-argument'
+  );
+
+  // 3. Cross-user storagePath (pointing to another user's folder) -> permission-denied
+  const otherUserPath = 'booking_attachments/other_user_99/stolen.pdf';
+  await bucket.file(otherUserPath).save(Buffer.from('%PDF-1.7\nOther user'));
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: {
+        facilityId: 'salon_eventos',
+        startTime: startMs,
+        endTime: endMs,
+        attachments: [
+          {
+            facilityDocId: 'doc_liability',
+            fileName: 'stolen.pdf',
+            fileType: 'pdf',
+            fileSize: 120,
+            url: `https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/${encodeURIComponent(otherUserPath)}?alt=media`,
+            storagePath: otherUserPath,
+          },
+        ],
+      },
+      auth: resAuth,
+    }),
+    'permission-denied'
+  );
+
+  // 4. Spoofed HTML content uploaded as .pdf -> rejected via server-side magic-byte check & deleted from Storage!
+  const spoofedPath = 'booking_attachments/res_doc_1/spoofed_xss.pdf';
+  await bucket.file(spoofedPath).save(Buffer.from('<html><script>alert(1)</script></html>'));
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: {
+        facilityId: 'salon_eventos',
+        startTime: startMs,
+        endTime: endMs,
+        attachments: [
+          {
+            facilityDocId: 'doc_liability',
+            fileName: 'spoofed_xss.pdf',
+            fileType: 'pdf',
+            fileSize: 40,
+            url: `https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/${encodeURIComponent(spoofedPath)}?alt=media`,
+            storagePath: spoofedPath,
+          },
+        ],
+      },
+      auth: resAuth,
+    }),
+    'invalid-argument'
+  );
+  assert.equal(env.savedStorageFiles.has(spoofedPath), false, 'Spoofed file must be deleted on validation failure');
+
+  // 5. Valid mandatory PDF + optional XLSX -> succeeds, writes summary on bookings and details in booking_attachments
+  const validXlsxPath = 'booking_attachments/res_doc_1/1700002_guests.xlsx';
+  await bucket.file(validXlsxPath).save(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00]));
+
+  const created = await createWrapped({
+    data: {
+      facilityId: 'salon_eventos',
+      startTime: startMs,
+      endTime: endMs,
+      attachments: [
+        {
+          facilityDocId: 'doc_liability',
+          fileName: '../../signed_waiver.pdf', // path basename sanitized automatically
+          fileType: 'pdf',
+          fileSize: 28,
+          url: `https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/${encodeURIComponent(validPdfPath)}?alt=media`,
+          storagePath: validPdfPath,
+        },
+        {
+          facilityDocId: 'doc_guests',
+          fileName: 'guests_october.xlsx',
+          fileType: 'xlsx',
+          fileSize: 8,
+          url: `https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/${encodeURIComponent(validXlsxPath)}?alt=media`,
+          storagePath: validXlsxPath,
+        },
+      ],
+    },
+    auth: resAuth,
+  });
+
+  assert.equal(created.success, true);
+  const savedBooking = env.store.get('bookings').get(created.bookingId);
+  assert.equal(savedBooking.hasAttachments, true);
+  assert.equal(savedBooking.attachmentCount, 2);
+  assert.equal(savedBooking.attachmentsPurgedAt, null);
+  // Neighbor-readable bookings doc must NOT leak raw attachment URLs
+  assert.equal(savedBooking.attachments, undefined);
+
+  const savedAttDoc = env.store.get('booking_attachments').get(created.bookingId);
+  assert.ok(savedAttDoc, 'booking_attachments/{bookingId} must be created');
+  assert.equal(savedAttDoc.userUid, 'res_doc_1');
+  assert.equal(savedAttDoc.addressId, 'addr_doc_1');
+  assert.equal(savedAttDoc.attachments.length, 2);
+  assert.equal(savedAttDoc.attachments[0].fileName, 'signed_waiver.pdf');
+  assert.equal(
+    savedAttDoc.expireAt.toMillis(),
+    endMs + 30 * 24 * 60 * 60 * 1000
+  );
+
+  // 6. Admin rejects booking ("Missing witness signature"); household roommate resubmits replacing waiver while keeping guests.xlsx
+  await env.makeDocRef('bookings', created.bookingId).update({
+    status: 'rejected',
+    rejectionReason: 'Missing witness signature',
+  });
+
+  const replacementPdfPath = 'booking_attachments/room_doc_1/1700009_waiver_v2.pdf';
+  await bucket.file(replacementPdfPath).save(Buffer.from('%PDF-1.7\nSigned with witness'));
+
+  const newEndMs = Date.UTC(2027, 8, 12, 19, 0, 0);
+  const resubmitted = await createWrapped({
+    data: {
+      facilityId: 'salon_eventos',
+      startTime: Date.UTC(2027, 8, 12, 15, 0, 0),
+      endTime: newEndMs,
+      resubmitBookingId: created.bookingId,
+      attachments: [
+        {
+          facilityDocId: 'doc_liability',
+          fileName: 'signed_waiver_v2.pdf',
+          fileType: 'pdf',
+          fileSize: 30,
+          url: `https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/${encodeURIComponent(replacementPdfPath)}?alt=media`,
+          storagePath: replacementPdfPath,
+        },
+        {
+          // Unchanged attachment originally uploaded by primary resident
+          facilityDocId: 'doc_guests',
+          fileName: 'guests_october.xlsx',
+          fileType: 'xlsx',
+          fileSize: 8,
+          url: `https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/${encodeURIComponent(validXlsxPath)}?alt=media`,
+          storagePath: validXlsxPath,
+        },
+      ],
+    },
+    auth: roomAuth,
+  });
+
+  assert.equal(resubmitted.bookingId, created.bookingId);
+  // Superseded v1 PDF must be deleted from Storage, while v2 PDF and unchanged XLSX remain!
+  assert.equal(env.savedStorageFiles.has(validPdfPath), false);
+  assert.equal(env.savedStorageFiles.has(replacementPdfPath), true);
+  assert.equal(env.savedStorageFiles.has(validXlsxPath), true);
+
+  const updatedAttDoc = env.store.get('booking_attachments').get(created.bookingId);
+  assert.equal(updatedAttDoc.expireAt.toMillis(), newEndMs + 30 * 24 * 60 * 60 * 1000);
+
+  // 7. Cancelling the booking immediately deletes remaining Storage files, removes booking_attachments doc, and stamps attachmentsPurgedAt
+  const cancelRes = await cancelWrapped({
+    data: { bookingId: created.bookingId },
+    auth: resAuth,
+  });
+  assert.equal(cancelRes.success, true);
+  assert.equal(env.savedStorageFiles.has(replacementPdfPath), false);
+  assert.equal(env.savedStorageFiles.has(validXlsxPath), false);
+  assert.equal((await env.makeDocRef('booking_attachments', created.bookingId).get()).exists, false);
+  const cancelledBooking = env.store.get('bookings').get(created.bookingId);
+  assert.equal(cancelledBooking.status, 'cancelled');
+  assert.equal(typeof cancelledBooking.attachmentsPurgedAt, 'number');
+});
+
+test('onBookingAttachmentDeleted and purgeExpiredBookingAttachments clean up Storage files after 30 days post-booking while preserving active/upcoming bookings', async (t) => {
+  const env = createMockAdminEnvironment();
+  installMockAdmin(t, env);
+
+  const nowMillis = Date.UTC(2027, 10, 1, 12, 0, 0);
+  const Timestamp = _test.admin.firestore.Timestamp;
+  const bucket = env.storageMock.bucket();
+
+  await bucket.file('booking_attachments/res_1/expired_form.pdf').save(Buffer.from('%PDF-1.7 old'));
+  await bucket.file('booking_attachments/res_1/future_form.pdf').save(Buffer.from('%PDF-1.7 future'));
+  await bucket.file('booking_attachments/res_2/ttl_trigger_form.jpg').save(Buffer.from([0xff, 0xd8, 0xff]));
+  await bucket.file('documents/admin_only/do_not_touch.pdf').save(Buffer.from('%PDF-1.7 admin'));
+
+  // 1) Booking ended 31 days ago -> eligible for daily sweep
+  const expiredEnd = nowMillis - 31 * 24 * 60 * 60 * 1000;
+  await env.makeDocRef('bookings', 'bk_expired_31d').set({
+    id: 'bk_expired_31d',
+    status: 'closed',
+    hasAttachments: true,
+    attachmentCount: 1,
+    attachmentsPurgedAt: null,
+  });
+  await env.makeDocRef('booking_attachments', 'bk_expired_31d').set({
+    bookingId: 'bk_expired_31d',
+    bookingEndTime: expiredEnd,
+    expireAt: Timestamp.fromMillis(expiredEnd + 30 * 24 * 60 * 60 * 1000),
+    attachments: [
+      {
+        facilityDocId: 'doc_1',
+        storagePath: 'booking_attachments/res_1/expired_form.pdf',
+        url: 'https://firebasestorage.googleapis.com/v0/b/test-catania-bucket/o/booking_attachments%2Fres_1%2Fexpired_form.pdf?alt=media',
+      },
+    ],
+  });
+
+  // 2) Booking ended 10 days ago (within 30-day window) -> must be preserved!
+  const recentEnd = nowMillis - 10 * 24 * 60 * 60 * 1000;
+  await env.makeDocRef('bookings', 'bk_recent_10d').set({
+    id: 'bk_recent_10d',
+    status: 'closed',
+    hasAttachments: true,
+    attachmentCount: 1,
+    attachmentsPurgedAt: null,
+  });
+  await env.makeDocRef('booking_attachments', 'bk_recent_10d').set({
+    bookingId: 'bk_recent_10d',
+    bookingEndTime: recentEnd,
+    expireAt: Timestamp.fromMillis(recentEnd + 30 * 24 * 60 * 60 * 1000),
+    attachments: [
+      {
+        facilityDocId: 'doc_1',
+        storagePath: 'booking_attachments/res_1/future_form.pdf',
+      },
+    ],
+  });
+
+  const purgedCount = await _test.purgeExpiredBookingAttachments(env.dbMock, bucket, nowMillis);
+  assert.equal(purgedCount, 1);
+  assert.equal((await env.makeDocRef('booking_attachments', 'bk_expired_31d').get()).exists, false);
+  assert.equal((await env.makeDocRef('booking_attachments', 'bk_recent_10d').get()).exists, true);
+  assert.equal(env.savedStorageFiles.has('booking_attachments/res_1/expired_form.pdf'), false);
+  assert.equal(env.savedStorageFiles.has('booking_attachments/res_1/future_form.pdf'), true);
+  assert.equal(
+    typeof (await env.makeDocRef('bookings', 'bk_expired_31d').get()).data().attachmentsPurgedAt,
+    'number'
+  );
+
+  // 3) Direct Firestore TTL deletion trigger (`onBookingAttachmentDeleted`): deletes valid attachment, ignores 404s, blocks out-of-scope paths
+  await env.makeDocRef('bookings', 'bk_ttl_trigger').set({
+    id: 'bk_ttl_trigger',
+    status: 'closed',
+    hasAttachments: true,
+    attachmentCount: 1,
+    attachmentsPurgedAt: null,
+  });
+  await cloudFunctions.onBookingAttachmentDeleted.run({
+    params: { bookingId: 'bk_ttl_trigger' },
+    data: {
+      data: () => ({
+        bookingId: 'bk_ttl_trigger',
+        attachments: [
+          { storagePath: 'booking_attachments/res_2/ttl_trigger_form.jpg' },
+          { storagePath: 'booking_attachments/res_2/already_deleted_404.pdf' },
+          { storagePath: 'documents/admin_only/do_not_touch.pdf' },
+        ],
+      }),
+    },
+  });
+
+  assert.equal(env.savedStorageFiles.has('booking_attachments/res_2/ttl_trigger_form.jpg'), false);
+  assert.equal(env.savedStorageFiles.has('documents/admin_only/do_not_touch.pdf'), true);
+  assert.equal(
+    typeof (await env.makeDocRef('bookings', 'bk_ttl_trigger').get()).data().attachmentsPurgedAt,
+    'number'
+  );
+});

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../core/backend/backend.dart';
 import 'package:intl/intl.dart';
+import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
-import 'booking_service.dart';
 import '../../l10n/app_localizations.dart';
+import 'booking_service.dart';
+import 'facility_document_models.dart';
+import 'widgets/facility_documents_section.dart';
 
 class BookingScreen extends StatefulWidget {
   const BookingScreen({Key? key}) : super(key: key);
@@ -19,6 +21,7 @@ class _BookingScreenState extends State<BookingScreen> {
   TimeOfDay _startTime = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 12, minute: 0);
   bool _isSubmitting = false;
+  final Map<String, DraftBookingAttachment> _draftAttachments = {};
 
   String? _cachedUserUid;
   Stream<Map<String, dynamic>?>? _userStream;
@@ -28,6 +31,21 @@ class _BookingScreenState extends State<BookingScreen> {
   String? _cachedFacilityStreamKey;
   Stream<List<Map<String, dynamic>>>? _householdBookingsStream;
   Stream<List<Map<String, dynamic>>>? _confirmedBookingsStream;
+
+  @override
+  void dispose() {
+    for (final draft in _draftAttachments.values) {
+      draft.disposeTempCapture();
+    }
+    super.dispose();
+  }
+
+  void _clearDraftAttachments() {
+    for (final draft in _draftAttachments.values) {
+      draft.disposeTempCapture();
+    }
+    _draftAttachments.clear();
+  }
 
   Stream<Map<String, dynamic>?> _getUserStream(String uid) {
     if (_cachedUserUid != uid || _userStream == null) {
@@ -111,8 +129,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
   void _submitBooking(
     Map<String, dynamic> activeFac,
-    List<Map<String, dynamic>> householdBookings,
-  ) async {
+    List<Map<String, dynamic>> householdBookings, {
+    required String userUid,
+    required String addressId,
+  }) async {
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
 
@@ -215,15 +235,47 @@ class _BookingScreenState extends State<BookingScreen> {
       return;
     }
 
+    // 4. Mandatory Documentation Attachments validation
+    final templates = FacilityDocumentTemplate.parseList(activeFac['facilityDocuments']);
+    final missingDocs = findMissingMandatoryDocuments(templates, _draftAttachments);
+    if (missingDocs.isNotEmpty) {
+      final missingTitles = missingDocs.map((m) => m.title).join(', ');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.missingMandatoryDocumentsError(missingTitles)),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
 
     try {
       final targetFacilityId = (activeFac['id'] ?? _selectedFacility).toString();
-      await _bookingService.createBooking(targetFacilityId, startDateTime, endDateTime);
+      final hasAnyAttachmentSlots =
+          templates.any((t) => t.requirementMode.acceptsAttachment) && _draftAttachments.isNotEmpty;
+
+      if (hasAnyAttachmentSlots) {
+        await _bookingService.uploadAndCreateBooking(
+          facilityId: targetFacilityId,
+          userUid: userUid,
+          addressId: addressId,
+          startTime: startDateTime,
+          endTime: endDateTime,
+          templates: templates,
+          draftsByDocId: _draftAttachments,
+        );
+      } else {
+        await _bookingService.createBooking(targetFacilityId, startDateTime, endDateTime);
+      }
 
       if (mounted) {
+        setState(() {
+          _draftAttachments.clear();
+        });
         messenger.showSnackBar(
           SnackBar(
             content: Text(l10n.bookingCreatedSuccess),
@@ -357,6 +409,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
                             if (mounted) {
                               setState(() {
+                                _clearDraftAttachments();
                                 _selectedFacility = facDocs.first['id'] as String;
                               });
                             }
@@ -391,6 +444,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         }
 
                         final restriction = BookingService.resolveRestriction(activeFac);
+                        final facTemplates = FacilityDocumentTemplate.parseList(activeFac['facilityDocuments']);
                         _ensureFacilityBookingStreams(
                           facilityId: activeFacId,
                           userUid: user.uid,
@@ -430,8 +484,9 @@ class _BookingScreenState extends State<BookingScreen> {
                                       );
                                     }).toList(),
                                     onChanged: (value) {
-                                      if (value != null) {
+                                      if (value != null && value != _selectedFacility) {
                                         setState(() {
+                                          _clearDraftAttachments();
                                           _selectedFacility = value;
                                         });
                                       }
@@ -571,6 +626,25 @@ class _BookingScreenState extends State<BookingScreen> {
                                       ),
                                     ],
                                   ),
+                                  if (facTemplates.isNotEmpty) ...[
+                                    const SizedBox(height: 20),
+                                    FacilityDocumentsSection(
+                                      templates: facTemplates,
+                                      draftsByDocId: _draftAttachments,
+                                      enabled: !_isSubmitting,
+                                      onDraftSelected: (draft) {
+                                        setState(() {
+                                          _draftAttachments[draft.facilityDocId] = draft;
+                                        });
+                                      },
+                                      onDraftRemoved: (docId) {
+                                        setState(() {
+                                          final removed = _draftAttachments.remove(docId);
+                                          removed?.disposeTempCapture();
+                                        });
+                                      },
+                                    ),
+                                  ],
                                   const SizedBox(height: 30),
                                   SizedBox(
                                     width: double.infinity,
@@ -582,8 +656,14 @@ class _BookingScreenState extends State<BookingScreen> {
                                           borderRadius: BorderRadius.circular(10),
                                         ),
                                       ),
-                                      onPressed:
-                                          _isSubmitting ? null : () => _submitBooking(activeFac, householdBookings),
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : () => _submitBooking(
+                                                activeFac,
+                                                householdBookings,
+                                                userUid: user.uid,
+                                                addressId: addressRef.id,
+                                              ),
                                       child: _isSubmitting
                                           ? const SizedBox(
                                               width: 24,

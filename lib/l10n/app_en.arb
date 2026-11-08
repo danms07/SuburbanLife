@@ -1117,5 +1117,54 @@
     }
   },
   "accessLogsRetentionBanner": "Auto-removal policy: Access logs and visitor verification photos are permanently deleted after 2 months (60 days).",
-  "qrPassRetentionBanner": "Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire."
+  "qrPassRetentionBanner": "Inactive QR passes (expired, used, or revoked) are automatically deleted after 7 days. Active permanent passes do not expire.",
+  "facilityDocsSectionTitle": "Amenity Documentation",
+  "facilityDocsSectionSubtitle": "Upload forms or rules (PDF, Word, Excel, JPG, PNG, WEBP — max 10 MB each).",
+  "addFacilityDocumentButton": "Add Document",
+  "noFacilityDocumentsAdded": "No documents configured for this amenity.",
+  "facilityDocTitleLabel": "Document Title",
+  "facilityDocModeLabel": "Requirement Type",
+  "facilityDocModeMandatory": "Required return (resident must attach)",
+  "facilityDocModeOptional": "Optional return (attachment optional)",
+  "facilityDocModeInformative": "Informative only (download/read only)",
+  "facilityDocBadgeMandatory": "Required Return",
+  "facilityDocBadgeOptional": "Optional Return",
+  "facilityDocBadgeInformative": "Informative",
+  "facilitySubtitleDocs": "Docs: {total}",
+  "@facilitySubtitleDocs": {
+    "placeholders": {
+      "total": { "type": "int" }
+    }
+  },
+  "facilitySubtitleDocsWithMandatory": "Docs: {total} ({mandatory} required)",
+  "@facilitySubtitleDocsWithMandatory": {
+    "placeholders": {
+      "total": { "type": "int" },
+      "mandatory": { "type": "int" }
+    }
+  },
+  "bookingDocsInstructionBanner": "Download the amenity documents below. Items marked as Required Return must be completed and attached to submit your booking.",
+  "downloadFacilityDocumentButton": "Download / View",
+  "attachCompletedFileButton": "Attach File",
+  "takeDocumentPhotoButton": "Take Photo",
+  "replaceAttachedFileButton": "Replace",
+  "removeAttachedFileTooltip": "Remove attachment",
+  "missingMandatoryDocumentsError": "Please attach all required documents before submitting: {titles}",
+  "@missingMandatoryDocumentsError": {
+    "placeholders": {
+      "titles": { "type": "String" }
+    }
+  },
+  "invalidDocumentContentError": "The selected file content does not match its file extension or is corrupted.",
+  "bookingAttachmentsSectionTitle": "Submitted Documentation",
+  "noBookingAttachmentsSubmitted": "No attachments submitted.",
+  "viewBookingAttachmentButton": "View / Download",
+  "bookingAttachmentsCountBadge": "{count} attachment(s)",
+  "@bookingAttachmentsCountBadge": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bookingAttachmentsPurgedNotice": "Attachments automatically removed 30 days after booking completion per privacy policy.",
+  "bookingAttachmentsRetentionHelper": "Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled)."
 }
