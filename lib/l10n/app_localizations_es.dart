@@ -2368,4 +2368,100 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get documentExceedsMaxSize =>
       'El archivo supera el límite máximo de 10 MB.';
+
+  @override
+  String get bookingRestrictionTypeLabel => 'Política de Límite de Reserva';
+
+  @override
+  String get restrictionUnrestricted => 'Sin Límite';
+
+  @override
+  String get restrictionCooldown =>
+      'Periodo de Espera (Cooldown entre reservas)';
+
+  @override
+  String get restrictionQuota => 'Cuota de Reservas (Máximo por periodo)';
+
+  @override
+  String get cooldownHours => 'Horas';
+
+  @override
+  String get quotaPeriodLabel => 'Periodo de Cuota';
+
+  @override
+  String get quotaLimitLabel => 'Máximo de Reservas Permitidas';
+
+  @override
+  String get quotaDaily => 'Diaria';
+
+  @override
+  String get quotaMonthly => 'Mensual';
+
+  @override
+  String get quotaYearly => 'Anual';
+
+  @override
+  String cooldownRulePreview(int value, String unit) {
+    return 'Al finalizar una reserva, cada domicilio debe esperar $value $unit antes de iniciar otra.';
+  }
+
+  @override
+  String quotaRulePreview(int limit, String period) {
+    return 'Cada domicilio puede reservar hasta $limit vez/veces ($period).';
+  }
+
+  @override
+  String get facilityCapacityUnique => 'Única';
+
+  @override
+  String facilityCapacityMulti(int qty) {
+    return 'Múltiple (Cant: $qty)';
+  }
+
+  @override
+  String facilitySubtitleHours(String hours) {
+    return 'Horario: $hours';
+  }
+
+  @override
+  String facilitySubtitleNotice(int value, String unit) {
+    return 'Aviso: $value $unit';
+  }
+
+  @override
+  String get facilityLimitUnrestricted => 'Límite: Sin restricciones';
+
+  @override
+  String facilityLimitCooldown(int value, String unit) {
+    return 'Límite: Esperar $value $unit';
+  }
+
+  @override
+  String facilityLimitQuota(int limit, String period) {
+    return 'Límite: $limit ($period)';
+  }
+
+  @override
+  String bookingCooldownBadge(int value, String unit) {
+    return 'Espera: $value $unit tras cada reserva';
+  }
+
+  @override
+  String bookingQuotaBadge(String period, int used, int limit) {
+    return 'Cuota $period: $used / $limit usadas';
+  }
+
+  @override
+  String get bookingEndTimeAfterStartError =>
+      'La hora de fin debe ser posterior a la hora de inicio.';
+
+  @override
+  String bookingCooldownBlockedError(int value, String unit) {
+    return 'Periodo de espera activo: Su domicilio debe esperar $value $unit entre reservas de esta amenidad.';
+  }
+
+  @override
+  String bookingQuotaExceededError(String period, int limit) {
+    return 'Cuota alcanzada: Su domicilio ya utilizó las $limit reservas ($period) permitidas para esta amenidad.';
+  }
 }

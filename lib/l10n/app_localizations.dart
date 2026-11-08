@@ -4297,6 +4297,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'File exceeds the 10 MB maximum size limit.'**
   String get documentExceedsMaxSize;
+
+  /// No description provided for @bookingRestrictionTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking Limit Policy'**
+  String get bookingRestrictionTypeLabel;
+
+  /// No description provided for @restrictionUnrestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Unrestricted (No Limit)'**
+  String get restrictionUnrestricted;
+
+  /// No description provided for @restrictionCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown Period (Wait between bookings)'**
+  String get restrictionCooldown;
+
+  /// No description provided for @restrictionQuota.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking Quota (Max bookings per period)'**
+  String get restrictionQuota;
+
+  /// No description provided for @cooldownHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours'**
+  String get cooldownHours;
+
+  /// No description provided for @quotaPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Quota Period'**
+  String get quotaPeriodLabel;
+
+  /// No description provided for @quotaLimitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Bookings Allowed'**
+  String get quotaLimitLabel;
+
+  /// No description provided for @quotaDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get quotaDaily;
+
+  /// No description provided for @quotaMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get quotaMonthly;
+
+  /// No description provided for @quotaYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get quotaYearly;
+
+  /// No description provided for @cooldownRulePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'After finishing a booking, each household must wait {value} {unit} before starting another.'**
+  String cooldownRulePreview(int value, String unit);
+
+  /// No description provided for @quotaRulePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Each household can book up to {limit} time(s) ({period}).'**
+  String quotaRulePreview(int limit, String period);
+
+  /// No description provided for @facilityCapacityUnique.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique'**
+  String get facilityCapacityUnique;
+
+  /// No description provided for @facilityCapacityMulti.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-item (Qty: {qty})'**
+  String facilityCapacityMulti(int qty);
+
+  /// No description provided for @facilitySubtitleHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Hours: {hours}'**
+  String facilitySubtitleHours(String hours);
+
+  /// No description provided for @facilitySubtitleNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Notice: {value} {unit}'**
+  String facilitySubtitleNotice(int value, String unit);
+
+  /// No description provided for @facilityLimitUnrestricted.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit: Unrestricted'**
+  String get facilityLimitUnrestricted;
+
+  /// No description provided for @facilityLimitCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit: Wait {value} {unit}'**
+  String facilityLimitCooldown(int value, String unit);
+
+  /// No description provided for @facilityLimitQuota.
+  ///
+  /// In en, this message translates to:
+  /// **'Limit: {limit} ({period})'**
+  String facilityLimitQuota(int limit, String period);
+
+  /// No description provided for @bookingCooldownBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown: Wait {value} {unit} after booking'**
+  String bookingCooldownBadge(int value, String unit);
+
+  /// No description provided for @bookingQuotaBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'{period} Quota: {used} / {limit} used'**
+  String bookingQuotaBadge(String period, int used, int limit);
+
+  /// No description provided for @bookingEndTimeAfterStartError.
+  ///
+  /// In en, this message translates to:
+  /// **'End time must be after start time.'**
+  String get bookingEndTimeAfterStartError;
+
+  /// No description provided for @bookingCooldownBlockedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooldown active: Your household must wait {value} {unit} between bookings for this amenity.'**
+  String bookingCooldownBlockedError(int value, String unit);
+
+  /// No description provided for @bookingQuotaExceededError.
+  ///
+  /// In en, this message translates to:
+  /// **'Quota reached: Your household has already used all {limit} allowed ({period}) bookings for this amenity.'**
+  String bookingQuotaExceededError(String period, int limit);
 }
 
 class _AppLocalizationsDelegate

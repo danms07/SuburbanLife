@@ -611,3 +611,216 @@ test('package-lock.json files only reference public registry.npmjs.org tarball U
   }
 });
 
+test('resolveFacilityRestriction normalizes legacy cooldown, explicit cooldown (incl. hours), and quota rules', () => {
+  const { resolveFacilityRestriction } = _test;
+
+  // Null / empty -> unrestricted
+  assert.deepEqual(resolveFacilityRestriction(null), {
+    restrictionType: 'unrestricted',
+    cooldownUnit: 'unrestricted',
+    cooldownValue: 0,
+    quotaPeriod: 'unrestricted',
+    quotaLimit: 0,
+  });
+
+  // Legacy facility doc (no restrictionType, only cooldownUnit + cooldownValue)
+  assert.deepEqual(resolveFacilityRestriction({ cooldownUnit: 'days', cooldownValue: 7 }), {
+    restrictionType: 'cooldown',
+    cooldownUnit: 'days',
+    cooldownValue: 7,
+    quotaPeriod: 'unrestricted',
+    quotaLimit: 0,
+  });
+
+  // Explicit hours cooldown
+  assert.deepEqual(
+    resolveFacilityRestriction({ restrictionType: 'cooldown', cooldownUnit: 'hours', cooldownValue: 4 }),
+    {
+      restrictionType: 'cooldown',
+      cooldownUnit: 'hours',
+      cooldownValue: 4,
+      quotaPeriod: 'unrestricted',
+      quotaLimit: 0,
+    }
+  );
+
+  // Explicit monthly quota
+  assert.deepEqual(
+    resolveFacilityRestriction({ restrictionType: 'quota', quotaPeriod: 'monthly', quotaLimit: 2 }),
+    {
+      restrictionType: 'quota',
+      cooldownUnit: 'unrestricted',
+      cooldownValue: 0,
+      quotaPeriod: 'monthly',
+      quotaLimit: 2,
+    }
+  );
+
+  // Invalid values fall back safely to unrestricted
+  assert.equal(
+    resolveFacilityRestriction({ restrictionType: 'quota', quotaPeriod: 'weekly', quotaLimit: 2 }).restrictionType,
+    'unrestricted'
+  );
+  assert.equal(
+    resolveFacilityRestriction({ restrictionType: 'cooldown', cooldownUnit: 'hours', cooldownValue: 0 }).restrictionType,
+    'unrestricted'
+  );
+});
+
+test('addCooldownOffset handles hours, days, month-end clamping, and leap-year clamping', () => {
+  const { addCooldownOffset } = _test;
+
+  const base = Date.UTC(2026, 0, 31, 14, 30, 0); // 2026-01-31T14:30:00Z
+  assert.equal(addCooldownOffset(base, 'hours', 3), Date.UTC(2026, 0, 31, 17, 30, 0));
+  assert.equal(addCooldownOffset(base, 'days', 2), Date.UTC(2026, 1, 2, 14, 30, 0));
+
+  // Jan 31 + 1 month in non-leap year 2026 -> Feb 28, 2026 14:30 UTC
+  assert.equal(addCooldownOffset(base, 'months', 1), Date.UTC(2026, 1, 28, 14, 30, 0));
+
+  // Feb 29, 2024 (leap year) + 1 year -> Feb 28, 2025
+  const leapDay = Date.UTC(2024, 1, 29, 10, 0, 0);
+  assert.equal(addCooldownOffset(leapDay, 'years', 1), Date.UTC(2025, 1, 28, 10, 0, 0));
+});
+
+test('isCountedBookingForRestriction counts pending review and confirmed statuses while ignoring rejected/cancelled', () => {
+  const { isCountedBookingForRestriction } = _test;
+
+  assert.equal(isCountedBookingForRestriction({ status: 'pending review' }), true);
+  assert.equal(isCountedBookingForRestriction({ status: 'pending' }), true);
+  assert.equal(isCountedBookingForRestriction({ status: 'approved (upcoming)' }), true);
+  assert.equal(isCountedBookingForRestriction({ status: 'approved (in use)' }), true);
+  assert.equal(isCountedBookingForRestriction({ status: 'confirmed' }), true);
+  assert.equal(isCountedBookingForRestriction({ status: 'closed' }), true);
+
+  assert.equal(isCountedBookingForRestriction({ status: 'rejected' }), false);
+  assert.equal(isCountedBookingForRestriction({ status: 'cancelled' }), false);
+  assert.equal(isCountedBookingForRestriction({}), false);
+});
+
+test('validateFacilityBooking rejects endTime <= startTime even for 24/7 unrestricted facilities', () => {
+  const { validateFacilityBooking } = _test;
+  const fac24x7 = {
+    anticipationUnit: 'unrestricted',
+    anticipationValue: 0,
+    openingTime: '00:00',
+    closingTime: '23:59',
+  };
+  const slot = Date.UTC(2026, 5, 15, 12, 0, 0);
+  assert.throws(
+    () => validateFacilityBooking({ facData: fac24x7, startTime: slot, endTime: slot, timeZone: 'UTC' }),
+    (err) => err.code === 'invalid-argument' && err.message.includes('End time must be after start time')
+  );
+});
+
+test('validateHouseholdBookingRestriction enforces symmetric endTime->startTime cooldown and timezone-aware quotas', () => {
+  const { validateHouseholdBookingRestriction } = _test;
+
+  // 1. Cooldown in hours: existing booking 10:00 - 12:00 UTC, 2h cooldown
+  const facHoursCooldown = {
+    restrictionType: 'cooldown',
+    cooldownUnit: 'hours',
+    cooldownValue: 2,
+  };
+  const existing = [
+    {
+      id: 'b_existing',
+      status: 'pending review',
+      startTime: Date.UTC(2026, 5, 15, 10, 0, 0),
+      endTime: Date.UTC(2026, 5, 15, 12, 0, 0),
+    },
+  ];
+
+  // 13:00 - 14:00 (only 1h after 12:00 end) -> blocked
+  assert.throws(
+    () =>
+      validateHouseholdBookingRestriction({
+        facData: facHoursCooldown,
+        startTime: Date.UTC(2026, 5, 15, 13, 0, 0),
+        endTime: Date.UTC(2026, 5, 15, 14, 0, 0),
+        householdBookings: existing,
+        timeZone: 'UTC',
+      }),
+    (err) => err.code === 'failed-precondition' && err.message.includes('wait 2 hours')
+  );
+
+  // Exact boundary 14:00 - 16:00 (2h after 12:00 end) -> allowed
+  assert.doesNotThrow(() =>
+    validateHouseholdBookingRestriction({
+      facData: facHoursCooldown,
+      startTime: Date.UTC(2026, 5, 15, 14, 0, 0),
+      endTime: Date.UTC(2026, 5, 15, 16, 0, 0),
+      householdBookings: existing,
+      timeZone: 'UTC',
+    })
+  );
+
+  // Earlier slot 08:30 - 09:00 (only 1h before 10:00 start) -> blocked symmetrically
+  assert.throws(
+    () =>
+      validateHouseholdBookingRestriction({
+        facData: facHoursCooldown,
+        startTime: Date.UTC(2026, 5, 15, 8, 30, 0),
+        endTime: Date.UTC(2026, 5, 15, 9, 0, 0),
+        householdBookings: existing,
+        timeZone: 'UTC',
+      }),
+    (err) => err.code === 'failed-precondition'
+  );
+
+  // Earlier slot 06:00 - 08:00 (ends 2h before 10:00 start) -> allowed
+  assert.doesNotThrow(() =>
+    validateHouseholdBookingRestriction({
+      facData: facHoursCooldown,
+      startTime: Date.UTC(2026, 5, 15, 6, 0, 0),
+      endTime: Date.UTC(2026, 5, 15, 8, 0, 0),
+      householdBookings: existing,
+      timeZone: 'UTC',
+    })
+  );
+
+  // 2. Daily quota in America/Mexico_City (UTC-6):
+  // 2026-06-16T03:00:00Z is 2026-06-15 21:00 in America/Mexico_City!
+  const facDailyQuota = {
+    restrictionType: 'quota',
+    quotaPeriod: 'daily',
+    quotaLimit: 1,
+  };
+  const mxBookings = [
+    {
+      id: 'b_mx_1',
+      status: 'approved (upcoming)',
+      startTime: Date.UTC(2026, 5, 15, 18, 0, 0), // 2026-06-15 12:00 CST
+      endTime: Date.UTC(2026, 5, 15, 19, 0, 0),
+    },
+    {
+      id: 'b_mx_rejected',
+      status: 'rejected',
+      startTime: Date.UTC(2026, 5, 16, 18, 0, 0), // rejected does not count
+      endTime: Date.UTC(2026, 5, 16, 19, 0, 0),
+    },
+  ];
+
+  // Same local day in Mexico City (2026-06-15 21:00 CST = 2026-06-16 03:00 UTC) -> blocked
+  assert.throws(
+    () =>
+      validateHouseholdBookingRestriction({
+        facData: facDailyQuota,
+        startTime: Date.UTC(2026, 5, 16, 3, 0, 0),
+        endTime: Date.UTC(2026, 5, 16, 4, 0, 0),
+        householdBookings: mxBookings,
+        timeZone: 'America/Mexico_City',
+      }),
+    (err) => err.code === 'failed-precondition' && err.message.includes('daily booking quota (1)')
+  );
+
+  // Next local day in Mexico City (2026-06-16 12:00 CST, where only a rejected booking exists) -> allowed
+  assert.doesNotThrow(() =>
+    validateHouseholdBookingRestriction({
+      facData: facDailyQuota,
+      startTime: Date.UTC(2026, 5, 16, 18, 0, 0),
+      endTime: Date.UTC(2026, 5, 16, 19, 0, 0),
+      householdBookings: mxBookings,
+      timeZone: 'America/Mexico_City',
+    })
+  );
+});

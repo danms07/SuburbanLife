@@ -45,7 +45,9 @@ erDiagram
         string userUid FK
         timestamp startTime
         timestamp endTime
-        string status "'pending review' | 'rejected' | 'approved' | 'closed'"
+        string addressId FK "Household address ID"
+        reference addressRef FK "Link to addresses"
+        string status "'pending review' | 'rejected' | 'approved' | 'closed' | 'cancelled'"
         string notes
         string rejectionReason "Optional rejection rationale from admin"
     }
@@ -102,11 +104,14 @@ erDiagram
         string name
         boolean isUnique
         number quantity
-        string cooldownUnit "'unrestricted' | 'days' | 'months' | 'years'"
+        string restrictionType "'unrestricted' | 'cooldown' | 'quota'"
+        string cooldownUnit "'unrestricted' | 'hours' | 'days' | 'months' | 'years'"
         number cooldownValue
     }
     config {
         string documentId PK "app_settings | smtp_settings"
+        string quotaPeriod "'unrestricted' | 'daily' | 'monthly' | 'yearly'"
+        number quotaLimit
         number paymentCutoffDay
         number gracePeriodDays
         boolean scanOnExitEnabled "Enable QR scan on exit"
@@ -124,6 +129,7 @@ erDiagram
     bookings }o--|| facilities : "reserves"
     announcements }o--|| users : "created by"
     access_logs }o--|| qr_codes : "validates"
+    bookings }o--o| addresses : "belongs to household"
     access_logs }o--|| users : "verified by guard"
     payments }o--|| addresses : "paid for"
     ownership_claims }o--|| users : "claimed by"
@@ -175,10 +181,12 @@ erDiagram
 ### `bookings` (Collection)
 - `bookingId`: string (Document ID)
 - `facilityId`: string ('multipurpose_room', 'bicycle_1', etc.)
-- `userUid`: string
+- `userUid`: string (UID of the resident who created the reservation)
+- `addressId`: string (Optional/populated on creation; physical household address ID shared across primary resident and roommates for cooldown/quota enforcement)
+- `addressRef`: document_reference (Optional/populated on creation; reference to `addresses/{addressId}`)
 - `startTime`: timestamp
 - `endTime`: timestamp
-- `status`: string ("pending review", "rejected", "approved (upcoming)", "approved (in use)", "closed")
+- `status`: string ("pending review", "rejected", "cancelled", "approved (upcoming)", "approved (in use)", "closed")
 - `isConfirmed`: boolean (True for approved/closed bookings; allows public calendar availability query)
 - `notes`: string
 - `rejectionReason`: string (Optional rationale provided by administrator upon rejection)
@@ -293,8 +301,11 @@ erDiagram
 - `name`: string (Localized or descriptive display label)
 - `isUnique`: boolean (True if single capacity unique amenity, False for multi-item amenities)
 - `quantity`: number (Available inventorial capacity, locked to 1 if isUnique is true)
-- `cooldownUnit`: string ('unrestricted', 'days', 'months', 'years')
-- `cooldownValue`: number (Cooldown duration before a resident can book the facility again, 0 if unrestricted)
+- `restrictionType`: string ('unrestricted' | 'cooldown' | 'quota' — optional; legacy documents without `restrictionType` infer `'cooldown'` when `cooldownUnit != 'unrestricted'` and `cooldownValue > 0`)
+- `cooldownUnit`: string ('unrestricted' | 'hours' | 'days' | 'months' | 'years')
+- `cooldownValue`: number (Minimum waiting duration measured from one booking's `endTime` to the next booking's `startTime` per household, 0 if unrestricted/quota)
+- `quotaPeriod`: string ('unrestricted' | 'daily' | 'monthly' | 'yearly')
+- `quotaLimit`: number (Maximum bookings allowed per household within the calendar `quotaPeriod` in the community timezone, 0 if unrestricted/cooldown)
 - `anticipationUnit`: string ('unrestricted', 'hours', 'days', 'weeks')
 - `anticipationValue`: number (Minimum advance notice required prior to reservation time)
 - `openingTime`: string (Daily opening hour in 24-hour HH:mm format, e.g. '08:00', default '00:00')
@@ -367,6 +378,10 @@ The application requires specific composite indexes to execute queries without d
   - `addressRef` (Ascending)
   - `period` (Descending)
 - **Index 2 (Resident Payments by Timestamp)**:
+- **Index 10 (Household Cooldown & Quota Facility Check)**:
+  - `facilityId` (Ascending)
+  - `addressId` (Ascending)
+  - `startTime` (Ascending)
   - `residentUid` (Ascending)
   - `timestamp` (Descending)
 - **Index 3 (Uploader Payments by Creation)**:

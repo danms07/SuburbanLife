@@ -63,6 +63,11 @@ test('Static Audit: firestore.rules enforces RBAC, field-level immutability, and
   const logsBlock = extractMatchBlock(source, 'match /access_logs/{logId}');
   assert.match(logsBlock, /allow read:\s*if isGuard\(\)\s*\|\|\s*isAdmin\(\);/);
   assert.match(logsBlock, /allow write:\s*if isAdmin\(\);/);
+
+  // 6. Bookings collection: household addressId read access for residents/roommates and admin-only direct writes
+  const bookingsBlock = extractMatchBlock(source, 'match /bookings/{bookingId}');
+  assert.match(bookingsBlock, /isCallerAddressResident\(resource\.data\.addressId\)/);
+  assert.match(bookingsBlock, /allow write:\s*if isAdmin\(\);/);
 });
 
 test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list, /sanctions/ coverage, and path ownership', () => {

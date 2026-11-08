@@ -138,8 +138,7 @@ class FakeDatabaseService implements DatabaseService {
   Stream<Map<String, dynamic>?> streamDocument(String collection, String docId) {
     final docKey = '$collection/$docId';
     final controller = _docControllers.putIfAbsent(docKey, () {
-      final sc = StreamController<Map<String, dynamic>?>.broadcast();
-      return sc;
+      return StreamController<Map<String, dynamic>?>.broadcast();
     });
     // Emit current state asynchronously
     Future.microtask(() {
@@ -162,14 +161,18 @@ class FakeDatabaseService implements DatabaseService {
       return StreamController<List<Map<String, dynamic>>>.broadcast();
     });
 
-    Future.microtask(() async {
+    Future.microtask(() {
       if (!controller.isClosed) {
-        final docs = await getCollection(collection, filters: filters, sorts: sorts, limit: limit);
-        controller.add(docs);
+        final rawDocs = (_store[collection]?.values ?? [])
+            .map((d) => Map<String, dynamic>.from(d))
+            .toList();
+        controller.add(rawDocs);
       }
     });
 
-    return controller.stream.map((list) => _applyFiltersAndSorts(list, filters, sorts, limit: limit));
+    return controller.stream.map(
+      (list) => _applyFiltersAndSorts(list, filters, sorts, limit: limit),
+    );
   }
 
   @override

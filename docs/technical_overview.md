@@ -62,7 +62,7 @@ flowchart TD
 ### 2.1 For Residents and Household Members
 
 * **Digital QR Access Passes**: Residents can generate instant QR codes for expected visitors, recurring guests, or delivery suppliers. Passes can be configured as **one-time use** or **temporary (with specific expiration dates and times)**, including optional vehicle details (car, motorcycle, license plate) and passenger counts.
-* **Amenity & Facility Reservations**: Residents can browse and reserve community amenities (such as event rooms, swimming pool areas, barbecue grills, or sports equipment). The system prevents scheduling conflicts in real time, enforces fair-use quotas, and manages booking approval workflows.
+* **Amenity & Facility Reservations**: Residents can browse and reserve community amenities (such as event rooms, swimming pool areas, barbecue grills, or sports equipment). The system prevents scheduling conflicts in real time, enforces household-level cooldown waiting periods (`hours`, `days`, `months`, or `years`) or calendar booking quotas (`daily`, `monthly`, or `yearly`), and manages booking approval workflows.
 * **Maintenance Fee Tracking & Proof Submission**: Residents can view their current balance status (Paid, Pending, Reviewing, Restricted), review past payment history, and upload digital photos of bank deposit slips or transfer receipts (coming soon) directly from their mobile camera or photo gallery.
 * **Community Bulletins & Announcements**: An interactive multimedia board delivers official administrative announcements with rich images, formatted notices, and automatic bilingual translation (English and Spanish).
 * **Document Transparency Portal**: An in-app virtual file explorer allows verified residents to view official condominium documents, such as neighborhood bylaws, meeting minutes, monthly balance sheets, and maintenance schedules, with offline caching for quick access.
@@ -82,7 +82,7 @@ flowchart TD
 * **Property Ownership Verification Queue**: Administrators review deed or handover documentation submitted by new residents to confirm genuine homeownership before assigning primary resident privileges.
 * **Payment Approval & Financial Matrix**: Administrative staff can review submitted payment receipts, approve or reject them with feedback, and export complete monthly payment status matrices (CSV) for accounting records.
 * **Bulk Data Import via CSV**: Administrators can provision hundreds of addresses or resident accounts in seconds using spreadsheet files (CSV), with automated welcome emails and cryptographically secure passwords.
-* **Amenity & Facility Configuration**: Board members can configure available amenities, mark facilities as single-booking or multi-unit, set operating hours, and define fair-use rules.
+* **Amenity & Facility Configuration**: Board members can configure available amenities, mark facilities as single-booking or multi-unit, set operating hours and advance notice rules, and define fair-use household cooldown periods or daily/monthly/yearly booking quotas.
 * **Automated Bilingual Bulletins with AI**: Administrators can post news bulletins in Spanish or English; the system automatically translates titles and descriptions using server-side Google Gemini AI without exposing sensitive keys.
 * **Custom SMTP Email Notifications**: Automated welcome emails with login credentials and community updates are dispatched via the administration's configured SMTP server.
 
@@ -275,7 +275,7 @@ In compliance with Mexican personal data protection laws (**LFPDPPP**), every us
 
 Users can exercise their ARCO rights directly through their Condominium Administration or via the in-app account portal.
 
-### 6.4 Account Deletion & Data Purging
+### 6.4 Automated Data Retention, Account Deletion & Data Purging
 
 * **Self-Service & Admin Deletion**: Users can delete their account directly within the app via the **"Delete Account"** button or by requesting deletion from an administrator.
 * **Permanent & Irreversible Purge**: When an account is deleted, the user's credentials in Firebase Authentication, user document in Cloud Firestore, and ownership proof files in Cloud Storage are **permanently and irreversibly destroyed**.

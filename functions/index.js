@@ -418,38 +418,88 @@ exports.createBooking = onCall(callableOptions, async (request) => {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
   }
 
-  const { facilityId, startTime, endTime } = request.data;
-  if (!facilityId || !startTime || !endTime) {
-    throw new HttpsError('invalid-argument', 'Missing facilityId, startTime, or endTime.');
+  const rawData = request.data || {};
+  const facilityId = typeof rawData.facilityId === 'string' ? rawData.facilityId.trim() : '';
+  const startTime = typeof rawData.startTime === 'number' ? rawData.startTime : Number(rawData.startTime);
+  const endTime = typeof rawData.endTime === 'number' ? rawData.endTime : Number(rawData.endTime);
+  const resubmitBookingId =
+    typeof rawData.resubmitBookingId === 'string' && rawData.resubmitBookingId.trim().length > 0
+      ? rawData.resubmitBookingId.trim()
+      : null;
+
+  if (
+    !facilityId ||
+    facilityId.length > 128 ||
+    facilityId.includes('/') ||
+    !Number.isFinite(startTime) ||
+    !Number.isFinite(endTime) ||
+    startTime <= 0 ||
+    endTime <= startTime ||
+    (resubmitBookingId && (resubmitBookingId.length > 128 || resubmitBookingId.includes('/')))
+  ) {
+    throw new HttpsError('invalid-argument', 'Invalid or missing facilityId, startTime, or endTime.');
   }
 
   const uid = request.auth.uid;
 
   try {
-    // 0. Check payment status
+    // 0. Check payment & sanction standing and resolve household address
+    let callerAddressRef = null;
+    let callerAddressId = null;
     const userDoc = await admin.firestore().collection('users').doc(uid).get();
     if (userDoc.exists) {
       const addressRef = userDoc.data().addressRef;
       if (addressRef) {
-        const addressDoc = await addressRef.get();
-        const status = addressDoc.exists ? addressDoc.data().paymentStatus : null;
-        const isWithinGrace = addressDoc.exists ? addressDoc.data().isWithinGracePeriod === true : false;
-        const isConsideredPaid = status === 'paid' ||
-          ((status === 'pending' || status === 'reviewing') && isWithinGrace);
+        callerAddressRef = addressRef;
+        callerAddressId = addressRef.id || String(addressRef.path || '').split('/').pop() || null;
+        const addressDoc = typeof addressRef.get === 'function'
+          ? await addressRef.get()
+          : await admin.firestore().doc(addressRef.path || `addresses/${callerAddressId}`).get();
+        const addrData = addressDoc.exists ? addressDoc.data() : null;
+        const status = addrData ? addrData.paymentStatus : null;
+        const hasActiveSanctions = addrData ? addrData.hasActiveSanctions === true : false;
+        const isWithinGrace = addrData ? addrData.isWithinGracePeriod === true : false;
+        const isConsideredPaid =
+          !hasActiveSanctions &&
+          (status === 'paid' || ((status === 'pending' || status === 'reviewing') && isWithinGrace));
         if (!isConsideredPaid) {
-          throw new HttpsError('permission-denied', 'Your account is restricted due to missing payment.');
+          throw new HttpsError(
+            'permission-denied',
+            'Your account is restricted due to missing payment or active sanctions.'
+          );
         }
       }
     }
 
-    // 1. Dynamic Cooldown validation fetched from facilities collection
+    // 0b. If resubmitting a rejected booking, verify ownership and status
+    let existingBookingRef = null;
+    if (resubmitBookingId) {
+      existingBookingRef = admin.firestore().collection('bookings').doc(resubmitBookingId);
+      const existingSnap = await existingBookingRef.get();
+      if (!existingSnap.exists) {
+        throw new HttpsError('not-found', 'Booking to resubmit was not found.');
+      }
+      const existingData = existingSnap.data() || {};
+      const sameOwner = existingData.userUid === uid;
+      const sameHousehold = Boolean(callerAddressId && existingData.addressId === callerAddressId);
+      if (!sameOwner && !sameHousehold) {
+        throw new HttpsError('permission-denied', 'You do not have permission to resubmit this booking.');
+      }
+      if (existingData.status !== 'rejected') {
+        throw new HttpsError('failed-precondition', 'Only rejected bookings can be resubmitted.');
+      }
+      if (existingData.facilityId && existingData.facilityId !== facilityId) {
+        throw new HttpsError('invalid-argument', 'Cannot change facility when resubmitting a booking.');
+      }
+    }
+
+    // 1. Load facility configuration & community timezone
     const facilityDoc = await admin.firestore().collection('facilities').doc(facilityId).get();
     if (!facilityDoc.exists) {
       throw new HttpsError('not-found', 'Facility not found.');
     }
-    
+
     const facData = facilityDoc.data();
-    // 1. Anticipation & Operating Hours validation
     let timeZone = 'America/Mexico_City';
     try {
       const configDoc = await admin.firestore().collection('config').doc('app_settings').get();
@@ -460,73 +510,98 @@ exports.createBooking = onCall(callableOptions, async (request) => {
 
     validateFacilityBooking({ facData, startTime, endTime, timeZone, now: Date.now() });
 
-    const cooldownUnit = facData.cooldownUnit || 'unrestricted';
-    const cooldownValue = facData.cooldownValue || 0;
+    // 2. Household Cooldown / Quota validation
+    const restriction = resolveFacilityRestriction(facData);
+    if (restriction.restrictionType !== 'unrestricted') {
+      const householdBookingsMap = new Map();
 
-    if (cooldownUnit !== 'unrestricted') {
-      let startTimeBoundary = 0;
-      let endTimeBoundary = Infinity;
-      if (cooldownUnit === 'days') {
-        const ms = cooldownValue * 24 * 60 * 60 * 1000;
-        startTimeBoundary = startTime - ms;
-        endTimeBoundary = startTime + ms;
-      } else if (cooldownUnit === 'months') {
-        const dateBefore = new Date(startTime);
-        dateBefore.setMonth(dateBefore.getMonth() - cooldownValue);
-        startTimeBoundary = dateBefore.getTime();
-        const dateAfter = new Date(startTime);
-        dateAfter.setMonth(dateAfter.getMonth() + cooldownValue);
-        endTimeBoundary = dateAfter.getTime();
-      } else if (cooldownUnit === 'years') {
-        const dateBefore = new Date(startTime);
-        dateBefore.setFullYear(dateBefore.getFullYear() - cooldownValue);
-        startTimeBoundary = dateBefore.getTime();
-        const dateAfter = new Date(startTime);
-        dateAfter.setFullYear(dateAfter.getFullYear() + cooldownValue);
-        endTimeBoundary = dateAfter.getTime();
-      }
+      if (callerAddressId) {
+        // Direct household bookings attributed with addressId
+        const byAddressSnap = await admin
+          .firestore()
+          .collection('bookings')
+          .where('facilityId', '==', facilityId)
+          .where('addressId', '==', callerAddressId)
+          .get();
+        for (const doc of byAddressSnap.docs) {
+          if (doc.id !== resubmitBookingId) {
+            householdBookingsMap.set(doc.id, doc.data());
+          }
+        }
 
-      const recentBookings = await admin.firestore().collection('bookings')
-        .where('userUid', '==', uid)
-        .where('facilityId', '==', facilityId)
-        .where('startTime', '>=', startTimeBoundary)
-        .get();
+        // Legacy fallback: include bookings without addressId created by any user currently linked to callerAddressRef
+        const memberUids = new Set([uid]);
+        if (callerAddressRef) {
+          const linkedUsersSnap = await admin
+            .firestore()
+            .collection('users')
+            .where('addressRef', '==', callerAddressRef)
+            .get();
+          for (const uDoc of linkedUsersSnap.docs) {
+            memberUids.add(uDoc.id);
+          }
+        }
 
-      // The booking restriction should only be applied once the booking is confirmed
-      const confirmedBookings = recentBookings.docs.filter((doc) => {
-        const b = doc.data();
-        const status = (b.status || '').toLowerCase();
-        const isConfirmed = status.startsWith('approved') || status === 'confirmed' || status === 'closed';
-        if (!isConfirmed) return false;
-        const bStart = typeof b.startTime === 'number' ? b.startTime : (b.startTime ? b.startTime.toMillis() : 0);
-        return bStart >= startTimeBoundary && bStart <= endTimeBoundary;
-      });
-
-      if (confirmedBookings.length > 0) {
-        throw new HttpsError(
-          'failed-precondition',
-          `You are only allowed to book this facility once every ${cooldownValue} ${cooldownUnit}.`
-        );
+        for (const memberUid of memberUids) {
+          const byMemberSnap = await admin
+            .firestore()
+            .collection('bookings')
+            .where('userUid', '==', memberUid)
+            .where('facilityId', '==', facilityId)
+            .get();
+          for (const doc of byMemberSnap.docs) {
+            if (doc.id === resubmitBookingId || householdBookingsMap.has(doc.id)) continue;
+            const bData = doc.data() || {};
+            if (!bData.addressId || bData.addressId === callerAddressId) {
+              householdBookingsMap.set(doc.id, bData);
+            }
+          }
+        }
+      } else {
+        const byUserSnap = await admin
+          .firestore()
+          .collection('bookings')
+          .where('userUid', '==', uid)
+          .where('facilityId', '==', facilityId)
+          .get();
+        for (const doc of byUserSnap.docs) {
+          if (doc.id !== resubmitBookingId) {
+            householdBookingsMap.set(doc.id, doc.data());
+          }
+        }
       }
     }
 
-    // 2. Clashes validation (Capacity & Quantity check): bounded time range
+      validateHouseholdBookingRestriction({
+        facData,
+        startTime,
+        endTime,
+        householdBookings: Array.from(householdBookingsMap.values()),
+        timeZone,
+      });
+
+    // 3. Clashes validation (Capacity & Quantity check): bounded time range
     const quantity = facData.quantity || 1;
-    const clashes = await admin.firestore().collection('bookings')
+    const clashes = await admin
+      .firestore()
+      .collection('bookings')
       .where('facilityId', '==', facilityId)
       .where('startTime', '<=', endTime)
-      .where('startTime', '>=', startTime - (7 * 24 * 60 * 60 * 1000))
+      .where('startTime', '>=', startTime - 7 * 24 * 60 * 60 * 1000)
       .get();
 
     const events = [];
     for (const doc of clashes.docs) {
       const b = doc.data();
+      if (doc.id === resubmitBookingId) continue;
       // Ignore cancelled or rejected bookings
       if (b.status === 'cancelled' || b.status === 'rejected') {
         continue;
       }
-      const overlapStart = Math.max(startTime, b.startTime);
-      const overlapEnd = Math.min(endTime, b.endTime);
+      const bStart = extractTimestampMillis(b.startTime);
+      const bEnd = extractTimestampMillis(b.endTime);
+      const overlapStart = Math.max(startTime, bStart);
+      const overlapEnd = Math.min(endTime, bEnd);
       if (overlapStart < overlapEnd) {
         events.push({ time: overlapStart, type: 1 });
         events.push({ time: overlapEnd, type: -1 });
@@ -557,7 +632,33 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       );
     }
 
-    // 3. Create booking
+    // 4. Persist booking (update rejected booking or create new booking)
+    if (existingBookingRef) {
+      const updatedPatch = {
+        startTime,
+        endTime,
+        addressId: callerAddressId || null,
+        addressRef: callerAddressRef || null,
+        status: 'pending review',
+        isConfirmed: false,
+        rejectionReason: '',
+        notes: '',
+        updatedAt: Date.now(),
+      };
+      await existingBookingRef.update(updatedPatch);
+      return {
+        success: true,
+        bookingId: resubmitBookingId,
+        booking: {
+          id: resubmitBookingId,
+          bookingId: resubmitBookingId,
+          facilityId,
+          userUid: uid,
+          ...updatedPatch,
+        },
+      };
+    }
+
     const bookingRef = admin.firestore().collection('bookings').doc();
     const bookingData = {
       id: bookingRef.id,
@@ -565,17 +666,19 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       facilityId,
       userUid: uid,
       startTime,
+      addressId: callerAddressId || null,
+      addressRef: callerAddressRef || null,
       endTime,
       status: 'pending review',
       isConfirmed: false,
       approvalMessage: '',
       rejectionReason: '',
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     await bookingRef.set(bookingData);
 
-    return { success: true, booking: bookingData };
+    return { success: true, bookingId: bookingRef.id, booking: bookingData };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     throw new HttpsError('internal', error.message);
@@ -680,6 +783,15 @@ function getNowInTimezone(timeZone = 'America/Mexico_City') {
  */
 function validateFacilityBooking({ facData, startTime, endTime, timeZone = 'America/Mexico_City', now = Date.now() }) {
   if (!facData) return;
+  if (
+    typeof startTime !== 'number' ||
+    typeof endTime !== 'number' ||
+    !Number.isFinite(startTime) ||
+    !Number.isFinite(endTime) ||
+    endTime <= startTime
+  ) {
+    throw new HttpsError('invalid-argument', 'End time must be after start time.');
+  }
 
   // 1. Anticipation window
   const anticipationUnit = facData.anticipationUnit || 'unrestricted';
@@ -716,7 +828,14 @@ function validateFacilityBooking({ facData, startTime, endTime, timeZone = 'Amer
     const startMinutes = startTz.hour * 60 + startTz.minute;
     const endMinutes = endTz.hour * 60 + endTz.minute;
 
-    if (startMinutes < openingMinutes || endMinutes > closingMinutes || startTz.day !== endTz.day) {
+    if (
+      startMinutes < openingMinutes ||
+      endMinutes > closingMinutes ||
+      endMinutes <= startMinutes ||
+      startTz.day !== endTz.day ||
+      startTz.month !== endTz.month ||
+      startTz.year !== endTz.year
+    ) {
       throw new HttpsError(
         'invalid-argument',
         `Reservation must be within operating hours (${openingTime} - ${closingTime}).`
@@ -726,6 +845,198 @@ function validateFacilityBooking({ facData, startTime, endTime, timeZone = 'Amer
 }
 
 /**
+/**
+ * Normalizes a facility document's booking restriction configuration, preserving
+ * backward compatibility with legacy documents that only specify cooldownUnit/cooldownValue.
+ */
+function resolveFacilityRestriction(facData) {
+  const unrestricted = {
+    restrictionType: 'unrestricted',
+    cooldownUnit: 'unrestricted',
+    cooldownValue: 0,
+    quotaPeriod: 'unrestricted',
+    quotaLimit: 0,
+  };
+  if (!facData) return unrestricted;
+
+  const explicitType = String(facData.restrictionType || '').trim().toLowerCase();
+  const cooldownUnit = String(facData.cooldownUnit || 'unrestricted').trim().toLowerCase();
+  const cooldownValue =
+    typeof facData.cooldownValue === 'number'
+      ? Math.floor(facData.cooldownValue)
+      : parseInt(String(facData.cooldownValue || '0'), 10) || 0;
+  const quotaPeriod = String(facData.quotaPeriod || 'unrestricted').trim().toLowerCase();
+  const quotaLimit =
+    typeof facData.quotaLimit === 'number'
+      ? Math.floor(facData.quotaLimit)
+      : parseInt(String(facData.quotaLimit || '0'), 10) || 0;
+
+  if (explicitType === 'quota') {
+    if (['daily', 'monthly', 'yearly'].includes(quotaPeriod) && quotaLimit > 0) {
+      return {
+        restrictionType: 'quota',
+        cooldownUnit: 'unrestricted',
+        cooldownValue: 0,
+        quotaPeriod,
+        quotaLimit,
+      };
+    }
+    return unrestricted;
+  }
+
+  if (explicitType === 'cooldown' || (!explicitType && cooldownUnit !== 'unrestricted' && cooldownValue > 0)) {
+    if (['hours', 'days', 'months', 'years'].includes(cooldownUnit) && cooldownValue > 0) {
+      return {
+        restrictionType: 'cooldown',
+        cooldownUnit,
+        cooldownValue,
+        quotaPeriod: 'unrestricted',
+        quotaLimit: 0,
+      };
+    }
+  }
+
+  return unrestricted;
+}
+
+/**
+ * Returns true if a booking record counts toward household cooldown or quota limits.
+ * Both pending review and approved/confirmed/closed bookings count; rejected and cancelled do not.
+ */
+function isCountedBookingForRestriction(booking) {
+  if (!booking) return false;
+  const status = String(booking.status || '').trim().toLowerCase();
+  if (!status || status === 'rejected' || status === 'cancelled') return false;
+  return (
+    status === 'pending' ||
+    status === 'pending review' ||
+    status.startsWith('approved') ||
+    status === 'confirmed' ||
+    status === 'closed'
+  );
+}
+
+/**
+ * Adds a cooldown duration (hours | days | months | years) to a millisecond epoch timestamp,
+ * safely clamping calendar month-end rollovers for months and years.
+ */
+function addCooldownOffset(timestampMs, unit, value) {
+  if (!value || value <= 0) return timestampMs;
+  if (unit === 'hours') {
+    return timestampMs + value * 60 * 60 * 1000;
+  }
+  if (unit === 'days') {
+    return timestampMs + value * 24 * 60 * 60 * 1000;
+  }
+  const d = new Date(timestampMs);
+  if (unit === 'months') {
+    const targetMonthIndex = d.getUTCFullYear() * 12 + d.getUTCMonth() + value;
+    const targetYear = Math.floor(targetMonthIndex / 12);
+    const targetMonth = targetMonthIndex % 12;
+    const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const clampedDay = Math.min(d.getUTCDate(), maxDay);
+    return Date.UTC(
+      targetYear,
+      targetMonth,
+      clampedDay,
+      d.getUTCHours(),
+      d.getUTCMinutes(),
+      d.getUTCSeconds(),
+      d.getUTCMilliseconds()
+    );
+  }
+  if (unit === 'years') {
+    const targetYear = d.getUTCFullYear() + value;
+    const targetMonth = d.getUTCMonth();
+    const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const clampedDay = Math.min(d.getUTCDate(), maxDay);
+    return Date.UTC(
+      targetYear,
+      targetMonth,
+      clampedDay,
+      d.getUTCHours(),
+      d.getUTCMinutes(),
+      d.getUTCSeconds(),
+      d.getUTCMilliseconds()
+    );
+  }
+  return timestampMs;
+}
+
+/**
+ * Validates that a requested booking [startTime, endTime] satisfies the facility's
+ * household Cooldown (endTime -> startTime gap) or Calendar-Period Quota rule.
+ */
+function validateHouseholdBookingRestriction({
+  facData,
+  startTime,
+  endTime,
+  householdBookings = [],
+  timeZone = 'America/Mexico_City',
+}) {
+  const restriction = resolveFacilityRestriction(facData);
+  if (restriction.restrictionType === 'unrestricted') {
+    return restriction;
+  }
+
+  const counted = householdBookings.filter(isCountedBookingForRestriction);
+
+  if (restriction.restrictionType === 'cooldown') {
+    const { cooldownUnit, cooldownValue } = restriction;
+    for (const b of counted) {
+      const bStart = extractTimestampMillis(b.startTime);
+      if (!bStart) continue;
+      const rawEnd = extractTimestampMillis(b.endTime);
+      const bEnd = rawEnd > bStart ? rawEnd : bStart;
+
+      const okAfterExisting = startTime >= addCooldownOffset(bEnd, cooldownUnit, cooldownValue);
+      const okBeforeExisting = bStart >= addCooldownOffset(endTime, cooldownUnit, cooldownValue);
+
+      if (!okAfterExisting && !okBeforeExisting) {
+        throw new HttpsError(
+          'failed-precondition',
+          `After booking this facility, your household must wait ${cooldownValue} ${cooldownUnit} before booking again.`
+        );
+      }
+    }
+    return restriction;
+  }
+
+  if (restriction.restrictionType === 'quota') {
+    const { quotaPeriod, quotaLimit } = restriction;
+    const reqTz = getDateInTimezone(startTime, timeZone);
+    let usedCount = 0;
+
+    for (const b of counted) {
+      const bStart = extractTimestampMillis(b.startTime);
+      if (!bStart) continue;
+      const bTz = getDateInTimezone(bStart, timeZone);
+
+      const sameYear = bTz.year === reqTz.year;
+      const sameMonth = sameYear && bTz.month === reqTz.month;
+      const sameDay = sameMonth && bTz.day === reqTz.day;
+
+      if (
+        (quotaPeriod === 'daily' && sameDay) ||
+        (quotaPeriod === 'monthly' && sameMonth) ||
+        (quotaPeriod === 'yearly' && sameYear)
+      ) {
+        usedCount++;
+      }
+    }
+
+    if (usedCount >= quotaLimit) {
+      throw new HttpsError(
+        'failed-precondition',
+        `Your household has reached the ${quotaPeriod} booking quota (${quotaLimit}) for this facility.`
+      );
+    }
+    return { ...restriction, usedCount };
+  }
+
+  return restriction;
+}
+
  * Helper: Validates that a delivery date is valid and not in the future.
  * Returns parsed Date object, or null if no deliveryDate was provided.
  */
@@ -2882,3 +3193,7 @@ exports._test = {
   admin,
 };
 
+  resolveFacilityRestriction,
+  isCountedBookingForRestriction,
+  addCooldownOffset,
+  validateHouseholdBookingRestriction,

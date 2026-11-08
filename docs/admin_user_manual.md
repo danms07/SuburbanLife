@@ -355,9 +355,12 @@ You can **Create** a new facility using the top form, **Edit** any existing faci
    * **Multi-item Amenity (`quantity = N`)**: Allows up to `N` concurrent reservations during the same time slot (e.g., 4 Pergolas or 3 Grill stations).
 3. **Daily Operating Hours Window**:
    * **Opening Time** and **Closing Time** (defaults to `08:00` – `21:00`). Closing time must be strictly after opening time. Residents can only request slots within this daily window.
-4. **Cooldown Rule (Frequency Limit)**:
-   * Prevents a single household from monopolizing high-demand amenities.
-   * Choose **Unrestricted**, or enforce a waiting period measured in **Days**, **Months**, or **Years** (e.g., *15 Days* between bookings of the same facility).
+4. **Booking Restriction Policy (Household Cooldown or Quota)**:
+   * Prevents a single household (shared across the primary resident and all linked roommates at the same physical address) from monopolizing high-demand amenities. Both `pending review` and confirmed (`approved` / `closed`) bookings count toward limits; `rejected` and `cancelled` bookings do not count.
+   * Choose one of three mutually exclusive policies:
+     * **Unrestricted (No Limit)**: No cooldown or quota limit applies.
+     * **Cooldown Period (Wait after booking)**: Enforces a minimum waiting gap measured from the **end time** of one booking to the **start time** of the next booking in **Hours**, **Days**, **Months**, or **Years** (e.g., *Wait 4 Hours* or *Wait 7 Days* before starting another reservation).
+     * **Booking Quota (Max bookings per period)**: Caps each household at up to `X` bookings per calendar **Daily**, **Monthly**, or **Yearly** period (evaluated in the community's configured timezone, e.g., *2 bookings per month*).
 5. **Advance Booking Anticipation Rule**:
    * Enforces minimum advance notice before a reservation start time.
    * Choose **Unrestricted**, or require a minimum number of **Hours**, **Days**, or **Weeks** in advance (e.g., *48 Hours* advance notice required to book the Event Hall).

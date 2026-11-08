@@ -33,150 +33,171 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
       body: uid == null
           ? Center(child: Text(l10n.userNotLoggedIn))
           : StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _bookingService.getUserBookings(uid),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+              stream: DatabaseService().streamCollection('facilities'),
+              builder: (context, facSnapshot) {
+                final facilitiesMap = <String, String>{};
+                for (final doc in facSnapshot.data ?? const <Map<String, dynamic>>[]) {
+                  final id = doc['id']?.toString();
+                  final name = doc['name']?.toString();
+                  if (id != null && id.isNotEmpty && name != null && name.isNotEmpty) {
+                    facilitiesMap[id] = name;
+                  }
                 }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(child: Text(l10n.noBookings));
-                }
 
-                final bookings = snapshot.data!;
+                return StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: _bookingService.getUserBookings(uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Center(child: Text(l10n.noBookings));
+                    }
 
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: bookings.length,
-                  itemBuilder: (context, index) {
-                    final b = bookings[index];
-                    final start = DateTime.fromMillisecondsSinceEpoch(b['startTime']);
-                    final end = DateTime.fromMillisecondsSinceEpoch(b['endTime']);
-                    final status = b['status'] ?? 'pending';
-                    final facilityId = b['facilityId'] ?? 'unknown';
+                    final bookings = snapshot.data!;
 
-                    final rawReason = (b['rejectionReason'] ?? b['notes'])?.toString().trim();
-                    final hasRejectionReason = status == 'rejected' && rawReason != null && rawReason.isNotEmpty;
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: bookings.length,
+                      itemBuilder: (context, index) {
+                        final b = bookings[index];
+                        final rawStart = b['startTime'];
+                        final rawEnd = b['endTime'];
+                        final start = rawStart is DateTime
+                            ? rawStart
+                            : DateTime.fromMillisecondsSinceEpoch((rawStart as num).toInt());
+                        final end = rawEnd is DateTime
+                            ? rawEnd
+                            : DateTime.fromMillisecondsSinceEpoch((rawEnd as num).toInt());
+                        final status = b['status'] ?? 'pending';
+                        final facilityId = (b['facilityId'] ?? 'unknown').toString();
+                        final displayFacilityName = facilitiesMap[facilityId] ?? _getFacilityName(l10n, facilityId);
 
-                    final approvalMessage = b['approvalMessage']?.toString().trim();
-                    final hasApprovalMessage = (status.toString().startsWith('approved') || status == 'confirmed') &&
-                        approvalMessage != null &&
-                        approvalMessage.isNotEmpty;
+                        final rawReason = (b['rejectionReason'] ?? b['notes'])?.toString().trim();
+                        final hasRejectionReason = status == 'rejected' && rawReason != null && rawReason.isNotEmpty;
 
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      child: ListTile(
-                        title: Text(
-                          _getFacilityName(l10n, facilityId),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: AppConfig.fontFamily),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('${DateFormat('MMM dd, yyyy').format(start)} from ${DateFormat('hh:mm a').format(start)} to ${DateFormat('hh:mm a').format(end)}'),
-                            const SizedBox(height: 4),
-                            _buildStatusChip(l10n, status),
-                            if (hasApprovalMessage) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                        final approvalMessage = b['approvalMessage']?.toString().trim();
+                        final hasApprovalMessage = (status.toString().startsWith('approved') || status == 'confirmed') &&
+                            approvalMessage != null &&
+                            approvalMessage.isNotEmpty;
+
+                        return Card(
+                          margin: const EdgeInsets.symmetric(vertical: 8),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          child: ListTile(
+                            title: Text(
+                              displayFacilityName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: AppConfig.fontFamily),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${DateFormat('MMM dd, yyyy').format(start)} from ${DateFormat('hh:mm a').format(start)} to ${DateFormat('hh:mm a').format(end)}'),
+                                const SizedBox(height: 4),
+                                _buildStatusChip(l10n, status.toString()),
+                                if (hasApprovalMessage) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.green.withValues(alpha: 0.25)),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(Icons.info_outline, size: 14, color: AppConfig.secondaryColor),
-                                        const SizedBox(width: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.info_outline, size: 14, color: AppConfig.secondaryColor),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              l10n.approvalInstructionsCardTitle,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppConfig.secondaryColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
                                         Text(
-                                          l10n.approvalInstructionsCardTitle,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: AppConfig.secondaryColor,
+                                          approvalMessage,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.green.shade900,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      approvalMessage,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.green.shade900,
-                                      ),
+                                  ),
+                                ],
+                                if (hasRejectionReason) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            if (hasRejectionReason) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Icon(Icons.info_outline, size: 14, color: Colors.redAccent),
-                                        const SizedBox(width: 4),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.info_outline, size: 14, color: Colors.redAccent),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              l10n.rejectionReasonLabel,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.redAccent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
                                         Text(
-                                          l10n.rejectionReasonLabel,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.redAccent,
+                                          rawReason,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.red.shade900,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      rawReason,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.red.shade900,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (status == 'rejected')
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: AppConfig.primaryColor),
-                                tooltip: l10n.editRejectedBookingTitle,
-                                onPressed: () {
-                                  _showEditDialog(b);
-                                },
-                              ),
-                            if (status == 'rejected' || status == 'pending review' || status == 'approved (upcoming)')
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                tooltip: l10n.deleteBooking,
-                                onPressed: () => _confirmCancelBooking(b['id']),
-                              ),
-                          ],
-                        ),
-                      ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (status == 'rejected')
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, color: AppConfig.primaryColor),
+                                    tooltip: l10n.editRejectedBookingTitle,
+                                    onPressed: () {
+                                      _showEditDialog(b);
+                                    },
+                                  ),
+                                if (status == 'rejected' || status == 'pending review' || status == 'approved (upcoming)')
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                    tooltip: l10n.deleteBooking,
+                                    onPressed: () => _confirmCancelBooking(b['id'].toString()),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
@@ -261,14 +282,23 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
 
   void _showEditDialog(Map<String, dynamic> booking) {
     final l10n = AppLocalizations.of(context)!;
-    DateTime selectedDate = DateTime.fromMillisecondsSinceEpoch(booking['startTime']);
+    final parentMessenger = ScaffoldMessenger.of(context);
+    final rawStart = booking['startTime'];
+    final rawEnd = booking['endTime'];
+    DateTime selectedDate = rawStart is DateTime
+        ? rawStart
+        : DateTime.fromMillisecondsSinceEpoch((rawStart as num).toInt());
     TimeOfDay startTime = TimeOfDay.fromDateTime(selectedDate);
-    TimeOfDay endTime = TimeOfDay.fromDateTime(DateTime.fromMillisecondsSinceEpoch(booking['endTime']));
+    TimeOfDay endTime = TimeOfDay.fromDateTime(
+      rawEnd is DateTime ? rawEnd : DateTime.fromMillisecondsSinceEpoch((rawEnd as num).toInt()),
+    );
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setState) {
+          final now = DateTime.now();
+          final firstDate = selectedDate.isBefore(now) ? selectedDate : now;
           return AlertDialog(
             title: Text(l10n.editRejectedBookingTitle),
             content: Column(
@@ -320,10 +350,10 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () async {
                     final picked = await showDatePicker(
-                      context: context,
+                      context: dialogCtx,
                       initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 30)),
+                      firstDate: firstDate,
+                      lastDate: DateTime.now().add(const Duration(days: 90)),
                     );
                     if (picked != null) {
                       setState(() {
@@ -336,10 +366,10 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                   children: [
                     Expanded(
                       child: ListTile(
-                        title: Text('${l10n.from}: ${startTime.format(context)}'),
+                        title: Text('${l10n.from}: ${startTime.format(dialogCtx)}'),
                         onTap: () async {
                           final picked = await showTimePicker(
-                            context: context,
+                            context: dialogCtx,
                             initialTime: startTime,
                           );
                           if (picked != null) {
@@ -352,10 +382,10 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                     ),
                     Expanded(
                       child: ListTile(
-                        title: Text('${l10n.to}: ${endTime.format(context)}'),
+                        title: Text('${l10n.to}: ${endTime.format(dialogCtx)}'),
                         onTap: () async {
                           final picked = await showTimePicker(
-                            context: context,
+                            context: dialogCtx,
                             initialTime: endTime,
                           );
                           if (picked != null) {
@@ -372,7 +402,7 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.pop(dialogCtx),
                 child: Text(l10n.cancel),
               ),
               ElevatedButton(
@@ -392,26 +422,38 @@ class _ManageBookingsScreenState extends State<ManageBookingsScreen> {
                     endTime.minute,
                   );
 
+                  if (!endDateTime.isAfter(startDateTime)) {
+                    parentMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.bookingEndTimeAfterStartError),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                    return;
+                  }
+
                   try {
-                    await DatabaseService().updateDocument('bookings', booking['id'], {
-                      'startTime': startDateTime.millisecondsSinceEpoch,
-                      'endTime': endDateTime.millisecondsSinceEpoch,
-                      'status': 'pending review',
-                    });
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.bookingResubmittedSuccess)),
-                      );
+                    await _bookingService.createBooking(
+                      booking['facilityId'].toString(),
+                      startDateTime,
+                      endDateTime,
+                      resubmitBookingId: booking['id'].toString(),
+                    );
+                    if (dialogCtx.mounted) {
+                      Navigator.pop(dialogCtx);
                     }
+                    parentMessenger.showSnackBar(
+                      SnackBar(content: Text(l10n.bookingResubmittedSuccess)),
+                    );
                   } catch (e, stack) {
                     debugPrint('Error resubmitting booking: $e');
                     Backend.crashlytics.recordError(e, stack, reason: 'ManageBookingsScreen.resubmitBooking');
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
-                      );
-                    }
+                    parentMessenger.showSnackBar(
+                      SnackBar(
+                        content: Text(l10n.errorPrefix(e.toString())),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
                   }
                 },
                 child: Text(l10n.resubmitButton),

@@ -114,6 +114,7 @@ service cloud.firestore {
           resource.data.isConfirmed == true ||
           resource.data.status in ['approved (upcoming)', 'approved (in use)', 'closed', 'confirmed']
         )
+          ('addressId' in resource.data && resource.data.addressId is string && isCallerAddressResident(resource.data.addressId)) ||
       );
       allow write: if isAdmin();
     }

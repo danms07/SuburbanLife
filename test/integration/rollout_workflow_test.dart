@@ -46,13 +46,14 @@ void main() {
       return {'success': true};
     });
 
-    // Register Cloud Function mock for createBooking with dynamic cooldown & clash checks
+    // Register Cloud Function mock for createBooking with household cooldown, quota & clash checks
     FakeBackendHelper.functions.registerHandler('createBooking', (params) async {
       final facilityId = params?['facilityId'] as String?;
       final startTime = params?['startTime'] as int?;
       final endTime = params?['endTime'] as int?;
-      if (facilityId == null || startTime == null || endTime == null) {
-        throw Exception('Missing facilityId, startTime, or endTime.');
+      final resubmitBookingId = params?['resubmitBookingId'] as String?;
+      if (facilityId == null || startTime == null || endTime == null || endTime <= startTime) {
+        throw Exception('Missing or invalid facilityId, startTime, or endTime.');
       }
 
       final uid = FakeBackendHelper.auth.currentUser?.uid;
@@ -60,18 +61,20 @@ void main() {
         throw Exception('User must be logged in.');
       }
 
-      // Check payment status
+      // Check payment & sanction status and resolve household addressId
+      String? callerAddressId;
       final userDoc = await FakeBackendHelper.db.getDocument('users', uid);
       if (userDoc != null && userDoc['addressRef'] != null) {
         final addressRef = userDoc['addressRef'];
-        final addrId = addressRef is StringDbReference ? addressRef.id : addressRef.toString();
-        final addressDoc = await FakeBackendHelper.db.getDocument('addresses', addrId);
+        callerAddressId = addressRef is StringDbReference ? addressRef.id : addressRef.toString();
+        final addressDoc = await FakeBackendHelper.db.getDocument('addresses', callerAddressId);
         final status = addressDoc?['paymentStatus'];
         final isWithinGrace = addressDoc?['isWithinGracePeriod'] as bool? ?? false;
-        final isConsideredPaid = status == 'paid' ||
-            ((status == 'pending' || status == 'reviewing') && isWithinGrace);
+        final hasActiveSanctions = addressDoc?['hasActiveSanctions'] as bool? ?? false;
+        final isConsideredPaid = !hasActiveSanctions &&
+            (status == 'paid' || ((status == 'pending' || status == 'reviewing') && isWithinGrace));
         if (!isConsideredPaid) {
-          throw Exception('Your account is restricted due to missing payment.');
+          throw Exception('Your account is restricted due to missing payment or active sanctions.');
         }
       }
 
@@ -113,44 +116,56 @@ void main() {
         }
       }
 
-      // Dynamic cooldown validation
-      final cooldownUnit = facilityDoc?['cooldownUnit'] ?? 'unrestricted';
-      final cooldownValue = (facilityDoc?['cooldownValue'] as num?)?.toInt() ?? 0;
+      final allBookings = await FakeBackendHelper.db.streamCollection('bookings').first;
+      final allUsers = await FakeBackendHelper.db.streamCollection('users').first;
 
-      if (cooldownUnit != 'unrestricted') {
-        int startTimeBoundary = 0;
-        int endTimeBoundary = 0x7FFFFFFFFFFFFFFF;
-        if (cooldownUnit == 'days') {
-          final ms = cooldownValue * 24 * 60 * 60 * 1000;
-          startTimeBoundary = startTime - ms;
-          endTimeBoundary = startTime + ms;
-        } else if (cooldownUnit == 'months') {
-          final dt = DateTime.fromMillisecondsSinceEpoch(startTime);
-          final dateBefore = DateTime(dt.year, dt.month - cooldownValue, dt.day, dt.hour, dt.minute);
-          final dateAfter = DateTime(dt.year, dt.month + cooldownValue, dt.day, dt.hour, dt.minute);
-          startTimeBoundary = dateBefore.millisecondsSinceEpoch;
-          endTimeBoundary = dateAfter.millisecondsSinceEpoch;
+      // Resolve all UIDs belonging to callerAddressId for legacy bookings without addressId
+      final householdUids = <String>{uid};
+      if (callerAddressId != null) {
+        for (final u in allUsers) {
+          final uAddr = u['addressRef'];
+          final uAddrId = uAddr is StringDbReference ? uAddr.id : uAddr?.toString();
+          if (uAddrId == callerAddressId && u['uid'] != null) {
+            householdUids.add(u['uid'].toString());
+          }
         }
+      }
 
-        final allBookings = await FakeBackendHelper.db.streamCollection('bookings').first;
-        final confirmedBookings = allBookings.where((b) {
-          if (b['userUid'] != uid || b['facilityId'] != facilityId) return false;
-          final status = (b['status'] ?? '').toString().toLowerCase();
-          final isConfirmed = status.startsWith('approved') || status == 'confirmed' || status == 'closed';
-          if (!isConfirmed) return false;
-          final bStart = (b['startTime'] as num).toInt();
-          return bStart >= startTimeBoundary && bStart <= endTimeBoundary;
-        }).toList();
-
-        if (confirmedBookings.isNotEmpty) {
-          throw Exception('You are only allowed to book this facility once every $cooldownValue $cooldownUnit.');
+      final householdBookings = allBookings.where((b) {
+        if (b['facilityId'] != facilityId) return false;
+        if (callerAddressId != null) {
+          if (b['addressId'] == callerAddressId) return true;
+          if ((b['addressId'] == null || b['addressId'] == '') && householdUids.contains(b['userUid'])) {
+            return true;
+          }
+          return false;
         }
+        return b['userUid'] == uid;
+      }).toList();
+
+      final eval = BookingService.evaluateRestriction(
+        facilityDoc: facilityDoc,
+        requestedStart: DateTime.fromMillisecondsSinceEpoch(startTime),
+        requestedEnd: DateTime.fromMillisecondsSinceEpoch(endTime),
+        householdBookings: householdBookings,
+        excludeBookingId: resubmitBookingId,
+      );
+
+      if (!eval.isAllowed) {
+        if (eval.config.isQuota) {
+          throw Exception(
+            'Your household has reached the ${eval.config.quotaPeriod} booking quota (${eval.config.quotaLimit}) for this facility.',
+          );
+        }
+        throw Exception(
+          'You are only allowed to book this facility once every ${eval.config.cooldownValue} ${eval.config.cooldownUnit}.',
+        );
       }
 
       // Clashes & Capacity validation
       final quantity = (facilityDoc?['quantity'] as num?)?.toInt() ?? 1;
-      final allBookings = await FakeBackendHelper.db.streamCollection('bookings').first;
       final activeClashes = allBookings.where((b) {
+        if (resubmitBookingId != null && b['id'] == resubmitBookingId) return false;
         if (b['facilityId'] != facilityId) return false;
         final bStatus = b['status'];
         if (bStatus == 'cancelled' || bStatus == 'rejected') return false;
@@ -163,12 +178,26 @@ void main() {
         throw Exception('This facility has reached its maximum booking capacity for the requested time slot.');
       }
 
+      if (resubmitBookingId != null && resubmitBookingId.isNotEmpty) {
+        await FakeBackendHelper.db.updateDocument('bookings', resubmitBookingId, {
+          'startTime': startTime,
+          'endTime': endTime,
+          'addressId': callerAddressId,
+          'status': 'pending review',
+          'isConfirmed': false,
+          'rejectionReason': '',
+        });
+        final updated = await FakeBackendHelper.db.getDocument('bookings', resubmitBookingId);
+        return {'success': true, 'bookingId': resubmitBookingId, 'booking': updated};
+      }
+
       // Create booking document
       final bookingId = 'booking_${allBookings.length + 1}';
       final bookingData = {
         'id': bookingId,
         'facilityId': facilityId,
         'userUid': uid,
+        'addressId': callerAddressId,
         'startTime': startTime,
         'endTime': endTime,
         'status': 'pending review',
@@ -176,7 +205,7 @@ void main() {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
       FakeBackendHelper.db.seedDocument('bookings', bookingId, bookingData);
-      return {'success': true, 'booking': bookingData};
+      return {'success': true, 'bookingId': bookingId, 'booking': bookingData};
     });
 
     // Register Cloud Function mock for adminCreateUser
@@ -929,6 +958,112 @@ void main() {
       final booking3 = bookings.firstWhere((b) => b['id'] != booking1['id'] && b['id'] != booking2['id']);
       expect(booking3['status'], equals('pending review'));
       expect(booking3['facilityId'], equals('multipurpose_room'));
+    });
+
+    testWidgets('Suite F2: Household Hours Cooldown & Monthly Quota Enforcement Across Primary Resident and Roommate', (tester) async {
+      final targetDay = DateTime.now().add(const Duration(days: 5));
+      final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_household_f2');
+      FakeBackendHelper.db.seedDocument('addresses', 'addr_household_f2', {
+        'id': 'addr_household_f2',
+        'streetName': 'Catania',
+        'number': 88,
+        'residentUid': 'primary_f2_uid',
+        'paymentStatus': 'paid',
+        'hasActiveSanctions': false,
+      });
+
+      FakeBackendHelper.db.seedDocument('users', 'primary_f2_uid', {
+        'uid': 'primary_f2_uid',
+        'name': 'Primary F2',
+        'email': 'primary_f2@test.com',
+        'role': 'resident',
+        'addressRef': addrRef,
+      });
+      FakeBackendHelper.db.seedDocument('users', 'roommate_f2_uid', {
+        'uid': 'roommate_f2_uid',
+        'name': 'Roommate F2',
+        'email': 'roommate_f2@test.com',
+        'role': 'roommate',
+        'addressRef': addrRef,
+      });
+
+      FakeBackendHelper.db.seedDocument('facilities', 'bbq_hours', {
+        'id': 'bbq_hours',
+        'name': 'BBQ Grill (4h Cooldown)',
+        'restrictionType': 'cooldown',
+        'cooldownUnit': 'hours',
+        'cooldownValue': 4,
+        'quantity': 2,
+      });
+      FakeBackendHelper.db.seedDocument('facilities', 'paddle_monthly', {
+        'id': 'paddle_monthly',
+        'name': 'Paddle Court (Monthly Quota)',
+        'restrictionType': 'quota',
+        'quotaPeriod': 'monthly',
+        'quotaLimit': 2,
+        'quantity': 1,
+      });
+
+      final bookingService = BookingService();
+
+      // 1. Primary resident books BBQ Grill 10:00 - 12:00
+      FakeBackendHelper.auth.emitUser(
+        AppUser(uid: 'primary_f2_uid', email: 'primary_f2@test.com', displayName: 'Primary F2'),
+      );
+      await bookingService.createBooking(
+        'bbq_hours',
+        DateTime(targetDay.year, targetDay.month, targetDay.day, 10, 0),
+        DateTime(targetDay.year, targetDay.month, targetDay.day, 12, 0),
+      );
+
+      // 2. Linked roommate tries to book BBQ Grill 14:00 - 16:00 (only 2h after 12:00 end) -> blocked!
+      FakeBackendHelper.auth.emitUser(
+        AppUser(uid: 'roommate_f2_uid', email: 'roommate_f2@test.com', displayName: 'Roommate F2'),
+      );
+      expect(
+        () => bookingService.createBooking(
+          'bbq_hours',
+          DateTime(targetDay.year, targetDay.month, targetDay.day, 14, 0),
+          DateTime(targetDay.year, targetDay.month, targetDay.day, 16, 0),
+        ),
+        throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('4 hours'))),
+      );
+
+      // 3. Linked roommate books BBQ Grill 16:00 - 18:00 (exact 4h gap after 12:00 end) -> succeeds!
+      await bookingService.createBooking(
+        'bbq_hours',
+        DateTime(targetDay.year, targetDay.month, targetDay.day, 16, 0),
+        DateTime(targetDay.year, targetDay.month, targetDay.day, 18, 0),
+      );
+
+      // 4. Monthly Quota (limit 2): Primary books 1st slot, Roommate books 2nd slot, 3rd slot in same month fails!
+      final nextMonth = DateTime(targetDay.year, targetDay.month + 1, 5);
+      FakeBackendHelper.auth.emitUser(
+        AppUser(uid: 'primary_f2_uid', email: 'primary_f2@test.com', displayName: 'Primary F2'),
+      );
+      await bookingService.createBooking(
+        'paddle_monthly',
+        DateTime(nextMonth.year, nextMonth.month, 5, 9, 0),
+        DateTime(nextMonth.year, nextMonth.month, 5, 10, 0),
+      );
+
+      FakeBackendHelper.auth.emitUser(
+        AppUser(uid: 'roommate_f2_uid', email: 'roommate_f2@test.com', displayName: 'Roommate F2'),
+      );
+      await bookingService.createBooking(
+        'paddle_monthly',
+        DateTime(nextMonth.year, nextMonth.month, 12, 9, 0),
+        DateTime(nextMonth.year, nextMonth.month, 12, 10, 0),
+      );
+
+      expect(
+        () => bookingService.createBooking(
+          'paddle_monthly',
+          DateTime(nextMonth.year, nextMonth.month, 20, 9, 0),
+          DateTime(nextMonth.year, nextMonth.month, 20, 10, 0),
+        ),
+        throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('monthly booking quota (2)'))),
+      );
     });
 
     testWidgets('Suite G: Admin Resident Creation & Delivery Date Validation', (tester) async {

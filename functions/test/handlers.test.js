@@ -671,3 +671,270 @@ test('syncTransparencyDocument validates PDF magic header, strips path traversal
   assert.equal(storedDoc.fileName, 'secret_audit.pdf');
   assert.equal(storedDoc.visibility, 'admin');
 });
+
+test('createBooking enforces household-wide cooldown (incl. roommate & legacy bookings), sanctions, and resubmitBookingId', async (t) => {
+  const env = createMockAdminEnvironment();
+  const addrRef = env.makeDocRef('addresses', 'addr_household_1');
+  const otherAddrRef = env.makeDocRef('addresses', 'addr_household_2');
+
+  await env.makeDocRef('config', 'app_settings').set({ timeZone: 'UTC' });
+  await addrRef.set({
+    id: 'addr_household_1',
+    streetName: 'Loreto',
+    number: 12,
+    paymentStatus: 'paid',
+    hasActiveSanctions: false,
+  });
+  await otherAddrRef.set({
+    id: 'addr_household_2',
+    streetName: 'Loreto',
+    number: 14,
+    paymentStatus: 'paid',
+    hasActiveSanctions: false,
+  });
+
+  await env.makeDocRef('users', 'primary_uid').set({
+    uid: 'primary_uid',
+    name: 'Primary Resident',
+    role: 'resident',
+    addressRef: addrRef,
+  });
+  await env.makeDocRef('users', 'roommate_uid').set({
+    uid: 'roommate_uid',
+    name: 'Linked Roommate',
+    role: 'roommate',
+    addressRef: addrRef,
+  });
+  await env.makeDocRef('users', 'neighbor_uid').set({
+    uid: 'neighbor_uid',
+    name: 'Neighbor Resident',
+    role: 'resident',
+    addressRef: otherAddrRef,
+  });
+
+  // Facility with 4-hour cooldown and capacity 2 (so capacity doesn't block, only household cooldown)
+  await env.makeDocRef('facilities', 'bbq_hours').set({
+    id: 'bbq_hours',
+    name: 'BBQ Grill 1',
+    quantity: 2,
+    restrictionType: 'cooldown',
+    cooldownUnit: 'hours',
+    cooldownValue: 4,
+    openingTime: '00:00',
+    closingTime: '23:59',
+    anticipationUnit: 'unrestricted',
+    anticipationValue: 0,
+  });
+
+  // Seed a legacy pre-refactor booking (no addressId) created by primary_uid: 10:00 - 12:00 UTC
+  const dayBase = Date.UTC(2027, 4, 10, 0, 0, 0);
+  await env.makeDocRef('bookings', 'legacy_b1').set({
+    facilityId: 'bbq_hours',
+    userUid: 'primary_uid',
+    startTime: dayBase + 10 * 3600_000,
+    endTime: dayBase + 12 * 3600_000,
+    status: 'pending review',
+    isConfirmed: false,
+  });
+
+  installMockAdmin(t, env);
+  const createWrapped = fft.wrap(cloudFunctions.createBooking);
+  const primaryAuth = { uid: 'primary_uid', token: { resident: true } };
+  const roommateAuth = { uid: 'roommate_uid', token: { roommate: true } };
+  const neighborAuth = { uid: 'neighbor_uid', token: { resident: true } };
+
+  // 1. Linked roommate tries to book 14:00 - 16:00 (only 2h after primary's 12:00 end; needs 4h) -> blocked!
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: {
+        facilityId: 'bbq_hours',
+        startTime: dayBase + 14 * 3600_000,
+        endTime: dayBase + 16 * 3600_000,
+      },
+      auth: roommateAuth,
+    }),
+    'failed-precondition'
+  );
+
+  // 2. Neighbor at a different address CAN book 14:00 - 16:00 (different household, capacity=2)
+  const neighborRes = await createWrapped({
+    data: {
+      facilityId: 'bbq_hours',
+      startTime: dayBase + 14 * 3600_000,
+      endTime: dayBase + 16 * 3600_000,
+    },
+    auth: neighborAuth,
+  });
+  assert.equal(neighborRes.success, true);
+
+  // 3. Linked roommate books at 16:00 - 18:00 (exact 4h gap after 12:00 end) -> allowed & persists addressId
+  const roommateRes = await createWrapped({
+    data: {
+      facilityId: 'bbq_hours',
+      startTime: dayBase + 16 * 3600_000,
+      endTime: dayBase + 18 * 3600_000,
+    },
+    auth: roommateAuth,
+  });
+  assert.equal(roommateRes.success, true);
+  const savedRoommateBooking = env.store.get('bookings').get(roommateRes.bookingId);
+  assert.equal(savedRoommateBooking.addressId, 'addr_household_1');
+
+  // 4. Rejected booking resubmission via resubmitBookingId
+  await env.makeDocRef('bookings', 'rejected_b1').set({
+    facilityId: 'bbq_hours',
+    userUid: 'primary_uid',
+    addressId: 'addr_household_1',
+    startTime: dayBase + 10 * 3600_000,
+    endTime: dayBase + 12 * 3600_000,
+    status: 'rejected',
+    rejectionReason: 'Rainstorm',
+    isConfirmed: false,
+  });
+
+  // Neighbor cannot hijack primary_uid's rejected booking
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: {
+        facilityId: 'bbq_hours',
+        startTime: dayBase + 22 * 3600_000,
+        endTime: dayBase + 23 * 3600_000,
+        resubmitBookingId: 'rejected_b1',
+      },
+      auth: neighborAuth,
+    }),
+    'permission-denied'
+  );
+
+  // Primary resident resubmits rejected_b1 to 22:00 - 23:00 (4h after roommate's 18:00 end) -> updates in place
+  const resubmitRes = await createWrapped({
+    data: {
+      facilityId: 'bbq_hours',
+      startTime: dayBase + 22 * 3600_000,
+      endTime: dayBase + 23 * 3600_000,
+      resubmitBookingId: 'rejected_b1',
+    },
+    auth: primaryAuth,
+  });
+  assert.equal(resubmitRes.bookingId, 'rejected_b1');
+  const resubmittedDoc = env.store.get('bookings').get('rejected_b1');
+  assert.equal(resubmittedDoc.status, 'pending review');
+  assert.equal(resubmittedDoc.startTime, dayBase + 22 * 3600_000);
+
+  // 5. Active sanction on household blocks new bookings with permission-denied
+  await addrRef.update({ hasActiveSanctions: true });
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: {
+        facilityId: 'bbq_hours',
+        startTime: dayBase + 48 * 3600_000,
+        endTime: dayBase + 50 * 3600_000,
+      },
+      auth: primaryAuth,
+    }),
+    'permission-denied'
+  );
+});
+
+test('createBooking enforces household calendar-period quota (daily/monthly/yearly) and frees quota when rejected/cancelled', async (t) => {
+  const env = createMockAdminEnvironment();
+  const addrRef = env.makeDocRef('addresses', 'addr_quota_1');
+
+  await env.makeDocRef('config', 'app_settings').set({ timeZone: 'UTC' });
+  await addrRef.set({
+    id: 'addr_quota_1',
+    streetName: 'Catania',
+    number: 5,
+    paymentStatus: 'paid',
+    hasActiveSanctions: false,
+  });
+  await env.makeDocRef('users', 'res_q1').set({
+    uid: 'res_q1',
+    name: 'Quota Resident',
+    role: 'resident',
+    addressRef: addrRef,
+  });
+  await env.makeDocRef('users', 'room_q1').set({
+    uid: 'room_q1',
+    name: 'Quota Roommate',
+    role: 'roommate',
+    addressRef: addrRef,
+  });
+
+  // Facility with monthly quota of 2 bookings per household
+  await env.makeDocRef('facilities', 'grill_quota').set({
+    id: 'grill_quota',
+    name: 'Grill Monthly Quota',
+    quantity: 1,
+    restrictionType: 'quota',
+    quotaPeriod: 'monthly',
+    quotaLimit: 2,
+    openingTime: '08:00',
+    closingTime: '22:00',
+    anticipationUnit: 'unrestricted',
+    anticipationValue: 0,
+  });
+
+  installMockAdmin(t, env);
+  const createWrapped = fft.wrap(cloudFunctions.createBooking);
+  const resAuth = { uid: 'res_q1', token: { resident: true } };
+  const roomAuth = { uid: 'room_q1', token: { roommate: true } };
+
+  // 1st booking in June 2027 (by primary resident) -> succeeds
+  const b1 = await createWrapped({
+    data: {
+      facilityId: 'grill_quota',
+      startTime: Date.UTC(2027, 5, 5, 10, 0, 0),
+      endTime: Date.UTC(2027, 5, 5, 12, 0, 0),
+    },
+    auth: resAuth,
+  });
+  assert.equal(b1.success, true);
+
+  // 2nd booking in June 2027 (by linked roommate) -> succeeds (reaches 2/2 monthly quota)
+  const b2 = await createWrapped({
+    data: {
+      facilityId: 'grill_quota',
+      startTime: Date.UTC(2027, 5, 12, 10, 0, 0),
+      endTime: Date.UTC(2027, 5, 12, 12, 0, 0),
+    },
+    auth: roomAuth,
+  });
+  assert.equal(b2.success, true);
+
+  // 3rd booking in June 2027 -> rejected due to monthly quota of 2
+  await assertHttpsErrorCode(
+    createWrapped({
+      data: {
+        facilityId: 'grill_quota',
+        startTime: Date.UTC(2027, 5, 20, 10, 0, 0),
+        endTime: Date.UTC(2027, 5, 20, 12, 0, 0),
+      },
+      auth: resAuth,
+    }),
+    'failed-precondition'
+  );
+
+  // Booking in July 2027 (next calendar month) -> succeeds!
+  const julyRes = await createWrapped({
+    data: {
+      facilityId: 'grill_quota',
+      startTime: Date.UTC(2027, 6, 3, 10, 0, 0),
+      endTime: Date.UTC(2027, 6, 3, 12, 0, 0),
+    },
+    auth: resAuth,
+  });
+  assert.equal(julyRes.success, true);
+
+  // Admin rejects 2nd June booking -> frees 1 June slot so household can book June 20!
+  await env.makeDocRef('bookings', b2.bookingId).update({ status: 'rejected' });
+  const b3 = await createWrapped({
+    data: {
+      facilityId: 'grill_quota',
+      startTime: Date.UTC(2027, 5, 20, 10, 0, 0),
+      endTime: Date.UTC(2027, 5, 20, 12, 0, 0),
+    },
+    auth: resAuth,
+  });
+  assert.equal(b3.success, true);
+});

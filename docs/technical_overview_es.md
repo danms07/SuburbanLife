@@ -62,7 +62,7 @@ flowchart TD
 ### 2.1 Para Residentes y Miembros del Hogar
 
 * **Pases Digitales de Acceso QR**: Los residentes pueden generar códigos QR al instante para visitantes esperados, familiares recurrentes o proveedores de servicios y paquetería. Los pases pueden configurarse como **de un solo uso** o **temporales (con fecha y hora de vencimiento específicas)**, agregando datos opcionales del vehículo (automóvil, motocicleta, número de placa) y número de pasajeros.
-* **Reserva de Amenidades y Áreas Comunes**: Los residentes pueden consultar y reservar espacios compartidos (salón de eventos, alberca, asadores o equipo recreativo). El sistema valida la disponibilidad en tiempo real para evitar empalmes de horarios y gestiona los flujos de aprobación.
+* **Reserva de Amenidades y Áreas Comunes**: Los residentes pueden consultar y reservar espacios compartidos (salón de eventos, alberca, asadores o equipo recreativo). El sistema valida la disponibilidad en tiempo real para evitar empalmes de horarios, aplica periodos de espera (*cooldown* en horas, días, meses o años) o cuotas calendario de reservas (diarias, mensuales o anuales) por domicilio, y gestiona los flujos de aprobación.
 * **Seguimiento de Cuotas de Mantenimiento y Carga de Comprobantes**: Los residentes pueden verificar el estado de su cuenta (Al día / Pagado, Pendiente, En Revisión o Restringido), consultar el historial mensual de cuotas y subir fotografías de fichas de depósito o transferencias bancarias (próximamente) directamente desde la cámara o galería del teléfono.
 * **Tablero de Avisos Comunitarios**: Un muro interactivo muestra comunicados oficiales de la administración con imágenes de alta resolución, formato destacado y traducción automática bilingüe (español e inglés).
 * **Portal de Transparencia Documental**: Un explorador de archivos virtual integrado permite a los residentes autorizados consultar reglamentos internos, minutas de asambleas, estados financieros y calendarios de obras con soporte para guardado en memoria local sin re-descargas innecesarias.
@@ -82,7 +82,7 @@ flowchart TD
 * **Validación de Títulos y Entrega de Propiedades**: Los administradores revisan las actas de entrega o escrituras enviadas por nuevos residentes para validar la posesión legal antes de otorgar privilegios de titular residencial.
 * **Aprobación de Comprobantes y Matriz Financiera**: El equipo administrativo revisa los pagos subidos, aprueba o rechaza comprobantes con retroalimentación y exporta la matriz de cobranza mensual completa en formato CSV para la contabilidad del condominio.
 * **Carga Masiva de Datos mediante CSV**: Facilita la creación masiva de cientos de direcciones o cuentas de residentes en segundos a través de archivos de hoja de cálculo (CSV), generando contraseñas seguras y enviando correos de bienvenida automáticamente.
-* **Configuración Dinámica de Amenidades**: Permite dar de alta espacios comunes, definir si son de uso exclusivo o de capacidad múltiple, establecer horarios y aplicar reglas de reserva.
+* **Configuración Dinámica de Amenidades**: Permite dar de alta espacios comunes, definir si son de uso exclusivo o de capacidad múltiple, establecer horarios y anticipación mínima, y aplicar tiempos de espera o cuotas diarias/mensuales/anuales por domicilio.
 * **Publicación de Avisos Asistida por Inteligencia Artificial**: Los administradores pueden redactar boletines en español o inglés; el sistema traduce automáticamente los títulos y contenidos mediante Google Gemini AI sin exponer claves confidenciales.
 * **Servicio de Correo SMTP Personalizado**: Envío automatizado de credenciales de acceso e información de bienvenida a través del servidor de correo institucional del condominio.
 
@@ -270,7 +270,7 @@ En apego a la legislación mexicana de protección de datos personales (**LFPDPP
 
 El ejercicio de los Derechos ARCO puede realizarse ante la Administración del Condominio o directamente desde el panel de perfil en la aplicación.
 
-### 6.4 Eliminación de Cuenta y Purga de Datos
+### 6.4 Retención Automática, Eliminación de Cuenta y Purga de Datos
 
 * **Mecanismos de Eliminación**: El usuario puede solicitar la eliminación de su cuenta en cualquier momento mediante el botón **"Eliminar Cuenta"** dentro de la app o solicitándolo a la Administración.
 * **Purga Definitiva e Irreversible**: Al ejecutarse la eliminación, las credenciales en Firebase Authentication, el registro del usuario en Cloud Firestore y sus archivos de acreditación en Cloud Storage son **destruidos de forma permanente e irrecuperable**.

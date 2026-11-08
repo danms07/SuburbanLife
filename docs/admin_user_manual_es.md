@@ -355,9 +355,12 @@ Puedes **Crear** una nueva instalación desde el formulario superior, **Editar**
    * **Amenidad Múltiple (`quantity = N`)**: Permite hasta `N` reservas simultáneas en el mismo horario (ej. 4 Pérgolas o 3 Asadores).
 3. **Ventana de Horario Operativo Diario**:
    * **Hora de Apertura** y **Hora de Cierre** (por defecto `08:00` – `21:00`). La hora de cierre debe ser posterior a la de apertura. Los residentes solo podrán solicitar horarios dentro de esta ventana.
-4. **Regla de Tiempo de Espera (*Cooldown*)**:
-   * Evita que un mismo domicilio acapare las amenidades de alta demanda.
-   * Elige **Sin restricción**, o define un periodo de espera obligatorio en **Días**, **Meses** o **Años** entre reservas de la misma instalación.
+4. **Política de Restricción de Reserva (Tiempo de Espera o Cuota por Domicilio)**:
+   * Evita que un mismo domicilio (compartido entre el residente titular y todos los cohabitantes vinculados a la misma propiedad) acapare las amenidades de alta demanda. Tanto las reservas en revisión (`pending review`) como las confirmadas (`approved` / `closed`) cuentan para el límite; las reservas rechazadas (`rejected`) o canceladas (`cancelled`) no cuentan.
+   * Elige una de tres políticas mutuamente excluyentes:
+     * **Sin restricción (Sin límite)**: No aplica tiempo de espera ni límite de cuota.
+     * **Tiempo de espera (Esperar después de reservar)**: Exige un intervalo mínimo medido desde la **hora de término** de una reserva hasta la **hora de inicio** de la siguiente en **Horas**, **Días**, **Meses** o **Años** (ej. *Esperar 4 Horas* o *Esperar 7 Días* antes de iniciar otra reserva).
+     * **Cuota de reservas (Máximo por periodo)**: Limita a cada domicilio a un máximo de `X` reservas por periodo calendario **Diario**, **Mensual** o **Anual** (evaluado en la zona horaria configurada de la comunidad, ej. *2 reservas al mes*).
 5. **Regla de Anticipación Mínima de Reserva**:
    * Exige reservar con un tiempo mínimo de antelación antes de la hora de inicio del evento.
    * Elige **Sin restricción**, o solicita un mínimo de **Horas**, **Días** o **Semanas** de anticipación (ej. *48 Horas* de anticipación para reservar el Salón de Eventos).

@@ -893,7 +893,94 @@
   "userDangerZoneSectionTitle": "Acciones Sensibles",
   "paymentStandingLabel": "Estatus de Pago",
   "unsupportedDocumentType": "Tipo de archivo no admitido. Formatos permitidos: PDF, Word, Excel, PowerPoint, TXT, Markdown, CSV e imágenes.",
-  "documentExceedsMaxSize": "El archivo supera el límite máximo de 10 MB."
+  "documentExceedsMaxSize": "El archivo supera el límite máximo de 10 MB.",
+  "bookingRestrictionTypeLabel": "Política de Límite de Reserva",
+  "restrictionUnrestricted": "Sin Límite",
+  "restrictionCooldown": "Periodo de Espera (Cooldown entre reservas)",
+  "restrictionQuota": "Cuota de Reservas (Máximo por periodo)",
+  "cooldownHours": "Horas",
+  "quotaPeriodLabel": "Periodo de Cuota",
+  "quotaLimitLabel": "Máximo de Reservas Permitidas",
+  "quotaDaily": "Diaria",
+  "quotaMonthly": "Mensual",
+  "quotaYearly": "Anual",
+  "cooldownRulePreview": "Al finalizar una reserva, cada domicilio debe esperar {value} {unit} antes de iniciar otra.",
+  "@cooldownRulePreview": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "quotaRulePreview": "Cada domicilio puede reservar hasta {limit} vez/veces ({period}).",
+  "@quotaRulePreview": {
+    "placeholders": {
+      "limit": { "type": "int" },
+      "period": { "type": "String" }
+    }
+  },
+  "facilityCapacityUnique": "Única",
+  "facilityCapacityMulti": "Múltiple (Cant: {qty})",
+  "@facilityCapacityMulti": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "facilitySubtitleHours": "Horario: {hours}",
+  "@facilitySubtitleHours": {
+    "placeholders": {
+      "hours": { "type": "String" }
+    }
+  },
+  "facilitySubtitleNotice": "Aviso: {value} {unit}",
+  "@facilitySubtitleNotice": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "facilityLimitUnrestricted": "Límite: Sin restricciones",
+  "facilityLimitCooldown": "Límite: Esperar {value} {unit}",
+  "@facilityLimitCooldown": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "facilityLimitQuota": "Límite: {limit} ({period})",
+  "@facilityLimitQuota": {
+    "placeholders": {
+      "limit": { "type": "int" },
+      "period": { "type": "String" }
+    }
+  },
+  "bookingCooldownBadge": "Espera: {value} {unit} tras cada reserva",
+  "@bookingCooldownBadge": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "bookingQuotaBadge": "Cuota {period}: {used} / {limit} usadas",
+  "@bookingQuotaBadge": {
+    "placeholders": {
+      "period": { "type": "String" },
+      "used": { "type": "int" },
+      "limit": { "type": "int" }
+    }
+  },
+  "bookingEndTimeAfterStartError": "La hora de fin debe ser posterior a la hora de inicio.",
+  "bookingCooldownBlockedError": "Periodo de espera activo: Su domicilio debe esperar {value} {unit} entre reservas de esta amenidad.",
+  "@bookingCooldownBlockedError": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "bookingQuotaExceededError": "Cuota alcanzada: Su domicilio ya utilizó las {limit} reservas ({period}) permitidas para esta amenidad.",
+  "@bookingQuotaExceededError": {
+    "placeholders": {
+      "period": { "type": "String" },
+      "limit": { "type": "int" }
+    }
+  }
 }
-
-

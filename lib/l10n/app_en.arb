@@ -1026,7 +1026,94 @@
   "userDangerZoneSectionTitle": "Sensitive Actions",
   "paymentStandingLabel": "Payment Standing",
   "unsupportedDocumentType": "Unsupported file type. Allowed formats: PDF, Word, Excel, PowerPoint, TXT, Markdown, CSV, and images.",
-  "documentExceedsMaxSize": "File exceeds the 10 MB maximum size limit."
+  "documentExceedsMaxSize": "File exceeds the 10 MB maximum size limit.",
+  "bookingRestrictionTypeLabel": "Booking Limit Policy",
+  "restrictionUnrestricted": "Unrestricted (No Limit)",
+  "restrictionCooldown": "Cooldown Period (Wait between bookings)",
+  "restrictionQuota": "Booking Quota (Max bookings per period)",
+  "cooldownHours": "Hours",
+  "quotaPeriodLabel": "Quota Period",
+  "quotaLimitLabel": "Max Bookings Allowed",
+  "quotaDaily": "Daily",
+  "quotaMonthly": "Monthly",
+  "quotaYearly": "Yearly",
+  "cooldownRulePreview": "After finishing a booking, each household must wait {value} {unit} before starting another.",
+  "@cooldownRulePreview": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "quotaRulePreview": "Each household can book up to {limit} time(s) ({period}).",
+  "@quotaRulePreview": {
+    "placeholders": {
+      "limit": { "type": "int" },
+      "period": { "type": "String" }
+    }
+  },
+  "facilityCapacityUnique": "Unique",
+  "facilityCapacityMulti": "Multi-item (Qty: {qty})",
+  "@facilityCapacityMulti": {
+    "placeholders": {
+      "qty": { "type": "int" }
+    }
+  },
+  "facilitySubtitleHours": "Hours: {hours}",
+  "@facilitySubtitleHours": {
+    "placeholders": {
+      "hours": { "type": "String" }
+    }
+  },
+  "facilitySubtitleNotice": "Notice: {value} {unit}",
+  "@facilitySubtitleNotice": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "facilityLimitUnrestricted": "Limit: Unrestricted",
+  "facilityLimitCooldown": "Limit: Wait {value} {unit}",
+  "@facilityLimitCooldown": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "facilityLimitQuota": "Limit: {limit} ({period})",
+  "@facilityLimitQuota": {
+    "placeholders": {
+      "limit": { "type": "int" },
+      "period": { "type": "String" }
+    }
+  },
+  "bookingCooldownBadge": "Cooldown: Wait {value} {unit} after booking",
+  "@bookingCooldownBadge": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "bookingQuotaBadge": "{period} Quota: {used} / {limit} used",
+  "@bookingQuotaBadge": {
+    "placeholders": {
+      "period": { "type": "String" },
+      "used": { "type": "int" },
+      "limit": { "type": "int" }
+    }
+  },
+  "bookingEndTimeAfterStartError": "End time must be after start time.",
+  "bookingCooldownBlockedError": "Cooldown active: Your household must wait {value} {unit} between bookings for this amenity.",
+  "@bookingCooldownBlockedError": {
+    "placeholders": {
+      "value": { "type": "int" },
+      "unit": { "type": "String" }
+    }
+  },
+  "bookingQuotaExceededError": "Quota reached: Your household has already used all {limit} allowed ({period}) bookings for this amenity.",
+  "@bookingQuotaExceededError": {
+    "placeholders": {
+      "period": { "type": "String" },
+      "limit": { "type": "int" }
+    }
+  }
 }
-
-
