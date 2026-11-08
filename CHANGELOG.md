@@ -2,7 +2,7 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
-## [Unreleased] — 2026-11-08
+## [1.0.25+26] — 2026-11-08
 
 ### Added
 - **Admin Amenity Documentation (`AdminFacilitiesScreen`)**:
