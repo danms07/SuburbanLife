@@ -20,6 +20,61 @@ A white-label residential management platform built using **Flutter** and **Fire
 
 ---
 
+## Prerequisites
+
+Before configuring and deploying **Suburban Life**, ensure the following SDKs and CLI tools are installed on your workstation:
+
+- **Flutter SDK** (with Dart SDK `^3.9.0`)
+- **Node.js `22.x`** (managed via `nvm`, required for Cloud Functions and administrative scripts)
+- **Firebase CLI**:
+  ```bash
+  npm i -g firebase-tools
+  ```
+- **FlutterFire CLI**:
+  ```bash
+  dart pub global activate flutterfire_cli
+  ```
+- **Google Cloud CLI (`gcloud`)**: Required for one-time infrastructure policies that `firebase deploy` does not configure directly (native Cloud Firestore Time-to-Live policies and Google Cloud Storage Object Lifecycle rules).
+
+### Google Cloud CLI (`gcloud`) One-Time Retention Setup
+
+Authenticate `gcloud`, set your target Firebase/GCP project, and apply the Firestore TTL and Cloud Storage lifecycle policies once per environment (run **after** deploying `firestore.indexes.json` via `firebase deploy --only firestore:indexes` so single-field `expireAt` index exemptions are active):
+
+```bash
+# 1. Authenticate and select your Firebase/GCP project
+gcloud auth login
+gcloud config set project <PROJECT_ID>
+
+# 2. Enable native Cloud Firestore TTL policies on `expireAt`
+# 60-day Gatehouse access log retention (cascades visitor photo cleanup via onAccessLogDeleted)
+gcloud firestore fields ttls update expireAt \
+  --collection-group=access_logs \
+  --enable-ttl \
+  --project=<PROJECT_ID>
+
+# 7-day post-expiration / post-revocation QR pass cleanup
+gcloud firestore fields ttls update expireAt \
+  --collection-group=qr_codes \
+  --enable-ttl \
+  --project=<PROJECT_ID>
+
+# 30-day post-booking resident attachment cleanup (cascades file cleanup via onBookingAttachmentDeleted)
+gcloud firestore fields ttls update expireAt \
+  --collection-group=booking_attachments \
+  --enable-ttl \
+  --project=<PROJECT_ID>
+
+# 3. Apply Cloud Storage Object Lifecycle safety-net rules (62d visitor media, 125d booking attachments)
+gcloud storage buckets update gs://<STORAGE_BUCKET> \
+  --lifecycle-file=storage_lifecycle.json
+
+# 4. (Optional) Verify async Firestore TTL operations and active bucket lifecycle config
+gcloud firestore operations list --project=<PROJECT_ID>
+gcloud storage buckets describe gs://<STORAGE_BUCKET> --format="json(lifecycle_config)"
+```
+
+---
+
 ## Setup & Configuration
 
 ### 1. Create a Firebase Project
@@ -69,27 +124,11 @@ The app includes automated global exception trapping and error reporting via `Cr
 - **User Association**: Crashlytics user identifiers (`setUserIdentifier`) are synced with Firebase Auth state transitions.
 
 ### 5. Enable Gatehouse & Booking Attachment Data Retention (Firestore TTL & Storage Lifecycle)
-Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation, and resident booking attachments (`booking_attachments` and `booking_attachments/**`) are purged **30 days** after the booking's scheduled end time. After deploying indexes, rules, and Cloud Functions, enable native Firestore TTL and the GCS Object Lifecycle safety net once per environment:
+Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation, and resident booking attachments (`booking_attachments` and `booking_attachments/**`) are purged **30 days** after the booking's scheduled end time.
+
+Deploy Firestore indexes (including single-field `expireAt` exemptions), security rules, Storage rules, and Cloud Functions first, then execute the one-time `gcloud` TTL and bucket lifecycle commands listed under [Google Cloud CLI (`gcloud`) One-Time Retention Setup](#google-cloud-cli-gcloud-one-time-retention-setup):
 ```bash
 firebase deploy --only firestore:indexes,firestore:rules,storage,functions
-
-gcloud firestore fields ttls update expireAt \
-  --collection-group=access_logs \
-  --enable-ttl \
-  --project=<PROJECT_ID>
-
-gcloud firestore fields ttls update expireAt \
-  --collection-group=qr_codes \
-  --enable-ttl \
-  --project=<PROJECT_ID>
-
-gcloud firestore fields ttls update expireAt \
-  --collection-group=booking_attachments \
-  --enable-ttl \
-  --project=<PROJECT_ID>
-
-gcloud storage buckets update gs://<STORAGE_BUCKET> \
-  --lifecycle-file=storage_lifecycle.json
 ```
 
 ---

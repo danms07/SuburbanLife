@@ -23,3 +23,9 @@ All notable changes to the **Suburban Life** project are documented in this file
 - **Localization & Automated Tests**:
   - Added 21 English and Spanish localization keys in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
   - Added unit, widget, Cloud Functions handler/helper, and Security Rules static audit tests across `test/features/booking/booking_documents_test.dart`, `test/features/admin/admin_facilities_test.dart`, `test/features/admin/admin_booking_approval_test.dart`, and `functions/test/`.
+
+### Documentation
+- **Project Prerequisites & `gcloud` Retention Provisioning (`README.md`)**:
+  - Added a top-level `## Prerequisites` section documenting required SDK/CLI toolchains (`Flutter`, `Node.js 22`, `firebase-tools`, `flutterfire_cli`, and Google Cloud CLI `gcloud`).
+  - Documented the one-time `gcloud` authentication, native Cloud Firestore TTL policy enablement (`access_logs.expireAt`, `qr_codes.expireAt`, and `booking_attachments.expireAt`), Cloud Storage Object Lifecycle bucket update (`storage_lifecycle.json`), and verification commands, linked from Setup Step 5.
+

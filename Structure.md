@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-08 (Amenity Documentation & Resident Booking Attachments: admin `facilities.facilityDocuments[]` templates with `mandatory_return`, `optional_return`, and `informative` modes, cross-platform `DocumentTransferHelper` with magic-byte verification and `Content-Disposition: attachment`, household-isolated `booking_attachments/{bookingId}` collection with 30-day post-booking TTL + `onBookingAttachmentDeleted` & `purgeExpiredBookingAttachments` Storage cleanup + 125-day GCS safety net, `FacilityDocumentsSection`, admin approval attachment viewer, rejected-booking attachment replacement, EN/ES l18n, and unit/widget/Cloud Functions/rules tests)*
+*Last Verified/Updated: 2026-11-08 (`README.md` Prerequisites & `gcloud` retention provisioning guide alongside Amenity Documentation & Resident Booking Attachments: admin `facilities.facilityDocuments[]` templates with `mandatory_return`, `optional_return`, and `informative` modes, cross-platform `DocumentTransferHelper` with magic-byte verification and `Content-Disposition: attachment`, household-isolated `booking_attachments/{bookingId}` collection with 30-day post-booking TTL + `onBookingAttachmentDeleted` & `purgeExpiredBookingAttachments` Storage cleanup + 125-day GCS safety net, `FacilityDocumentsSection`, admin approval attachment viewer, rejected-booking attachment replacement, EN/ES l18n, and unit/widget/Cloud Functions/rules tests)*
 
 Current state of project files and folders:
 
@@ -41,6 +41,7 @@ Current state of project files and folders:
 - `ios/`: Native iOS configuration and build files.
 - `LICENSE`: MIT No Attribution (MIT-0) license file.
 - `PRIVACY_POLICY.md`: Bilingual Privacy Policy (LFPDPPP/ARCO compliant, documenting 60-day gatehouse log/photo auto-removal, 7-day inactive QR pass cleanup, and 30-day post-booking resident attachment retention).
+- `README.md`: Project overview, SDK/CLI prerequisites (including one-time `gcloud` Firestore TTL and Cloud Storage lifecycle setup commands), Firebase & App Check setup guide, architecture summary, Admin SDK scripts guide, and rollout test instructions.
 - `lib/`: Main Flutter source code.
     - `core/`: Core configuration and themes.
         - `backend/`: Agnostic BaaS service abstractions and service locator.
