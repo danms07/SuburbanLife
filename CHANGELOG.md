@@ -26,6 +26,6 @@ All notable changes to the **Suburban Life** project are documented in this file
 
 ### Documentation
 - **Project Prerequisites & `gcloud` Retention Provisioning (`README.md`)**:
-  - Added a top-level `## Prerequisites` section documenting required SDK/CLI toolchains (`Flutter`, `Node.js 22`, `firebase-tools`, `flutterfire_cli`, and Google Cloud CLI `gcloud`).
+  - Added a top-level `## Prerequisites` section documenting required SDK/CLI toolchains and installation commands (`Flutter`, `Node.js 22`, `firebase-tools`, `flutterfire_cli`, and Google Cloud CLI `gcloud`).
   - Documented the one-time `gcloud` authentication, native Cloud Firestore TTL policy enablement (`access_logs.expireAt`, `qr_codes.expireAt`, and `booking_attachments.expireAt`), Cloud Storage Object Lifecycle bucket update (`storage_lifecycle.json`), and verification commands, linked from Setup Step 5.
 

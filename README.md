@@ -34,7 +34,10 @@ Before configuring and deploying **Suburban Life**, ensure the following SDKs an
   ```bash
   dart pub global activate flutterfire_cli
   ```
-- **Google Cloud CLI (`gcloud`)**: Required for one-time infrastructure policies that `firebase deploy` does not configure directly (native Cloud Firestore Time-to-Live policies and Google Cloud Storage Object Lifecycle rules).
+- **Google Cloud CLI (`gcloud`)**: Required for one-time infrastructure policies that `firebase deploy` does not configure directly (native Cloud Firestore Time-to-Live policies and Google Cloud Storage Object Lifecycle rules). Install via [Google Cloud SDK docs](https://cloud.google.com/sdk/docs/install) (or on macOS via Homebrew):
+  ```bash
+  brew install --cask google-cloud-sdk
+  ```
 
 ### Google Cloud CLI (`gcloud`) One-Time Retention Setup
 
