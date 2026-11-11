@@ -4,6 +4,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:suburban_life/core/backend/backend.dart';
+import 'package:suburban_life/core/config/app_config.dart';
+import 'package:suburban_life/core/widgets/storage_network_image.dart';
 import 'package:suburban_life/features/auth/admin_resident_approval_screen.dart';
 import 'package:suburban_life/features/auth/forgot_password_screen.dart';
 import 'package:suburban_life/features/auth/login_screen.dart';
@@ -400,107 +402,293 @@ void main() {
     });
   });
 
-  group('AdminResidentApprovalScreen', () {
+  group('AdminResidentApprovalScreen & AdminResidentDetailScreen', () {
     testWidgets('renders empty state when no pending claims exist', (tester) async {
       await tester.pumpWidget(_wrapWithApp(const AdminResidentApprovalScreen()));
       await tester.pumpAndSettle();
 
       final l10n = _enL10n(tester);
+      expect(find.byType(AppBar), findsOneWidget);
       expect(find.text(l10n.noResidentsToApprove), findsOneWidget);
     });
 
-    testWidgets('approves pending claim: invokes setRole, binds address & user, deletes Storage proof and claim doc', (tester) async {
-      final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_approve');
-      final deliveryDate = DateTime(2026, 5, 10);
-      const proofUrl = 'https://fake-storage.local/ownership_proofs/res_new/proof.jpg';
+    testWidgets(
+      'displays summary card without action buttons, opens side-by-side detail screen (>650px), masks email PII, and rotates image inline and in full-screen viewer',
+      (tester) async {
+        const screenWidth = 1000.0;
+        const screenHeight = 800.0;
+        tester.view.physicalSize = const Size(screenWidth, screenHeight);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
 
-      FakeBackendHelper.db.seedDocument('addresses', 'addr_approve', {
-        'id': 'addr_approve',
-        'streetName': 'Catania Norte',
-        'number': 12,
-        'residentUid': null,
-        'paymentStatus': 'restricted',
-      });
-      FakeBackendHelper.db.seedDocument('users', 'res_new', {
-        'uid': 'res_new',
-        'name': 'Marco Polo',
-        'role': 'resident',
-        'addressRef': null,
-      });
-      FakeBackendHelper.db.seedDocument('ownership_claims', 'claim_1', {
-        'id': 'claim_1',
-        'userUid': 'res_new',
-        'addressRef': addrRef,
-        'proofUrl': proofUrl,
-        'status': 'pending',
-        'deliveryDate': deliveryDate,
-      });
+        final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_preview');
+        final deliveryDate = DateTime(2026, 5, 10);
+        final submittedDate = DateTime(2026, 5, 11);
+        const proofUrl = 'https://fake-storage.local/ownership_proofs/res_preview/deed.jpg';
 
-      Map<String, dynamic>? setRoleParams;
-      FakeBackendHelper.functions.registerHandler('setRole', (params) async {
-        setRoleParams = params;
-        return {'success': true};
-      });
+        FakeBackendHelper.db.seedDocument('addresses', 'addr_preview', {
+          'id': 'addr_preview',
+          'streetName': 'Catania Norte',
+          'number': 12,
+          'residentUid': null,
+        });
+        FakeBackendHelper.db.seedDocument('users', 'res_preview', {
+          'uid': 'res_preview',
+          'name': 'Marco Polo',
+          'email': 'marco@catania.com',
+          'role': 'resident',
+          'addressRef': null,
+        });
+        FakeBackendHelper.db.seedDocument('ownership_claims', 'claim_preview', {
+          'id': 'claim_preview',
+          'userUid': 'res_preview',
+          'addressRef': addrRef,
+          'proofUrl': proofUrl,
+          'status': 'pending',
+          'deliveryDate': deliveryDate,
+          'timestamp': submittedDate,
+        });
 
-      await tester.pumpWidget(_wrapWithApp(const AdminResidentApprovalScreen()));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(_wrapWithApp(const AdminResidentApprovalScreen()));
+        await tester.pumpAndSettle();
 
-      final l10n = _enL10n(tester);
-      expect(find.text('Catania Norte 12'), findsOneWidget);
+        final l10n = _enL10n(tester);
 
-      await tester.tap(find.widgetWithText(ElevatedButton, l10n.approveResidentButton));
-      await tester.pumpAndSettle();
+        // 1. Verify master summary card renders address & basic metadata without action buttons or thumbnail
+        expect(find.text('Catania Norte #12'), findsOneWidget);
+        expect(find.text('Marco Polo'), findsOneWidget);
+        expect(find.text('${l10n.deliveryDateLabel}: 2026-05-10'), findsOneWidget);
+        expect(find.text(l10n.pendingReview), findsOneWidget);
+        expect(find.text('marco@catania.com'), findsNothing);
+        expect(find.widgetWithText(ElevatedButton, l10n.approveResidentButton), findsNothing);
+        expect(find.byKey(const ValueKey('ownership_proof_thumbnail')), findsNothing);
 
-      expect(setRoleParams, equals({'uid': 'res_new', 'role': 'resident'}));
+        // 2. Tap summary card to navigate to AdminResidentDetailScreen
+        final cardFinder = find.byKey(const ValueKey('resident_claim_card_claim_preview'));
+        expect(cardFinder, findsOneWidget);
+        await tester.tap(cardFinder);
+        await tester.pumpAndSettle();
 
-      final updatedAddr = await FakeBackendHelper.db.getDocument('addresses', 'addr_approve');
-      expect(updatedAddr?['residentUid'], equals('res_new'));
-      expect(updatedAddr?['paymentStatus'], equals('paid'));
-      expect(updatedAddr?['deliveryDate'], equals(deliveryDate));
+        expect(find.byType(AdminResidentDetailScreen), findsOneWidget);
+        expect(find.text('Catania Norte #12'), findsOneWidget);
+        expect(find.text('Marco Polo'), findsOneWidget);
+        expect(find.text('ma***@catania.com'), findsOneWidget);
+        expect(find.text('marco@catania.com'), findsNothing);
+        expect(find.text('${l10n.deliveryDateLabel}: 2026-05-10'), findsOneWidget);
+        expect(find.text('${l10n.date}: 2026-05-11'), findsOneWidget);
 
-      final updatedUser = await FakeBackendHelper.db.getDocument('users', 'res_new');
-      expect((updatedUser?['addressRef'] as DbReference).id, equals('addr_approve'));
+        // Verify Approve Resident button uses AppConfig.primaryColor
+        final approveBtnFinder = find.widgetWithText(ElevatedButton, l10n.approveResidentButton);
+        expect(approveBtnFinder, findsOneWidget);
+        final approveBtn = tester.widget<ElevatedButton>(approveBtnFinder);
+        expect(
+          approveBtn.style?.backgroundColor?.resolve({}),
+          equals(AppConfig.primaryColor),
+        );
 
-      expect(FakeBackendHelper.storage.deletedUrls, contains(proofUrl));
-      expect(await FakeBackendHelper.db.getDocument('ownership_claims', 'claim_1'), isNull);
-    });
+        // Verify wide layout (>650px): proof preview on the left, details & buttons on the right
+        final thumbFinder = find.byKey(const ValueKey('ownership_proof_thumbnail'));
+        expect(thumbFinder, findsOneWidget);
+        expect(tester.getSize(thumbFinder).height, greaterThan(300.0));
+        expect(
+          tester.getTopLeft(thumbFinder).dx,
+          lessThan(tester.getTopLeft(find.text('Catania Norte #12')).dx),
+        );
+        expect(
+          tester.getTopLeft(thumbFinder).dx,
+          lessThan(tester.getTopLeft(approveBtnFinder).dx),
+        );
 
-    testWidgets('rejects pending claim: deletes Storage proof and claim doc without calling setRole', (tester) async {
-      final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_reject');
-      const proofUrl = 'https://fake-storage.local/ownership_proofs/res_rej/proof.jpg';
+        // 3. Verify inline 90-degree rotation control on the detail screen
+        final inlineRotatedBoxFinder = find.byKey(const ValueKey('inline_proof_rotated_box'));
+        expect(inlineRotatedBoxFinder, findsOneWidget);
+        expect(tester.widget<RotatedBox>(inlineRotatedBoxFinder).quarterTurns, equals(0));
 
-      FakeBackendHelper.db.seedDocument('addresses', 'addr_reject', {
-        'id': 'addr_reject',
-        'streetName': 'Catania Sur',
-        'number': 88,
-        'residentUid': null,
-      });
-      FakeBackendHelper.db.seedDocument('ownership_claims', 'claim_rej', {
-        'id': 'claim_rej',
-        'userUid': 'res_rej',
-        'addressRef': addrRef,
-        'proofUrl': proofUrl,
-        'status': 'pending',
-      });
+        final inlineRotateBtnFinder = find.byKey(const ValueKey('inline_rotate_image_button'));
+        expect(inlineRotateBtnFinder, findsOneWidget);
+        await tester.tap(inlineRotateBtnFinder);
+        await tester.pump();
+        expect(tester.widget<RotatedBox>(inlineRotatedBoxFinder).quarterTurns, equals(1));
 
-      bool setRoleCalled = false;
-      FakeBackendHelper.functions.registerHandler('setRole', (_) async {
-        setRoleCalled = true;
-        return {'success': true};
-      });
+        // 4. Tap thumbnail to open full-screen interactive viewer (carrying over inline rotation)
+        await tester.tap(thumbFinder);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.pumpWidget(_wrapWithApp(const AdminResidentApprovalScreen()));
-      await tester.pumpAndSettle();
+        final paddingFinder = find.byKey(const ValueKey('interactive_image_padding'));
+        expect(paddingFinder, findsOneWidget);
+        expect(
+          tester.widget<Padding>(paddingFinder).padding,
+          equals(
+            const EdgeInsets.symmetric(
+              horizontal: screenWidth * 0.2,
+              vertical: screenHeight * 0.2,
+            ),
+          ),
+        );
 
-      final l10n = _enL10n(tester);
-      expect(find.text('Catania Sur 88'), findsOneWidget);
+        final fullScreenRotatedBoxFinder = find.byKey(const ValueKey('interactive_image_rotated_box'));
+        expect(fullScreenRotatedBoxFinder, findsOneWidget);
+        final fullScreenImageFinder = find.descendant(
+          of: fullScreenRotatedBoxFinder,
+          matching: find.byType(StorageNetworkImage),
+        );
+        expect(tester.widget<StorageNetworkImage>(fullScreenImageFinder).fit, equals(BoxFit.contain));
+        expect(tester.widget<RotatedBox>(fullScreenRotatedBoxFinder).quarterTurns, equals(1));
 
-      await tester.tap(find.widgetWithText(TextButton, l10n.rejectResidentButton));
-      await tester.pumpAndSettle();
+        final rotateBtnFinder = find.byKey(const ValueKey('rotate_image_button'));
+        expect(rotateBtnFinder, findsOneWidget);
 
-      expect(setRoleCalled, isFalse);
-      expect(FakeBackendHelper.storage.deletedUrls, contains(proofUrl));
-      expect(await FakeBackendHelper.db.getDocument('ownership_claims', 'claim_rej'), isNull);
-    });
+        await tester.tap(rotateBtnFinder);
+        await tester.pump();
+        expect(tester.widget<RotatedBox>(fullScreenRotatedBoxFinder).quarterTurns, equals(2));
+
+        await tester.tap(rotateBtnFinder);
+        await tester.pump();
+        expect(tester.widget<RotatedBox>(fullScreenRotatedBoxFinder).quarterTurns, equals(3));
+
+        await tester.tap(rotateBtnFinder);
+        await tester.pump();
+        expect(tester.widget<RotatedBox>(fullScreenRotatedBoxFinder).quarterTurns, equals(0));
+
+        final closeBtnFinder = find.byKey(const ValueKey('close_image_button'));
+        await tester.tap(closeBtnFinder);
+        await tester.pumpAndSettle();
+        expect(fullScreenRotatedBoxFinder, findsNothing);
+      },
+    );
+
+    testWidgets(
+      'approves pending claim from detail screen: invokes setRole, binds address & user, deletes Storage proof and claim doc, and pops detail screen',
+      (tester) async {
+        final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_approve');
+        final deliveryDate = DateTime(2026, 5, 10);
+        const proofUrl = 'https://fake-storage.local/ownership_proofs/res_new/proof.jpg';
+
+        FakeBackendHelper.db.seedDocument('addresses', 'addr_approve', {
+          'id': 'addr_approve',
+          'streetName': 'Catania Norte',
+          'number': 12,
+          'residentUid': null,
+          'paymentStatus': 'restricted',
+        });
+        FakeBackendHelper.db.seedDocument('users', 'res_new', {
+          'uid': 'res_new',
+          'name': 'Marco Polo',
+          'role': 'resident',
+          'addressRef': null,
+        });
+        FakeBackendHelper.db.seedDocument('ownership_claims', 'claim_1', {
+          'id': 'claim_1',
+          'userUid': 'res_new',
+          'addressRef': addrRef,
+          'proofUrl': proofUrl,
+          'status': 'pending',
+          'deliveryDate': deliveryDate,
+        });
+
+        Map<String, dynamic>? setRoleParams;
+        FakeBackendHelper.functions.registerHandler('setRole', (params) async {
+          setRoleParams = params;
+          return {'success': true};
+        });
+
+        await tester.pumpWidget(_wrapWithApp(const AdminResidentApprovalScreen()));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Catania Norte #12'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('resident_claim_card_claim_1')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AdminResidentDetailScreen), findsOneWidget);
+        final detailL10n = AppLocalizations.of(
+          tester.element(find.byType(AdminResidentDetailScreen)),
+        )!;
+
+        await tester.tap(find.widgetWithText(ElevatedButton, detailL10n.approveResidentButton));
+        await tester.pumpAndSettle();
+
+        expect(setRoleParams, equals({'uid': 'res_new', 'role': 'resident'}));
+
+        final updatedAddr = await FakeBackendHelper.db.getDocument('addresses', 'addr_approve');
+        expect(updatedAddr?['residentUid'], equals('res_new'));
+        expect(updatedAddr?['paymentStatus'], equals('paid'));
+        expect(updatedAddr?['deliveryDate'], equals(deliveryDate));
+
+        final updatedUser = await FakeBackendHelper.db.getDocument('users', 'res_new');
+        expect((updatedUser?['addressRef'] as DbReference).id, equals('addr_approve'));
+
+        expect(FakeBackendHelper.storage.deletedUrls, contains(proofUrl));
+        expect(await FakeBackendHelper.db.getDocument('ownership_claims', 'claim_1'), isNull);
+        expect(find.byType(AdminResidentDetailScreen), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'rejects pending claim on mobile Spanish layout: deletes Storage proof and claim doc without calling setRole, and pops detail screen',
+      (tester) async {
+        tester.view.physicalSize = const Size(420, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_reject');
+        const proofUrl = 'https://fake-storage.local/ownership_proofs/res_rej/proof.jpg';
+
+        FakeBackendHelper.db.seedDocument('addresses', 'addr_reject', {
+          'id': 'addr_reject',
+          'streetName': 'Catania Sur',
+          'number': 88,
+          'residentUid': null,
+        });
+        FakeBackendHelper.db.seedDocument('ownership_claims', 'claim_rej', {
+          'id': 'claim_rej',
+          'userUid': 'res_rej',
+          'addressRef': addrRef,
+          'proofUrl': proofUrl,
+          'status': 'pending',
+        });
+
+        bool setRoleCalled = false;
+        FakeBackendHelper.functions.registerHandler('setRole', (_) async {
+          setRoleCalled = true;
+          return {'success': true};
+        });
+
+        await tester.pumpWidget(
+          _wrapWithApp(const AdminResidentApprovalScreen(), locale: const Locale('es')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Catania Sur #88'), findsOneWidget);
+        await tester.tap(find.byKey(const ValueKey('resident_claim_card_claim_rej')));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AdminResidentDetailScreen), findsOneWidget);
+        final esL10n = AppLocalizations.of(
+          tester.element(find.byType(AdminResidentDetailScreen)),
+        )!;
+
+        // Verify stacked mobile layout: proof thumbnail below address header and above action buttons
+        final thumbFinder = find.byKey(const ValueKey('ownership_proof_thumbnail'));
+        expect(
+          tester.getTopLeft(thumbFinder).dy,
+          greaterThan(tester.getTopLeft(find.text('Catania Sur #88')).dy),
+        );
+
+        await tester.tap(find.widgetWithText(TextButton, esL10n.rejectResidentButton));
+        await tester.pumpAndSettle();
+
+        expect(setRoleCalled, isFalse);
+        expect(FakeBackendHelper.storage.deletedUrls, contains(proofUrl));
+        expect(await FakeBackendHelper.db.getDocument('ownership_claims', 'claim_rej'), isNull);
+        expect(find.byType(AdminResidentDetailScreen), findsNothing);
+      },
+    );
   });
 }

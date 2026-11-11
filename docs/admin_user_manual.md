@@ -151,10 +151,13 @@ At the top of the screen, a live **SMTP Status Badge** indicates whether automat
 
 When a self-registered user claims an unlinked address in the app, they upload a photo of their ownership document (e.g., deed, utility bill, or contract) and specify their **Property Delivery Date**.
 
-1. Review the applicant's **Name**, **Email**, **Claimed Address (Street & Number)**, and **Property Delivery Date**.
-2. Inspect the **Ownership Proof Image** (tap or pinch-to-zoom to inspect details).
-3. Choose an action:
-   * **Approve**: Grants the `resident` role, binds the user to the address, stores the `deliveryDate` on the address document, initializes `paymentStatus: 'paid'`, and deletes the ownership claim.
+1. **Browse Pending Summary Cards**: The **Approve Residents** list displays compact summary cards showing the **Claimed Address** (`Street #Number`), **Pending Review** badge, **Applicant Name**, and **Property Delivery Date** without inline action buttons to prevent accidental misclicks.
+2. **Open Dedicated Claim Detail Screen (`AdminResidentDetailScreen`)**: Tap any summary card to inspect the claim in a responsive detail view (side-by-side on wide screens `> 650px`, stacked vertically on mobile) displaying the **Address Header**, **Applicant Name**, **Masked Email**, **Property Delivery Date**, **Submission Date**, and an expanded **Ownership Proof Preview**.
+3. **Rotate & Zoom Ownership Proof Photos**:
+   * Tap the inline **Rotate (`90°`)** button (`Icons.rotate_right`) in the top-right corner of the document preview to orient sideways deeds or utility bills directly on the detail screen.
+   * Tap anywhere on the preview (or the **Expand** icon) to open the **Full-Screen Interactive Viewer** with 20% screen padding, pinch-to-zoom (`4.0x` magnification), pan, and `90°` rotation controls (carrying over your current inline rotation).
+4. **Choose an Action**:
+   * **Approve Resident**: Grants the `resident` role, binds the user to the address, stores the `deliveryDate` on the address document, initializes `paymentStatus: 'paid'`, and deletes the ownership claim.
    * **Reject**: Declines the claim and deletes the pending request so the user can submit a corrected claim.
 
 > [!IMPORTANT]

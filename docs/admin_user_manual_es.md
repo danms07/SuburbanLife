@@ -151,10 +151,13 @@ En la parte superior de la pantalla, una **Insignia de Estado SMTP** muestra en 
 
 Cuando un usuario se registra por su cuenta y reclama un domicilio disponible, sube una fotografía de su documento probatorio (escritura, recibo de servicios o contrato) e indica su **Fecha de Entrega de la Propiedad**.
 
-1. Verifica el **Nombre**, **Correo Electrónico**, **Domicilio Solicitado (Calle y Número)** y la **Fecha de Entrega de la Propiedad**.
-2. Inspecciona la **Imagen del Comprobante de Propiedad** (puedes pellizcar o hacer zoom para revisar los detalles).
-3. Elige una acción:
-   * **Aprobar**: Otorga el rol `resident`, vincula al usuario con el domicilio, guarda la `deliveryDate` en el documento de la propiedad, inicializa `paymentStatus: 'paid'` y elimina la solicitud pendiente.
+1. **Explorar Tarjetas de Resumen Pendientes**: La lista de **Aprobar Residentes** muestra tarjetas de resumen compactas con el **Domicilio Solicitado** (`Calle #Número`), insignia **En Revisión**, **Nombre del Solicitante** y **Fecha de Entrega de la Propiedad**, sin botones de acción directos para evitar toques accidentales.
+2. **Abrir Pantalla de Detalle (`AdminResidentDetailScreen`)**: Toca cualquier tarjeta para revisar la solicitud en una vista detallada responsiva (lado a lado en pantallas amplias `> 650px`, apilada verticalmente en dispositivos móviles) con el **Encabezado del Domicilio**, **Nombre del Solicitante**, **Correo Enmascarado**, **Fecha de Entrega**, **Fecha de Envío** y la **Vista Previa del Comprobante de Propiedad**.
+3. **Rotar y Ampliar Fotografía del Comprobante**:
+   * Toca el botón **Rotar (`90°`)** (`Icons.rotate_right`) en la esquina superior derecha de la vista previa para enderezar escrituras o recibos tomados horizontalmente directamente desde la pantalla de detalle.
+   * Toca cualquier parte de la imagen (o el ícono de **Pantalla Completa**) para abrir el **Visor Interactivo en Pantalla Completa** con margen del 20%, zoom táctil (`4.0x`), desplazamiento y control de rotación de `90°` (conservando la orientación actual).
+4. **Elige una Acción**:
+   * **Aprobar Residente**: Otorga el rol `resident`, vincula al usuario con el domicilio, guarda la `deliveryDate` en el documento de la propiedad, inicializa `paymentStatus: 'paid'` y elimina la solicitud pendiente.
    * **Rechazar**: Deniega la solicitud y elimina el registro pendiente para que el usuario pueda enviar una nueva solicitud corregida.
 
 > [!IMPORTANT]

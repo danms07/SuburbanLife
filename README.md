@@ -7,7 +7,7 @@ A white-label residential management platform built using **Flutter** and **Fire
 ## Features
 
 - **Adaptive Admin NavDrawer Workspace**: Persistent left sidebar on desktop (`>= 900px`) and modal hamburger `Drawer` on mobile (`< 900px`) organizing administrative workflows into **Overview** (with pending approval cards and live community KPIs that collapse into expandable cards on mobile, conditional **Visitors currently inside** KPI shown when **Scan on exit** is enabled, 6 quick **Shortcuts** cards, and an Overview-only **Generate Access QR** FAB), collapsible category groups (**User Management**, **Residential Management**, **Finance**, **Transparency & Community**) with roll-up notification badges, and a direct single-tap **General Settings** item.
-- **Secure Multi-Role Access Control**: Integrated with Firebase Auth and Cloud Functions.
+- **Secure Multi-Role Access Control & Master-Detail Resident Onboarding Approval**: Integrated with Firebase Auth and Cloud Functions, including self-service resident signup with ownership proof capture, compact button-free pending claim cards, and a responsive **Resident Approval Detail** screen with PII-masked applicant email, inline + full-screen 90-degree rotatable document inspection, and privacy-by-design Cloud Storage cleanup upon decision.
 - **Bulk Resident & Address Import via CSV**: Administrator bulk creation with temporary passwords and automated claim granting.
 - **Address-Level Sanctions System**: Neighborhood infraction issuance with photographic evidence, automated standing restrictions, resident fine history with interactive photo zoom, and direct payment flows.
 - **Enhanced Payment Form, Receipt Review & Rejection Recovery**: Strict validation for folio, concept (quota vs sanction), and payment date, advance periods toggle with checklist view, persistent missing-field warnings, admin approval cards with proof-of-payment thumbnails that open in a full-screen viewer with 20% padding and 90-degree rotation controls, customizable admin rejection reason pool, and one-tap recovery pre-filling for rejected payments.
@@ -231,7 +231,7 @@ To test cloud functions, firestore rules, and authentication flows locally:
    ```bash
    firebase emulators:start --only firestore,functions,storage,auth
    ```
-3. In a separate terminal, seed the emulator with sample addresses, facilities, settings, announcements, and default users (`admin@example.com`, `resident@test.com`, `roommate@test.com`, `guard@test.com`):
+3. In a separate terminal, seed the emulator with sample addresses, facilities, settings, announcements, pending payment & ownership claims, and default users (`admin@example.com`, `resident@test.com`, `roommate@test.com`, `guard@test.com`, `applicant@test.com`):
    ```bash
    node scripts/seed_emulator.js
    ```

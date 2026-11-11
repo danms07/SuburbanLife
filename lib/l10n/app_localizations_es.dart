@@ -2573,4 +2573,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get bookingAttachmentsRetentionHelper =>
       'Aviso de privacidad: Los adjuntos de reserva solo son visibles para su hogar y la administración, y se eliminan automáticamente 30 días después de finalizar la reserva (o de inmediato si se cancela).';
+
+  @override
+  String get unknownAddress => 'Dirección desconocida';
+
+  @override
+  String get residentRejectedSuccess => 'Solicitud de propiedad rechazada.';
+
+  @override
+  String get adminProofDeletionNotice =>
+      'Aviso de privacidad: Al aprobar o rechazar esta solicitud, la imagen del comprobante de propiedad se elimina permanentemente de la nube.';
 }

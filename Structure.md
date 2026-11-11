@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-08 (v1.0.25+26 — `README.md` Prerequisites & `gcloud` retention provisioning guide alongside Amenity Documentation & Resident Booking Attachments: admin `facilities.facilityDocuments[]` templates with `mandatory_return`, `optional_return`, and `informative` modes, cross-platform `DocumentTransferHelper` with magic-byte verification and `Content-Disposition: attachment`, household-isolated `booking_attachments/{bookingId}` collection with 30-day post-booking TTL + `onBookingAttachmentDeleted` & `purgeExpiredBookingAttachments` Storage cleanup + 125-day GCS safety net, `FacilityDocumentsSection`, admin approval attachment viewer, rejected-booking attachment replacement, EN/ES l18n, and unit/widget/Cloud Functions/rules tests)*
+*Last Verified/Updated: 2026-11-10 (v1.0.26+27 — Master-Detail Resident Ownership Approval UI with Rotatable Proof Inspection: compact button-free `_ResidentSummaryCard` list in `AdminResidentApprovalScreen`, responsive `AdminResidentDetailScreen` (`> 650px` side-by-side / mobile stacked), PII-masked applicant email chip, inline 90-degree rotation + `showInteractiveImageDialog` `initialQuarterTurns` synchronization, emulator seed sample ownership claim, EN/ES l18n, and widget tests)*
 
 Current state of project files and folders:
 
@@ -57,7 +57,7 @@ Current state of project files and folders:
         - `widgets/`: Shared reusable UI components.
             - `storage_network_image.dart`: Cross-platform cached image loader with web CORS and memory fallbacks.
             - `web_image_view.dart`: Cross-platform conditional adapter for web HTML image element view registration (`web_image_view_web.dart` keyed by URL and BoxFit, and `web_image_view_stub.dart`).
-            - `interactive_image_dialog.dart`: Centralized full-screen interactive image viewer with 20% screen padding, 90-degree rotation control, pinch-to-zoom, pan, and dismiss controls.
+            - `interactive_image_dialog.dart`: Centralized full-screen interactive image viewer with 20% screen padding, optional `initialQuarterTurns` synchronization, 90-degree rotation control, pinch-to-zoom, pan, and dismiss controls.
             - `error_fallback_screen.dart`: User-friendly release-mode error screen presented on fatal framework rendering or build exceptions.
     - `features/`: Specific feature modules separated by domain.
         - `admin/`: Core management modules for administrators.
@@ -82,7 +82,7 @@ Current state of project files and folders:
             - `login_screen.dart`: Main login interface with navigation.
             - `signup_screen.dart`: Resident onboarding with password complexity enforcement (min 8 chars, uppercase, lowercase, digit) and address selection list.
             - `ownership_proof_screen.dart`: Mandatory proof of ownership capture with property handover date picker, bounded camera capture, upload interface, and automatic local temp image cleanup after upload.
-            - `admin_resident_approval_screen.dart`: Dedicated admin list view for validating property ownership proofs and propagating delivery date to address upon approval. Keyed stateful cards prevent redundant downloads/fetches.
+            - `admin_resident_approval_screen.dart`: Master-detail resident ownership proof review workflow displaying compact, button-free summary cards (`_ResidentSummaryCard` with physical address `streetName #number`, `Pending Review` badge, applicant name, property handover date chip, and trailing chevron) that navigate on tap to a dedicated responsive detail screen (`AdminResidentDetailScreen`: side-by-side on wide screens `> 650px`, stacked with constrained scrollable metadata on mobile) featuring PII-masked applicant email, inline 90-degree image rotation (`inline_rotate_image_button`), full-screen rotatable zoom viewer (`showInteractiveImageDialog` carrying over `initialQuarterTurns`), privacy-by-design Cloud Storage proof deletion, and resident role/address binding upon approval.
             - `forgot_password_screen.dart`: Password recovery request interface.
             - `roommates_screen.dart`: Family group management interface with clear step-by-step onboarding guide, camera QR scanner with camera selector (back/front switch), and UID/email roommate addition options.
         - `booking/`: Facility booking screens, document models, widgets, and service logic.
@@ -118,7 +118,7 @@ Current state of project files and folders:
     - `set_role.js`: Claims and role assignment utility supporting both Firebase Emulator (`--emulator`) and production modes with auto user provisioning, residential `addressRef` preservation/restoration, and dual-role (`admin` + `resident`) claim preservation for residents promoted to admin.
     - `populate_addresses.js`: Batched write logic for address import on csv files.
     - `set_resident_addresses_paid.js`: Batch maintenance utility iterating across all physical addresses linked to a resident and updating their paymentStatus to 'paid' (with aligned `extractAddressId` supporting `DocumentReference`, `'addresses/<id>'` paths, and plain IDs, plus emulator, dry-run, force, and batching support).
-    - `seed_emulator.js`: Automated Firebase database and Storage seeder supporting both local Emulators (default) and remote/staging projects (`--remote` / `--staging`), provisioning CSV addresses, admin, resident, roommate, and guard accounts (with role claims), app settings, neighborhood facilities with operating hours, cooldown rules (`hours`/`days`), and booking quotas (`daily`/`monthly`), sample announcements, sanctions, and sample pending payment approval requests with generated proof-of-payment PNG images.
+    - `seed_emulator.js`: Automated Firebase database and Storage seeder supporting both local Emulators (default) and remote/staging projects (`--remote` / `--staging`), provisioning CSV addresses, admin, resident, roommate, guard, and unverified applicant (`applicant@test.com`) accounts, app settings, neighborhood facilities with operating hours, cooldown rules (`hours`/`days`), and booking quotas (`daily`/`monthly`), sample announcements, sanctions, sample pending payment approval requests, and a sample pending ownership claim with a generated landscape deed PNG image.
     - `run_rollout_tests.sh`: Zero-touch test runner orchestrating Firebase Emulator startup, live Security Rules & Cloud Function tests (`functions/`), script tests (`scripts/`), and the complete `flutter test` suite.
     - `test/`: Node.js test suite for script automation (`set_role.test.js`, `set_resident_addresses_paid.test.js`, `build_and_publish_docs.test.js`).
 - `test_driver/`: Flutter Driver host scripts.
@@ -143,7 +143,7 @@ Current state of project files and folders:
             - `admin_create_user_test.dart`: Production `AdminCreateUserScreen` resident/guard/admin creation, future delivery date validation, address claiming, and callable payload widget tests.
         - `announcements/announcement_model_test.dart`: Announcement serialization and timestamp parsing tests.
         - `auth/`:
-            - `auth_screens_test.dart`: Widget tests for `LoginScreen`, `SignupScreen`, `OwnershipProofScreen` (handover date validation, Storage upload, `ownership_claims` write, Crashlytics & temp-file cleanup on failure), and `AdminResidentApprovalScreen` (approval & rejection workflows).
+            - `auth_screens_test.dart`: Widget tests for `LoginScreen`, `SignupScreen`, `OwnershipProofScreen` (handover date validation, Storage upload, `ownership_claims` write, Crashlytics & temp-file cleanup on failure), and `AdminResidentApprovalScreen` / `AdminResidentDetailScreen` (empty state, master-detail summary card navigation, wide `> 650px` side-by-side layout, PII email masking, inline + full-screen 90-degree image rotation synchronization, approval workflow, and mobile Spanish rejection workflow).
             - `password_validation_test.dart`: Password complexity constraint validation tests.
         - `booking/`:
             - `booking_service_test.dart`: Booking filters, user booking sorting, `resubmitBookingId` cloud function invocation, symmetric cooldown (`hours`, `days`, `months`, `years`) and household quota (`daily`, `monthly`, `yearly`) evaluation, merged `getHouseholdFacilityBookings` (`addressId` + legacy `userUid`), `BookingScreen` quota badge & blocking widget tests, and full booking lifecycle tests.

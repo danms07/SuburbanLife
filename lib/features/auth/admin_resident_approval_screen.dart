@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../core/backend/backend.dart';
-import 'package:suburban_life/core/config/app_config.dart';
-import 'package:suburban_life/core/widgets/interactive_image_dialog.dart';
-import 'package:suburban_life/l10n/app_localizations.dart';
-import 'package:suburban_life/core/widgets/storage_network_image.dart';
 import 'package:intl/intl.dart';
+import '../../core/backend/backend.dart';
+import '../../core/config/app_config.dart';
+import '../../core/widgets/interactive_image_dialog.dart';
+import '../../core/widgets/storage_network_image.dart';
+import '../../l10n/app_localizations.dart';
 
 class AdminResidentApprovalScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -12,31 +12,432 @@ class AdminResidentApprovalScreen extends StatefulWidget {
   const AdminResidentApprovalScreen({super.key, this.isEmbedded = false});
 
   @override
-  State<AdminResidentApprovalScreen> createState() => _AdminResidentApprovalScreenState();
+  State<AdminResidentApprovalScreen> createState() =>
+      _AdminResidentApprovalScreenState();
 }
 
-class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScreen> {
+class _AdminResidentApprovalScreenState
+    extends State<AdminResidentApprovalScreen> {
+  void _openResidentClaimDetail(Map<String, dynamic> doc) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AdminResidentDetailScreen(doc: doc),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return Scaffold(
+      backgroundColor: AppConfig.backgroundColor,
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(
+                l10n.approveResidentsMenu,
+                style: const TextStyle(fontFamily: AppConfig.fontFamily),
+              ),
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: DatabaseService().streamCollection('ownership_claims'),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Text(l10n.errorPrefix(snapshot.error.toString())),
+            );
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data ?? [];
+
+          if (docs.isEmpty) {
+            return Center(
+              child: Text(
+                l10n.noResidentsToApprove,
+                style: const TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              return _ResidentSummaryCard(
+                key: ValueKey(doc['id']),
+                doc: doc,
+                onTap: () => _openResidentClaimDetail(doc),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+DbReference? _resolveClaimAddressRef(Map<String, dynamic> claimDoc) {
+  final dynamic rawAddressRef = claimDoc['addressRef'];
+  if (rawAddressRef is DbReference) {
+    return rawAddressRef;
+  }
+  if (rawAddressRef is String && rawAddressRef.trim().isNotEmpty) {
+    final id = rawAddressRef.trim().split('/').last;
+    if (id.isNotEmpty) {
+      return DatabaseService().createReference('addresses', id);
+    }
+  }
+  return null;
+}
+
+Future<Map<String, dynamic>?> _fetchClaimAddress(
+  Map<String, dynamic> claimDoc,
+) async {
+  final addressRef = _resolveClaimAddressRef(claimDoc);
+  if (addressRef != null && addressRef.id.isNotEmpty) {
+    return DatabaseService().getDocument('addresses', addressRef.id);
+  }
+  return null;
+}
+
+Future<Map<String, dynamic>?> _fetchClaimUser(
+  Map<String, dynamic> claimDoc,
+) async {
+  final userUid = claimDoc['userUid']?.toString().trim() ?? '';
+  if (userUid.isNotEmpty) {
+    return DatabaseService().getDocument('users', userUid);
+  }
+  return null;
+}
+
+String _formatClaimAddressTitle(
+  Map<String, dynamic>? addrData,
+  String unknownFallback,
+) {
+  final street = addrData?['streetName']?.toString().trim() ?? '';
+  final number = addrData?['number']?.toString().trim() ?? '';
+  if (street.isEmpty) return unknownFallback;
+  return number.isNotEmpty ? '$street #$number' : street;
+}
+
+DateTime? _parseClaimDateTime(dynamic rawDate) {
+  if (rawDate == null) return null;
+  if (rawDate is DateTime) return rawDate;
+  if (rawDate is int && rawDate > 0) {
+    return DateTime.fromMillisecondsSinceEpoch(rawDate);
+  }
+  if (rawDate is String && rawDate.trim().isNotEmpty) {
+    final parsedInt = int.tryParse(rawDate.trim());
+    if (parsedInt != null && parsedInt > 0) {
+      return DateTime.fromMillisecondsSinceEpoch(parsedInt);
+    }
+    return DateTime.tryParse(rawDate.trim());
+  }
+  return null;
+}
+
+/// Masks an email address so full PII is not surfaced directly in UI labels.
+String _maskEmail(String email) {
+  final trimmed = email.trim();
+  final atIndex = trimmed.indexOf('@');
+  if (atIndex <= 0 || atIndex >= trimmed.length - 1) return '';
+  final local = trimmed.substring(0, atIndex);
+  final domain = trimmed.substring(atIndex + 1);
+  final visiblePrefix = local.length <= 2 ? local.substring(0, 1) : local.substring(0, 2);
+  return '$visiblePrefix***@$domain';
+}
+
+class _ResidentSummaryCard extends StatefulWidget {
+  final Map<String, dynamic> doc;
+  final VoidCallback onTap;
+
+  const _ResidentSummaryCard({
+    required Key key,
+    required this.doc,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  State<_ResidentSummaryCard> createState() => _ResidentSummaryCardState();
+}
+
+class _ResidentSummaryCardState extends State<_ResidentSummaryCard> {
+  Future<List<Map<String, dynamic>?>>? _detailsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDetailsFuture();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ResidentSummaryCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldAddressId = _resolveClaimAddressRef(oldWidget.doc)?.id;
+    final newAddressId = _resolveClaimAddressRef(widget.doc)?.id;
+    final oldUserUid = oldWidget.doc['userUid']?.toString();
+    final newUserUid = widget.doc['userUid']?.toString();
+    if (oldAddressId != newAddressId || oldUserUid != newUserUid) {
+      _initDetailsFuture();
+    }
+  }
+
+  void _initDetailsFuture() {
+    _detailsFuture = Future.wait<Map<String, dynamic>?>([
+      _fetchClaimAddress(widget.doc),
+      _fetchClaimUser(widget.doc),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final deliveryDate = _parseClaimDateTime(widget.doc['deliveryDate']);
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: ValueKey('resident_claim_card_${widget.doc['id']}'),
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: FutureBuilder<List<Map<String, dynamic>?>>(
+                  future: _detailsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox(
+                        height: 40,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final addrData =
+                        snapshot.data != null && snapshot.data!.isNotEmpty
+                        ? snapshot.data![0]
+                        : null;
+                    final userData =
+                        snapshot.data != null && snapshot.data!.length > 1
+                        ? snapshot.data![1]
+                        : null;
+                    final addressTitle = _formatClaimAddressTitle(
+                      addrData,
+                      l10n.unknownAddress,
+                    );
+                    final applicantName =
+                        userData?['name']?.toString().trim() ?? '';
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.home_outlined,
+                                    size: 20,
+                                    color: AppConfig.primaryColor,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      addressTitle,
+                                      style: const TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppConfig.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.amber.shade300,
+                                ),
+                              ),
+                              child: Text(
+                                l10n.pendingReview,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber.shade900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            if (applicantName.isNotEmpty)
+                              Chip(
+                                avatar: const Icon(
+                                  Icons.person_outline,
+                                  size: 14,
+                                  color: AppConfig.primaryColor,
+                                ),
+                                label: Text(
+                                  applicantName,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.08),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              )
+                            else
+                              Chip(
+                                avatar: const Icon(
+                                  Icons.home_work_outlined,
+                                  size: 14,
+                                  color: AppConfig.primaryColor,
+                                ),
+                                label: Text(
+                                  l10n.ownershipProofTitle,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.08),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            if (deliveryDate != null)
+                              Chip(
+                                avatar: const Icon(
+                                  Icons.calendar_today,
+                                  size: 14,
+                                  color: Colors.teal,
+                                ),
+                                label: Text(
+                                  '${l10n.deliveryDateLabel}: ${DateFormat('yyyy-MM-dd').format(deliveryDate)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                backgroundColor: Colors.teal.shade50,
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class AdminResidentDetailScreen extends StatefulWidget {
+  final Map<String, dynamic> doc;
+
+  const AdminResidentDetailScreen({
+    super.key,
+    required this.doc,
+  });
+
+  @override
+  State<AdminResidentDetailScreen> createState() =>
+      _AdminResidentDetailScreenState();
+}
+
+class _AdminResidentDetailScreenState extends State<AdminResidentDetailScreen> {
   bool _isProcessing = false;
+  int _inlineQuarterTurns = 0;
+  Future<Map<String, dynamic>?>? _addressFuture;
+  Future<Map<String, dynamic>?>? _userFuture;
 
-  void _approveClaim(Map<String, dynamic> claimDoc) async {
+  @override
+  void initState() {
+    super.initState();
+    _addressFuture = _fetchClaimAddress(widget.doc);
+    _userFuture = _fetchClaimUser(widget.doc);
+  }
+
+  void _rotateInlinePreview() {
     setState(() {
-      _isProcessing = true;
+      _inlineQuarterTurns = (_inlineQuarterTurns + 1) % 4;
     });
+  }
 
+  void _showImagePreview(String url) {
+    showInteractiveImageDialog(
+      context,
+      url,
+      initialQuarterTurns: _inlineQuarterTurns,
+    );
+  }
+
+  Future<void> _approveClaim(Map<String, dynamic> claimDoc) async {
     final userUid = claimDoc['userUid'] as String?;
-    final addressRef = claimDoc['addressRef'] as DbReference?;
+    final addressRef = _resolveClaimAddressRef(claimDoc);
     final proofUrl = claimDoc['proofUrl'] as String?;
-    final deliveryDate = claimDoc['deliveryDate'] as DateTime?;
+    final deliveryDate = _parseClaimDateTime(claimDoc['deliveryDate']);
 
-    if (userUid == null || addressRef == null) {
-      setState(() {
-        _isProcessing = false;
-      });
+    if (userUid == null || userUid.isEmpty || addressRef == null) {
       return;
     }
 
     final l10n = AppLocalizations.of(context)!;
-    final messenger = ScaffoldMessenger.of(context);
+    setState(() {
+      _isProcessing = true;
+    });
 
     try {
       // 1. Invoke setRole Cloud Function to assign resident custom claim
@@ -45,14 +446,14 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
         'role': 'resident',
       });
 
-      // 2. Assign residentUid and initialize paymentStatus to paid, and save deliveryDate on the underlying address document
+      // 2. Assign residentUid, initialize paymentStatus to paid, and propagate deliveryDate on the address
       await DatabaseService().updateDocument('addresses', addressRef.id, {
         'residentUid': userUid,
         'paymentStatus': 'paid',
-        if (deliveryDate != null) 'deliveryDate': deliveryDate,
+        'deliveryDate': ?deliveryDate,
       });
 
-      // 3. If the user's active session addressRef is null, assign it
+      // 3. Link addressRef on the user document if not already linked
       final userData = await DatabaseService().getDocument('users', userUid);
       if (userData != null && userData['addressRef'] == null) {
         await DatabaseService().updateDocument('users', userUid, {
@@ -70,17 +471,35 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
       }
 
       // 5. Delete the pending ownership claim document
-      await DatabaseService().deleteDocument('ownership_claims', claimDoc['id']);
-
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.residentApprovedSuccess)),
+      await DatabaseService().deleteDocument(
+        'ownership_claims',
+        claimDoc['id'] as String,
       );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.residentApprovedSuccess),
+            backgroundColor: AppConfig.secondaryColor,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
     } catch (e, stack) {
       debugPrint('Error approving claim: $e');
-      Backend.crashlytics.recordError(e, stack, reason: 'AdminResidentApprovalScreen._approveClaim');
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'AdminResidentDetailScreen._approveClaim',
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -90,7 +509,8 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
     }
   }
 
-  void _rejectClaim(Map<String, dynamic> claimDoc) async {
+  Future<void> _rejectClaim(Map<String, dynamic> claimDoc) async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _isProcessing = true;
     });
@@ -102,14 +522,43 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
           await StorageService().deleteFileFromUrl(proofUrl);
         } catch (err, stack) {
           debugPrint('Error deleting proof storage image: $err');
-          Backend.crashlytics.recordError(err, stack, reason: 'AdminResidentApprovalScreen.deleteProofImage');
+          Backend.crashlytics.recordError(
+            err,
+            stack,
+            reason: 'AdminResidentDetailScreen.deleteProofImage',
+          );
         }
       }
 
-      await DatabaseService().deleteDocument('ownership_claims', claimDoc['id']);
+      await DatabaseService().deleteDocument(
+        'ownership_claims',
+        claimDoc['id'] as String,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.residentRejectedSuccess),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
     } catch (e, stack) {
       debugPrint('Error rejecting claim: $e');
-      Backend.crashlytics.recordError(e, stack, reason: 'AdminResidentApprovalScreen._rejectClaim');
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'AdminResidentDetailScreen._rejectClaim',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -119,266 +568,436 @@ class _AdminResidentApprovalScreenState extends State<AdminResidentApprovalScree
     }
   }
 
-  void _showImagePreview(String url) {
-    showInteractiveImageDialog(context, url);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    return Scaffold(
-      body: Column(
-        children: [
-          if (!widget.isEmbedded)
-            // Premium Header
-            Container(
-              padding: EdgeInsets.only(
-                top: MediaQuery.paddingOf(context).top + 16,
-                left: 20,
-                right: 20,
-                bottom: 30,
-              ),
-              decoration: const BoxDecoration(
-                color: AppConfig.primaryColor,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      l10n.approveResidentsMenu,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: AppConfig.fontFamily,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // Claims List
-          Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: DatabaseService().streamCollection('ownership_claims'),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text(l10n.errorPrefix(snapshot.error.toString())));
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final docs = snapshot.data ?? [];
-
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Text(
-                      l10n.noResidentsToApprove,
-                      style: const TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    return _ResidentApprovalCard(
-                      key: ValueKey(doc['id']),
-                      doc: doc,
-                      isProcessing: _isProcessing,
-                      onApprove: _approveClaim,
-                      onReject: _rejectClaim,
-                      onShowPreview: _showImagePreview,
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ResidentApprovalCard extends StatefulWidget {
-  final Map<String, dynamic> doc;
-  final bool isProcessing;
-  final Function(Map<String, dynamic>) onApprove;
-  final Function(Map<String, dynamic>) onReject;
-  final Function(String) onShowPreview;
-
-  const _ResidentApprovalCard({
-    required Key key,
-    required this.doc,
-    required this.isProcessing,
-    required this.onApprove,
-    required this.onReject,
-    required this.onShowPreview,
-  }) : super(key: key);
-
-  @override
-  State<_ResidentApprovalCard> createState() => _ResidentApprovalCardState();
-}
-
-class _ResidentApprovalCardState extends State<_ResidentApprovalCard> {
-  Future<Map<String, dynamic>?>? _addressFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _initAddressFuture();
-  }
-
-  @override
-  void didUpdateWidget(covariant _ResidentApprovalCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    
-    final oldAddressRef = oldWidget.doc['addressRef'] as DbReference?;
-    final newAddressRef = widget.doc['addressRef'] as DbReference?;
- 
-    if (oldAddressRef?.id != newAddressRef?.id) {
-      _initAddressFuture();
-    }
-  }
-
-  void _initAddressFuture() {
-    final addressRef = widget.doc['addressRef'] as DbReference?;
-    _addressFuture = addressRef != null ? DatabaseService().getDocument('addresses', addressRef.id) : null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final proofUrl = widget.doc['proofUrl'] as String? ?? '';
-    final deliveryTimestamp = widget.doc['deliveryDate'] as DateTime?;
-    final deliveryDate = deliveryTimestamp;
- 
-    return Card(
-      elevation: 3,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
+    final deliveryDate = _parseClaimDateTime(widget.doc['deliveryDate']);
+    final submittedDate = _parseClaimDateTime(widget.doc['timestamp']);
+
+    Widget buildClaimInfo() {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          InkWell(
-            onTap: proofUrl.isNotEmpty ? () => widget.onShowPreview(proofUrl) : null,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          // 1. Address Header & Pending Review Badge
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _addressFuture,
+            builder: (context, addrSnapshot) {
+              if (addrSnapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 36,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
+              final addressTitle = _formatClaimAddressTitle(
+                addrSnapshot.data,
+                l10n.unknownAddress,
+              );
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Fetch Address Details
-                  FutureBuilder<Map<String, dynamic>?>(
-                    future: _addressFuture,
-                    builder: (context, addrSnapshot) {
-                      if (addrSnapshot.connectionState == ConnectionState.waiting) {
-                        return const SizedBox(
-                          height: 20,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 1.5),
-                            ),
-                          ),
-                        );
-                      }
-                      final addrData = addrSnapshot.data;
-                      final street = addrData?['streetName'] ?? 'Unknown Street';
-                      final number = addrData?['number'] ?? '';
-                      return Text(
-                        '$street $number',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.home_outlined,
+                          size: 24,
                           color: AppConfig.primaryColor,
                         ),
-                      );
-                    },
-                  ),
-                  if (deliveryDate != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '${l10n.deliveryDateLabel}: ${DateFormat('yyyy-MM-dd').format(deliveryDate)}',
+                            addressTitle,
                             style: const TextStyle(
-                              fontSize: 14,
-                              color: AppConfig.textColor,
-                              fontFamily: AppConfig.fontFamily,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppConfig.primaryColor,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                  ],
-                  const SizedBox(height: 12),
-                  if (proofUrl.isNotEmpty)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: StorageNetworkImage(
-                        imageUrl: proofUrl,
-                        height: 150,
-                        fit: BoxFit.cover,
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.shade300),
+                    ),
+                    child: Text(
+                      l10n.pendingReview,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber.shade900,
+                        fontSize: 13,
                       ),
                     ),
+                  ),
                 ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+
+          // 2. Claim & Applicant Metadata Badges
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _userFuture,
+            builder: (context, userSnapshot) {
+              final userData = userSnapshot.data;
+              final applicantName = userData?['name']?.toString().trim() ?? '';
+              final maskedEmail = _maskEmail(
+                userData?['email']?.toString() ?? '',
+              );
+
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Chip(
+                    avatar: const Icon(
+                      Icons.home_work_outlined,
+                      size: 16,
+                      color: AppConfig.primaryColor,
+                    ),
+                    label: Text(
+                      l10n.ownershipProofTitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.08),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  if (applicantName.isNotEmpty)
+                    Chip(
+                      avatar: const Icon(
+                        Icons.person_outline,
+                        size: 16,
+                        color: AppConfig.primaryColor,
+                      ),
+                      label: Text(
+                        applicantName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      backgroundColor: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.08),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  if (maskedEmail.isNotEmpty)
+                    Chip(
+                      avatar: const Icon(
+                        Icons.alternate_email,
+                        size: 16,
+                        color: Colors.blueGrey,
+                      ),
+                      label: Text(
+                        maskedEmail,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      backgroundColor: Colors.blueGrey.shade50,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  Chip(
+                    avatar: const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: Colors.teal,
+                    ),
+                    label: Text(
+                      deliveryDate != null
+                          ? '${l10n.deliveryDateLabel}: ${DateFormat('yyyy-MM-dd').format(deliveryDate)}'
+                          : '${l10n.deliveryDateLabel}: ${l10n.deliveryDateNotSet}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    backgroundColor: Colors.teal.shade50,
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  if (submittedDate != null)
+                    Chip(
+                      avatar: const Icon(
+                        Icons.schedule,
+                        size: 16,
+                        color: Colors.blueGrey,
+                      ),
+                      label: Text(
+                        '${l10n.date}: ${DateFormat('yyyy-MM-dd').format(submittedDate)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      backgroundColor: Colors.blueGrey.shade50,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+
+          // 3. Privacy Notice Callout
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppConfig.warningColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppConfig.warningColor.withValues(alpha: 0.3),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 12,
-              runSpacing: 8,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextButton(
-                  onPressed: widget.isProcessing ? null : () => widget.onReject(widget.doc),
-                  child: Text(
-                    l10n.rejectResidentButton,
-                    style: const TextStyle(color: Colors.redAccent),
-                  ),
+                const Icon(
+                  Icons.privacy_tip_outlined,
+                  color: AppConfig.warningColor,
+                  size: 18,
                 ),
-                ElevatedButton(
-                  onPressed: widget.isProcessing ? null : () => widget.onApprove(widget.doc),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConfig.secondaryColor,
-                    foregroundColor: Colors.white,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.adminProofDeletionNotice,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.black87,
+                      height: 1.3,
+                    ),
                   ),
-                  child: widget.isProcessing
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : Text(l10n.approveResidentButton),
                 ),
               ],
             ),
           ),
         ],
+      );
+    }
+
+    Widget buildProofPreview() {
+      if (proofUrl.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(13),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: IgnorePointer(
+                  child: RotatedBox(
+                    key: const ValueKey('inline_proof_rotated_box'),
+                    quarterTurns: _inlineQuarterTurns,
+                    child: StorageNetworkImage(
+                      imageUrl: proofUrl,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    key: const ValueKey('ownership_proof_thumbnail'),
+                    onTap: () => _showImagePreview(proofUrl),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Material(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: IconButton(
+                        key: const ValueKey('inline_rotate_image_button'),
+                        tooltip: l10n.rotateImage,
+                        icon: const Icon(
+                          Icons.rotate_right,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: _rotateInlinePreview,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      shape: const CircleBorder(),
+                      clipBehavior: Clip.antiAlias,
+                      child: IconButton(
+                        key: const ValueKey('fullscreen_proof_button'),
+                        tooltip: l10n.viewFullImage,
+                        icon: const Icon(
+                          Icons.open_in_full,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        onPressed: () => _showImagePreview(proofUrl),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget buildActionButtons(double bottomMargin) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: bottomMargin),
+        child: Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 12,
+          runSpacing: 8,
+          children: [
+            TextButton(
+              onPressed: _isProcessing ? null : () => _rejectClaim(widget.doc),
+              child: Text(
+                l10n.rejectResidentButton,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: _isProcessing ? null : () => _approveClaim(widget.doc),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppConfig.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+              child: _isProcessing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : Text(l10n.approveResidentButton),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppConfig.backgroundColor,
+      appBar: AppBar(
+        title: Text(
+          l10n.approveResidentsMenu,
+          style: const TextStyle(fontFamily: AppConfig.fontFamily),
+        ),
+        backgroundColor: AppConfig.primaryColor,
+        foregroundColor: Colors.white,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 650.0) {
+                final actionBottomMargin = constraints.maxHeight > 500.0
+                    ? constraints.maxHeight * 0.1
+                    : 8.0;
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: buildProofPreview(),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: SingleChildScrollView(
+                              child: buildClaimInfo(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          buildActionButtons(actionBottomMargin),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: constraints.maxHeight * 0.42,
+                    ),
+                    child: SingleChildScrollView(
+                      child: buildClaimInfo(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: buildProofPreview(),
+                  ),
+                  const SizedBox(height: 16),
+                  buildActionButtons(12.0),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }

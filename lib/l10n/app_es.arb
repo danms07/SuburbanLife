@@ -1033,5 +1033,8 @@
     }
   },
   "bookingAttachmentsPurgedNotice": "Los archivos adjuntos se eliminaron automáticamente 30 días después de finalizar la reserva conforme al aviso de privacidad.",
-  "bookingAttachmentsRetentionHelper": "Aviso de privacidad: Los adjuntos de reserva solo son visibles para su hogar y la administración, y se eliminan automáticamente 30 días después de finalizar la reserva (o de inmediato si se cancela)."
+  "bookingAttachmentsRetentionHelper": "Aviso de privacidad: Los adjuntos de reserva solo son visibles para su hogar y la administración, y se eliminan automáticamente 30 días después de finalizar la reserva (o de inmediato si se cancela).",
+  "unknownAddress": "Dirección desconocida",
+  "residentRejectedSuccess": "Solicitud de propiedad rechazada.",
+  "adminProofDeletionNotice": "Aviso de privacidad: Al aprobar o rechazar esta solicitud, la imagen del comprobante de propiedad se elimina permanentemente de la nube."
 }

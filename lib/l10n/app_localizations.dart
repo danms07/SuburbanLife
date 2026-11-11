@@ -4621,6 +4621,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled).'**
   String get bookingAttachmentsRetentionHelper;
+
+  /// No description provided for @unknownAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Address'**
+  String get unknownAddress;
+
+  /// No description provided for @residentRejectedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Ownership claim rejected.'**
+  String get residentRejectedSuccess;
+
+  /// No description provided for @adminProofDeletionNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage.'**
+  String get adminProofDeletionNotice;
 }
 
 class _AppLocalizationsDelegate

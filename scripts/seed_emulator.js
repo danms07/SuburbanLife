@@ -251,10 +251,14 @@ async function createOrUpdateUser(email, password, displayName, role) {
   }
 
   // Set custom claims (both boolean flag for Firestore/Storage rules and role string)
-  await auth.setCustomUserClaims(userRecord.uid, {
-    [role]: true,
-    role: role,
-  });
+  if (role) {
+    await auth.setCustomUserClaims(userRecord.uid, {
+      [role]: true,
+      role: role,
+    });
+  } else {
+    await auth.setCustomUserClaims(userRecord.uid, {});
+  }
   return userRecord;
 }
 
@@ -658,7 +662,54 @@ async function seedUsersAndSamplePayments() {
 
   console.log('✅ Sample payments & sanctions seeded.');
 
-  return { adminUser, residentUser, secondResident, roommateUser, guardUser };
+  // 8. Seed sample pending ownership claim (landscape-oriented deed image to test rotation)
+  console.log('🏠 Seeding sample pending resident ownership claim...');
+  const applicantUser = await createOrUpdateUser('applicant@test.com', 'TestPass123!', 'Elena Vargas', null);
+  const claimedAddressRef = db.collection('addresses').doc('1st_Avenue_101');
+
+  await claimedAddressRef.set({
+    streetName: '1st Avenue',
+    number: 101,
+    residentUid: null,
+    paymentStatus: 'paid',
+    hasActiveSanctions: false,
+    activeSanctionsCount: 0,
+  }, { merge: true });
+
+  await db.collection('users').doc(applicantUser.uid).set({
+    uid: applicantUser.uid,
+    name: 'Elena Vargas',
+    email: 'applicant@test.com',
+    role: 'resident',
+    addressRef: null,
+    familyMembers: [],
+    createdAt: Date.now(),
+  }, { merge: true });
+
+  const ownershipProofPath = `ownership_proofs/${applicantUser.uid}/sample_ownership_proof_landscape.png`;
+  await bucket.file(ownershipProofPath).save(pngBuffer2, {
+    contentType: 'image/png',
+    metadata: {
+      metadata: {
+        uploaderUid: applicantUser.uid,
+        firebaseStorageDownloadTokens: 'sample-ownership-token-001',
+      },
+    },
+  });
+  const ownershipProofUrl = buildStorageUrl(ownershipProofPath, 'sample-ownership-token-001');
+
+  await db.collection('ownership_claims').doc('sample_ownership_claim_1').set({
+    id: 'sample_ownership_claim_1',
+    userUid: applicantUser.uid,
+    addressRef: claimedAddressRef,
+    proofUrl: ownershipProofUrl,
+    status: 'pending',
+    deliveryDate: admin.firestore.Timestamp.fromDate(deliveryDate),
+    timestamp: admin.firestore.Timestamp.now(),
+  });
+  console.log('   - Applicant: applicant@test.com / TestPass123! (Pending claim on 1st Avenue #101)');
+
+  return { adminUser, residentUser, secondResident, roommateUser, guardUser, applicantUser };
 }
 
 async function seedAnnouncements(adminUid) {

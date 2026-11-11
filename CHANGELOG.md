@@ -2,6 +2,25 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.26+27] — 2026-11-10
+
+### Changed
+- **Master-Detail Resident Ownership Approval UI (`AdminResidentApprovalScreen` & `AdminResidentDetailScreen`)**:
+  - Redesigned `AdminResidentApprovalScreen` (`lib/features/auth/admin_resident_approval_screen.dart`) to match the `AdminPaymentApprovalScreen` master-detail workflow:
+    - Added branded `AppConfig.primaryColor` `AppBar` when opened standalone while hiding it seamlessly when embedded inside `AdminShellScreen` (`isEmbedded: true`).
+    - Replaced inline approve/reject list cards with compact, button-free, keyed stateful `_ResidentSummaryCard` widgets displaying physical address (`Street #Number`), `Pending Review` status badge, applicant name chip, property handover date chip, and trailing chevron to eliminate accidental mobile misclicks.
+    - Added dedicated `AdminResidentDetailScreen` adapting via `LayoutBuilder`: side-by-side split layout (`> 650px`) with expanded ownership proof preview on the left and claim metadata + `Reject` / `Approve Resident` actions on the right, and a stacked vertical layout (`<= 650px`) with constrained scrollable metadata and expanded proof preview on mobile.
+    - Masked applicant email addresses (`_maskEmail`) on the detail screen and added a localized privacy-by-design notice (`adminProofDeletionNotice`) explaining automatic Cloud Storage proof deletion upon approval or rejection.
+
+### Added
+- **Inline & Full-Screen 90-Degree Rotatable Ownership Proof Viewer (`AdminResidentDetailScreen` & `showInteractiveImageDialog`)**:
+  - Added inline 90-degree rotation button (`inline_rotate_image_button` / `inline_proof_rotated_box`) and full-screen expand trigger (`fullscreen_proof_button` / `ownership_proof_thumbnail`) directly on `AdminResidentDetailScreen` so sideways deeds or utility bills can be oriented immediately.
+  - Added optional `initialQuarterTurns` parameter to `showInteractiveImageDialog` (`lib/core/widgets/interactive_image_dialog.dart`) so inline rotation carries seamlessly into the full-screen 20%-padded pinch-to-zoom and rotatable viewer.
+- **Emulator Seed, Localization & Widget Tests**:
+  - Added `unknownAddress`, `residentRejectedSuccess`, and `adminProofDeletionNotice` in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
+  - Updated `scripts/seed_emulator.js` to support unverified (`role: null`) accounts and seed `applicant@test.com` (`Elena Vargas`) with a sample landscape deed PNG and pending `ownership_claims` entry on `1st_Avenue_101`.
+  - Expanded `test/features/auth/auth_screens_test.dart` to test empty state, master-detail summary card navigation, wide `> 650px` side-by-side layout, PII email masking, inline + full-screen 90-degree rotation synchronization, approval workflow, and mobile Spanish rejection workflow.
+
 ## [1.0.25+26] — 2026-11-08
 
 ### Added

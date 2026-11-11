@@ -2538,4 +2538,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bookingAttachmentsRetentionHelper =>
       'Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled).';
+
+  @override
+  String get unknownAddress => 'Unknown Address';
+
+  @override
+  String get residentRejectedSuccess => 'Ownership claim rejected.';
+
+  @override
+  String get adminProofDeletionNotice =>
+      'Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage.';
 }

@@ -8,6 +8,7 @@ void showInteractiveImageDialog(
   BuildContext context,
   String imageUrl, {
   String? title,
+  int initialQuarterTurns = 0,
 }) {
   showDialog(
     context: context,
@@ -15,6 +16,7 @@ void showInteractiveImageDialog(
     builder: (context) => _InteractiveImageDialog(
       imageUrl: imageUrl,
       title: title,
+      initialQuarterTurns: initialQuarterTurns,
     ),
   );
 }
@@ -22,10 +24,12 @@ void showInteractiveImageDialog(
 class _InteractiveImageDialog extends StatefulWidget {
   final String imageUrl;
   final String? title;
+  final int initialQuarterTurns;
 
   const _InteractiveImageDialog({
     required this.imageUrl,
     this.title,
+    this.initialQuarterTurns = 0,
   });
 
   @override
@@ -34,9 +38,15 @@ class _InteractiveImageDialog extends StatefulWidget {
 }
 
 class _InteractiveImageDialogState extends State<_InteractiveImageDialog> {
-  int _quarterTurns = 0;
+  late int _quarterTurns;
   final TransformationController _transformationController =
       TransformationController();
+
+  @override
+  void initState() {
+    super.initState();
+    _quarterTurns = widget.initialQuarterTurns % 4;
+  }
 
   @override
   void dispose() {

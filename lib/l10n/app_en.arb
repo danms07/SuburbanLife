@@ -1166,5 +1166,8 @@
     }
   },
   "bookingAttachmentsPurgedNotice": "Attachments automatically removed 30 days after booking completion per privacy policy.",
-  "bookingAttachmentsRetentionHelper": "Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled)."
+  "bookingAttachmentsRetentionHelper": "Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled).",
+  "unknownAddress": "Unknown Address",
+  "residentRejectedSuccess": "Ownership claim rejected.",
+  "adminProofDeletionNotice": "Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage."
 }
