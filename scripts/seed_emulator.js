@@ -122,7 +122,7 @@ const storage = admin.storage();
  * with a distinct Suburban Life blue header bar at top, green seal at bottom-right,
  * and horizontal text lines so 90-degree rotations in the full-screen viewer are clearly visible.
  */
-function generateSampleReceiptPng(width = 360, height = 520) {
+function generateSampleReceiptPng(width = 360, height = 520, quarterTurns = 0) {
   const crcTable = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
     let c = n;
@@ -150,59 +150,80 @@ function generateSampleReceiptPng(width = 360, height = 520) {
     return Buffer.concat([lenBuf, typeBuf, data, crcBuf]);
   }
 
-  const rawData = Buffer.alloc((width * 4 + 1) * height);
-  for (let y = 0; y < height; y++) {
-    const rowStart = y * (width * 4 + 1);
+  function getUprightPixel(x, y) {
+    let r = 248, g = 249, b = 252;
+
+    // Outer border
+    if (x < 8 || x >= width - 8 || y < 8 || y >= height - 8) {
+      r = 40; g = 100; b = 190;
+    }
+    // Top Suburban Life blue header banner (distinct top orientation marker)
+    else if (y >= 8 && y < 95) {
+      r = 40; g = 100; b = 190;
+      if (x >= 28 && x <= 75 && y >= 28 && y <= 75) {
+        r = 255; g = 255; b = 255;
+      }
+      if (y >= 85) {
+        r = 245; g = 158; b = 11;
+      }
+    }
+    // Green amount/property highlight box in upper-middle
+    else if (x >= 32 && x < width - 32 && y >= 125 && y < 185) {
+      r = 220; g = 247; b = 230;
+      if (y < 130 || y >= 180 || x < 37 || x >= width - 37) {
+        r = 37; g = 211; b = 102;
+      }
+    }
+    // Simulated document text rows
+    else if (
+      x >= 36 &&
+      x < width - 60 &&
+      ((y >= 220 && y < 234) ||
+        (y >= 255 && y < 269) ||
+        (y >= 290 && y < 304) ||
+        (y >= 325 && y < 339) ||
+        (y >= 360 && y < 374))
+    ) {
+      r = 115; g = 120; b = 135;
+    }
+    // Distinct green seal circle in bottom-right corner
+    else {
+      const dx = x - (width - 85);
+      const dy = y - (height - 85);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 42 && dist > 30) {
+        r = 37; g = 211; b = 102;
+      } else if (dist <= 22) {
+        r = 200; g = 245; b = 215;
+      }
+    }
+
+    return [r, g, b];
+  }
+
+  const turns = ((quarterTurns % 4) + 4) % 4;
+  const outWidth = turns % 2 === 1 ? height : width;
+  const outHeight = turns % 2 === 1 ? width : height;
+
+  const rawData = Buffer.alloc((outWidth * 4 + 1) * outHeight);
+  for (let y = 0; y < outHeight; y++) {
+    const rowStart = y * (outWidth * 4 + 1);
     rawData[rowStart] = 0; // filter type 0
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < outWidth; x++) {
+      let srcX = x;
+      let srcY = y;
+      if (turns === 1) {
+        srcX = y;
+        srcY = height - 1 - x;
+      } else if (turns === 2) {
+        srcX = width - 1 - x;
+        srcY = height - 1 - y;
+      } else if (turns === 3) {
+        srcX = width - 1 - y;
+        srcY = x;
+      }
+      const [r, g, b] = getUprightPixel(srcX, srcY);
       const px = rowStart + 1 + x * 4;
-      let r = 248, g = 249, b = 252;
-
-      // Outer border
-      if (x < 8 || x >= width - 8 || y < 8 || y >= height - 8) {
-        r = 40; g = 100; b = 190;
-      }
-      // Top Suburban Life blue header banner (distinct top orientation marker)
-      else if (y >= 8 && y < 95) {
-        r = 40; g = 100; b = 190;
-        if (x >= 28 && x <= 75 && y >= 28 && y <= 75) {
-          r = 255; g = 255; b = 255;
-        }
-        if (y >= 85) {
-          r = 245; g = 158; b = 11;
-        }
-      }
-      // Green amount highlight box in upper-middle
-      else if (x >= 32 && x < width - 32 && y >= 125 && y < 185) {
-        r = 220; g = 247; b = 230;
-        if (y < 130 || y >= 180 || x < 37 || x >= width - 37) {
-          r = 37; g = 211; b = 102;
-        }
-      }
-      // Simulated receipt text rows
-      else if (
-        x >= 36 &&
-        x < width - 60 &&
-        ((y >= 220 && y < 234) ||
-          (y >= 255 && y < 269) ||
-          (y >= 290 && y < 304) ||
-          (y >= 325 && y < 339) ||
-          (y >= 360 && y < 374))
-      ) {
-        r = 115; g = 120; b = 135;
-      }
-      // Distinct green approval stamp circle in bottom-right corner
-      else {
-        const dx = x - (width - 85);
-        const dy = y - (height - 85);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 42 && dist > 30) {
-          r = 37; g = 211; b = 102;
-        } else if (dist <= 22) {
-          r = 200; g = 245; b = 215;
-        }
-      }
-
       rawData[px] = r;
       rawData[px + 1] = g;
       rawData[px + 2] = b;
@@ -211,8 +232,8 @@ function generateSampleReceiptPng(width = 360, height = 520) {
   }
 
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
+  ihdr.writeUInt32BE(outWidth, 0);
+  ihdr.writeUInt32BE(outHeight, 4);
   ihdr[8] = 8;
   ihdr[9] = 6;
   ihdr[10] = 0;
@@ -560,7 +581,7 @@ async function seedUsersAndSamplePayments() {
     createdAt: Date.now(),
   }, { merge: true });
 
-  const pngBuffer2 = generateSampleReceiptPng(520, 360);
+  const pngBuffer2 = generateSampleReceiptPng(360, 520, 3);
   const filePath2 = `payments/${secondResident.uid}/sample_receipt_november_landscape.png`;
   await bucket.file(filePath2).save(pngBuffer2, {
     contentType: 'image/png',
@@ -662,52 +683,96 @@ async function seedUsersAndSamplePayments() {
 
   console.log('✅ Sample payments & sanctions seeded.');
 
-  // 8. Seed sample pending ownership claim (landscape-oriented deed image to test rotation)
-  console.log('🏠 Seeding sample pending resident ownership claim...');
-  const applicantUser = await createOrUpdateUser('applicant@test.com', 'TestPass123!', 'Elena Vargas', null);
-  const claimedAddressRef = db.collection('addresses').doc('1st_Avenue_101');
-
-  await claimedAddressRef.set({
-    streetName: '1st Avenue',
-    number: 101,
-    residentUid: null,
-    paymentStatus: 'paid',
-    hasActiveSanctions: false,
-    activeSanctionsCount: 0,
-  }, { merge: true });
-
-  await db.collection('users').doc(applicantUser.uid).set({
-    uid: applicantUser.uid,
-    name: 'Elena Vargas',
-    email: 'applicant@test.com',
-    role: 'resident',
-    addressRef: null,
-    familyMembers: [],
-    createdAt: Date.now(),
-  }, { merge: true });
-
-  const ownershipProofPath = `ownership_proofs/${applicantUser.uid}/sample_ownership_proof_landscape.png`;
-  await bucket.file(ownershipProofPath).save(pngBuffer2, {
-    contentType: 'image/png',
-    metadata: {
-      metadata: {
-        uploaderUid: applicantUser.uid,
-        firebaseStorageDownloadTokens: 'sample-ownership-token-001',
-      },
+  // 8. Seed sample pending ownership claims (sideways, upside-down, and upright PNGs to test rotation)
+  console.log('🏠 Seeding sample pending resident ownership claims...');
+  const upsideDownBuffer = generateSampleReceiptPng(360, 520, 2);
+  const sampleClaims = [
+    {
+      claimId: 'sample_ownership_claim_1',
+      email: 'applicant@test.com',
+      name: 'Elena Vargas',
+      addressDocId: '1st_Avenue_101',
+      streetName: '1st Avenue',
+      number: 101,
+      buffer: pngBuffer2, // 90° sideways (1 click of Rotate makes it upright)
+      fileName: 'sample_ownership_proof_sideways.png',
+      token: 'sample-ownership-token-001',
+      deliveryDate: new Date(now.getFullYear(), now.getMonth() - 2, 15),
     },
-  });
-  const ownershipProofUrl = buildStorageUrl(ownershipProofPath, 'sample-ownership-token-001');
+    {
+      claimId: 'sample_ownership_claim_2',
+      email: 'applicant2@test.com',
+      name: 'Mateo Silva',
+      addressDocId: 'Oak_Street_7',
+      streetName: 'Oak Street',
+      number: 7,
+      buffer: upsideDownBuffer, // 180° upside-down (2 clicks of Rotate makes it upright)
+      fileName: 'sample_ownership_proof_upside_down.png',
+      token: 'sample-ownership-token-002',
+      deliveryDate: new Date(now.getFullYear(), now.getMonth() - 1, 10),
+    },
+    {
+      claimId: 'sample_ownership_claim_3',
+      email: 'applicant3@test.com',
+      name: 'Sofía Herrera',
+      addressDocId: 'Maple_Boulevard_24',
+      streetName: 'Maple Boulevard',
+      number: 24,
+      buffer: pngBuffer, // Upright portrait
+      fileName: 'sample_ownership_proof_portrait.png',
+      token: 'sample-ownership-token-003',
+      deliveryDate: new Date(now.getFullYear(), now.getMonth(), 1),
+    },
+  ];
 
-  await db.collection('ownership_claims').doc('sample_ownership_claim_1').set({
-    id: 'sample_ownership_claim_1',
-    userUid: applicantUser.uid,
-    addressRef: claimedAddressRef,
-    proofUrl: ownershipProofUrl,
-    status: 'pending',
-    deliveryDate: admin.firestore.Timestamp.fromDate(deliveryDate),
-    timestamp: admin.firestore.Timestamp.now(),
-  });
-  console.log('   - Applicant: applicant@test.com / TestPass123! (Pending claim on 1st Avenue #101)');
+  let applicantUser = null;
+  for (const item of sampleClaims) {
+    const userRecord = await createOrUpdateUser(item.email, 'TestPass123!', item.name, null);
+    if (!applicantUser) applicantUser = userRecord;
+
+    const claimedAddressRef = db.collection('addresses').doc(item.addressDocId);
+    await claimedAddressRef.set({
+      streetName: item.streetName,
+      number: item.number,
+      residentUid: null,
+      paymentStatus: 'paid',
+      hasActiveSanctions: false,
+      activeSanctionsCount: 0,
+    }, { merge: true });
+
+    await db.collection('users').doc(userRecord.uid).set({
+      uid: userRecord.uid,
+      name: item.name,
+      email: item.email,
+      role: 'resident',
+      addressRef: null,
+      familyMembers: [],
+      createdAt: Date.now(),
+    }, { merge: true });
+
+    const ownershipProofPath = `ownership_proofs/${userRecord.uid}/${item.fileName}`;
+    await bucket.file(ownershipProofPath).save(item.buffer, {
+      contentType: 'image/png',
+      metadata: {
+        metadata: {
+          uploaderUid: userRecord.uid,
+          firebaseStorageDownloadTokens: item.token,
+        },
+      },
+    });
+    const ownershipProofUrl = buildStorageUrl(ownershipProofPath, item.token);
+
+    await db.collection('ownership_claims').doc(item.claimId).set({
+      id: item.claimId,
+      userUid: userRecord.uid,
+      addressRef: claimedAddressRef,
+      proofUrl: ownershipProofUrl,
+      status: 'pending',
+      deliveryDate: admin.firestore.Timestamp.fromDate(item.deliveryDate),
+      timestamp: admin.firestore.Timestamp.now(),
+    });
+    console.log(`   - Applicant: ${item.email} / TestPass123! (Pending claim on ${item.streetName} #${item.number})`);
+  }
 
   return { adminUser, residentUser, secondResident, roommateUser, guardUser, applicantUser };
 }

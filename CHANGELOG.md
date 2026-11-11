@@ -18,7 +18,7 @@ All notable changes to the **Suburban Life** project are documented in this file
   - Added optional `initialQuarterTurns` parameter to `showInteractiveImageDialog` (`lib/core/widgets/interactive_image_dialog.dart`) so inline rotation carries seamlessly into the full-screen 20%-padded pinch-to-zoom and rotatable viewer.
 - **Emulator Seed, Localization & Widget Tests**:
   - Added `unknownAddress`, `residentRejectedSuccess`, and `adminProofDeletionNotice` in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
-  - Updated `scripts/seed_emulator.js` to support unverified (`role: null`) accounts and seed `applicant@test.com` (`Elena Vargas`) with a sample landscape deed PNG and pending `ownership_claims` entry on `1st_Avenue_101`.
+  - Updated `scripts/seed_emulator.js` to support unverified (`role: null`) accounts and `quarterTurns` PNG pixel rotation, seeding 3 pending `ownership_claims` (`applicant@test.com`, `applicant2@test.com`, `applicant3@test.com`) with sideways, upside-down, and portrait proof images.
   - Expanded `test/features/auth/auth_screens_test.dart` to test empty state, master-detail summary card navigation, wide `> 650px` side-by-side layout, PII email masking, inline + full-screen 90-degree rotation synchronization, approval workflow, and mobile Spanish rejection workflow.
 
 ## [1.0.25+26] — 2026-11-08
