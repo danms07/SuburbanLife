@@ -9,9 +9,9 @@
     - Update cloud functions documentation if needed
     - Update the .gitignore file if needed
     - Check for a conflict with the database_schema.md file, if there is a conflict, plan a refactor strategy
-    - Run the test suite and check the results.
-- When commiting
-    - Check for previously uncommited changes, if exist, handle them first
+    - Bump the app version if the frontend code was changed
+    - Create a commit with a short and concise message. The detailed change history should be recorded in a CHANGELOG.md file
+
 - Before running the Firebase emulator
    - Use `nvm default` to switch to the default node version 
    - Use `npm i -g firebase-tools` to make sure you are using the latest Firebase CLI version 
@@ -20,9 +20,8 @@
 - Always add spanish translations for the UI text
 - Keep the comments in the code updated and concise
 - Keep the README.md updated
-- Refer to Structure.md to gather information about the project
+- Refer toR EADME.md and Structure.md to gather information about the project
 - For bumping the app version, update pubspec.yaml file and version.json file.
-- After bumping the app version, run `flutter build web --source-maps` and `flutter build apk`
 - Use white_logo.png for the favicon icons in the web version
 
 ## Don't
