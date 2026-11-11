@@ -132,8 +132,22 @@ void main() {
           lessThan(tester.getTopLeft(approveBtnFinder).dx),
         );
 
-        // Click the thumbnail to open the full-screen preview dialog
-        await tester.tap(thumbFinder);
+        // Verify inline rotate and full-screen buttons exist on the receipt preview
+        final inlineRotatedBoxFinder = find.byKey(const ValueKey('payment_inline_rotated_box'));
+        final inlineRotateBtnFinder = find.byKey(const ValueKey('payment_inline_rotate_button'));
+        final fullscreenBtnFinder = find.byKey(const ValueKey('payment_fullscreen_button'));
+        expect(inlineRotatedBoxFinder, findsOneWidget);
+        expect(inlineRotateBtnFinder, findsOneWidget);
+        expect(fullscreenBtnFinder, findsOneWidget);
+        expect(tester.widget<RotatedBox>(inlineRotatedBoxFinder).quarterTurns, equals(0));
+
+        // Rotate inline once (0 -> 1) and verify full-screen viewer inherits quarterTurns = 1
+        await tester.tap(inlineRotateBtnFinder);
+        await tester.pump();
+        expect(tester.widget<RotatedBox>(inlineRotatedBoxFinder).quarterTurns, equals(1));
+
+        // Click the fullscreen button to open the full-screen preview dialog
+        await tester.tap(fullscreenBtnFinder);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
@@ -162,16 +176,12 @@ void main() {
         final fullScreenImage = tester.widget<StorageNetworkImage>(fullScreenImageFinder);
         expect(fullScreenImage.fit, equals(BoxFit.contain));
 
-        // Verify initial rotation is 0 quarterTurns
-        expect(tester.widget<RotatedBox>(rotatedBoxFinder).quarterTurns, equals(0));
+        // Verify full-screen viewer inherited 1 quarterTurn from inline preview
+        expect(tester.widget<RotatedBox>(rotatedBoxFinder).quarterTurns, equals(1));
 
-        // Verify rotate button exists and rotates the image through all orientations
+        // Verify rotate button inside dialog continues rotating through all orientations
         final rotateBtnFinder = find.byKey(const ValueKey('rotate_image_button'));
         expect(rotateBtnFinder, findsOneWidget);
-
-        await tester.tap(rotateBtnFinder);
-        await tester.pump();
-        expect(tester.widget<RotatedBox>(rotatedBoxFinder).quarterTurns, equals(1));
 
         await tester.tap(rotateBtnFinder);
         await tester.pump();
@@ -195,8 +205,15 @@ void main() {
     );
 
     testWidgets(
-      'displays linked sanction reason, requested fine amount, and photo evidence on AdminPaymentDetailScreen for sanction payments',
+      'displays linked sanction reason, requested fine amount, and rotatable photo evidence on AdminPaymentDetailScreen for sanction payments',
       (tester) async {
+        tester.view.physicalSize = const Size(1100, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
         FakeBackendHelper.auth.emitUser(
           AppUser(
             uid: 'admin_uid',
@@ -255,6 +272,23 @@ void main() {
         expect(find.text('Infraction Description'), findsOneWidget);
         expect(find.text('Excessive noise during quiet hours after 11:00 PM.'), findsOneWidget);
         expect(find.text('Photo Evidence'), findsOneWidget);
+
+        // Both receipt and sanction evidence have independent inline rotate + fullscreen buttons
+        final sanctionRotateBtn = find.byKey(const ValueKey('sanction_inline_rotate_button'));
+        final sanctionFullscreenBtn = find.byKey(const ValueKey('sanction_fullscreen_button'));
+        final sanctionRotatedBox = find.byKey(const ValueKey('sanction_inline_rotated_box'));
+        final receiptRotatedBox = find.byKey(const ValueKey('payment_inline_rotated_box'));
+
+        expect(sanctionRotateBtn, findsOneWidget);
+        expect(sanctionFullscreenBtn, findsOneWidget);
+        expect(tester.widget<RotatedBox>(sanctionRotatedBox).quarterTurns, equals(0));
+        expect(tester.widget<RotatedBox>(receiptRotatedBox).quarterTurns, equals(0));
+
+        await tester.ensureVisible(sanctionRotateBtn);
+        await tester.tap(sanctionRotateBtn);
+        await tester.pump();
+        expect(tester.widget<RotatedBox>(sanctionRotatedBox).quarterTurns, equals(1));
+        expect(tester.widget<RotatedBox>(receiptRotatedBox).quarterTurns, equals(0));
       },
     );
 

@@ -293,5 +293,50 @@ void main() {
       expect(updatedAddr?['paymentStatus'], equals('paid'));
       expect(updatedAddr?['hasActiveSanctions'], isFalse);
     });
+
+    testWidgets('supports inline rotation and fullscreen viewer controls on sanction evidence photos', (tester) async {
+      final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_ev');
+      FakeBackendHelper.db.seedDocument('addresses', 'addr_ev', {
+        'id': 'addr_ev',
+        'streetName': 'Turin',
+        'number': 88,
+        'paymentStatus': 'restricted',
+      });
+      FakeBackendHelper.db.seedDocument('sanctions', 's_ev_1', {
+        'id': 's_ev_1',
+        'addressRef': addrRef,
+        'residentUid': 'res_ev',
+        'authorizedUids': ['res_ev'],
+        'reason': 'Sideways parking evidence test',
+        'amount': 450.0,
+        'evidenceUrl': 'https://example.com/sideways_car.png',
+        'status': 'pending_review',
+        'createdAt': 3000,
+      });
+
+      await tester.pumpWidget(_wrapWithApp(const AdminSanctionsScreen()));
+      await tester.pumpAndSettle();
+
+      final rotatedBox = find.byKey(const ValueKey('admin_sanction_rotated_box_s_ev_1'));
+      final rotateBtn = find.byKey(const ValueKey('admin_sanction_rotate_btn_s_ev_1'));
+      final fullscreenBtn = find.byKey(const ValueKey('admin_sanction_fullscreen_btn_s_ev_1'));
+
+      expect(rotatedBox, findsOneWidget);
+      expect(rotateBtn, findsOneWidget);
+      expect(fullscreenBtn, findsOneWidget);
+      expect(tester.widget<RotatedBox>(rotatedBox).quarterTurns, equals(0));
+
+      await tester.tap(rotateBtn);
+      await tester.pump();
+      expect(tester.widget<RotatedBox>(rotatedBox).quarterTurns, equals(1));
+
+      await tester.tap(fullscreenBtn);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final dialogRotatedBox = find.byKey(const ValueKey('interactive_image_rotated_box'));
+      expect(dialogRotatedBox, findsOneWidget);
+      expect(tester.widget<RotatedBox>(dialogRotatedBox).quarterTurns, equals(1));
+    });
   });
 }

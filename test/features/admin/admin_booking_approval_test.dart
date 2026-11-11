@@ -217,5 +217,73 @@ void main() {
       expect(openedUrl, equals('https://fake.storage/booking_attachments/res_att/contract.pdf'));
       expect(openedFileName, equals('sofia_signed_contract.pdf'));
     });
+
+    testWidgets('renders inline rotatable preview with rotate and fullscreen buttons for image booking attachments', (tester) async {
+      FakeBackendHelper.db.seedDocument('facilities', 'pool', {
+        'name': 'Community Pool',
+      });
+      FakeBackendHelper.db.seedDocument('users', 'res_img', {
+        'name': 'Diego Resident',
+      });
+      FakeBackendHelper.db.seedDocument('bookings', 'bk_with_img', {
+        'facilityId': 'pool',
+        'userUid': 'res_img',
+        'status': 'pending review',
+        'isConfirmed': false,
+        'hasAttachments': true,
+        'attachmentCount': 1,
+        'startTime': DateTime(2026, 7, 12, 12, 0),
+        'endTime': DateTime(2026, 7, 12, 16, 0),
+      });
+      FakeBackendHelper.db.seedDocument('booking_attachments', 'bk_with_img', {
+        'bookingId': 'bk_with_img',
+        'facilityId': 'pool',
+        'userUid': 'res_img',
+        'attachments': [
+          {
+            'facilityDocId': 'doc_id_photo',
+            'title': 'Signed Rules Photo',
+            'requirementMode': 'mandatory_return',
+            'fileName': 'signed_rules.png',
+            'fileType': 'png',
+            'fileSize': 40960,
+            'url': 'https://fake.storage/booking_attachments/res_img/signed_rules.png',
+            'storagePath': 'booking_attachments/res_img/signed_rules.png',
+            'uploadedAt': 1700000000000,
+          },
+        ],
+      });
+
+      await tester.pumpWidget(_wrapWithL10n(const AdminBookingApprovalScreen()));
+      await tester.pumpAndSettle();
+
+      final rotatedBoxFinder = find.byKey(
+        const ValueKey('booking_att_rotated_box_bk_with_img_doc_id_photo'),
+      );
+      final rotateBtnFinder = find.byKey(
+        const ValueKey('booking_att_rotate_btn_bk_with_img_doc_id_photo'),
+      );
+      final fullscreenBtnFinder = find.byKey(
+        const ValueKey('booking_att_fullscreen_btn_bk_with_img_doc_id_photo'),
+      );
+
+      expect(rotatedBoxFinder, findsOneWidget);
+      expect(rotateBtnFinder, findsOneWidget);
+      expect(fullscreenBtnFinder, findsOneWidget);
+      expect(tester.widget<RotatedBox>(rotatedBoxFinder).quarterTurns, equals(0));
+
+      await tester.ensureVisible(rotateBtnFinder);
+      await tester.tap(rotateBtnFinder);
+      await tester.pump();
+      expect(tester.widget<RotatedBox>(rotatedBoxFinder).quarterTurns, equals(1));
+
+      await tester.tap(fullscreenBtnFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final dialogRotatedBox = find.byKey(const ValueKey('interactive_image_rotated_box'));
+      expect(dialogRotatedBox, findsOneWidget);
+      expect(tester.widget<RotatedBox>(dialogRotatedBox).quarterTurns, equals(1));
+    });
   });
 }

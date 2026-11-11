@@ -209,7 +209,7 @@ The **Review Payments** list displays compact summary cards showing basic addres
 * **Folio Chip**: Unique transaction or bank reference number.
 * **Payment Date Chip**: Date the payment was made.
 * **Covered Periods Chips**: Lists every billing month (`YYYY-MM`) covered by a single receipt when a resident pays multiple months at once.
-* **Receipt Thumbnail & Full-Screen Rotatable Viewer**: Displays an expanded clickable preview thumbnail of the proof of payment that fills the middle vertical space of the screen. Tap anywhere on the thumbnail to open a full-screen viewer with 20% padding, pinch-to-zoom (`4.0x` magnification), and a rotate button (`90°` increments) to inspect receipts regardless of camera orientation.
+* **Receipt & Sanction Evidence Preview with Inline Rotate + Full-Screen Controls**: Displays an expanded preview of the proof of payment (and an inline preview of the linked infraction photo when reviewing a **Sanction** payment) equipped with two top-right overlay buttons: **Rotate (`90°`)** (`Icons.rotate_right`) to orient sideways receipts immediately inline, and **View Full Image** (`Icons.open_in_full`, or tap anywhere on the preview) to launch the full-screen viewer with 20% padding, pinch-to-zoom (`4.0x` magnification), and synchronized `90°` rotation.
 
 #### Approving or Rejecting a Payment
 * **Approve**: Marks the payment as `approved`.

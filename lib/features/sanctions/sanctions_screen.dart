@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
-import '../../core/widgets/interactive_image_dialog.dart';
-import '../../core/widgets/storage_network_image.dart';
+import '../../core/widgets/rotatable_image_preview.dart';
 import '../../l10n/app_localizations.dart';
 import '../payments/payment_screen.dart';
 
@@ -231,41 +230,16 @@ class _SanctionItemCard extends StatelessWidget {
             // Evidence Photo Preview
             if (evidenceUrl.isNotEmpty) ...[
               const SizedBox(height: 4),
-              InkWell(
-                onTap: () => showInteractiveImageDialog(context, evidenceUrl),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      StorageNetworkImage(
-                        imageUrl: evidenceUrl,
-                        height: 160,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                      Container(
-                        margin: const EdgeInsets.all(8),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.6),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.zoom_in, color: Colors.white, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              'Zoom',
-                              style: TextStyle(color: Colors.white, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              RotatableImagePreview(
+                imageUrl: evidenceUrl,
+                dialogTitle: l10n.sanctionEvidencePhoto,
+                height: 160,
+                padding: const EdgeInsets.all(8),
+                borderRadius: 10,
+                thumbnailKey: ValueKey('resident_sanction_evidence_thumb_${sanction['id'] ?? evidenceUrl.hashCode}'),
+                rotatedBoxKey: ValueKey('resident_sanction_rotated_box_${sanction['id'] ?? evidenceUrl.hashCode}'),
+                rotateButtonKey: ValueKey('resident_sanction_rotate_btn_${sanction['id'] ?? evidenceUrl.hashCode}'),
+                fullscreenButtonKey: ValueKey('resident_sanction_fullscreen_btn_${sanction['id'] ?? evidenceUrl.hashCode}'),
               ),
               const SizedBox(height: 12),
             ],

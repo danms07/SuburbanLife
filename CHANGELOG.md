@@ -2,6 +2,21 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.27+28] — 2026-11-11
+
+### Added
+- **Shared Rotatable Evidence Preview Component (`RotatableImagePreview`)**:
+  - Created `lib/core/widgets/rotatable_image_preview.dart` encapsulating `RotatedBox`, `StorageNetworkImage`, full-surface clickable `InkWell`, and the two top-right circular overlay buttons: **Rotate Image (`90°`)** (`Icons.rotate_right`) and **View Full Image** (`Icons.open_in_full`), forwarding the active inline orientation (`initialQuarterTurns`) into `showInteractiveImageDialog`.
+
+### Changed
+- **Unified Inline Rotate & Full-Screen Controls Across All Evidence Approval Flows**:
+  - **Payment Approval (`AdminPaymentDetailScreen`)**: Upgraded both the primary proof-of-payment receipt viewer and the linked sanction infraction photo viewer (`concept == 'sanction'`) to `RotatableImagePreview`, with constrained scrollable payment metadata on mobile (`<= 650px`) to prevent vertical overflow.
+  - **Amenity Booking Approval (`AdminBookingApprovalScreen`)**: Rendered inline `RotatableImagePreview` containers with top-right rotate and full-screen buttons beneath image attachments (`jpg`, `jpeg`, `png`, `webp`) in the **Submitted Documentation** section while preserving `View / Download` actions for all document types.
+  - **Sanctions Evidence (`AdminSanctionsScreen` & `SanctionsScreen`)**: Replaced plain `StorageNetworkImage` thumbnails (and removed the legacy hardcoded `'Zoom'` badge in `SanctionsScreen`) with `RotatableImagePreview` so administrators and residents can rotate and expand infraction evidence directly on sanction cards.
+  - **Resident Ownership Approval (`AdminResidentDetailScreen`)**: Refactored `buildProofPreview()` to consume the shared `RotatableImagePreview` widget while preserving all existing keys and layout behavior.
+- **Automated Widget Tests**:
+  - Expanded `test/features/admin/admin_payment_approval_test.dart`, `test/features/admin/admin_booking_approval_test.dart`, and `test/features/sanctions/sanctions_screens_test.dart` to assert inline 90-degree rotation and `initialQuarterTurns` synchronization into the full-screen viewer across receipts, linked sanction evidence, image booking attachments, and sanction cards.
+
 ## [1.0.26+27] — 2026-11-10
 
 ### Changed

@@ -209,7 +209,7 @@ La lista **Revisar Pagos** muestra tarjetas de resumen con la información bási
 * **Chip de Folio**: Número de referencia bancaria o folio de transacción.
 * **Chip de Fecha de Pago**: Fecha en que se realizó el pago.
 * **Chips de Periodos Cubiertos**: Muestra todos los meses (`AAAA-MM`) cubiertos por un mismo comprobante cuando el residente paga varios meses en una sola exhibición.
-* **Miniatura del Comprobante y Visor Rotable en Pantalla Completa**: Muestra una vista previa expandida y seleccionable del comprobante ocupando el espacio vertical central de la pantalla. Toca cualquier parte de la miniatura para abrir el visor en pantalla completa con un margen (padding) del 20%, zoom de hasta `4.0x` y un botón para rotar la imagen (`90°` por toque) sin importar la orientación en que fue tomada la fotografía.
+* **Vista Previa del Comprobante y Evidencia de Sanción con Rotación en Línea y Pantalla Completa**: Muestra una vista previa expandida del comprobante de pago (así como la fotografía de evidencia vinculada cuando se revisa el pago de una **Sanción**) equipada con dos botones circulares en la esquina superior derecha: **Rotar (`90°`)** (`Icons.rotate_right`) para enderezar comprobantes horizontales directamente en pantalla, y **Ver Imagen Completa** (`Icons.open_in_full`, o tocando cualquier parte de la imagen) para abrir el visor en pantalla completa con margen del 20%, zoom de hasta `4.0x` y rotación sincronizada.
 
 #### Aprobar o Rechazar un Pago
 * **Aprobar**: Marca el pago como `approved`.

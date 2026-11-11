@@ -6,8 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/temp_image_cleanup_service.dart';
-import '../../core/widgets/interactive_image_dialog.dart';
-import '../../core/widgets/storage_network_image.dart';
+import '../../core/widgets/rotatable_image_preview.dart';
 import '../../l10n/app_localizations.dart';
 import '../payments/payment_service.dart';
 
@@ -319,17 +318,16 @@ class _AdminSanctionCard extends StatelessWidget {
             const SizedBox(height: 10),
 
             if (evidenceUrl.isNotEmpty) ...[
-              InkWell(
-                onTap: () => showInteractiveImageDialog(context, evidenceUrl),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: StorageNetworkImage(
-                    imageUrl: evidenceUrl,
-                    height: 140,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                ),
+              RotatableImagePreview(
+                imageUrl: evidenceUrl,
+                dialogTitle: l10n.sanctionEvidencePhoto,
+                height: 160,
+                padding: const EdgeInsets.all(8),
+                borderRadius: 10,
+                thumbnailKey: ValueKey('admin_sanction_evidence_thumb_${sanction['id'] ?? evidenceUrl.hashCode}'),
+                rotatedBoxKey: ValueKey('admin_sanction_rotated_box_${sanction['id'] ?? evidenceUrl.hashCode}'),
+                rotateButtonKey: ValueKey('admin_sanction_rotate_btn_${sanction['id'] ?? evidenceUrl.hashCode}'),
+                fullscreenButtonKey: ValueKey('admin_sanction_fullscreen_btn_${sanction['id'] ?? evidenceUrl.hashCode}'),
               ),
               const SizedBox(height: 10),
             ],

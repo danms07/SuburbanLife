@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
-import '../../core/widgets/interactive_image_dialog.dart';
+import '../../core/widgets/rotatable_image_preview.dart';
 import '../../l10n/app_localizations.dart';
-import '../../core/widgets/storage_network_image.dart';
 import '../payments/payment_service.dart';
 
 class AdminPaymentApprovalScreen extends StatefulWidget {
@@ -549,10 +548,6 @@ class _AdminPaymentDetailScreenState extends State<AdminPaymentDetailScreen> {
     }
   }
 
-  void _showImagePreview(String url) {
-    showInteractiveImageDialog(context, url);
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -818,20 +813,31 @@ class _AdminPaymentDetailScreenState extends State<AdminPaymentDetailScreen> {
                       ],
                       if (evidenceUrl.isNotEmpty) ...[
                         const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: OutlinedButton.icon(
-                            onPressed: () => _showImagePreview(evidenceUrl),
-                            icon: Icon(Icons.photo_library_outlined, size: 16, color: Colors.red.shade800),
-                            label: Text(
+                        Row(
+                          children: [
+                            Icon(Icons.photo_library_outlined, size: 15, color: Colors.red.shade800),
+                            const SizedBox(width: 6),
+                            Text(
                               l10n.sanctionEvidencePhoto,
-                              style: TextStyle(fontSize: 12, color: Colors.red.shade800),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red.shade800,
+                              ),
                             ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: Colors.red.shade300),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        RotatableImagePreview(
+                          imageUrl: evidenceUrl,
+                          dialogTitle: l10n.sanctionEvidencePhoto,
+                          height: 160,
+                          padding: const EdgeInsets.all(8),
+                          borderRadius: 10,
+                          thumbnailKey: const ValueKey('sanction_evidence_thumbnail'),
+                          rotatedBoxKey: const ValueKey('sanction_inline_rotated_box'),
+                          rotateButtonKey: const ValueKey('sanction_inline_rotate_button'),
+                          fullscreenButtonKey: const ValueKey('sanction_fullscreen_button'),
                         ),
                       ],
                     ],
@@ -847,38 +853,13 @@ class _AdminPaymentDetailScreenState extends State<AdminPaymentDetailScreen> {
       if (receiptUrl.isEmpty) {
         return const SizedBox.shrink();
       }
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: IgnorePointer(
-                  child: StorageNetworkImage(
-                    imageUrl: receiptUrl,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    key: const ValueKey('payment_receipt_thumbnail'),
-                    onTap: () => _showImagePreview(receiptUrl),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return RotatableImagePreview(
+        imageUrl: receiptUrl,
+        dialogTitle: l10n.reviewPaymentsMenu,
+        thumbnailKey: const ValueKey('payment_receipt_thumbnail'),
+        rotatedBoxKey: const ValueKey('payment_inline_rotated_box'),
+        rotateButtonKey: const ValueKey('payment_inline_rotate_button'),
+        fullscreenButtonKey: const ValueKey('payment_fullscreen_button'),
       );
     }
 
@@ -945,8 +926,10 @@ class _AdminPaymentDetailScreenState extends State<AdminPaymentDetailScreen> {
           padding: const EdgeInsets.all(20),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final actionBottomMargin = constraints.maxHeight * 0.1;
               if (constraints.maxWidth > 650.0) {
+                final actionBottomMargin = constraints.maxHeight > 500.0
+                    ? constraints.maxHeight * 0.1
+                    : 8.0;
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -978,13 +961,20 @@ class _AdminPaymentDetailScreenState extends State<AdminPaymentDetailScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  buildPaymentInfo(),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: constraints.maxHeight * 0.45,
+                    ),
+                    child: SingleChildScrollView(
+                      child: buildPaymentInfo(),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Expanded(
                     child: buildReceiptPreview(),
                   ),
                   const SizedBox(height: 16),
-                  buildActionButtons(actionBottomMargin),
+                  buildActionButtons(12.0),
                 ],
               );
             },

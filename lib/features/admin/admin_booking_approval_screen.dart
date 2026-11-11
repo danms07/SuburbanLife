@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/document_transfer_helper.dart';
+import '../../core/widgets/rotatable_image_preview.dart';
 import '../../l10n/app_localizations.dart';
 import '../booking/booking_service.dart';
 import '../booking/facility_document_models.dart';
@@ -518,50 +519,73 @@ class _BookingApprovalCard extends StatelessWidget {
                               )
                             else
                               ...attachments.map((att) {
+                                final ext = att.fileType.trim().toLowerCase();
+                                final isImageAttachment =
+                                    DocumentTransferHelper.imageExtensions.contains(ext) &&
+                                    att.url.isNotEmpty;
                                 return Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Wrap(
-                                    spacing: 8,
-                                    runSpacing: 6,
-                                    crossAxisAlignment: WrapCrossAlignment.center,
-                                    alignment: WrapAlignment.spaceBetween,
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 6,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        alignment: WrapAlignment.spaceBetween,
                                         children: [
-                                          Icon(
-                                            DocumentTransferHelper.iconForExtension(att.fileType),
-                                            size: 18,
-                                            color: AppConfig.primaryColor,
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                DocumentTransferHelper.iconForExtension(att.fileType),
+                                                size: 18,
+                                                color: AppConfig.primaryColor,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  '${att.title} (${att.fileName})',
+                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              FacilityDocumentsSection.buildModeBadge(l10n, att.requirementMode),
+                                            ],
                                           ),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: Text(
-                                              '${att.title} (${att.fileName})',
-                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                          OutlinedButton.icon(
+                                            key: ValueKey('approval_view_attachment_${bookingId}_${att.facilityDocId}'),
+                                            onPressed: () {
+                                              DocumentTransferHelper.openOrDownloadDocument(
+                                                context: context,
+                                                cacheId: 'batt_${bookingId}_${att.facilityDocId}',
+                                                url: att.url,
+                                                fileName: att.fileName,
+                                                title: att.title,
+                                              );
+                                            },
+                                            icon: const Icon(Icons.open_in_new, size: 15),
+                                            label: Text(
+                                              l10n.viewBookingAttachmentButton,
+                                              style: const TextStyle(fontSize: 12),
                                             ),
                                           ),
-                                          const SizedBox(width: 6),
-                                          FacilityDocumentsSection.buildModeBadge(l10n, att.requirementMode),
                                         ],
                                       ),
-                                      OutlinedButton.icon(
-                                        key: ValueKey('approval_view_attachment_${bookingId}_${att.facilityDocId}'),
-                                        onPressed: () {
-                                          DocumentTransferHelper.openOrDownloadDocument(
-                                            context: context,
-                                            cacheId: 'batt_${bookingId}_${att.facilityDocId}',
-                                            url: att.url,
-                                            fileName: att.fileName,
-                                            title: att.title,
-                                          );
-                                        },
-                                        icon: const Icon(Icons.open_in_new, size: 15),
-                                        label: Text(
-                                          l10n.viewBookingAttachmentButton,
-                                          style: const TextStyle(fontSize: 12),
+                                      if (isImageAttachment) ...[
+                                        const SizedBox(height: 8),
+                                        RotatableImagePreview(
+                                          imageUrl: att.url,
+                                          dialogTitle: att.title,
+                                          height: 180,
+                                          padding: const EdgeInsets.all(8),
+                                          borderRadius: 10,
+                                          thumbnailKey: ValueKey('booking_att_thumbnail_${bookingId}_${att.facilityDocId}'),
+                                          rotatedBoxKey: ValueKey('booking_att_rotated_box_${bookingId}_${att.facilityDocId}'),
+                                          rotateButtonKey: ValueKey('booking_att_rotate_btn_${bookingId}_${att.facilityDocId}'),
+                                          fullscreenButtonKey: ValueKey('booking_att_fullscreen_btn_${bookingId}_${att.facilityDocId}'),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 );

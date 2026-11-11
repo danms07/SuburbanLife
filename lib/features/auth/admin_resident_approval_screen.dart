@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
-import '../../core/widgets/interactive_image_dialog.dart';
-import '../../core/widgets/storage_network_image.dart';
+import '../../core/widgets/rotatable_image_preview.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminResidentApprovalScreen extends StatefulWidget {
@@ -399,7 +398,6 @@ class AdminResidentDetailScreen extends StatefulWidget {
 
 class _AdminResidentDetailScreenState extends State<AdminResidentDetailScreen> {
   bool _isProcessing = false;
-  int _inlineQuarterTurns = 0;
   Future<Map<String, dynamic>?>? _addressFuture;
   Future<Map<String, dynamic>?>? _userFuture;
 
@@ -408,20 +406,6 @@ class _AdminResidentDetailScreenState extends State<AdminResidentDetailScreen> {
     super.initState();
     _addressFuture = _fetchClaimAddress(widget.doc);
     _userFuture = _fetchClaimUser(widget.doc);
-  }
-
-  void _rotateInlinePreview() {
-    setState(() {
-      _inlineQuarterTurns = (_inlineQuarterTurns + 1) % 4;
-    });
-  }
-
-  void _showImagePreview(String url) {
-    showInteractiveImageDialog(
-      context,
-      url,
-      initialQuarterTurns: _inlineQuarterTurns,
-    );
   }
 
   Future<void> _approveClaim(Map<String, dynamic> claimDoc) async {
@@ -809,82 +793,13 @@ class _AdminResidentDetailScreenState extends State<AdminResidentDetailScreen> {
       if (proofUrl.isEmpty) {
         return const SizedBox.shrink();
       }
-      return Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: IgnorePointer(
-                  child: RotatedBox(
-                    key: const ValueKey('inline_proof_rotated_box'),
-                    quarterTurns: _inlineQuarterTurns,
-                    child: StorageNetworkImage(
-                      imageUrl: proofUrl,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    key: const ValueKey('ownership_proof_thumbnail'),
-                    onTap: () => _showImagePreview(proofUrl),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Material(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: IconButton(
-                        key: const ValueKey('inline_rotate_image_button'),
-                        tooltip: l10n.rotateImage,
-                        icon: const Icon(
-                          Icons.rotate_right,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        onPressed: _rotateInlinePreview,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Material(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      shape: const CircleBorder(),
-                      clipBehavior: Clip.antiAlias,
-                      child: IconButton(
-                        key: const ValueKey('fullscreen_proof_button'),
-                        tooltip: l10n.viewFullImage,
-                        icon: const Icon(
-                          Icons.open_in_full,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                        onPressed: () => _showImagePreview(proofUrl),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      return RotatableImagePreview(
+        imageUrl: proofUrl,
+        dialogTitle: l10n.approveResidentsMenu,
+        thumbnailKey: const ValueKey('ownership_proof_thumbnail'),
+        rotatedBoxKey: const ValueKey('inline_proof_rotated_box'),
+        rotateButtonKey: const ValueKey('inline_rotate_image_button'),
+        fullscreenButtonKey: const ValueKey('fullscreen_proof_button'),
       );
     }
 
