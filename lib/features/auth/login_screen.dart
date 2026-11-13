@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   void _login() async {
+    if (_isLoading) return;
     final l10n = AppLocalizations.of(context)!;
     setState(() {
       _isLoading = true;
@@ -42,6 +43,13 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(content: Text(l10n.loginFailed)),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -159,6 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                                 keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
                               ),
                               const SizedBox(height: 16),
                               TextField(
@@ -182,6 +191,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                                 ),
                                 obscureText: _obscurePassword,
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => _login(),
                               ),
                               const SizedBox(height: 12),
                               Align(
@@ -317,6 +328,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
                           ),
                           const SizedBox(height: 16),
                           TextField(
@@ -340,6 +352,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                             obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _login(),
                           ),
                           const SizedBox(height: 12),
                           Align(

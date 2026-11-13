@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-10 (v1.0.26+27 — Master-Detail Resident Ownership Approval UI with Rotatable Proof Inspection: compact button-free `_ResidentSummaryCard` list in `AdminResidentApprovalScreen`, responsive `AdminResidentDetailScreen` (`> 650px` side-by-side / mobile stacked), PII-masked applicant email chip, inline 90-degree rotation + `showInteractiveImageDialog` `initialQuarterTurns` synchronization, emulator seed sample ownership claim, EN/ES l18n, and widget tests)*
+*Last Verified/Updated: 2026-11-13 (v1.0.28+29 — Keyboard Submission & Enter Flow on LoginScreen: Added `TextInputAction.done` and `onSubmitted` on password field to trigger sign-in on Enter for desktop web, `TextInputAction.next` on email field, controller cleanup in `dispose()`, and automated widget tests)*
 
 Current state of project files and folders:
 

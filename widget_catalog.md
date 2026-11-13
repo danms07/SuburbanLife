@@ -60,7 +60,7 @@ The following table maps each visual component to its feature domain and source 
 
 ## 2. Padded Form Cards
 - **Description**: Elevated card containers (`elevation: 4`) wrapping input forms to provide a clean, glassmorphism-inspired layering effect on top of the scaffold background.
-- **Usage**: Used in authentication and registration screens to house `TextField` and `ElevatedButton` components.
+- **Usage**: Used in authentication and registration screens to house `TextField` and `ElevatedButton` components. In `LoginScreen`, the email input is configured with `TextInputAction.next` and the password input with `TextInputAction.done` alongside `onSubmitted` to trigger the sign-in flow immediately upon pressing Enter on desktop web and hardware keyboards.
 - **Properties**:
   - Border radius: 15px
   - Internal padding: 24px

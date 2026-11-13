@@ -103,6 +103,40 @@ void main() {
       expect(find.text(l10n.loginSuccess), findsOneWidget);
     });
 
+    testWidgets('triggers sign in flow when submitting password text field on desktop web (>900px)', (tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      String? capturedEmail;
+      String? capturedPassword;
+
+      FakeBackendHelper.auth.signInHandler = (email, password) async {
+        capturedEmail = email;
+        capturedPassword = password;
+        return AppUser(uid: 'u_login', email: email, displayName: 'Test User');
+      };
+
+      await tester.pumpWidget(_wrapWithApp(const LoginScreen()));
+      await tester.pumpAndSettle();
+
+      final l10n = _enL10n(tester);
+
+      final textFields = find.byType(TextField);
+      expect(textFields, findsNWidgets(2));
+      await tester.enterText(textFields.at(0), 'resident@catania.com');
+      await tester.enterText(textFields.at(1), 'ValidPass#99');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pumpAndSettle();
+
+      expect(capturedEmail, equals('resident@catania.com'));
+      expect(capturedPassword, equals('ValidPass#99'));
+      expect(find.text(l10n.loginSuccess), findsOneWidget);
+    });
+
     testWidgets('renders mobile layout and navigates to ForgotPasswordScreen and SignupScreen', (tester) async {
       tester.view.physicalSize = const Size(400, 850);
       tester.view.devicePixelRatio = 1.0;

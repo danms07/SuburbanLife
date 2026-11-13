@@ -2,6 +2,17 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.28+29] — 2026-11-13
+
+### Changed
+- **Desktop & Keyboard Sign-In Flow on `LoginScreen`**:
+  - Added `textInputAction: TextInputAction.done` and `onSubmitted: (_) => _login()` to the password text field across both desktop/wide and mobile layouts, allowing users to authenticate by pressing Enter without having to manually click the Sign In button.
+  - Added `textInputAction: TextInputAction.next` to the email text field to advance focus naturally to the password field.
+  - Added `if (_isLoading) return;` guard to `_login()` to prevent accidental duplicate submission.
+  - Implemented `dispose()` for `_emailController` and `_passwordController` to prevent memory leaks.
+- **Automated Widget Tests**:
+  - Added widget test in `test/features/auth/auth_screens_test.dart` verifying that submitting the password field triggers the sign-in workflow on desktop web.
+
 ## [1.0.27+28] — 2026-11-11
 
 ### Added
