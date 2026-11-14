@@ -2,6 +2,27 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.29+30] — 2026-11-14
+
+### Added
+- **Bulk Previous Payments Import Interface (`AdminBulkPaymentImportScreen`)**:
+  - Implemented `lib/features/admin/admin_bulk_payment_import_screen.dart` allowing administrators to upload historical resident payments in bulk via CSV.
+  - Added interactive **Starting Period** calendar picker selector defaulting the end period to the current calendar month.
+  - Added dual template downloads: **Sample Template** (with dummy amounts) and **All Addresses Template** (pre-populating all registered community addresses with empty month columns).
+  - Built client-side parser supporting case-insensitive street matching, bilingual English/Spanish `mmm-yy` periods, monetary amount extraction (`$1,500.00`, `1500`), and empty/0 unpaid handling.
+  - Created sequential pre-import reconciliation dialog guiding admins through amount discrepancies (`existingAmount != csvAmount`) to choose "Keep Existing" vs. "Overwrite with CSV" prior to committing.
+  - Added comprehensive results reporting displaying summary metrics, color-coded per-address breakdown, and downloadable results CSV export.
+- **Callable Cloud Functions for Pre-Check & Bulk Import**:
+  - Added `adminPreCheckPaymentImport` in `functions/index.js` to resolve addresses, match existing approved payments, and detect amount mismatches in a single request.
+  - Added `adminBulkImportPayments` in `functions/index.js` to batch-create approved `payments` documents, apply reconciliation directives, skip identical periods idempotently, and trigger automatic `recalculateAddressPaymentStatus` on affected addresses.
+- **Admin Shell Navigation & Screen Shortcuts**:
+  - Activated `AdminSection.importPaymentHistory` in `admin_shell_screen.dart` under the **Finance** menu.
+  - Added direct navigation shortcut buttons in `AdminUploadPaymentScreen` and `AdminPaymentReportScreen`.
+- **Localization & Automated Tests**:
+  - Added complete English and Spanish translation keys in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
+  - Added unit tests in `functions/test/helpers.test.js` and `functions/test/handlers.test.js` verifying period parsing, street normalization, and RBAC enforcement.
+  - Added Flutter widget and parser tests in `test/features/admin/admin_bulk_payment_import_test.dart`.
+
 ## [1.0.28+29] — 2026-11-13
 
 ### Changed

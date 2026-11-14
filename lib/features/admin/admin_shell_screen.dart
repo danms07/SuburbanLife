@@ -16,6 +16,7 @@ import 'admin_create_user_screen.dart';
 import 'admin_facilities_screen.dart';
 import 'admin_payment_approval_screen.dart';
 import 'admin_payment_report_screen.dart';
+import 'admin_bulk_payment_import_screen.dart';
 import 'admin_settings_screen.dart';
 import 'admin_upload_payment_screen.dart';
 import 'admin_user_management_screen.dart';
@@ -41,8 +42,7 @@ enum AdminSection {
   reviewPayments,
   uploadPayment,
   downloadPaymentReport,
-  // TODO(feature): Import payment history (uncomment when screen is implemented)
-  // importPaymentHistory,
+  importPaymentHistory,
 
   // Transparency & Community
   announcements,
@@ -342,8 +342,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
             label: l10n.downloadReportMenu,
             icon: Icons.table_chart,
           ),
-          // TODO(feature): Import payment history (AdminSection.importPaymentHistory)
-          // Reserved menu slot — keep hidden until feature is implemented.
+          _AdminNavItem(
+            section: AdminSection.importPaymentHistory,
+            label: l10n.bulkPaymentImportMenu,
+            icon: Icons.history_edu,
+          ),
         ],
       ),
       _AdminNavGroup(
@@ -894,6 +897,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return const AdminUploadPaymentScreen(isEmbedded: true);
       case AdminSection.downloadPaymentReport:
         return const AdminPaymentReportScreen(isEmbedded: true);
+      case AdminSection.importPaymentHistory:
+        return const AdminBulkPaymentImportScreen(isEmbedded: true);
       case AdminSection.announcements:
         return AnnouncementsScreen(
           isEmbedded: true,

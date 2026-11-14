@@ -2516,6 +2516,393 @@ exports.adminBulkImportAddresses = onCall(callableOptions, async (request) => {
   };
 });
 
+const BULK_PAYMENT_MONTH_MAP = {
+  // English
+  'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+  'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+  // Spanish
+  'ene': 1, 'abr': 4, 'ago': 8, 'set': 9, 'dic': 12,
+};
+
+/**
+ * Normalizes a street name for case- and diacritic-insensitive matching.
+ */
+function normalizeStreetName(street) {
+  if (!street || typeof street !== 'string') return '';
+  return street
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Parses a period header string (e.g. 'Nov-24', 'ene-25', '2024-11', 'Dec-2024')
+ * into canonical 'YYYY-MM' format. Returns null if invalid.
+ */
+function parsePeriodHeader(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const str = raw.trim().toLowerCase();
+
+  // 1. Direct YYYY-MM or YYYY/MM match
+  const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})$/);
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = parseInt(isoMatch[2], 10);
+    if (m >= 1 && m <= 12) {
+      return `${y}-${String(m).padStart(2, '0')}`;
+    }
+    return null;
+  }
+
+  // 2. mmm-yy, mmm-yyyy, mmm/yy, mmm yy, mmm_yy
+  const textMatch = str.match(/^([a-z]{3,4})[-/_\s]?(\d{2}|\d{4})$/);
+  if (textMatch) {
+    const monthKey = textMatch[1];
+    const yearRaw = parseInt(textMatch[2], 10);
+    const monthNum = BULK_PAYMENT_MONTH_MAP[monthKey];
+    if (!monthNum) return null;
+
+    let fullYear = yearRaw;
+    if (textMatch[2].length === 2) {
+      fullYear = yearRaw < 70 ? 2000 + yearRaw : 1900 + yearRaw;
+    }
+    return `${fullYear}-${String(monthNum).padStart(2, '0')}`;
+  }
+
+  return null;
+}
+
+/**
+ * Callable Cloud Function: Pre-checks a payment bulk import CSV dataset.
+ * Resolves addresses, matches existing payments, and detects amount discrepancies.
+ */
+exports.adminPreCheckPaymentImport = onCall(callableOptions, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { items } = request.data || {};
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new HttpsError('invalid-argument', 'Must provide a non-empty array of items.');
+  }
+
+  const db = admin.firestore();
+
+  // Pre-fetch all addresses into in-memory map
+  const allAddressesSnap = await db.collection('addresses').get();
+  const addressMap = new Map();
+  for (const doc of allAddressesSnap.docs) {
+    const d = doc.data();
+    if (d.streetName && d.number !== undefined && d.number !== null) {
+      const key = `${normalizeStreetName(d.streetName)}::${parseInt(d.number, 10)}`;
+      addressMap.set(key, doc);
+    }
+  }
+
+  const unmatchedAddresses = [];
+  const mismatches = [];
+  let matchedAddressesCount = 0;
+  let identicalPeriodsCount = 0;
+  let newPeriodsCount = 0;
+
+  for (const item of items) {
+    const streetName = (item.streetName || item.street || '').toString().trim();
+    const num = parseInt(item.number, 10);
+    const periodAmounts = item.periodAmounts || {};
+
+    const key = `${normalizeStreetName(streetName)}::${num}`;
+    const addressDoc = addressMap.get(key);
+
+    if (!addressDoc) {
+      unmatchedAddresses.push({ street: streetName, number: item.number });
+      continue;
+    }
+
+    matchedAddressesCount++;
+
+    // Query existing payments for this address
+    const paymentsSnap = await db.collection('payments')
+      .where('addressRef', '==', addressDoc.ref)
+      .get();
+
+    const existingPeriodAmounts = {};
+    for (const pDoc of paymentsSnap.docs) {
+      const p = pDoc.data();
+      if (p.concept && p.concept !== 'monthly quota') continue;
+      if (p.status !== 'approved' && p.status !== 'paid') continue;
+
+      const periods = [];
+      if (Array.isArray(p.periods)) {
+        for (const pr of p.periods) {
+          if (pr && typeof pr === 'string') periods.push(pr.trim());
+        }
+      } else if (p.period) {
+        for (const pr of p.period.toString().split(',')) {
+          if (pr.trim()) periods.push(pr.trim());
+        }
+      }
+
+      const paymentAmount = typeof p.amount === 'number' ? p.amount : 0;
+      const perPeriodAmount = periods.length > 1 ? (paymentAmount / periods.length) : paymentAmount;
+
+      for (const pr of periods) {
+        existingPeriodAmounts[pr] = {
+          paymentDocId: pDoc.id,
+          amount: perPeriodAmount,
+          isMultiPeriod: periods.length > 1,
+        };
+      }
+    }
+
+    for (const [periodKey, rawAmount] of Object.entries(periodAmounts)) {
+      const csvAmount = typeof rawAmount === 'number' ? rawAmount : parseFloat(rawAmount);
+      if (isNaN(csvAmount) || csvAmount <= 0) continue;
+
+      const existing = existingPeriodAmounts[periodKey];
+      if (existing) {
+        const existingRounded = Math.round(existing.amount * 100) / 100;
+        const csvRounded = Math.round(csvAmount * 100) / 100;
+
+        if (existingRounded === csvRounded) {
+          identicalPeriodsCount++;
+        } else {
+          mismatches.push({
+            street: addressDoc.data().streetName,
+            number: addressDoc.data().number,
+            addressId: addressDoc.id,
+            periodKey,
+            existingAmount: existingRounded,
+            csvAmount: csvRounded,
+            existingPaymentId: existing.paymentDocId,
+            isMultiPeriod: existing.isMultiPeriod,
+          });
+        }
+      } else {
+        newPeriodsCount++;
+      }
+    }
+  }
+
+  return {
+    matchedAddressesCount,
+    unmatchedAddresses,
+    mismatches,
+    identicalPeriodsCount,
+    newPeriodsCount,
+  };
+});
+
+/**
+ * Callable Cloud Function: Executes bulk import of previous payments.
+ * Handles duplicate skips, applies manual reconciliation decisions, and recalculates address statuses.
+ */
+exports.adminBulkImportPayments = onCall(callableOptions, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { items, reconciliationDecisions } = request.data || {};
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new HttpsError('invalid-argument', 'Must provide a non-empty array of items.');
+  }
+
+  const decisionsMap = reconciliationDecisions || {};
+  const db = admin.firestore();
+  const currentAdminUid = request.auth.uid;
+
+  // Pre-fetch all addresses
+  const allAddressesSnap = await db.collection('addresses').get();
+  const addressMap = new Map();
+  for (const doc of allAddressesSnap.docs) {
+    const d = doc.data();
+    if (d.streetName && d.number !== undefined && d.number !== null) {
+      const key = `${normalizeStreetName(d.streetName)}::${parseInt(d.number, 10)}`;
+      addressMap.set(key, doc);
+    }
+  }
+
+  const results = [];
+  let successCount = 0;
+  let failureCount = 0;
+  let skippedPeriodsCount = 0;
+  let totalPaymentsCreated = 0;
+  const addressesToRecalculate = new Set();
+
+  for (const item of items) {
+    const streetName = (item.streetName || item.street || '').toString().trim();
+    const num = parseInt(item.number, 10);
+    const periodAmounts = item.periodAmounts || {};
+
+    const key = `${normalizeStreetName(streetName)}::${num}`;
+    const addressDoc = addressMap.get(key);
+
+    if (!addressDoc) {
+      results.push({
+        street: streetName,
+        number: item.number,
+        status: 'error',
+        importedPeriods: [],
+        skippedPeriods: [],
+        message: `Address "${streetName} #${item.number}" not found in database records.`,
+      });
+      failureCount++;
+      continue;
+    }
+
+    const canonicalStreet = addressDoc.data().streetName;
+    const canonicalNum = addressDoc.data().number;
+    const addressId = addressDoc.id;
+    const residentUid = addressDoc.data().residentUid || null;
+
+    // Query existing payments for this address
+    const paymentsSnap = await db.collection('payments')
+      .where('addressRef', '==', addressDoc.ref)
+      .get();
+
+    const existingPeriodAmounts = {};
+    for (const pDoc of paymentsSnap.docs) {
+      const p = pDoc.data();
+      if (p.concept && p.concept !== 'monthly quota') continue;
+      if (p.status !== 'approved' && p.status !== 'paid') continue;
+
+      const periods = [];
+      if (Array.isArray(p.periods)) {
+        for (const pr of p.periods) {
+          if (pr && typeof pr === 'string') periods.push(pr.trim());
+        }
+      } else if (p.period) {
+        for (const pr of p.period.toString().split(',')) {
+          if (pr.trim()) periods.push(pr.trim());
+        }
+      }
+
+      const paymentAmount = typeof p.amount === 'number' ? p.amount : 0;
+      const perPeriodAmount = periods.length > 1 ? (paymentAmount / periods.length) : paymentAmount;
+
+      for (const pr of periods) {
+        existingPeriodAmounts[pr] = {
+          paymentDocId: pDoc.id,
+          amount: perPeriodAmount,
+          docRef: pDoc.ref,
+          periods: periods,
+          isMultiPeriod: periods.length > 1,
+        };
+      }
+    }
+
+    const periodsToCreate = [];
+    const importedPeriodsLabels = [];
+    const skippedPeriodsLabels = [];
+
+    for (const [periodKey, rawAmount] of Object.entries(periodAmounts)) {
+      const csvAmount = typeof rawAmount === 'number' ? rawAmount : parseFloat(rawAmount);
+      if (isNaN(csvAmount) || csvAmount <= 0) {
+        continue;
+      }
+
+      const existing = existingPeriodAmounts[periodKey];
+      if (existing) {
+        const existingRounded = Math.round(existing.amount * 100) / 100;
+        const csvRounded = Math.round(csvAmount * 100) / 100;
+
+        if (existingRounded === csvRounded) {
+          skippedPeriodsLabels.push(`${periodKey} (Already Paid)`);
+          skippedPeriodsCount++;
+        } else {
+          const decisionKey = `${addressId}::${periodKey}`;
+          const decision = decisionsMap[decisionKey];
+
+          if (decision === 'overwrite') {
+            if (!existing.isMultiPeriod) {
+              await existing.docRef.update({
+                amount: csvAmount,
+                updatedAt: FieldValue.serverTimestamp(),
+                reconciledBy: currentAdminUid,
+                notes: 'Amount updated via bulk payment import reconciliation',
+              });
+              importedPeriodsLabels.push(`${periodKey} ($${csvAmount} Overwritten)`);
+              addressesToRecalculate.add(addressDoc);
+            } else {
+              periodsToCreate.push({ periodKey, amount: csvAmount });
+              importedPeriodsLabels.push(`${periodKey} ($${csvAmount} Overwritten)`);
+            }
+          } else {
+            skippedPeriodsLabels.push(`${periodKey} (Kept Existing $${existingRounded})`);
+            skippedPeriodsCount++;
+          }
+        }
+      } else {
+        periodsToCreate.push({ periodKey, amount: csvAmount });
+        importedPeriodsLabels.push(`${periodKey} ($${csvAmount})`);
+      }
+    }
+
+    if (periodsToCreate.length > 0) {
+      const sortedPeriodKeys = periodsToCreate.map(p => p.periodKey).sort();
+      const totalAmount = periodsToCreate.reduce((sum, p) => sum + p.amount, 0);
+      const paymentId = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+      await db.collection('payments').doc(paymentId).set({
+        id: paymentId,
+        addressRef: addressDoc.ref,
+        residentUid: residentUid,
+        uploaderUid: currentAdminUid,
+        concept: 'monthly quota',
+        status: 'approved',
+        periods: sortedPeriodKeys,
+        period: sortedPeriodKeys.join(', '),
+        amount: totalAmount,
+        folio: `BULK-${paymentId}`,
+        source: 'bulk_csv_import',
+        notes: 'Bulk previous payments historical import',
+        paymentDate: Timestamp.now(),
+        timestamp: FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      totalPaymentsCreated++;
+      addressesToRecalculate.add(addressDoc);
+    }
+
+    const hasImported = importedPeriodsLabels.length > 0;
+    const hasSkipped = skippedPeriodsLabels.length > 0;
+
+    results.push({
+      street: canonicalStreet,
+      number: canonicalNum,
+      status: hasImported ? 'ok' : (hasSkipped ? 'skipped' : 'no_data'),
+      importedPeriods: importedPeriodsLabels,
+      skippedPeriods: skippedPeriodsLabels,
+      message: hasImported
+        ? `Imported ${importedPeriodsLabels.length} period(s).`
+        : (hasSkipped ? 'All periods already paid.' : 'No amounts specified.'),
+    });
+
+    if (hasImported || hasSkipped) {
+      successCount++;
+    }
+  }
+
+  // Recalculate payment status for affected addresses
+  for (const addrDoc of addressesToRecalculate) {
+    try {
+      await recalculateAddressPaymentStatus(addrDoc.ref, true);
+    } catch (recalcErr) {
+      console.error(`Error recalculating address ${addrDoc.id} in bulk import:`, recalcErr);
+    }
+  }
+
+  return {
+    successCount,
+    failureCount,
+    skippedPeriodsCount,
+    totalPaymentsCreated,
+    results,
+  };
+});
+
 /**
  * Determines whether a QR code document represents a single-use pass.
  */
@@ -4290,6 +4677,8 @@ exports._test = {
   validateAndNormalizeBookingAttachments,
   cleanupDeletedBookingAttachmentResources,
   purgeExpiredBookingAttachments,
+  parsePeriodHeader,
+  normalizeStreetName,
   admin,
 };
 

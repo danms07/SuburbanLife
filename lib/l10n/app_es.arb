@@ -1036,5 +1036,62 @@
   "bookingAttachmentsRetentionHelper": "Aviso de privacidad: Los adjuntos de reserva solo son visibles para su hogar y la administración, y se eliminan automáticamente 30 días después de finalizar la reserva (o de inmediato si se cancela).",
   "unknownAddress": "Dirección desconocida",
   "residentRejectedSuccess": "Solicitud de propiedad rechazada.",
-  "adminProofDeletionNotice": "Aviso de privacidad: Al aprobar o rechazar esta solicitud, la imagen del comprobante de propiedad se elimina permanentemente de la nube."
+  "adminProofDeletionNotice": "Aviso de privacidad: Al aprobar o rechazar esta solicitud, la imagen del comprobante de propiedad se elimina permanentemente de la nube.",
+  "bulkPaymentImportMenu": "Carga Masiva de Pagos Previos (CSV)",
+  "bulkPaymentImportTitle": "Importación Masiva de Pagos Previos",
+  "bulkPaymentImportSubtitle": "Cargue el historial previo de pagos de residentes mediante un archivo CSV",
+  "startingPeriodLabel": "Periodo Inicial",
+  "endPeriodLabel": "Periodo Final (Actual)",
+  "selectStartingPeriod": "Seleccionar Periodo Inicial",
+  "downloadSampleTemplateButton": "Descargar Plantilla de Ejemplo",
+  "downloadAllAddressesTemplateButton": "Descargar Plantilla con Todas las Direcciones",
+  "copyTemplateButton": "Copiar Plantilla",
+  "templateCopiedSuccess": "Plantilla CSV copiada al portapapeles",
+  "uploadPaymentCsvButton": "Seleccionar CSV de Pagos",
+  "previewPaymentsTitle": "Vista Previa de Pagos",
+  "processPaymentImportButton": "Procesar Importación ({count})",
+  "@processPaymentImportButton": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "reconciliationTitle": "Conciliar Discrepancia de Monto",
+  "reconciliationSubtitle": "El pago existente en el sistema difiere del archivo CSV",
+  "existingAmountLabel": "Existente en Sistema",
+  "csvAmountLabel": "Cargado en CSV",
+  "keepExistingButton": "Mantener Existente",
+  "overwriteWithCsvButton": "Sobrescribir con CSV",
+  "reconciliationProgress": "Discrepancia {current} de {total}",
+  "@reconciliationProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "paymentImportSuccessTitle": "Resultados de la Importación de Pagos",
+  "paymentImportSummary": "{successCount} procesados, {skippedCount} omitidos, {failureCount} fallidos",
+  "@paymentImportSummary": {
+    "placeholders": {
+      "successCount": { "type": "int" },
+      "skippedCount": { "type": "int" },
+      "failureCount": { "type": "int" }
+    }
+  },
+  "downloadPaymentResultCsvButton": "Descargar Resultados CSV",
+  "copyPaymentResultCsvButton": "Copiar Resultados CSV",
+  "unmatchedAddressesWarning": "{count} dirección(es) no se encontraron en la base de datos y serán omitidas.",
+  "@unmatchedAddressesWarning": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "noValidPeriodsFound": "No se encontraron columnas de periodo válidas en el encabezado. Formato esperado: Nov-24, Dic-24, etc.",
+  "emptyAmountWarning": "Las filas con $0.00 o vacías se considerarán no pagadas.",
+  "allPeriodsAlreadyPaid": "Todos los periodos ya están registrados con montos idénticos.",
+  "reconcileMismatchesButton": "Revisar y Conciliar Discrepancias ({count})",
+  "@reconcileMismatchesButton": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
 }

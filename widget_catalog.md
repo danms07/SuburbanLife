@@ -47,6 +47,7 @@ The following table maps each visual component to its feature domain and source 
 | **Resident QR Pass Inside Status Badge** | QR Access | [manage_qr_screen.dart](lib/features/qr_access/manage_qr_screen.dart) |
 | **Facility Documentation & Resident Attachments Section** | Bookings | [facility_documents_section.dart](lib/features/booking/widgets/facility_documents_section.dart) |
 | **Rotatable Image Preview Container** | Core / UI | [rotatable_image_preview.dart](lib/core/widgets/rotatable_image_preview.dart) |
+| **Bulk Payment Import CSV Manager** | Admin Payments | [admin_bulk_payment_import_screen.dart](lib/features/admin/admin_bulk_payment_import_screen.dart) |
 
 ---
 
@@ -210,6 +211,10 @@ The following table maps each visual component to its feature domain and source 
 ## 36. Rotatable Image Preview Container
 - **Description**: A shared evidence and document preview component (`RotatableImagePreview`) rendering `StorageNetworkImage` inside a bordered rounded white container with `RotatedBox`, a full-surface `InkWell` tap target, and two top-right semi-transparent dark circular `IconButton`s (`Colors.black.withValues(alpha: 0.55)`): **Rotate Image (`90°`)** (`Icons.rotate_right`, localized via `l10n.rotateImage`) for instant clockwise inline orientation adjustment, and **View Full Image** (`Icons.open_in_full`, localized via `l10n.viewFullImage`) to launch `showInteractiveImageDialog` while seamlessly preserving `initialQuarterTurns`. Supports both unbounded `Expanded` layouts and fixed-height card layouts (`height: 160` / `180`) with optional scoped `ValueKey`s to prevent key collisions when multiple previews appear on the same screen.
 - **Usage**: Shared across `AdminResidentDetailScreen`, `AdminPaymentDetailScreen` (receipt & linked sanction evidence), `AdminBookingApprovalScreen` (image booking attachments), `AdminSanctionsScreen`, and `SanctionsScreen`.
+
+## 37. Bulk Payment Import CSV Manager
+- **Description**: An administrative interface (`AdminBulkPaymentImportScreen`) for uploading historical resident payments in bulk via CSV. Features interactive Starting Period selection (with Month/Year dialog defaulting the end period to the current calendar month), downloadable sample & community-populated address CSV templates, case-insensitive street matching, pre-check mismatch detection against existing payments in Firestore, an interactive sequential mismatch reconciliation dialog (`Keep Existing` vs `Overwrite with CSV`), and comprehensive results reporting with downloadable results CSV export.
+- **Usage**: Exposed via `AdminBulkPaymentImportScreen` under the Finance section of `AdminShellScreen` and cross-linked from `AdminUploadPaymentScreen` and `AdminPaymentReportScreen`.
 
 
 

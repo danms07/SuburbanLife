@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { _test } = require('../index.js');
 const { DEFAULT_APP_NAME, BRAND_COLORS: EXPECTED_BRAND_COLORS } = require('../brand_config.js');
-const { generateSecurePassword, replacePlaceholders, getNowInTimezone, validateDeliveryDate } = _test;
+const { generateSecurePassword, replacePlaceholders, getNowInTimezone, validateDeliveryDate, parsePeriodHeader, normalizeStreetName } = _test;
 
 test('generateSecurePassword generates passwords meeting complexity rules', (t) => {
   // Test default length 12
@@ -1124,4 +1124,45 @@ test('extractBookingAttachmentStoragePath extracts valid booking_attachments/<ui
   assert.equal(extractBookingAttachmentStoragePath('documents/admin_only/secret.pdf'), null);
   assert.equal(extractBookingAttachmentStoragePath(''), null);
   assert.equal(extractBookingAttachmentStoragePath(null), null);
+});
+
+test('parsePeriodHeader parses bilingual mmm-yy and ISO YYYY-MM periods', (t) => {
+  // English variations
+  assert.equal(parsePeriodHeader('Nov-24'), '2024-11');
+  assert.equal(parsePeriodHeader('nov-24'), '2024-11');
+  assert.equal(parsePeriodHeader('NOV-24'), '2024-11');
+  assert.equal(parsePeriodHeader('Jan-25'), '2025-01');
+  assert.equal(parsePeriodHeader('Dec-2024'), '2024-12');
+  assert.equal(parsePeriodHeader('Sept-24'), '2024-09');
+
+  // Spanish variations
+  assert.equal(parsePeriodHeader('Ene-25'), '2025-01');
+  assert.equal(parsePeriodHeader('ene-25'), '2025-01');
+  assert.equal(parsePeriodHeader('Abr-24'), '2024-04');
+  assert.equal(parsePeriodHeader('Ago-24'), '2024-08');
+  assert.equal(parsePeriodHeader('Dic-23'), '2023-12');
+
+  // Separators & whitespace
+  assert.equal(parsePeriodHeader('Nov/24'), '2024-11');
+  assert.equal(parsePeriodHeader('Nov 24'), '2024-11');
+  assert.equal(parsePeriodHeader('  Nov-24  '), '2024-11');
+  assert.equal(parsePeriodHeader('2024-11'), '2024-11');
+  assert.equal(parsePeriodHeader('2025/01'), '2025-01');
+
+  // Invalid inputs
+  assert.equal(parsePeriodHeader('invalid'), null);
+  assert.equal(parsePeriodHeader(''), null);
+  assert.equal(parsePeriodHeader(null), null);
+  assert.equal(parsePeriodHeader('123-45'), null);
+  assert.equal(parsePeriodHeader('Street'), null);
+});
+
+test('normalizeStreetName handles casing, accents, and excessive whitespace', (t) => {
+  assert.equal(normalizeStreetName('  Calle  Almendros  '), 'calle almendros');
+  assert.equal(normalizeStreetName('CALLE ALMENDROS'), 'calle almendros');
+  assert.equal(normalizeStreetName('Calle Almendros'), 'calle almendros');
+  assert.equal(normalizeStreetName('Avenida México'), 'avenida mexico');
+  assert.equal(normalizeStreetName('Álamo'), 'alamo');
+  assert.equal(normalizeStreetName(''), '');
+  assert.equal(normalizeStreetName(null), '');
 });

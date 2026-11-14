@@ -4639,6 +4639,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage.'**
   String get adminProofDeletionNotice;
+
+  String get bulkPaymentImportMenu;
+  String get bulkPaymentImportTitle;
+  String get bulkPaymentImportSubtitle;
+  String get startingPeriodLabel;
+  String get endPeriodLabel;
+  String get selectStartingPeriod;
+  String get downloadSampleTemplateButton;
+  String get downloadAllAddressesTemplateButton;
+  String get copyTemplateButton;
+  String get templateCopiedSuccess;
+  String get uploadPaymentCsvButton;
+  String get previewPaymentsTitle;
+  String processPaymentImportButton(int count);
+  String get reconciliationTitle;
+  String get reconciliationSubtitle;
+  String get existingAmountLabel;
+  String get csvAmountLabel;
+  String get keepExistingButton;
+  String get overwriteWithCsvButton;
+  String reconciliationProgress(int current, int total);
+  String get paymentImportSuccessTitle;
+  String paymentImportSummary(int successCount, int skippedCount, int failureCount);
+  String get downloadPaymentResultCsvButton;
+  String get copyPaymentResultCsvButton;
+  String unmatchedAddressesWarning(int count);
+  String get noValidPeriodsFound;
+  String get emptyAmountWarning;
+  String get allPeriodsAlreadyPaid;
+  String reconcileMismatchesButton(int count);
 }
 
 class _AppLocalizationsDelegate

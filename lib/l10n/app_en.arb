@@ -1169,5 +1169,62 @@
   "bookingAttachmentsRetentionHelper": "Privacy notice: Uploaded booking attachments are visible only to your household and administrators, and are automatically deleted 30 days after the booking ends (or immediately if cancelled).",
   "unknownAddress": "Unknown Address",
   "residentRejectedSuccess": "Ownership claim rejected.",
-  "adminProofDeletionNotice": "Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage."
+  "adminProofDeletionNotice": "Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage.",
+  "bulkPaymentImportMenu": "Bulk Payment History (CSV)",
+  "bulkPaymentImportTitle": "Bulk Previous Payments Import",
+  "bulkPaymentImportSubtitle": "Upload historical resident payments in bulk using a CSV file",
+  "startingPeriodLabel": "Starting Period",
+  "endPeriodLabel": "End Period (Current)",
+  "selectStartingPeriod": "Select Starting Period",
+  "downloadSampleTemplateButton": "Download Sample Template",
+  "downloadAllAddressesTemplateButton": "Download All Addresses Template",
+  "copyTemplateButton": "Copy Template",
+  "templateCopiedSuccess": "CSV Template copied to clipboard",
+  "uploadPaymentCsvButton": "Select Payment CSV",
+  "previewPaymentsTitle": "Preview Payments",
+  "processPaymentImportButton": "Process Payment Import ({count})",
+  "@processPaymentImportButton": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "reconciliationTitle": "Reconcile Amount Mismatch",
+  "reconciliationSubtitle": "Existing payment in system differs from the uploaded CSV",
+  "existingAmountLabel": "Existing in System",
+  "csvAmountLabel": "Uploaded in CSV",
+  "keepExistingButton": "Keep Existing",
+  "overwriteWithCsvButton": "Overwrite with CSV",
+  "reconciliationProgress": "Mismatch {current} of {total}",
+  "@reconciliationProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "paymentImportSuccessTitle": "Payment Import Results",
+  "paymentImportSummary": "{successCount} processed, {skippedCount} skipped, {failureCount} failed",
+  "@paymentImportSummary": {
+    "placeholders": {
+      "successCount": { "type": "int" },
+      "skippedCount": { "type": "int" },
+      "failureCount": { "type": "int" }
+    }
+  },
+  "downloadPaymentResultCsvButton": "Download Results CSV",
+  "copyPaymentResultCsvButton": "Copy Results CSV",
+  "unmatchedAddressesWarning": "{count} address(es) were not found in database records and will be skipped.",
+  "@unmatchedAddressesWarning": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "noValidPeriodsFound": "No valid period columns found in CSV header. Expected format: Nov-24, Dec-24, etc.",
+  "emptyAmountWarning": "Rows with $0.00 or empty amounts will be treated as unpaid.",
+  "allPeriodsAlreadyPaid": "All periods already recorded with identical amounts.",
+  "reconcileMismatchesButton": "Review & Reconcile Mismatches ({count})",
+  "@reconcileMismatchesButton": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
 }

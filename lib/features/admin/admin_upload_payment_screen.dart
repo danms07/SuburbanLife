@@ -7,6 +7,7 @@ import '../../core/config/app_config.dart';
 import '../../core/services/temp_image_cleanup_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../payments/payment_service.dart';
+import 'admin_bulk_payment_import_screen.dart';
 
 class AdminUploadPaymentScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -227,6 +228,22 @@ class _AdminUploadPaymentScreenState extends State<AdminUploadPaymentScreen> {
                     fontWeight: FontWeight.bold,
                     color: AppConfig.primaryColor,
                     fontFamily: AppConfig.fontFamily,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.center,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminBulkPaymentImportScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.history_edu, size: 18),
+                    label: Text(l10n.bulkPaymentImportMenu),
                   ),
                 ),
                 const SizedBox(height: 24),

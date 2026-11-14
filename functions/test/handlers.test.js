@@ -1626,3 +1626,35 @@ test('onBookingAttachmentDeleted and purgeExpiredBookingAttachments clean up Sto
     'number'
   );
 });
+
+test('adminPreCheckPaymentImport and adminBulkImportPayments enforce RBAC and validate arguments', async (t) => {
+  // 1) Unauthenticated rejection
+  await assert.rejects(
+    () => cloudFunctions.adminPreCheckPaymentImport.run({ auth: null, data: { items: [] } }),
+    /authenticated admin/
+  );
+  await assert.rejects(
+    () => cloudFunctions.adminBulkImportPayments.run({ auth: null, data: { items: [] } }),
+    /authenticated admin/
+  );
+
+  // 2) Non-admin resident rejection
+  await assert.rejects(
+    () => cloudFunctions.adminPreCheckPaymentImport.run({ auth: { uid: 'res_1', token: { resident: true } }, data: { items: [{ streetName: 'Main', number: 1 }] } }),
+    /authenticated admin/
+  );
+  await assert.rejects(
+    () => cloudFunctions.adminBulkImportPayments.run({ auth: { uid: 'res_1', token: { resident: true } }, data: { items: [{ streetName: 'Main', number: 1 }] } }),
+    /authenticated admin/
+  );
+
+  // 3) Empty items rejection
+  await assert.rejects(
+    () => cloudFunctions.adminPreCheckPaymentImport.run({ auth: { uid: 'admin_1', token: { admin: true } }, data: { items: [] } }),
+    /non-empty array/
+  );
+  await assert.rejects(
+    () => cloudFunctions.adminBulkImportPayments.run({ auth: { uid: 'admin_1', token: { admin: true } }, data: { items: [] } }),
+    /non-empty array/
+  );
+});

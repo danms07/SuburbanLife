@@ -2548,4 +2548,108 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get adminProofDeletionNotice =>
       'Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage.';
+
+  @override
+  String get bulkPaymentImportMenu => 'Bulk Payment History (CSV)';
+
+  @override
+  String get bulkPaymentImportTitle => 'Bulk Previous Payments Import';
+
+  @override
+  String get bulkPaymentImportSubtitle =>
+      'Upload historical resident payments in bulk using a CSV file';
+
+  @override
+  String get startingPeriodLabel => 'Starting Period';
+
+  @override
+  String get endPeriodLabel => 'End Period (Current)';
+
+  @override
+  String get selectStartingPeriod => 'Select Starting Period';
+
+  @override
+  String get downloadSampleTemplateButton => 'Download Sample Template';
+
+  @override
+  String get downloadAllAddressesTemplateButton =>
+      'Download All Addresses Template';
+
+  @override
+  String get copyTemplateButton => 'Copy Template';
+
+  @override
+  String get templateCopiedSuccess => 'CSV Template copied to clipboard';
+
+  @override
+  String get uploadPaymentCsvButton => 'Select Payment CSV';
+
+  @override
+  String get previewPaymentsTitle => 'Preview Payments';
+
+  @override
+  String processPaymentImportButton(int count) {
+    return 'Process Payment Import ($count)';
+  }
+
+  @override
+  String get reconciliationTitle => 'Reconcile Amount Mismatch';
+
+  @override
+  String get reconciliationSubtitle =>
+      'Existing payment in system differs from the uploaded CSV';
+
+  @override
+  String get existingAmountLabel => 'Existing in System';
+
+  @override
+  String get csvAmountLabel => 'Uploaded in CSV';
+
+  @override
+  String get keepExistingButton => 'Keep Existing';
+
+  @override
+  String get overwriteWithCsvButton => 'Overwrite with CSV';
+
+  @override
+  String reconciliationProgress(int current, int total) {
+    return 'Mismatch $current of $total';
+  }
+
+  @override
+  String get paymentImportSuccessTitle => 'Payment Import Results';
+
+  @override
+  String paymentImportSummary(
+      int successCount, int skippedCount, int failureCount) {
+    return '$successCount processed, $skippedCount skipped, $failureCount failed';
+  }
+
+  @override
+  String get downloadPaymentResultCsvButton => 'Download Results CSV';
+
+  @override
+  String get copyPaymentResultCsvButton => 'Copy Results CSV';
+
+  @override
+  String unmatchedAddressesWarning(int count) {
+    return '$count address(es) were not found in database records and will be skipped.';
+  }
+
+  @override
+  String get noValidPeriodsFound =>
+      'No valid period columns found in CSV header. Expected format: Nov-24, Dec-24, etc.';
+
+  @override
+  String get emptyAmountWarning =>
+      'Rows with \$0.00 or empty amounts will be treated as unpaid.';
+
+  @override
+  String get allPeriodsAlreadyPaid =>
+      'All periods already recorded with identical amounts.';
+
+  @override
+  String reconcileMismatchesButton(int count) {
+    return 'Review & Reconcile Mismatches ($count)';
+  }
 }

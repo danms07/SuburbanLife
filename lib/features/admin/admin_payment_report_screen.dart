@@ -7,6 +7,7 @@ import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
+import 'admin_bulk_payment_import_screen.dart';
 
 class AdminPaymentReportScreen extends StatefulWidget {
   final Future<void> Function(String csvContent)? onSaveCsv;
@@ -406,7 +407,23 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey, fontSize: 13),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.center,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AdminBulkPaymentImportScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.history_edu, size: 18),
+                    label: Text(l10n.bulkPaymentImportMenu),
+                  ),
+                ),
+                const SizedBox(height: 24),
 
                 // Start Month Dropdown
                 DropdownButtonFormField<DateTime>(

@@ -2583,4 +2583,109 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get adminProofDeletionNotice =>
       'Aviso de privacidad: Al aprobar o rechazar esta solicitud, la imagen del comprobante de propiedad se elimina permanentemente de la nube.';
+
+  @override
+  String get bulkPaymentImportMenu => 'Carga Masiva de Pagos Previos (CSV)';
+
+  @override
+  String get bulkPaymentImportTitle => 'Importación Masiva de Pagos Previos';
+
+  @override
+  String get bulkPaymentImportSubtitle =>
+      'Cargue el historial previo de pagos de residentes mediante un archivo CSV';
+
+  @override
+  String get startingPeriodLabel => 'Periodo Inicial';
+
+  @override
+  String get endPeriodLabel => 'Periodo Final (Actual)';
+
+  @override
+  String get selectStartingPeriod => 'Seleccionar Periodo Inicial';
+
+  @override
+  String get downloadSampleTemplateButton => 'Descargar Plantilla de Ejemplo';
+
+  @override
+  String get downloadAllAddressesTemplateButton =>
+      'Descargar Plantilla con Todas las Direcciones';
+
+  @override
+  String get copyTemplateButton => 'Copiar Plantilla';
+
+  @override
+  String get templateCopiedSuccess => 'Plantilla CSV copiada al portapapeles';
+
+  @override
+  String get uploadPaymentCsvButton => 'Seleccionar CSV de Pagos';
+
+  @override
+  String get previewPaymentsTitle => 'Vista Previa de Pagos';
+
+  @override
+  String processPaymentImportButton(int count) {
+    return 'Procesar Importación ($count)';
+  }
+
+  @override
+  String get reconciliationTitle => 'Conciliar Discrepancia de Monto';
+
+  @override
+  String get reconciliationSubtitle =>
+      'El pago existente en el sistema difiere del archivo CSV';
+
+  @override
+  String get existingAmountLabel => 'Existente en Sistema';
+
+  @override
+  String get csvAmountLabel => 'Cargado en CSV';
+
+  @override
+  String get keepExistingButton => 'Mantener Existente';
+
+  @override
+  String get overwriteWithCsvButton => 'Sobrescribir con CSV';
+
+  @override
+  String reconciliationProgress(int current, int total) {
+    return 'Discrepancia $current de $total';
+  }
+
+  @override
+  String get paymentImportSuccessTitle =>
+      'Resultados de la Importación de Pagos';
+
+  @override
+  String paymentImportSummary(
+      int successCount, int skippedCount, int failureCount) {
+    return '$successCount procesados, $skippedCount omitidos, $failureCount fallidos';
+  }
+
+  @override
+  String get downloadPaymentResultCsvButton => 'Descargar Resultados CSV';
+
+  @override
+  String get copyPaymentResultCsvButton => 'Copiar Resultados CSV';
+
+  @override
+  String unmatchedAddressesWarning(int count) {
+    return '$count dirección(es) no se encontraron en la base de datos y serán omitidas.';
+  }
+
+  @override
+  String get noValidPeriodsFound =>
+      'No se encontraron columnas de periodo válidas en el encabezado. Formato esperado: Nov-24, Dic-24, etc.';
+
+  @override
+  String get emptyAmountWarning =>
+      'Las filas con \$0.00 o vacías se considerarán no pagadas.';
+
+  @override
+  String get allPeriodsAlreadyPaid =>
+      'Todos los periodos ya están registrados con montos idénticos.';
+
+  @override
+  String reconcileMismatchesButton(int count) {
+    return 'Revisar y Conciliar Discrepancias ($count)';
+  }
 }
