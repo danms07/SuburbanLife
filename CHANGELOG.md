@@ -2,6 +2,14 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.35+36] — 2026-11-16
+
+### Added & Fixed
+- **Sign Out Button on Address Claim / Family Group Onboarding Screen (`lib/main.dart`)**:
+  - Added a persistent `TextButton.icon` (`onboarding_logout_button`) at the bottom of `_buildAddressSelectionAndProofForm` calling `Backend.auth.signOut()` with localized `l10n.logout` copy, ensuring newly registered or unassigned users can sign out regardless of whether they are on the **Claim Property** or **Join as Roommate / Family Group** tab (or when no unclaimed addresses are listed).
+  - Memoized resident address, ownership claim, and unclaimed address streams in `MyHomePageState` (`_getUnclaimedAddressesStream`, `_getUserAddressesStream`, `_getClaimsStream`) so rebuilding the onboarding screen does not miss initial stream snapshots or re-subscribe `StreamBuilder`s unnecessarily.
+  - Added a widget test in `test/widget_test.dart` verifying button visibility across both onboarding tabs and verifying `Backend.auth.signOut()` execution on tap.
+
 ## [1.0.34+35] — 2026-11-16
 
 ### Changed & Fixed

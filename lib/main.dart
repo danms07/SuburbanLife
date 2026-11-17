@@ -169,13 +169,20 @@ class _MyHomePageState extends State<MyHomePage> {
   Map<String, dynamic>? _claimAddress;
   bool _isClaimSubmitting = false;
   int _onboardingModeIndex = 0;
-  late final Stream<List<Map<String, dynamic>>> _unclaimedAddressesStream;
+  Stream<List<Map<String, dynamic>>>? _unclaimedAddressesStream;
+  String? _userAddressesUid;
+  Stream<List<Map<String, dynamic>>>? _userAddressesStream;
+  String? _claimsUid;
+  Stream<List<Map<String, dynamic>>>? _claimsStream;
 
   @override
   void initState() {
     super.initState();
     _checkRoles();
-    _unclaimedAddressesStream = Backend.db
+  }
+
+  Stream<List<Map<String, dynamic>>> _getUnclaimedAddressesStream() {
+    return _unclaimedAddressesStream ??= Backend.db
         .streamCollection('addresses')
         .map((docs) {
           final List<Map<String, dynamic>> unclaimed = [];
@@ -187,6 +194,28 @@ class _MyHomePageState extends State<MyHomePage> {
           }
           return unclaimed;
         });
+  }
+
+  Stream<List<Map<String, dynamic>>> _getUserAddressesStream(String uid) {
+    if (_userAddressesUid != uid || _userAddressesStream == null) {
+      _userAddressesUid = uid;
+      _userAddressesStream = Backend.db.streamCollection(
+        'addresses',
+        filters: [QueryFilter('residentUid', FilterOperator.equal, uid)],
+      );
+    }
+    return _userAddressesStream!;
+  }
+
+  Stream<List<Map<String, dynamic>>> _getClaimsStream(String uid) {
+    if (_claimsUid != uid || _claimsStream == null) {
+      _claimsUid = uid;
+      _claimsStream = Backend.db.streamCollection(
+        'ownership_claims',
+        filters: [QueryFilter('userUid', FilterOperator.equal, uid)],
+      );
+    }
+    return _claimsStream!;
   }
 
   void _checkRoles() async {
@@ -293,9 +322,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Widget _buildReviewStatusPage(AppLocalizations l10n, String uid) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: Backend.db.streamCollection('ownership_claims', filters: [
-        QueryFilter('userUid', FilterOperator.equal, uid),
-      ]),
+      stream: _getClaimsStream(uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -410,7 +437,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Widget _buildAddressSelectionAndProofForm(AppLocalizations l10n, String uid) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _unclaimedAddressesStream,
+      stream: _getUnclaimedAddressesStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -666,6 +693,16 @@ class _MyHomePageState extends State<MyHomePage> {
                         ),
                       ],
                     ],
+                    const SizedBox(height: 16),
+                    TextButton.icon(
+                      key: const ValueKey('onboarding_logout_button'),
+                      onPressed: () => Backend.auth.signOut(),
+                      icon: const Icon(Icons.logout, size: 18, color: Colors.grey),
+                      label: Text(
+                        l10n.logout,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -978,10 +1015,7 @@ class _MyHomePageState extends State<MyHomePage> {
         final addressRef = userData?['addressRef'] as DbReference?;
 
         return StreamBuilder<List<Map<String, dynamic>>>(
-          stream: Backend.db.streamCollection(
-            'addresses',
-            filters: [QueryFilter('residentUid', FilterOperator.equal, user.uid)],
-          ),
+          stream: _getUserAddressesStream(user.uid),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());

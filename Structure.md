@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-16 (v1.0.34+35 — Responsive Welcome Message Template Card & Default Body Pre-Fill in AdminSettingsScreen)*
+*Last Verified/Updated: 2026-11-16 (v1.0.35+36 — Sign-Out Button on Unassigned Resident Onboarding Choice Screen)*
 
 Current state of project files and folders:
 
@@ -171,7 +171,7 @@ Current state of project files and folders:
         - `rollout_workflow_test.dart`: Headless end-to-end workflow test suite exercising real `PaymentService`, `BookingService`, and UI screens across roommate linking (Suite A), announcements (Suite B), multi-period advance payments (Suite C), past due debt recovery with feature gating (Suite D), partial settlement restriction persistence & grace period pending unrestricted access (Suite E), facility booking full lifecycle (Suite F), household roommate hours cooldown & monthly quota sharing (Suite F2), admin resident creation with delivery date validation (Suite G), and sanctions enforcement, payment redirection, and facility operating hours window (Suite H).
     - `helpers/fake_backend.dart`: High-fidelity in-memory BaaS fake service locator supporting isolated per-subscriber `Stream.multi` snapshots, compound `QueryFilter` operators, `QuerySort`, `limit`/`startAfter` cursor pagination, `DbFieldValue` mutations, and custom Storage/Functions test handlers (including `uploadedOptions` metadata tracking).
     - `import_boundary_test.dart`: Static architectural & AGENTS.md compliance suite enforcing zero direct Firebase SDK imports in `lib/features/`, zero raw `print()` calls in `lib/`, English/Spanish ARB localization key parity (`app_en.arb` vs `app_es.arb`), zero `.withOpacity()` usages, and zero deprecated `DropdownButtonFormField` `value:` usages.
-    - `widget_test.dart`: Widget tests for `MyHomePage` admin AppBar role-switching, drawer logout, and resignation button visibility (`_isAdmin && _isResident`).
+    - `widget_test.dart`: Widget tests for `MyHomePage` admin AppBar role-switching, drawer logout, resignation button visibility (`_isAdmin && _isResident`), and unassigned resident onboarding (`Claim Property` / `Join as Roommate`) Sign Out action (`onboarding_logout_button`).
 - `web/`: Web entry point and assets including `index.html`, `manifest.json`, `favicon.ico`, `favicon.png`, `icons/`, and base `version.json`.
 - `resident_import_template.csv`: Sample CSV template for administrator bulk user account import.
 - `Structure.md`: This inventory map file.

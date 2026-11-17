@@ -117,4 +117,48 @@ void main() {
       expect(find.byKey(const ValueKey('admin_nav_logout')), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Unassigned resident onboarding screen shows Sign Out button on both claim and family group tabs and signs out when tapped',
+    (WidgetTester tester) async {
+      FakeBackendHelper.auth.currentUserMock = AppUser(
+        uid: 'new_res_1',
+        email: 'new@test.com',
+        displayName: 'New Resident',
+      );
+      FakeBackendHelper.auth.isAdminMock = false;
+      FakeBackendHelper.auth.isResidentMock = true;
+      FakeBackendHelper.auth.isGuardMock = false;
+
+      FakeBackendHelper.db.seedDocument('users', 'new_res_1', {
+        'uid': 'new_res_1',
+        'name': 'New Resident',
+        'email': 'new@test.com',
+        'role': 'resident',
+      });
+
+      await tester.pumpWidget(createWidgetUnderTest());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('onboarding_logout_button')),
+        findsOneWidget,
+      );
+
+      // Switch to Join Family / Roommate tab and confirm logout button remains accessible
+      // Use bounded pumps because the QR waiting banner contains a continuous progress spinner.
+      await tester.tap(find.byIcon(Icons.qr_code));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final logoutBtn = find.byKey(const ValueKey('onboarding_logout_button'));
+      expect(logoutBtn, findsOneWidget);
+
+      await tester.ensureVisible(logoutBtn);
+      await tester.tap(logoutBtn);
+      await tester.pump();
+
+      expect(FakeBackendHelper.auth.currentUserMock, isNull);
+    },
+  );
 }
