@@ -4,7 +4,10 @@ All notable changes to the **Suburban Life** project are documented in this file
 
 ## [1.0.36+37] — 2026-11-17
 
-### Added
+### Added & Fixed
+- **Cloud Storage Web CORS Policy & Prerequisite Setup (`storage_cors.json` & `README.md`)**:
+  - Added [`storage_cors.json`](storage_cors.json) configuring `GET`/`HEAD` `Access-Control-Allow-Origin` and exposed response headers on Firebase Cloud Storage so Flutter Web clients (`DocumentCacheService`, `DocumentViewerScreen`) can fetch Transparency `.md`/`.pdf`/`.csv` files without `ClientException: Failed to fetch` CORS blocks, and applied it to the project Storage bucket.
+  - Updated `README.md` prerequisites & `gcloud` setup commands (covering `storage_cors.json`, `storage_lifecycle.json`, and Gen 2 Cloud Run `onCall` Public access IAM recovery notes) and added a static audit assertion for `storage_cors.json` in `functions/test/helpers.test.js`.
 - **Admin Auth User Directory & Onboarding Visibility (`adminListAuthUsers` & `AdminUserManagementScreen`)**:
   - Added the `adminListAuthUsers` HTTPS callable Cloud Function in `functions/index.js` (protected by `admin` RBAC) using `admin.auth().listUsers()` (`getAuth().listUsers()`) paginated across batches and cross-referenced with Firestore `users` metadata (`hasFirestoreProfile`, `hasAddress`, `onboardingCompleted`) without exposing sensitive fields.
   - Updated `AdminUserManagementScreen` to fetch and merge Auth users with Firestore `users`, render an `Onboarding Incomplete` badge and Auth-only notice on incomplete accounts (`!hasFirestoreProfile` or non-staff accounts missing `addressRef`), and add an `onboarding_incomplete_filter_chip` (`FilterChip`) to isolate incomplete-onboarding users.

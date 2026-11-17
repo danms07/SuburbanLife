@@ -35,14 +35,14 @@ Before configuring and deploying **Suburban Life**, ensure the following SDKs an
   ```bash
   dart pub global activate flutterfire_cli
   ```
-- **Google Cloud CLI (`gcloud`)**: Required for one-time infrastructure policies that `firebase deploy` does not configure directly (native Cloud Firestore Time-to-Live policies and Google Cloud Storage Object Lifecycle rules). Install via [Google Cloud SDK docs](https://cloud.google.com/sdk/docs/install) (or on macOS via Homebrew):
+- **Google Cloud CLI (`gcloud`)**: Required for one-time infrastructure policies that `firebase deploy` does not configure directly (native Cloud Firestore Time-to-Live policies, Google Cloud Storage Object Lifecycle rules, and Cloud Storage Web CORS headers via `storage_cors.json`). Install via [Google Cloud SDK docs](https://cloud.google.com/sdk/docs/install) (or on macOS via Homebrew):
   ```bash
   brew install --cask google-cloud-sdk
   ```
 
-### Google Cloud CLI (`gcloud`) One-Time Retention Setup
+### Google Cloud CLI (`gcloud`) One-Time Retention & Storage CORS Setup
 
-Authenticate `gcloud`, set your target Firebase/GCP project, and apply the Firestore TTL and Cloud Storage lifecycle policies once per environment (run **after** deploying `firestore.indexes.json` via `firebase deploy --only firestore:indexes` so single-field `expireAt` index exemptions are active):
+Authenticate `gcloud`, set your target Firebase/GCP project, and apply the Firestore TTL, Cloud Storage lifecycle, and Web CORS policies once per environment (run **after** deploying `firestore.indexes.json` via `firebase deploy --only firestore:indexes` so single-field `expireAt` index exemptions are active):
 
 ```bash
 # 1. Authenticate and select your Firebase/GCP project
@@ -69,13 +69,18 @@ gcloud firestore fields ttls update expireAt \
   --project=<PROJECT_ID>
 
 # 3. Apply Cloud Storage Object Lifecycle safety-net rules (62d visitor media, 125d booking attachments)
+#    and Web CORS headers (allows Flutter Web clients to fetch/render Transparency .md/.pdf/CSV files)
 gcloud storage buckets update gs://<STORAGE_BUCKET> \
   --lifecycle-file=storage_lifecycle.json
+gcloud storage buckets update gs://<STORAGE_BUCKET> \
+  --cors-file=storage_cors.json
 
-# 4. (Optional) Verify async Firestore TTL operations and active bucket lifecycle config
+# 4. (Optional) Verify async Firestore TTL operations and active bucket lifecycle & CORS config
 gcloud firestore operations list --project=<PROJECT_ID>
-gcloud storage buckets describe gs://<STORAGE_BUCKET> --format="json(lifecycle_config)"
+gcloud storage buckets describe gs://<STORAGE_BUCKET> --format="json(lifecycle_config,cors_config)"
 ```
+
+> **Cloud Run Invoker Note (Gen 2 `onCall` Functions):** Firebase `onCall` functions verify Firebase App Check and Firebase Auth inside each handler, so their backing Cloud Run services must have **Public access** (`roles/run.invoker` for `allUsers`). Normally `firebase deploy --only functions` assigns this on creation, but if an existing callable service ever returns `[firebase_functions/internal] internal [0]` because Cloud Run rejects unauthenticated HTTP ingress/CORS preflight, restore it with `gcloud run services add-iam-policy-binding <function_lowercase> --region=us-central1 --project=<PROJECT_ID> --member="allUsers" --role="roles/run.invoker"`. Keep background Eventarc/Scheduler functions (`checkmonthlypaymentstatuses`, `onaccesslogdeleted`, `onbookingattachmentdeleted`, `onpaymentwritten`, `onsanctionwritten`) restricted to **Require authentication**.
 
 ---
 
@@ -127,10 +132,10 @@ The app includes automated global exception trapping and error reporting via `Cr
 - **Collection Gating**: Error reporting is disabled automatically in debug and Firebase Emulator environments (`kDebugMode` or `useFirebaseEmulator: true`).
 - **User Association**: Crashlytics user identifiers (`setUserIdentifier`) are synced with Firebase Auth state transitions.
 
-### 5. Enable Gatehouse & Booking Attachment Data Retention (Firestore TTL & Storage Lifecycle)
-Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation, and resident booking attachments (`booking_attachments` and `booking_attachments/**`) are purged **30 days** after the booking's scheduled end time.
+### 5. Enable Retention (Firestore TTL & Storage Lifecycle) & Web Storage CORS
+Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation, and resident booking attachments (`booking_attachments` and `booking_attachments/**`) are purged **30 days** after the booking's scheduled end time. Web clients also require `storage_cors.json` applied to Cloud Storage so `.md`/`.pdf`/`.csv` Transparency documents and media can be fetched in browsers.
 
-Deploy Firestore indexes (including single-field `expireAt` exemptions), security rules, Storage rules, and Cloud Functions first, then execute the one-time `gcloud` TTL and bucket lifecycle commands listed under [Google Cloud CLI (`gcloud`) One-Time Retention Setup](#google-cloud-cli-gcloud-one-time-retention-setup):
+Deploy Firestore indexes (including single-field `expireAt` exemptions), security rules, Storage rules, and Cloud Functions first, then execute the one-time `gcloud` TTL, bucket lifecycle, and Storage CORS commands listed under [Google Cloud CLI (`gcloud`) One-Time Retention & Storage CORS Setup](#google-cloud-cli-gcloud-one-time-retention--storage-cors-setup):
 ```bash
 firebase deploy --only firestore:indexes,firestore:rules,storage,functions
 ```

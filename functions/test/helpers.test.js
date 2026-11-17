@@ -996,9 +996,18 @@ test('evaluateQrCleanupAction purges terminal QR passes after 7 days while prese
   );
 });
 
-test('Static Config Audit: storage_lifecycle.json and firestore.indexes.json configure 62-day media safety net, 125-day booking attachment safety net, and expireAt exemptions', () => {
+test('Static Config Audit: storage_cors.json, storage_lifecycle.json, and firestore.indexes.json configure Web CORS, 62d/125d retention safety nets, and expireAt exemptions', () => {
   const fs = require('node:fs');
   const path = require('node:path');
+
+  const corsPath = path.resolve(__dirname, '../../storage_cors.json');
+  const corsJson = JSON.parse(fs.readFileSync(corsPath, 'utf8'));
+  assert.ok(Array.isArray(corsJson) && corsJson.length === 1);
+  assert.deepEqual(corsJson[0].method, ['GET', 'HEAD']);
+  assert.deepEqual(corsJson[0].origin, ['*']);
+  assert.ok(corsJson[0].responseHeader.includes('Content-Type'));
+  assert.ok(corsJson[0].responseHeader.includes('Content-Disposition'));
+  assert.equal(corsJson[0].maxAgeSeconds, 3600);
 
   const lifecyclePath = path.resolve(__dirname, '../../storage_lifecycle.json');
   const lifecycleJson = JSON.parse(fs.readFileSync(lifecyclePath, 'utf8'));
