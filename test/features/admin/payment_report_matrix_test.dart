@@ -7,7 +7,7 @@ import 'package:suburban_life/features/admin/admin_payment_report_screen.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
 
-Widget _wrapWithL10n(Widget child) {
+Widget _wrapWithL10n(Widget child, {Locale locale = const Locale('en')}) {
   return MaterialApp(
     localizationsDelegates: const [
       AppLocalizations.delegate,
@@ -16,7 +16,7 @@ Widget _wrapWithL10n(Widget child) {
       GlobalCupertinoLocalizations.delegate,
     ],
     supportedLocales: const [Locale('en'), Locale('es')],
-    locale: const Locale('en'),
+    locale: locale,
     home: child,
   );
 }
@@ -176,6 +176,7 @@ void main() {
       await tester.pumpWidget(_wrapWithL10n(const AdminPaymentReportScreen()));
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.byIcon(Icons.download));
       await tester.tap(find.byIcon(Icons.download));
       await tester.pumpAndSettle();
 
@@ -217,6 +218,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.byIcon(Icons.download));
       await tester.tap(find.byIcon(Icons.download));
       await tester.pumpAndSettle();
 
@@ -327,5 +329,46 @@ void main() {
       expect(decodedMd, isNot(contains('Calle Privada')));
       expect(decodedMd, isNot(contains('past due')));
     });
+
+    testWidgets(
+      'renders cleanly on narrow mobile Spanish viewport with preview at top, date pickers middle, and downloads at bottom',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 780);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          _wrapWithL10n(
+            const AdminPaymentReportScreen(),
+            locale: const Locale('es'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Reportes Financieros'), findsWidgets);
+        expect(find.text('Vista Previa del Resumen Financiero'), findsOneWidget);
+
+        final previewTop = tester.getTopLeft(
+          find.byKey(const ValueKey('financial_summary_preview_card')),
+        ).dy;
+        final startMonthTop = tester.getTopLeft(find.text('Mes de Inicio')).dy;
+        final endMonthTop = tester.getTopLeft(find.text('Mes de Fin')).dy;
+        final bundleButtonTop = tester.getTopLeft(
+          find.byKey(const ValueKey('download_report_bundle_button')),
+        ).dy;
+        final matrixButtonTop = tester.getTopLeft(
+          find.byKey(const ValueKey('download_status_matrix_only_button')),
+        ).dy;
+
+        expect(previewTop, lessThan(startMonthTop));
+        expect(startMonthTop, lessThan(endMonthTop));
+        expect(endMonthTop, lessThan(bundleButtonTop));
+        expect(bundleButtonTop, lessThan(matrixButtonTop));
+      },
+    );
   });
 }

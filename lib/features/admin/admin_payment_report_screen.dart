@@ -615,28 +615,30 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                     timeZone: timeZone,
                   );
 
+                  final isCompact = MediaQuery.sizeOf(context).width < 600;
+
                   return Align(
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 820),
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24.0),
+                        padding: EdgeInsets.all(isCompact ? 12.0 : 24.0),
                         child: Card(
                           elevation: 4,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.all(24.0),
+                            padding: EdgeInsets.all(isCompact ? 16.0 : 24.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.table_chart,
-                                  size: 56,
+                                  size: isCompact ? 44 : 52,
                                   color: AppConfig.primaryColor,
                                 ),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: 12),
                                 Text(
                                   l10n.generateReportTitle,
                                   textAlign: TextAlign.center,
@@ -656,24 +658,11 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                     fontSize: 13,
                                   ),
                                 ),
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.center,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const AdminBulkPaymentImportScreen(),
-                                        ),
-                                      );
-                                    },
-                                    icon: const Icon(Icons.history_edu, size: 18),
-                                    label: Text(l10n.bulkPaymentImportMenu),
-                                  ),
-                                ),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 20),
+
+                                // Live Financial Summary Preview Card (at top)
+                                _buildFinancialPreviewCard(l10n, ledger),
+                                const SizedBox(height: 20),
 
                                 // Start & End Month Dropdowns
                                 LayoutBuilder(
@@ -683,6 +672,7 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                       key: ValueKey(
                                         'start_month_${_startMonth.millisecondsSinceEpoch}',
                                       ),
+                                      isExpanded: true,
                                       decoration: InputDecoration(
                                         labelText: l10n.startMonthLabel,
                                         prefixIcon: const Icon(
@@ -701,7 +691,10 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                       items: availableMonths.map((dt) {
                                         return DropdownMenuItem(
                                           value: dt,
-                                          child: Text(_formatMonthLabel(dt)),
+                                          child: Text(
+                                            _formatMonthLabel(dt),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         );
                                       }).toList(),
                                       onChanged: (val) {
@@ -721,6 +714,7 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                       key: ValueKey(
                                         'end_month_${_startMonth.millisecondsSinceEpoch}_${_endMonth.millisecondsSinceEpoch}',
                                       ),
+                                      isExpanded: true,
                                       decoration: InputDecoration(
                                         labelText: l10n.endMonthLabel,
                                         prefixIcon: const Icon(
@@ -743,7 +737,10 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                           .map((dt) {
                                         return DropdownMenuItem(
                                           value: dt,
-                                          child: Text(_formatMonthLabel(dt)),
+                                          child: Text(
+                                            _formatMonthLabel(dt),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         );
                                       }).toList(),
                                       onChanged: (val) {
@@ -773,7 +770,7 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                 ),
                                 const SizedBox(height: 20),
 
-                                // Primary Bundle Export CTA
+                                // Download & Export Options (at the end)
                                 ElevatedButton.icon(
                                   key: const ValueKey(
                                     'download_report_bundle_button',
@@ -791,11 +788,15 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : Text(l10n.downloadReportBundleButton),
+                                      : Text(
+                                          l10n.downloadReportBundleButton,
+                                          textAlign: TextAlign.center,
+                                        ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppConfig.secondaryColor,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
                                       vertical: 16,
                                     ),
                                     shape: RoundedRectangleBorder(
@@ -803,75 +804,123 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 14),
 
-                                // Live Financial Summary Preview Card
-                                _buildFinancialPreviewCard(l10n, ledger),
-                                const SizedBox(height: 16),
+                                // Secondary Individual Exports & Publish
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final buttons = [
+                                      OutlinedButton.icon(
+                                        key: const ValueKey(
+                                          'download_status_matrix_only_button',
+                                        ),
+                                        onPressed: _isLoading
+                                            ? null
+                                            : () => _exportReports(
+                                                  _ExportMode.matrixOnly,
+                                                ),
+                                        icon: const Icon(
+                                          Icons.table_chart_outlined,
+                                          size: 18,
+                                        ),
+                                        label: Text(
+                                          l10n.downloadStatusMatrixCsvButton,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                      OutlinedButton.icon(
+                                        key: const ValueKey(
+                                          'download_financial_ledger_only_button',
+                                        ),
+                                        onPressed: _isLoading
+                                            ? null
+                                            : () => _exportReports(
+                                                  _ExportMode.ledgerOnly,
+                                                ),
+                                        icon: const Icon(
+                                          Icons.receipt_long_outlined,
+                                          size: 18,
+                                        ),
+                                        label: Text(
+                                          l10n.downloadFinancialLedgerCsvButton,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                      OutlinedButton.icon(
+                                        key: const ValueKey(
+                                          'publish_transparency_report_button',
+                                        ),
+                                        onPressed: (_isLoading || _isPublishing)
+                                            ? null
+                                            : () =>
+                                                _publishSummaryToTransparency(
+                                                  ledger,
+                                                ),
+                                        icon: _isPublishing
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            : const Icon(
+                                                Icons.public,
+                                                size: 18,
+                                              ),
+                                        label: Text(
+                                          l10n.publishToTransparencyButton,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                      OutlinedButton.icon(
+                                        key: const ValueKey(
+                                          'open_bulk_payment_import_button',
+                                        ),
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  const AdminBulkPaymentImportScreen(),
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.history_edu,
+                                          size: 18,
+                                        ),
+                                        label: Text(
+                                          l10n.bulkPaymentImportMenu,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    ];
 
-                                // Secondary Individual Exports
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  alignment: WrapAlignment.center,
-                                  children: [
-                                    OutlinedButton.icon(
-                                      key: const ValueKey(
-                                        'download_status_matrix_only_button',
-                                      ),
-                                      onPressed: _isLoading
-                                          ? null
-                                          : () => _exportReports(
-                                                _ExportMode.matrixOnly,
-                                              ),
-                                      icon: const Icon(
-                                        Icons.table_chart_outlined,
-                                        size: 18,
-                                      ),
-                                      label: Text(
-                                        l10n.downloadStatusMatrixCsvButton,
-                                      ),
-                                    ),
-                                    OutlinedButton.icon(
-                                      key: const ValueKey(
-                                        'download_financial_ledger_only_button',
-                                      ),
-                                      onPressed: _isLoading
-                                          ? null
-                                          : () => _exportReports(
-                                                _ExportMode.ledgerOnly,
-                                              ),
-                                      icon: const Icon(
-                                        Icons.receipt_long_outlined,
-                                        size: 18,
-                                      ),
-                                      label: Text(
-                                        l10n.downloadFinancialLedgerCsvButton,
-                                      ),
-                                    ),
-                                    OutlinedButton.icon(
-                                      key: const ValueKey(
-                                        'publish_transparency_report_button',
-                                      ),
-                                      onPressed: (_isLoading || _isPublishing)
-                                          ? null
-                                          : () => _publishSummaryToTransparency(
-                                                ledger,
-                                              ),
-                                      icon: _isPublishing
-                                          ? const SizedBox(
-                                              width: 16,
-                                              height: 16,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Icon(Icons.public, size: 18),
-                                      label: Text(
-                                        l10n.publishToTransparencyButton,
-                                      ),
-                                    ),
-                                  ],
+                                    if (constraints.maxWidth < 520) {
+                                      return Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          for (var i = 0;
+                                              i < buttons.length;
+                                              i++) ...[
+                                            if (i > 0)
+                                              const SizedBox(height: 10),
+                                            buttons[i],
+                                          ],
+                                        ],
+                                      );
+                                    }
+
+                                    return Wrap(
+                                      spacing: 10,
+                                      runSpacing: 10,
+                                      alignment: WrapAlignment.center,
+                                      children: buttons,
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -919,13 +968,15 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
                 size: 20,
               ),
               const SizedBox(width: 8),
-              Text(
-                l10n.reportPreviewTitle,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  color: AppConfig.primaryColor,
-                  fontFamily: AppConfig.fontFamily,
+              Expanded(
+                child: Text(
+                  l10n.reportPreviewTitle,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: AppConfig.primaryColor,
+                    fontFamily: AppConfig.fontFamily,
+                  ),
                 ),
               ),
             ],
@@ -990,6 +1041,7 @@ class _PreviewLine extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3.5),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
@@ -1002,6 +1054,7 @@ class _PreviewLine extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 12),
           Text(
             value,
             style: TextStyle(

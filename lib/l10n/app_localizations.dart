@@ -1439,13 +1439,13 @@ abstract class AppLocalizations {
   /// No description provided for @downloadReportMenu.
   ///
   /// In en, this message translates to:
-  /// **'Download Payment Report'**
+  /// **'Download Financial Reports'**
   String get downloadReportMenu;
 
   /// No description provided for @generateReportTitle.
   ///
   /// In en, this message translates to:
-  /// **'Payment Matrix Report'**
+  /// **'Financial Reports'**
   String get generateReportTitle;
 
   /// No description provided for @startMonthLabel.

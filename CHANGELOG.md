@@ -2,6 +2,15 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.33+34] — 2026-11-16
+
+### Changed & Fixed
+- **Financial Reports Screen Rebrand, Reordering & Mobile Overflow Fix (`AdminPaymentReportScreen`)**:
+  - Rebranded `downloadReportMenu` and `generateReportTitle` in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb` from *Download Payment Report* / *Payment Matrix Report* (`Descargar Reporte de Pagos` / `Reporte Matriz de Pagos`) to **Download Financial Reports** / **Financial Reports** (**Descargar Reportes Financieros** / **Reportes Financieros**).
+  - Reordered sections in `lib/features/admin/admin_payment_report_screen.dart` so the **Financial Summary Preview** card (`financial_summary_preview_card`) renders at the top below the screen header, followed by the **Start Month** / **End Month** dropdown pickers (`isExpanded: true` with text ellipsis), and all download/publish/bulk-import options grouped at the bottom (stacking secondary buttons cleanly on `< 520px` mobile viewports).
+  - Fixed horizontal text overflow inside `_buildFinancialPreviewCard` on narrow mobile viewports (e.g., `"Vista Previa del Resumen Financiero"`) by wrapping the card heading in `Expanded`, adding gap spacing and top alignment to `_PreviewLine`, and applying compact responsive screen/card padding below `600px`.
+  - Added Spanish mobile (`360x780`) layout/order/overflow regression test in `test/features/admin/payment_report_matrix_test.dart` and updated label assertions in `test/features/admin/admin_shell_screen_test.dart`.
+
 ## [1.0.32+33] — 2026-11-16
 
 ### Fixed

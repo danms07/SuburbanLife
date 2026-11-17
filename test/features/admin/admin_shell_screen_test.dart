@@ -412,7 +412,7 @@ void main() {
         expect(find.text('Directorio de Usuarios'), findsOneWidget);
         expect(find.text('Crear Anuncio'), findsOneWidget);
         expect(find.text('Subir Pago a Nombre de Usuario'), findsOneWidget);
-        expect(find.text('Descargar Reporte de Pagos'), findsOneWidget);
+        expect(find.text('Descargar Reportes Financieros'), findsOneWidget);
         expect(find.text('Configuración'), findsOneWidget);
 
         expect(find.text('Gestión de Usuarios'), findsOneWidget);

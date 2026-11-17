@@ -703,10 +703,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadingDocument => 'Downloading document...';
 
   @override
-  String get downloadReportMenu => 'Download Payment Report';
+  String get downloadReportMenu => 'Download Financial Reports';
 
   @override
-  String get generateReportTitle => 'Payment Matrix Report';
+  String get generateReportTitle => 'Financial Reports';
 
   @override
   String get startMonthLabel => 'Start Month';
