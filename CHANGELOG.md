@@ -2,6 +2,18 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.32+33] — 2026-11-16
+
+### Fixed
+- **Mobile Responsive Layout in `AdminBulkPaymentImportScreen`**:
+  - Fixed unreadable vertical character-by-character wrapping and overlapping controls in the Starting Period selector on narrow mobile viewports (`< 520px`) by introducing `LayoutBuilder` breakpoints in `lib/features/admin/admin_bulk_payment_import_screen.dart` (`_buildPeriodRangeSelector`) that stack the full-width `Select Starting Period` button below the `Starting Period -> End Period` summary row (and switch to a vertical column below `220px`).
+  - Added responsive page/card padding (`12px`/`16px` on `< 600px` mobile vs. `24px`/`20px` on wider viewports) centered within a `960px` `ConstrainedBox`.
+  - Stacked template download/copy and results export action buttons cleanly at full width on compact screens (`_buildTemplateActions`, `_buildResultActions`, `_buildResponsiveButtonGroup`) with balanced vertical button padding.
+  - Replaced the fixed `Row` in the CSV Preview header (`_buildPreviewHeader`) with a responsive `LayoutBuilder` (`< 560px` vertical stack) to prevent horizontal overflow when previewing imported rows.
+  - Wrapped `_pickStartingPeriod` and `_showReconciliationDialog` dialog contents in `SingleChildScrollView`, added `isExpanded: true` to the Month/Year `DropdownButtonFormField`s (plus localized `l10n.ok` button text), and stacked comparison cards vertically on ultra-narrow dialogs (`< 260px`).
+- **Automated Responsive Widget Tests (`test/features/admin/admin_bulk_payment_import_test.dart`)**:
+  - Added Spanish mobile (`360x780`) and English desktop (`1024x800`) widget layout tests asserting zero overflow exceptions, readable label dimensions, stacked period/template controls on mobile, inline controls on desktop, and overflow-free period picker dialog rendering.
+
 ## [1.0.31+32] — 2026-11-16
 
 ### Added

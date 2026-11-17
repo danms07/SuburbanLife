@@ -6,7 +6,7 @@ import 'package:suburban_life/features/admin/admin_bulk_payment_import_screen.da
 import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
 
-Widget _wrapWithL10n(Widget child) {
+Widget _wrapWithL10n(Widget child, {Locale locale = const Locale('en')}) {
   return MaterialApp(
     localizationsDelegates: const [
       AppLocalizations.delegate,
@@ -15,7 +15,7 @@ Widget _wrapWithL10n(Widget child) {
       GlobalCupertinoLocalizations.delegate,
     ],
     supportedLocales: const [Locale('en'), Locale('es')],
-    locale: const Locale('en'),
+    locale: locale,
     home: child,
   );
 }
@@ -196,6 +196,77 @@ void main() {
       expect(copiedClipboardText, isNotNull);
       expect(copiedClipboardText!.contains('"Street","Number"'), isTrue);
       expect(find.text('CSV Template copied to clipboard'), findsOneWidget);
+    });
+
+    testWidgets('stacks period selector and template buttons cleanly on mobile viewports in Spanish', (tester) async {
+      tester.view.physicalSize = const Size(360, 780);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        _wrapWithL10n(
+          const AdminBulkPaymentImportScreen(isEmbedded: true),
+          locale: const Locale('es'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Periodo Inicial'), findsOneWidget);
+      expect(find.text('Periodo Final (Actual)'), findsOneWidget);
+      expect(find.text('Seleccionar Periodo Inicial'), findsOneWidget);
+
+      final startLabelRect = tester.getRect(find.text('Periodo Inicial'));
+      final endLabelRect = tester.getRect(find.text('Periodo Final (Actual)'));
+      final selectBtnRect = tester.getRect(find.text('Seleccionar Periodo Inicial'));
+
+      // Labels must have horizontal breathing room and not wrap character-by-character vertically.
+      expect(startLabelRect.width, greaterThanOrEqualTo(75));
+      expect(startLabelRect.height, lessThan(45));
+      expect(endLabelRect.width, greaterThanOrEqualTo(75));
+      expect(endLabelRect.height, lessThan(60));
+
+      // Action button stacks cleanly below the period summary row on mobile.
+      expect(selectBtnRect.top, greaterThanOrEqualTo(endLabelRect.bottom));
+
+      // Template action buttons stack cleanly vertically on compact viewports.
+      final sampleBtnRect = tester.getRect(find.text('Descargar Plantilla de Ejemplo'));
+      final allAddrBtnRect = tester.getRect(find.text('Descargar Plantilla con Todas las Direcciones'));
+      final copyBtnRect = tester.getRect(find.text('Copiar Plantilla'));
+      expect(allAddrBtnRect.top, greaterThanOrEqualTo(sampleBtnRect.bottom));
+      expect(copyBtnRect.top, greaterThanOrEqualTo(allAddrBtnRect.bottom));
+
+      // Opening the period picker dialog on mobile should render without overflow.
+      await tester.tap(find.text('Seleccionar Periodo Inicial'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Cancelar'), findsOneWidget);
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('keeps period selector inline on wide desktop viewports', (tester) async {
+      tester.view.physicalSize = const Size(1024, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        _wrapWithL10n(const AdminBulkPaymentImportScreen(isEmbedded: true)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final endLabelRect = tester.getRect(find.text('End Period (Current)'));
+      final selectBtnRect = tester.getRect(find.text('Select Starting Period'));
+
+      expect(selectBtnRect.left, greaterThan(endLabelRect.right));
     });
   });
 }

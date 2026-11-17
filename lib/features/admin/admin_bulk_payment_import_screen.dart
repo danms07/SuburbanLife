@@ -254,37 +254,41 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
             final l10n = AppLocalizations.of(context)!;
             return AlertDialog(
               title: Text(l10n.selectStartingPeriod),
-              content: Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: selectedMonth,
-                      decoration: const InputDecoration(labelText: 'Month'),
-                      items: List.generate(12, (index) {
-                        final mNum = index + 1;
-                        final label = AdminBulkPaymentImportScreen.monthLabelsEn[index];
-                        return DropdownMenuItem(value: mNum, child: Text(label));
-                      }),
-                      onChanged: (val) {
-                        if (val != null) setDialogState(() => selectedMonth = val);
-                      },
+              content: SingleChildScrollView(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: selectedMonth,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Month'),
+                        items: List.generate(12, (index) {
+                          final mNum = index + 1;
+                          final label = AdminBulkPaymentImportScreen.monthLabelsEn[index];
+                          return DropdownMenuItem(value: mNum, child: Text(label));
+                        }),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => selectedMonth = val);
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<int>(
-                      initialValue: selectedYear,
-                      decoration: const InputDecoration(labelText: 'Year'),
-                      items: List.generate(now.year - 2020 + 2, (index) {
-                        final y = 2020 + index;
-                        return DropdownMenuItem(value: y, child: Text('$y'));
-                      }),
-                      onChanged: (val) {
-                        if (val != null) setDialogState(() => selectedYear = val);
-                      },
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: selectedYear,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Year'),
+                        items: List.generate(now.year - 2020 + 2, (index) {
+                          final y = 2020 + index;
+                          return DropdownMenuItem(value: y, child: Text('$y'));
+                        }),
+                        onChanged: (val) {
+                          if (val != null) setDialogState(() => selectedYear = val);
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -308,7 +312,7 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
                     });
                     Navigator.pop(ctx);
                   },
-                  child: const Text('OK'),
+                  child: Text(l10n.ok),
                 ),
               ],
             );
@@ -618,47 +622,48 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
               ),
               content: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.reconciliationProgress(currentIndex + 1, mismatches.length),
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      l10n.reconciliationSubtitle,
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppConfig.primaryColor.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.reconciliationProgress(currentIndex + 1, mismatches.length),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '$street #$number',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Period: $periodKey',
-                            style: const TextStyle(fontWeight: FontWeight.w600, color: AppConfig.secondaryColor),
-                          ),
-                        ],
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.reconciliationSubtitle,
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppConfig.primaryColor.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$street #$number',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Period: $periodKey',
+                              style: const TextStyle(fontWeight: FontWeight.w600, color: AppConfig.secondaryColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      LayoutBuilder(
+                        builder: (context, boxConstraints) {
+                          final existingCard = Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.grey.shade100,
@@ -675,11 +680,8 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Container(
+                          );
+                          final csvCard = Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.green.shade50,
@@ -696,11 +698,30 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          );
+
+                          if (boxConstraints.maxWidth < 260) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                existingCard,
+                                const SizedBox(height: 10),
+                                csvCard,
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              Expanded(child: existingCard),
+                              const SizedBox(width: 12),
+                              Expanded(child: csvCard),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -792,6 +813,222 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
     );
   }
 
+  Widget _buildPeriodColumn({
+    required String label,
+    required Color labelColor,
+    required DateTime date,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: labelColor,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _formatPeriod(date),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPeriodRangeSelector(AppLocalizations l10n) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppConfig.primaryColor.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.15)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final startCol = _buildPeriodColumn(
+            label: l10n.startingPeriodLabel,
+            labelColor: AppConfig.primaryColor,
+            date: _startPeriod,
+          );
+          final endCol = _buildPeriodColumn(
+            label: l10n.endPeriodLabel,
+            labelColor: Colors.grey.shade600,
+            date: _endPeriod,
+          );
+
+          final Widget periodRange = constraints.maxWidth < 220
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    startCol,
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 6),
+                      child: Icon(Icons.arrow_downward, color: Colors.grey, size: 18),
+                    ),
+                    endCol,
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(child: startCol),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Icon(Icons.arrow_forward, color: Colors.grey, size: 20),
+                    ),
+                    Expanded(child: endCol),
+                  ],
+                );
+
+          final selectButton = OutlinedButton.icon(
+            onPressed: _isLoading ? null : _pickStartingPeriod,
+            icon: const Icon(Icons.calendar_month, size: 18),
+            label: Text(l10n.selectStartingPeriod),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          );
+
+          if (constraints.maxWidth >= 520) {
+            return Row(
+              children: [
+                Expanded(child: periodRange),
+                const SizedBox(width: 12),
+                selectButton,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              periodRange,
+              const SizedBox(height: 12),
+              selectButton,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildResponsiveButtonGroup(List<Widget> buttons, {required bool stackVertically}) {
+    if (stackVertically) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (int i = 0; i < buttons.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            buttons[i],
+          ],
+        ],
+      );
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: buttons,
+    );
+  }
+
+  Widget _buildTemplateActions(AppLocalizations l10n, {required bool isCompact}) {
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+    return _buildResponsiveButtonGroup(
+      [
+        ElevatedButton.icon(
+          onPressed: _isLoading ? null : _downloadSampleTemplate,
+          icon: const Icon(Icons.download),
+          label: Text(l10n.downloadSampleTemplateButton),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppConfig.primaryColor,
+            foregroundColor: Colors.white,
+            padding: buttonPadding,
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: _isLoading ? null : _downloadAllAddressesTemplate,
+          icon: const Icon(Icons.location_city),
+          label: Text(l10n.downloadAllAddressesTemplateButton),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppConfig.secondaryColor,
+            foregroundColor: Colors.white,
+            padding: buttonPadding,
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _copyTemplateToClipboard,
+          icon: const Icon(Icons.copy),
+          label: Text(l10n.copyTemplateButton),
+          style: OutlinedButton.styleFrom(padding: buttonPadding),
+        ),
+      ],
+      stackVertically: isCompact,
+    );
+  }
+
+  Widget _buildPreviewHeader(AppLocalizations l10n) {
+    final title = Text(
+      '${l10n.previewPaymentsTitle} (${_parsedItems.length})',
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
+    );
+    final warning = Text(
+      l10n.emptyAmountWarning,
+      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 560) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: title),
+              const SizedBox(width: 12),
+              Flexible(child: warning),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            title,
+            const SizedBox(height: 4),
+            warning,
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildResultActions(AppLocalizations l10n, {required bool isCompact}) {
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+    return _buildResponsiveButtonGroup(
+      [
+        ElevatedButton.icon(
+          onPressed: _downloadResultCsv,
+          icon: const Icon(Icons.download),
+          label: Text(l10n.downloadPaymentResultCsvButton),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppConfig.secondaryColor,
+            foregroundColor: Colors.white,
+            padding: buttonPadding,
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _copyResultCsv,
+          icon: const Icon(Icons.copy),
+          label: Text(l10n.copyPaymentResultCsvButton),
+          style: OutlinedButton.styleFrom(padding: buttonPadding),
+        ),
+      ],
+      stackVertically: isCompact,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -804,276 +1041,188 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
               backgroundColor: AppConfig.primaryColor,
               foregroundColor: Colors.white,
             ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Instructions Card
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
+      body: LayoutBuilder(
+        builder: (context, viewportConstraints) {
+          final isCompact = viewportConstraints.maxWidth < 600;
+          final outerPadding = isCompact ? 12.0 : 24.0;
+          final cardPadding = isCompact ? 16.0 : 20.0;
+
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(outerPadding),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.history_edu, color: AppConfig.primaryColor, size: 28),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            l10n.bulkPaymentImportTitle,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      l10n.bulkPaymentImportSubtitle,
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 16),
-                    // Starting Period Picker Selector
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppConfig.primaryColor.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppConfig.primaryColor.withValues(alpha: 0.15)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(l10n.startingPeriodLabel, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppConfig.primaryColor)),
-                                const SizedBox(height: 4),
-                                Text(_formatPeriod(_startPeriod), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.arrow_forward, color: Colors.grey),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(l10n.endPeriodLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade600)),
-                                const SizedBox(height: 4),
-                                Text(_formatPeriod(_endPeriod), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _isLoading ? null : _pickStartingPeriod,
-                            icon: const Icon(Icons.calendar_month, size: 18),
-                            label: Text(l10n.selectStartingPeriod),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    // Template action buttons
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _isLoading ? null : _downloadSampleTemplate,
-                          icon: const Icon(Icons.download),
-                          label: Text(l10n.downloadSampleTemplateButton),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppConfig.primaryColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: _isLoading ? null : _downloadAllAddressesTemplate,
-                          icon: const Icon(Icons.location_city),
-                          label: Text(l10n.downloadAllAddressesTemplateButton),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppConfig.secondaryColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _copyTemplateToClipboard,
-                          icon: const Icon(Icons.copy),
-                          label: Text(l10n.copyTemplateButton),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    // Upload CSV Trigger
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isProcessing ? null : _pickCsvFile,
-                            icon: const Icon(Icons.file_upload),
-                            label: Text(l10n.uploadPaymentCsvButton),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConfig.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_selectedFileName != null) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppConfig.primaryColor.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
+                    // Instructions Card
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      child: Padding(
+                        padding: EdgeInsets.all(cardPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.table_chart, color: AppConfig.primaryColor),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                '$_selectedFileName (${_parsedItems.length} records, ${_detectedPeriods.length} periods detected)',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Preview Section
-            if (_parsedItems.isNotEmpty && _importResult == null) ...[
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${l10n.previewPaymentsTitle} (${_parsedItems.length})',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
-                          ),
-                          Text(
-                            l10n.emptyAmountWarning,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columnSpacing: 24,
-                          headingRowColor: WidgetStatePropertyAll(AppConfig.primaryColor.withValues(alpha: 0.06)),
-                          columns: [
-                            const DataColumn(label: Text('Street', style: TextStyle(fontWeight: FontWeight.bold))),
-                            const DataColumn(label: Text('Number', style: TextStyle(fontWeight: FontWeight.bold))),
-                            ..._detectedPeriods.values.map(
-                              (p) => DataColumn(label: Text(p, style: const TextStyle(fontWeight: FontWeight.bold))),
-                            ),
-                          ],
-                          rows: _parsedItems.take(8).map((item) {
-                            final amounts = (item['periodAmounts'] as Map<String, double>?) ?? {};
-                            return DataRow(
-                              cells: [
-                                DataCell(Text(item['streetName']?.toString() ?? '')),
-                                DataCell(Text(item['number']?.toString() ?? '')),
-                                ..._detectedPeriods.keys.map((pKey) {
-                                  final amt = amounts[pKey];
-                                  return DataCell(
-                                    amt != null && amt > 0
-                                        ? Text('\$${amt.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green))
-                                        : const Text('-', style: TextStyle(color: Colors.grey)),
-                                  );
-                                }),
+                            Row(
+                              children: [
+                                const Icon(Icons.history_edu, color: AppConfig.primaryColor, size: 28),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    l10n.bulkPaymentImportTitle,
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
+                                  ),
+                                ),
                               ],
-                            );
-                          }).toList(),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              l10n.bulkPaymentImportSubtitle,
+                              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                            ),
+                            const SizedBox(height: 16),
+                            // Starting Period Picker Selector
+                            _buildPeriodRangeSelector(l10n),
+                            const SizedBox(height: 16),
+                            // Template action buttons
+                            _buildTemplateActions(l10n, isCompact: isCompact),
+                            const SizedBox(height: 20),
+                            const Divider(),
+                            const SizedBox(height: 16),
+                            // Upload CSV Trigger
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _isProcessing ? null : _pickCsvFile,
+                                    icon: const Icon(Icons.file_upload),
+                                    label: Text(l10n.uploadPaymentCsvButton),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppConfig.primaryColor,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_selectedFileName != null) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppConfig.primaryColor.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.table_chart, color: AppConfig.primaryColor),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        '$_selectedFileName (${_parsedItems.length} records, ${_detectedPeriods.length} periods detected)',
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: _isProcessing ? null : _startPreCheckAndImport,
-                        icon: _isProcessing
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Icon(Icons.check_circle),
-                        label: Text(l10n.processPaymentImportButton(_parsedItems.length)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppConfig.secondaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Preview Section
+                    if (_parsedItems.isNotEmpty && _importResult == null) ...[
+                      Card(
+                        elevation: 3,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        child: Padding(
+                          padding: EdgeInsets.all(cardPadding),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildPreviewHeader(l10n),
+                              const SizedBox(height: 12),
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: DataTable(
+                                  columnSpacing: 24,
+                                  headingRowColor: WidgetStatePropertyAll(AppConfig.primaryColor.withValues(alpha: 0.06)),
+                                  columns: [
+                                    const DataColumn(label: Text('Street', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    const DataColumn(label: Text('Number', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    ..._detectedPeriods.values.map(
+                                      (p) => DataColumn(label: Text(p, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                    ),
+                                  ],
+                                  rows: _parsedItems.take(8).map((item) {
+                                    final amounts = (item['periodAmounts'] as Map<String, double>?) ?? {};
+                                    return DataRow(
+                                      cells: [
+                                        DataCell(Text(item['streetName']?.toString() ?? '')),
+                                        DataCell(Text(item['number']?.toString() ?? '')),
+                                        ..._detectedPeriods.keys.map((pKey) {
+                                          final amt = amounts[pKey];
+                                          return DataCell(
+                                            amt != null && amt > 0
+                                                ? Text('\$${amt.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green))
+                                                : const Text('-', style: TextStyle(color: Colors.grey)),
+                                          );
+                                        }),
+                                      ],
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton.icon(
+                                onPressed: _isProcessing ? null : _startPreCheckAndImport,
+                                icon: _isProcessing
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                    : const Icon(Icons.check_circle),
+                                label: Text(l10n.processPaymentImportButton(_parsedItems.length)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppConfig.secondaryColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ),
-            ],
 
-            // Results Section
-            if (_importResult != null) ...[
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.paymentImportSuccessTitle,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        l10n.paymentImportSummary(
-                          (_importResult!['successCount'] as num?)?.toInt() ?? 0,
-                          (_importResult!['skippedPeriodsCount'] as num?)?.toInt() ?? 0,
-                          (_importResult!['failureCount'] as num?)?.toInt() ?? 0,
-                        ),
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                      ),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _downloadResultCsv,
-                            icon: const Icon(Icons.download),
-                            label: Text(l10n.downloadPaymentResultCsvButton),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConfig.secondaryColor,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: _copyResultCsv,
-                            icon: const Icon(Icons.copy),
-                            label: Text(l10n.copyPaymentResultCsvButton),
-                          ),
-                        ],
-                      ),
+                    // Results Section
+                    if (_importResult != null) ...[
+                      Card(
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        child: Padding(
+                          padding: EdgeInsets.all(cardPadding),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.paymentImportSuccessTitle,
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppConfig.primaryColor),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n.paymentImportSummary(
+                                  (_importResult!['successCount'] as num?)?.toInt() ?? 0,
+                                  (_importResult!['skippedPeriodsCount'] as num?)?.toInt() ?? 0,
+                                  (_importResult!['failureCount'] as num?)?.toInt() ?? 0,
+                                ),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 16),
+                              _buildResultActions(l10n, isCompact: isCompact),
                       const SizedBox(height: 16),
                       const Divider(),
                       const SizedBox(height: 8),
@@ -1178,6 +1327,10 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
             ],
           ],
         ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
