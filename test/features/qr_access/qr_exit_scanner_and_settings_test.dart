@@ -464,5 +464,112 @@ void main() {
       final savedDoc = await FakeBackendHelper.db.getDocument('config', 'app_settings');
       expect(savedDoc?['initialBudgetBalance'], equals(15250.5));
     });
+
+    testWidgets(
+      'pre-fills default welcome template body when no custom body is saved and preserves custom body when present',
+      (tester) async {
+        tester.view.physicalSize = const Size(1000, 1200);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(wrapWithApp(const AdminSettingsScreen()));
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('settings_card_email_template')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('settings_card_email_template')),
+        );
+        await tester.pumpAndSettle();
+
+        final ctx = tester.element(find.byType(AdminSettingsScreen));
+        final l10n = AppLocalizations.of(ctx)!;
+        final bodyField = tester.widget<TextFormField>(
+          find.byKey(const ValueKey('email_template_body_field')),
+        );
+        expect(bodyField.controller!.text, equals(l10n.defaultWelcomeBody));
+
+        // Now verify existing custom template is preserved on fresh load
+        FakeBackendHelper.setUp();
+        FakeBackendHelper.db.seedDocument('config', 'smtp_settings', {
+          'customSubject': 'Custom Subject',
+          'customBody': 'Custom saved welcome body for %name%',
+        });
+
+        await tester.pumpWidget(
+          wrapWithApp(const AdminSettingsScreen(key: ValueKey('saved_template_reload'))),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('settings_card_email_template')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('settings_card_email_template')),
+        );
+        await tester.pumpAndSettle();
+
+        final savedBodyField = tester.widget<TextFormField>(
+          find.byKey(const ValueKey('email_template_body_field')),
+        );
+        expect(
+          savedBodyField.controller!.text,
+          equals('Custom saved welcome body for %name%'),
+        );
+      },
+    );
+
+    testWidgets(
+      'stacks welcome template description cleanly above restore button on mobile Spanish viewport without vertical squishing',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 780);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(
+          wrapWithApp(const AdminSettingsScreen(), locale: const Locale('es')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('settings_card_email_template')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('settings_card_email_template')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+
+        final ctx = tester.element(find.byType(AdminSettingsScreen));
+        final l10n = AppLocalizations.of(ctx)!;
+
+        // First match may be the collapsed tile subtitle; the expanded body copy
+        // sits directly above reset_default_template_button with full width.
+        final expandedDescription = find.text(l10n.customWelcomeEmailSubtitle).last;
+        final restoreBtn = find.byKey(const ValueKey('reset_default_template_button'));
+
+        expect(expandedDescription, findsOneWidget);
+        expect(restoreBtn, findsOneWidget);
+
+        final descRect = tester.getRect(expandedDescription);
+        final btnRect = tester.getRect(restoreBtn);
+
+        expect(descRect.width, greaterThan(220));
+        expect(descRect.bottom, lessThanOrEqualTo(btnRect.top));
+
+        final bodyField = tester.widget<TextFormField>(
+          find.byKey(const ValueKey('email_template_body_field')),
+        );
+        expect(bodyField.controller!.text, equals(l10n.defaultWelcomeBody));
+      },
+    );
   });
 }

@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-16 (v1.0.33+34 — Financial Reports Rebrand, Reordered Preview/Pickers/Downloads Layout & Mobile Overflow Fix)*
+*Last Verified/Updated: 2026-11-16 (v1.0.34+35 — Responsive Welcome Message Template Card & Default Body Pre-Fill in AdminSettingsScreen)*
 
 Current state of project files and folders:
 
@@ -164,7 +164,7 @@ Current state of project files and folders:
             - `qr_camera_selector_test.dart`: Widget tests for camera direction switch controls in `RoommatesScreen` and `QrScannerScreen`.
             - `qr_code_model_test.dart`: QrCode model serialization and default parsing tests.
             - `qr_service_test.dart`: QR stream sorting, status normalization, expiration resolution, `isVisitorInside` detection, and code invalidation (`deactivatedAt` + 7-day `expireAt` TTL stamping) tests.
-            - `qr_exit_scanner_and_settings_test.dart`: Widget tests for `AdminSettingsScreen` 5 expandable/collapsible cards, real-time auto-save (`Scan on exit`, timezone dropdown, SMTP switch, `initialBudgetBalance` Opening Balance inside `Payment & Grace Period`) vs. isolated manual Save buttons (`save_smtp_config_button` and `save_email_template_button`), Spanish localization, `ManageQrScreen` localized 7-day retention banner (`qr_codes_retention_banner`) & live `INSIDE` badge rendering, and `QrScannerScreen` fast exit verification flow without photo capture and return navigation to the guard main screen.
+            - `qr_exit_scanner_and_settings_test.dart`: Widget tests for `AdminSettingsScreen` 5 expandable/collapsible cards, real-time auto-save (`Scan on exit`, timezone dropdown, SMTP switch, `initialBudgetBalance` Opening Balance inside `Payment & Grace Period`) vs. isolated manual Save buttons (`save_smtp_config_button` and `save_email_template_button`), default welcome email body pre-fill + saved custom body preservation + Spanish `360x780` mobile email template layout, Spanish localization, `ManageQrScreen` localized 7-day retention banner (`qr_codes_retention_banner`) & live `INSIDE` badge rendering, and `QrScannerScreen` fast exit verification flow without photo capture and return navigation to the guard main screen.
         - `sanctions/sanctions_screens_test.dart`: Widget tests for `SanctionsScreen` (resident sanction display and direct `Pay Sanction` navigation to `PaymentScreen`) and `AdminSanctionsScreen` (issuing new sanctions with infraction photo upload, waiving active sanctions, and inline `RotatableImagePreview` rotation + full-screen synchronization).
         - `transparency/transparency_explorer_test.dart`: Production `TransparencyScreen` and `DocumentViewerScreen` widget and unit tests covering role-based `visibility == 'admin'` document/folder filtering, upload `accept` allow-list & filename traversal sanitization, virtual folder navigation, category management, stream subscription disposal, and Markdown viewer font scaling.
     - `integration/`:

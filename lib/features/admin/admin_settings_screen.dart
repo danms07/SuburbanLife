@@ -141,6 +141,14 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         _customSubjectController.text = _savedCustomSubject;
         _customBodyController.text = _savedCustomBody;
       }
+
+      // Pre-fill default template body when no custom template has been saved yet
+      if (mounted && _savedCustomBody.trim().isEmpty) {
+        final l10n = AppLocalizations.of(context);
+        if (l10n != null && _customBodyController.text.trim().isEmpty) {
+          _customBodyController.text = l10n.defaultWelcomeBody;
+        }
+      }
     } catch (e, stack) {
       debugPrint('Error loading settings: $e');
       Backend.crashlytics.recordError(
@@ -1615,26 +1623,59 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                         title: l10n.customWelcomeEmailSection,
                         subtitle: l10n.customWelcomeEmailSubtitle,
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  l10n.customWelcomeEmailSubtitle,
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: Colors.grey,
-                                  ),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final subtitleText = Text(
+                                l10n.customWelcomeEmailSubtitle,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: Colors.grey,
                                 ),
-                              ),
-                              TextButton.icon(
+                              );
+                              final restoreButton = TextButton.icon(
+                                key: const ValueKey(
+                                  'reset_default_template_button',
+                                ),
                                 onPressed: _resetDefaultTemplate,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
                                 icon: const Icon(Icons.restore, size: 16),
                                 label: Text(
                                   l10n.resetDefaultTemplateButton,
                                   style: const TextStyle(fontSize: 12),
                                 ),
-                              ),
-                            ],
+                              );
+
+                              if (constraints.maxWidth >= 520) {
+                                return Row(
+                                  children: [
+                                    Expanded(child: subtitleText),
+                                    const SizedBox(width: 12),
+                                    restoreButton,
+                                  ],
+                                );
+                              }
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  subtitleText,
+                                  const SizedBox(height: 8),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: restoreButton,
+                                  ),
+                                ],
+                              );
+                            },
                           ),
                           const SizedBox(height: 12),
 
@@ -1787,6 +1828,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                                   : const Icon(Icons.save_outlined),
                               label: Text(
                                 l10n.saveEmailTemplateButton,
+                                textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.bold,
@@ -1797,6 +1839,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                                 backgroundColor: AppConfig.secondaryColor,
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
                                   vertical: 14,
                                 ),
                                 shape: RoundedRectangleBorder(

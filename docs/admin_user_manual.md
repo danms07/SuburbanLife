@@ -504,6 +504,6 @@ Configure automated email delivery across two collapsible cards for new user onb
    * **SMTP Username**, **Password / App Password**, **Sender Email**, and **Sender Display Name**.
    * Tap **Test Connection** to invoke `adminTestSmtpConnection` and send a live test email, then tap **Save SMTP Configuration** to persist server credentials.
 3. **Custom Welcome Message Card (Manual Save)**:
-   * Customize the **Email Subject** and **Email Body**.
+   * Customize the **Email Subject** and **Email Body** (when no custom template has been saved yet, the body field automatically pre-fills with the localized default template; use **Restore Default Template** at any time to reset both subject and body).
    * Click any **Dynamic Placeholder Chip** to insert live variables (`%name%`, `%email%`, `%password%`, `%address%`, `%role%`, `%appName%`).
    * Tap **Save Email Template** to persist your custom welcome email subject and body.

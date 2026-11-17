@@ -504,6 +504,6 @@ Configura el envío automático de correos en dos tarjetas desplegables independ
    * **Usuario SMTP**, **Contraseña / Contraseña de Aplicación**, **Correo Remitente** y **Nombre Visible del Remitente**.
    * Toca **Probar Conexión** para ejecutar `adminTestSmtpConnection` y enviar un correo de prueba en vivo, y luego toca **Guardar Configuración SMTP** para almacenar las credenciales del servidor.
 3. **Tarjeta Mensaje de Bienvenida Personalizado (Guardado Manual)**:
-   * Personaliza el **Asunto del Correo** y el **Cuerpo del Mensaje**.
+   * Personaliza el **Asunto del Correo** y el **Cuerpo del Mensaje** (cuando aún no existe una plantilla guardada, el campo del cuerpo se rellena automáticamente con la plantilla predeterminada; usa **Restablecer Plantilla Predeterminada** cuando necesites restaurar ambos campos).
    * Toca cualquiera de los **Chips de Variables Dinámicas** para insertar datos reales (`%name%`, `%email%`, `%password%`, `%address%`, `%role%`, `%appName%`).
    * Toca **Guardar Plantilla de Correo** para guardar el asunto y cuerpo personalizados.

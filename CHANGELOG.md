@@ -2,6 +2,14 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.34+35] — 2026-11-16
+
+### Changed & Fixed
+- **Welcome Message Template Mobile Layout & Default Body Pre-Fill (`AdminSettingsScreen`)**:
+  - Replaced the fixed `Row` inside the Custom Welcome Message card in `lib/features/admin/admin_settings_screen.dart` with a responsive `LayoutBuilder` (`< 520px` breakpoint) that renders the description across the full card width and stacks a compact `reset_default_template_button` right-aligned beneath it on mobile devices, eliminating severe vertical text squishing.
+  - Updated `_loadSettings()` so that when no custom email body has been persisted in `config/smtp_settings` (`customBody` missing or blank), `_customBodyController.text` automatically pre-fills with the localized `l10n.defaultWelcomeBody`.
+  - Added widget tests in `test/features/qr_access/qr_exit_scanner_and_settings_test.dart` covering default template body pre-fill, preservation of saved custom bodies, and Spanish `360x780` mobile layout positioning without overflow or text squishing.
+
 ## [1.0.33+34] — 2026-11-16
 
 ### Changed & Fixed
