@@ -2621,7 +2621,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String paymentImportSummary(
-      int successCount, int skippedCount, int failureCount) {
+    int successCount,
+    int skippedCount,
+    int failureCount,
+  ) {
     return '$successCount processed, $skippedCount skipped, $failureCount failed';
   }
 

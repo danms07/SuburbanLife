@@ -4640,34 +4640,182 @@ abstract class AppLocalizations {
   /// **'Privacy notice: Approving or rejecting this request permanently deletes the ownership proof image from Cloud Storage.'**
   String get adminProofDeletionNotice;
 
+  /// No description provided for @bulkPaymentImportMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk Payment History (CSV)'**
   String get bulkPaymentImportMenu;
+
+  /// No description provided for @bulkPaymentImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk Previous Payments Import'**
   String get bulkPaymentImportTitle;
+
+  /// No description provided for @bulkPaymentImportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload historical resident payments in bulk using a CSV file'**
   String get bulkPaymentImportSubtitle;
+
+  /// No description provided for @startingPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting Period'**
   String get startingPeriodLabel;
+
+  /// No description provided for @endPeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'End Period (Current)'**
   String get endPeriodLabel;
+
+  /// No description provided for @selectStartingPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Starting Period'**
   String get selectStartingPeriod;
+
+  /// No description provided for @downloadSampleTemplateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Sample Template'**
   String get downloadSampleTemplateButton;
+
+  /// No description provided for @downloadAllAddressesTemplateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download All Addresses Template'**
   String get downloadAllAddressesTemplateButton;
+
+  /// No description provided for @copyTemplateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Template'**
   String get copyTemplateButton;
+
+  /// No description provided for @templateCopiedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV Template copied to clipboard'**
   String get templateCopiedSuccess;
+
+  /// No description provided for @uploadPaymentCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Payment CSV'**
   String get uploadPaymentCsvButton;
+
+  /// No description provided for @previewPaymentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview Payments'**
   String get previewPaymentsTitle;
+
+  /// No description provided for @processPaymentImportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Process Payment Import ({count})'**
   String processPaymentImportButton(int count);
+
+  /// No description provided for @reconciliationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconcile Amount Mismatch'**
   String get reconciliationTitle;
+
+  /// No description provided for @reconciliationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing payment in system differs from the uploaded CSV'**
   String get reconciliationSubtitle;
+
+  /// No description provided for @existingAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing in System'**
   String get existingAmountLabel;
+
+  /// No description provided for @csvAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded in CSV'**
   String get csvAmountLabel;
+
+  /// No description provided for @keepExistingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Existing'**
   String get keepExistingButton;
+
+  /// No description provided for @overwriteWithCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite with CSV'**
   String get overwriteWithCsvButton;
+
+  /// No description provided for @reconciliationProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Mismatch {current} of {total}'**
   String reconciliationProgress(int current, int total);
+
+  /// No description provided for @paymentImportSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Import Results'**
   String get paymentImportSuccessTitle;
-  String paymentImportSummary(int successCount, int skippedCount, int failureCount);
+
+  /// No description provided for @paymentImportSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{successCount} processed, {skippedCount} skipped, {failureCount} failed'**
+  String paymentImportSummary(
+    int successCount,
+    int skippedCount,
+    int failureCount,
+  );
+
+  /// No description provided for @downloadPaymentResultCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Results CSV'**
   String get downloadPaymentResultCsvButton;
+
+  /// No description provided for @copyPaymentResultCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Results CSV'**
   String get copyPaymentResultCsvButton;
+
+  /// No description provided for @unmatchedAddressesWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} address(es) were not found in database records and will be skipped.'**
   String unmatchedAddressesWarning(int count);
+
+  /// No description provided for @noValidPeriodsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid period columns found in CSV header. Expected format: Nov-24, Dec-24, etc.'**
   String get noValidPeriodsFound;
+
+  /// No description provided for @emptyAmountWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows with \$0.00 or empty amounts will be treated as unpaid.'**
   String get emptyAmountWarning;
+
+  /// No description provided for @allPeriodsAlreadyPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'All periods already recorded with identical amounts.'**
   String get allPeriodsAlreadyPaid;
+
+  /// No description provided for @reconcileMismatchesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Review & Reconcile Mismatches ({count})'**
   String reconcileMismatchesButton(int count);
 }
 

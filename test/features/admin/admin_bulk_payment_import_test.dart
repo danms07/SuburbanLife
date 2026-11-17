@@ -70,7 +70,7 @@ void main() {
 
     test('splits CSV lines preserving quoted values with commas and delimiters', () {
       final cells = AdminBulkPaymentImportScreen.splitCsvLine(
-        '"Almendros, Privada",101,"$1,500.00","0.00"',
+        '"Almendros, Privada",101,"\$1,500.00","0.00"',
         ',',
       );
       expect(cells.length, 4);
@@ -113,6 +113,27 @@ void main() {
       expect(items[2]['number'], 5);
       final p3 = items[2]['periodAmounts'] as Map<String, double>;
       expect(p3.isEmpty, isTrue);
+    });
+
+    test('returns empty error when CSV content is empty or whitespace', () {
+      final result = AdminBulkPaymentImportScreen.parsePaymentCsv('   \n  ');
+      expect(result['error'], 'empty');
+      expect((result['items'] as List), isEmpty);
+    });
+
+    test('auto-detects semicolon delimiter when commas are absent', () {
+      const csv = '"Calle";"Numero";"Nov-24";"Dic-24"\n'
+          '"Robles";25;"1500";"0"\n';
+      final result = AdminBulkPaymentImportScreen.parsePaymentCsv(csv);
+      expect(result['error'], isNull);
+
+      final items = List<Map<String, dynamic>>.from(result['items'] as List);
+      expect(items.length, 1);
+      expect(items[0]['streetName'], 'Robles');
+      expect(items[0]['number'], 25);
+      final periods = items[0]['periodAmounts'] as Map<String, double>;
+      expect(periods['2024-11'], 1500.0);
+      expect(periods.containsKey('2024-12'), isFalse);
     });
 
     test('returns no_periods error if CSV does not contain valid period headers', () {

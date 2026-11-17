@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -360,7 +361,7 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
       Backend.crashlytics.recordError(e, stack, reason: 'AdminBulkPaymentImportScreen._downloadAllAddressesTemplate');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load community addresses: $e'), backgroundColor: Colors.redAccent),
+          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
         );
       }
     } finally {
@@ -425,20 +426,70 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
   Future<void> _pickCsvFile() async {
     final l10n = AppLocalizations.of(context)!;
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv', 'txt'],
-        withData: true,
-      );
+      String? selectedFileName;
+      Uint8List? rawBytes;
 
-      if (result == null || result.files.isEmpty) return;
+      if (kIsWeb) {
+        final uploadInput = html.FileUploadInputElement()
+          ..accept = '.csv,text/csv,text/plain,.txt';
+        uploadInput.click();
 
-      final file = result.files.first;
-      final rawBytes = file.bytes;
-      if (rawBytes == null) throw Exception('Could not read file data.');
+        await uploadInput.onChange.first;
+        if (uploadInput.files == null || uploadInput.files!.isEmpty) return;
+
+        final file = uploadInput.files!.first;
+        selectedFileName = file.name;
+        final reader = html.FileReader();
+        reader.readAsArrayBuffer(file);
+        await reader.onLoadEnd.first;
+
+        final result = reader.result;
+        if (result != null) {
+          if (result is Uint8List) {
+            rawBytes = result;
+          } else if (result is ByteBuffer) {
+            rawBytes = result.asUint8List();
+          } else if (result is List<int>) {
+            rawBytes = Uint8List.fromList(result);
+          }
+        }
+      } else {
+        final result = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['csv', 'txt'],
+          withData: true,
+        );
+
+        if (result == null || result.files.isEmpty) return;
+
+        final file = result.files.first;
+        selectedFileName = file.name;
+        rawBytes = file.bytes;
+        if ((rawBytes == null || rawBytes.isEmpty) && file.path != null) {
+          rawBytes = await File(file.path!).readAsBytes();
+        }
+      }
+
+      if (rawBytes == null || rawBytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.invalidCsvFormat), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
 
       final content = utf8.decode(rawBytes, allowMalformed: true);
       final parsed = AdminBulkPaymentImportScreen.parsePaymentCsv(content);
+
+      if (parsed['error'] == 'empty') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.invalidCsvFormat), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
 
       if (parsed['error'] == 'no_periods') {
         if (mounted) {
@@ -450,7 +501,7 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
       }
 
       setState(() {
-        _selectedFileName = file.name;
+        _selectedFileName = selectedFileName;
         _parsedItems = List<Map<String, dynamic>>.from(parsed['items'] as List);
         _detectedPeriods = Map<String, String>.from(parsed['periods'] as Map);
         _importResult = null;
@@ -692,13 +743,13 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
           _importResult = Map<String, dynamic>.from(res);
         });
 
-        final successCount = _importResult?['successCount'] ?? 0;
-        final failureCount = _importResult?['failureCount'] ?? 0;
+        final successCount = (_importResult?['successCount'] as num?)?.toInt() ?? 0;
+        final failureCount = (_importResult?['failureCount'] as num?)?.toInt() ?? 0;
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(l10n.importSummaryText(successCount as int, failureCount as int)),
+              content: Text(l10n.importSummaryText(successCount, failureCount)),
               backgroundColor: failureCount == 0 ? AppConfig.secondaryColor : Colors.orange,
             ),
           );
@@ -996,9 +1047,9 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
                       const SizedBox(height: 8),
                       Text(
                         l10n.paymentImportSummary(
-                          _importResult!['successCount'] as int? ?? 0,
-                          _importResult!['skippedPeriodsCount'] as int? ?? 0,
-                          _importResult!['failureCount'] as int? ?? 0,
+                          (_importResult!['successCount'] as num?)?.toInt() ?? 0,
+                          (_importResult!['skippedPeriodsCount'] as num?)?.toInt() ?? 0,
+                          (_importResult!['failureCount'] as num?)?.toInt() ?? 0,
                         ),
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                       ),

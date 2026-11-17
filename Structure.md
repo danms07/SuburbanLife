@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-14 (v1.0.29+30 — Bulk Previous Payments Import: AdminBulkPaymentImportScreen with calendar starting period selector, sample and pre-populated addresses templates, case-insensitive address resolution, sequential amount mismatch reconciliation, adminBulkImportPayments & adminPreCheckPaymentImport Cloud Functions, widget tests, and Spanish/English localization)*
+*Last Verified/Updated: 2026-11-16 (v1.0.30+31 — Fix Web build & file picking in AdminBulkPaymentImportScreen, localize template load error, and fix bulk payment import test compilation)*
 
 Current state of project files and folders:
 
@@ -133,6 +133,7 @@ Current state of project files and folders:
         - `services/temp_image_cleanup_test.dart`: Unit and widget tests verifying safe canonical temp/cache directory deletion, Android `scaled_` companion raw capture removal, stale top-level picker sweep without touching cache subdirectories, and automatic `QrScannerScreen` photo cleanup on upload, retake, `Scan Again`, and disposal.
     - `features/`:
         - `admin/`:
+            - `admin_bulk_payment_import_test.dart`: Unit and widget tests for `AdminBulkPaymentImportScreen` covering bilingual `mmm-yy` and ISO period parsing, CSV splitting and delimiter auto-detection, empty/missing-period error reporting, RFC-compliant results CSV serialization, and template clipboard export.
             - `admin_shell_screen_test.dart`: Widget tests for `AdminShellScreen` covering persistent desktop sidebar (`>= 900px`), mobile hamburger `Drawer` (`< 900px`), collapsible category `ExpansionTile` roll-up badges vs. child badges, direct single-tap `General Settings` leaf tile without an expansion chevron, `Overview` dashboard KPIs & Overview-only `Generate Access QR` FAB, embedded view switching without duplicate AppBars, and Spanish localization.
             - `admin_booking_approval_test.dart`: Widget tests for `AdminBookingApprovalScreen` covering custom/preset approval messages (`approvalMessage`), booking rejection persistence, `booking_attachments` Submitted Documentation streaming & View/Download actions, and inline `RotatableImagePreview` rotate + full-screen controls on image attachments.
             - `admin_payment_approval_test.dart`: Widget tests for `AdminPaymentApprovalScreen` and `AdminPaymentDetailScreen` covering receipt thumbnail layout, inline 90-degree rotation + full-screen `initialQuarterTurns` synchronization on both payment receipts and linked sanction infraction evidence, `approvePayment` callable execution, custom rejection reason persistence, and automatic sanction reversion to `active` on sanction payment rejection.

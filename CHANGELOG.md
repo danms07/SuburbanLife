@@ -2,6 +2,18 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.30+31] — 2026-11-16
+
+### Fixed
+- **Web Build & Cross-Platform CSV Upload in `AdminBulkPaymentImportScreen`**:
+  - Fixed compilation failure in `lib/features/admin/admin_bulk_payment_import_screen.dart` caused by `FilePicker.platform.pickFiles(...)` (removed in `file_picker ^11.0.2`), which broke `flutter build web`, `flutter analyze`, and Flutter test suites.
+  - Added `kIsWeb` HTML file picker (`html.FileUploadInputElement` + `html.FileReader`) on Web and updated native picking to `FilePicker.pickFiles(...)` with disk-path fallback, matching the codebase pattern in `AdminBulkUserImportScreen` and `AdminBulkAddressImportScreen`.
+  - Added handling for empty CSV errors (`parsed['error'] == 'empty'`), safe `num` to `int` coercions for Cloud Function summary counts, and replaced the hardcoded template-load error snackbar in `_downloadAllAddressesTemplate` with `l10n.errorPrefix(...)` (resolving the `unused_local_variable` warning).
+- **Bulk Payment Import Test Suite (`test/features/admin/admin_bulk_payment_import_test.dart`)**:
+  - Escaped the literal `$1,500.00` string interpolation error in the `splitCsvLine` unit test fixture and added parser tests for empty CSVs and semicolon delimiters.
+- **Generated Localizations (`lib/l10n/`)**:
+  - Regenerated localization outputs via `flutter gen-l10n` to keep generated files synchronized with `app_en.arb` and `app_es.arb`.
+
 ## [1.0.29+30] — 2026-11-14
 
 ### Added
