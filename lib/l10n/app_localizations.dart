@@ -4817,6 +4817,462 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Review & Reconcile Mismatches ({count})'**
   String reconcileMismatchesButton(int count);
+
+  /// No description provided for @expensesMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Expenses'**
+  String get expensesMenu;
+
+  /// No description provided for @expensesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Community Expenses'**
+  String get expensesTitle;
+
+  /// No description provided for @recordExpenseButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Record Expense'**
+  String get recordExpenseButton;
+
+  /// No description provided for @expenseProductServiceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Product / Service'**
+  String get expenseProductServiceLabel;
+
+  /// No description provided for @expenseProductServiceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Monthly gardening & lawn service'**
+  String get expenseProductServiceHint;
+
+  /// No description provided for @expenseAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get expenseAmountLabel;
+
+  /// No description provided for @expenseBillablePeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Billable Period'**
+  String get expenseBillablePeriodLabel;
+
+  /// No description provided for @expenseDateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense Date'**
+  String get expenseDateLabel;
+
+  /// No description provided for @expenseCategoryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get expenseCategoryLabel;
+
+  /// No description provided for @expenseVendorLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplier / Vendor (Optional)'**
+  String get expenseVendorLabel;
+
+  /// No description provided for @expenseVendorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. GreenCare Landscaping'**
+  String get expenseVendorHint;
+
+  /// No description provided for @expenseNotesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes (Optional)'**
+  String get expenseNotesLabel;
+
+  /// No description provided for @expenseNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional details or invoice folio...'**
+  String get expenseNotesHint;
+
+  /// No description provided for @expenseCategoryMaintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance'**
+  String get expenseCategoryMaintenance;
+
+  /// No description provided for @expenseCategoryGardening.
+  ///
+  /// In en, this message translates to:
+  /// **'Gardening'**
+  String get expenseCategoryGardening;
+
+  /// No description provided for @expenseCategorySecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get expenseCategorySecurity;
+
+  /// No description provided for @expenseCategoryUtilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Utilities'**
+  String get expenseCategoryUtilities;
+
+  /// No description provided for @expenseCategoryRepairs.
+  ///
+  /// In en, this message translates to:
+  /// **'Repairs'**
+  String get expenseCategoryRepairs;
+
+  /// No description provided for @expenseCategorySupplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Supplies'**
+  String get expenseCategorySupplies;
+
+  /// No description provided for @expenseCategoryOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get expenseCategoryOther;
+
+  /// No description provided for @expenseProductEvidenceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo Evidence of Acquired Product / Service'**
+  String get expenseProductEvidenceLabel;
+
+  /// No description provided for @expenseReceiptEvidenceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Receipt / Invoice Evidence (Photo or PDF)'**
+  String get expenseReceiptEvidenceLabel;
+
+  /// No description provided for @expenseChoosePhotoButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Photo'**
+  String get expenseChoosePhotoButton;
+
+  /// No description provided for @expenseChooseFileOrPhotoButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Photo / PDF'**
+  String get expenseChooseFileOrPhotoButton;
+
+  /// No description provided for @expenseTakePhotoButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Take Photo'**
+  String get expenseTakePhotoButton;
+
+  /// No description provided for @expenseEvidenceSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected: {fileName}'**
+  String expenseEvidenceSelected(String fileName);
+
+  /// No description provided for @expenseMissingProductService.
+  ///
+  /// In en, this message translates to:
+  /// **'• Enter the Product or Service description'**
+  String get expenseMissingProductService;
+
+  /// No description provided for @expenseMissingAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'• Enter a valid positive amount'**
+  String get expenseMissingAmount;
+
+  /// No description provided for @expenseMissingPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'• Select a billable period'**
+  String get expenseMissingPeriod;
+
+  /// No description provided for @expenseMissingProductEvidence.
+  ///
+  /// In en, this message translates to:
+  /// **'• Attach a photo of the acquired product or service'**
+  String get expenseMissingProductEvidence;
+
+  /// No description provided for @expenseMissingReceiptEvidence.
+  ///
+  /// In en, this message translates to:
+  /// **'• Attach a photo or PDF of the receipt/invoice'**
+  String get expenseMissingReceiptEvidence;
+
+  /// No description provided for @expenseMissingFieldsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Please complete all required expense fields before saving.'**
+  String get expenseMissingFieldsWarning;
+
+  /// No description provided for @expenseRecordedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense recorded successfully!'**
+  String get expenseRecordedSuccess;
+
+  /// No description provided for @noExpensesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No expenses recorded for the selected filters.'**
+  String get noExpensesFound;
+
+  /// No description provided for @financialSummaryIncomeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected Income'**
+  String get financialSummaryIncomeLabel;
+
+  /// No description provided for @financialSummaryExpensesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Expenses'**
+  String get financialSummaryExpensesLabel;
+
+  /// No description provided for @financialSummaryBudgetLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Accumulated Budget'**
+  String get financialSummaryBudgetLabel;
+
+  /// No description provided for @expenseStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get expenseStatusActive;
+
+  /// No description provided for @expenseStatusVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided'**
+  String get expenseStatusVoided;
+
+  /// No description provided for @expenseFilterAllPeriods.
+  ///
+  /// In en, this message translates to:
+  /// **'All Periods'**
+  String get expenseFilterAllPeriods;
+
+  /// No description provided for @expenseFilterAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'All Categories'**
+  String get expenseFilterAllCategories;
+
+  /// No description provided for @expenseRecordedByLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded by'**
+  String get expenseRecordedByLabel;
+
+  /// No description provided for @expenseVoidedByLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided by'**
+  String get expenseVoidedByLabel;
+
+  /// No description provided for @expenseVoidButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Void Expense'**
+  String get expenseVoidButton;
+
+  /// No description provided for @expenseVoidDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Void Expense Record'**
+  String get expenseVoidDialogTitle;
+
+  /// No description provided for @expenseVoidReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason for voiding'**
+  String get expenseVoidReasonLabel;
+
+  /// No description provided for @expenseVoidReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain why this expense is being voided (min 3 chars)'**
+  String get expenseVoidReasonHint;
+
+  /// No description provided for @expenseVoidAuditNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided expenses remain visible in the audit trail and are excluded from active totals.'**
+  String get expenseVoidAuditNotice;
+
+  /// No description provided for @expenseVoidedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense voided successfully.'**
+  String get expenseVoidedSuccess;
+
+  /// No description provided for @expenseVoidedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'VOIDED: {reason}'**
+  String expenseVoidedBanner(String reason);
+
+  /// No description provided for @openingBudgetBalanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial / Opening Budget Balance'**
+  String get openingBudgetBalanceLabel;
+
+  /// No description provided for @openingBudgetBalanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. 0.00'**
+  String get openingBudgetBalanceHint;
+
+  /// No description provided for @openingBudgetBalanceHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting community funds prior to tracked transactions (optional).'**
+  String get openingBudgetBalanceHelper;
+
+  /// No description provided for @openingBalancePeriodLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Effective From Period (Optional)'**
+  String get openingBalancePeriodLabel;
+
+  /// No description provided for @openingBalanceAllPrior.
+  ///
+  /// In en, this message translates to:
+  /// **'Prior to all tracked periods'**
+  String get openingBalanceAllPrior;
+
+  /// No description provided for @openingBalanceSaveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Budget Balance'**
+  String get openingBalanceSaveButton;
+
+  /// No description provided for @openingBalanceSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening budget settings saved!'**
+  String get openingBalanceSaveSuccess;
+
+  /// No description provided for @openingBalanceInvalidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid non-negative opening balance.'**
+  String get openingBalanceInvalidError;
+
+  /// No description provided for @financialReportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export the admin-only address payment status matrix and the financial ledger & accumulated budget summary.'**
+  String get financialReportSubtitle;
+
+  /// No description provided for @downloadReportBundleButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Full Report Bundle (2 CSVs)'**
+  String get downloadReportBundleButton;
+
+  /// No description provided for @downloadStatusMatrixCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Status Matrix CSV (Admin Only)'**
+  String get downloadStatusMatrixCsvButton;
+
+  /// No description provided for @downloadFinancialLedgerCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Financial Ledger & Budget CSV'**
+  String get downloadFinancialLedgerCsvButton;
+
+  /// No description provided for @reportPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Summary Preview'**
+  String get reportPreviewTitle;
+
+  /// No description provided for @openingBalancePreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening / Brought-Forward Balance'**
+  String get openingBalancePreviewLabel;
+
+  /// No description provided for @quotaIncomePreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance Quotas Income'**
+  String get quotaIncomePreviewLabel;
+
+  /// No description provided for @sanctionIncomePreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanction Fines Income'**
+  String get sanctionIncomePreviewLabel;
+
+  /// No description provided for @expensesPreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Expenses'**
+  String get expensesPreviewLabel;
+
+  /// No description provided for @netPeriodBalancePreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Net Period Balance'**
+  String get netPeriodBalancePreviewLabel;
+
+  /// No description provided for @accumulatedBudgetPreviewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ending Accumulated Budget'**
+  String get accumulatedBudgetPreviewLabel;
+
+  /// No description provided for @publishToTransparencyButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish Summary to Transparency'**
+  String get publishToTransparencyButton;
+
+  /// No description provided for @publishTransparencyDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish Financial Summary'**
+  String get publishTransparencyDialogTitle;
+
+  /// No description provided for @publishTransparencyPrivacyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Only aggregated community income, expenses, and accumulated budget are published. The address payment status matrix is never disclosed.'**
+  String get publishTransparencyPrivacyNote;
+
+  /// No description provided for @publishTransparencyTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Title'**
+  String get publishTransparencyTitleLabel;
+
+  /// No description provided for @publishTransparencyVisibilityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility'**
+  String get publishTransparencyVisibilityLabel;
+
+  /// No description provided for @publishTransparencySuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial summary published to Transparency!'**
+  String get publishTransparencySuccess;
+
+  /// No description provided for @publishTransparencyButtonConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get publishTransparencyButtonConfirm;
 }
 
 class _AppLocalizationsDelegate

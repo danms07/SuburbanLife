@@ -3490,10 +3490,10 @@ function validateDocumentMagicBytes(buffer, extension) {
 
 /**
  * Safely extracts and validates a Cloud Storage object path strictly within
- * `booking_attachments/<uid>/<filename>`. Rejects traversal sequences, null bytes,
- * backslashes, extra nesting, and paths outside `booking_attachments/`.
+ * `<expectedPrefix>/<scopeId>/<filename>`. Rejects traversal sequences, null bytes,
+ * backslashes, extra nesting, and paths outside the expected prefix.
  */
-function extractBookingAttachmentStoragePath(rawInput) {
+function extractScopedStoragePath(rawInput, expectedPrefix) {
   if (!rawInput || typeof rawInput !== 'string') return null;
   const trimmed = rawInput.trim();
   if (!trimmed || trimmed.includes('\0') || /%00/i.test(trimmed)) {
@@ -3512,7 +3512,7 @@ function extractBookingAttachmentStoragePath(rawInput) {
         if (gcsMatch) {
           candidate = decodeURIComponent(gcsMatch[1]);
         }
-      } else if (parsed.pathname.startsWith('/booking_attachments/')) {
+      } else if (parsed.pathname.startsWith(`/${expectedPrefix}/`)) {
         candidate = decodeURIComponent(parsed.pathname.slice(1));
       }
     } else if (/^gs:\/\//i.test(trimmed)) {
@@ -3538,7 +3538,7 @@ function extractBookingAttachmentStoragePath(rawInput) {
   }
 
   const segments = candidate.split('/');
-  if (segments.length !== 3 || segments[0] !== 'booking_attachments') {
+  if (segments.length !== 3 || segments[0] !== expectedPrefix) {
     return null;
   }
   if (segments.some((seg) => !seg || seg === '.' || seg === '..')) {
@@ -3550,11 +3550,143 @@ function extractBookingAttachmentStoragePath(rawInput) {
     return null;
   }
 
-  if (!/^booking_attachments\/[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9._-]{1,200}$/.test(normalized)) {
+  const safePattern = new RegExp(`^${expectedPrefix}/[A-Za-z0-9_-]{1,128}/[A-Za-z0-9._-]{1,200}$`);
+  if (!safePattern.test(normalized)) {
     return null;
   }
 
   return normalized;
+}
+
+function extractBookingAttachmentStoragePath(rawInput) {
+  return extractScopedStoragePath(rawInput, 'booking_attachments');
+}
+
+function extractExpenseStoragePath(rawInput) {
+  return extractScopedStoragePath(rawInput, 'expenses');
+}
+
+const ALLOWED_EXPENSE_PRODUCT_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+const ALLOWED_EXPENSE_RECEIPT_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+const ALLOWED_EXPENSE_CATEGORIES = [
+  'maintenance',
+  'gardening',
+  'security',
+  'utilities',
+  'repairs',
+  'supplies',
+  'other',
+];
+const MAX_EXPENSE_EVIDENCE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit
+
+/**
+ * Validates and normalizes an uploaded expense evidence object (`productEvidence` or `receiptEvidence`),
+ * confirming path ownership (`expenses/<callerUid>/...`) and Cloud Storage magic-byte headers.
+ */
+async function validateAndNormalizeExpenseEvidence({
+  evidence,
+  allowedExtensions,
+  callerUid,
+  label,
+  bucket = null,
+  nowMillis = Date.now(),
+}) {
+  if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
+    throw new HttpsError('invalid-argument', `${label} evidence is required.`);
+  }
+
+  const baseName = path.posix.basename(String(evidence.fileName || '').trim());
+  const safeFileName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
+  if (!safeFileName || safeFileName === '.' || safeFileName === '..' || safeFileName.length > 200) {
+    throw new HttpsError('invalid-argument', `${label} fileName is invalid.`);
+  }
+
+  const extFromName = safeFileName.includes('.')
+    ? safeFileName.split('.').pop().toLowerCase()
+    : '';
+  const fileType = String(evidence.fileType || extFromName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\./, '');
+  if (!allowedExtensions.includes(fileType)) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Unsupported ${label} fileType "${fileType}". Allowed: ${allowedExtensions.join(', ')}.`
+    );
+  }
+  if (extFromName) {
+    const normalizedExtFromName = extFromName === 'jpeg' ? 'jpg' : extFromName;
+    const normalizedDeclared = fileType === 'jpeg' ? 'jpg' : fileType;
+    if (normalizedExtFromName !== normalizedDeclared) {
+      throw new HttpsError('invalid-argument', `${label} fileName extension does not match fileType.`);
+    }
+  }
+
+  const numericSize = Number(evidence.fileSize);
+  if (!Number.isFinite(numericSize) || numericSize <= 0 || numericSize > MAX_EXPENSE_EVIDENCE_SIZE_BYTES) {
+    throw new HttpsError('invalid-argument', `${label} fileSize must be between 1 byte and 10 MB.`);
+  }
+
+  const cleanUrl = String(evidence.url || '').trim();
+  if (
+    !cleanUrl ||
+    cleanUrl.length > 2048 ||
+    !(
+      cleanUrl.startsWith('https://') ||
+      cleanUrl.startsWith('http://127.0.0.1:') ||
+      cleanUrl.startsWith('http://localhost:')
+    )
+  ) {
+    throw new HttpsError('invalid-argument', `${label} URL must be a valid Storage download URL.`);
+  }
+
+  const cleanStoragePath = extractExpenseStoragePath(evidence.storagePath || cleanUrl);
+  if (!cleanStoragePath || !cleanStoragePath.startsWith(`expenses/${callerUid}/`)) {
+    throw new HttpsError(
+      'permission-denied',
+      `${label} storagePath must belong to the authenticated admin under expenses/.`
+    );
+  }
+
+  // TODO(security): Integrate with an antivirus API and CDR tool to scan and strip active content from uploaded PDFs/images.
+  if (bucket && typeof bucket.file === 'function') {
+    const fileRef = bucket.file(cleanStoragePath);
+    if (fileRef && typeof fileRef.download === 'function') {
+      let headerBuf;
+      try {
+        const [downloaded] = await fileRef.download({ start: 0, end: 15 });
+        headerBuf = downloaded;
+      } catch (dlErr) {
+        const code = dlErr && (dlErr.code || dlErr.status);
+        if (code === 404 || code === 'storage/object-not-found') {
+          throw new HttpsError('invalid-argument', `Uploaded ${label} file was not found in Cloud Storage.`);
+        }
+        throw dlErr;
+      }
+
+      if (!validateDocumentMagicBytes(headerBuf, fileType)) {
+        if (typeof fileRef.delete === 'function') {
+          await fileRef.delete({ ignoreNotFound: true }).catch(() => {});
+        }
+        throw new HttpsError(
+          'invalid-argument',
+          `${label} content does not match declared file type (${fileType}).`
+        );
+      }
+    }
+  }
+
+  const uploadedAtNum = Number(evidence.uploadedAt);
+  return {
+    fileName: safeFileName,
+    fileType,
+    fileSize: Math.floor(numericSize),
+    url: cleanUrl,
+    storagePath: cleanStoragePath,
+    uploadedAt: Number.isFinite(uploadedAtNum) && uploadedAtNum > 0
+      ? Math.floor(uploadedAtNum)
+      : nowMillis,
+  };
 }
 
 /**
@@ -4541,10 +4673,21 @@ exports.syncTransparencyDocument = onCall(callableOptions, async (request) => {
     const fileRef = bucket.file(storagePath);
     const downloadToken = crypto.randomUUID();
 
+    const contentTypeMap = {
+      pdf: 'application/pdf',
+      md: 'text/markdown; charset=utf-8',
+      txt: 'text/plain; charset=utf-8',
+      csv: 'text/csv; charset=utf-8',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      webp: 'image/webp',
+    };
+
     await fileRef.save(fileBuffer, {
       resumable: false,
       metadata: {
-        contentType: validated.fileType === 'pdf' ? 'application/pdf' : 'application/octet-stream',
+        contentType: contentTypeMap[validated.fileType] || 'application/octet-stream',
         contentDisposition: `attachment; filename="${validated.fileName}"`,
         metadata: {
           firebaseStorageDownloadTokens: downloadToken,
@@ -4625,6 +4768,192 @@ exports.syncTransparencyDocument = onCall(callableOptions, async (request) => {
   };
 });
 
+/**
+ * Callable Cloud Function: createExpense
+ * Records an administrative community expense after validating input fields,
+ * Storage path ownership, and magic-byte file signatures for both evidences.
+ */
+exports.createExpense = onCall(callableOptions, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Only administrators can record expenses.');
+  }
+
+  const data = request.data || {};
+  const productOrService = String(data.productOrService || '').trim();
+  if (!productOrService || productOrService.length > 200) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Product or service description is required and must be at most 200 characters.'
+    );
+  }
+
+  const rawAmount = Number(data.amount);
+  const roundedAmount = Math.round(rawAmount * 100) / 100;
+  if (!Number.isFinite(rawAmount) || roundedAmount <= 0 || roundedAmount > 100000000) {
+    throw new HttpsError('invalid-argument', 'Expense amount must be a positive number.');
+  }
+
+  const billablePeriod = String(data.billablePeriod || '').trim();
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(billablePeriod)) {
+    throw new HttpsError('invalid-argument', 'Billable period must follow YYYY-MM format.');
+  }
+
+  const nowMillis = Date.now();
+  let expenseDate = nowMillis;
+  if (data.expenseDate !== undefined && data.expenseDate !== null) {
+    const parsedDate = Number(data.expenseDate);
+    if (!Number.isFinite(parsedDate) || parsedDate <= 0) {
+      throw new HttpsError('invalid-argument', 'Expense date must be a valid timestamp.');
+    }
+    expenseDate = Math.floor(parsedDate);
+  }
+
+  const rawCategory = String(data.category || 'other').trim().toLowerCase();
+  if (!ALLOWED_EXPENSE_CATEGORIES.includes(rawCategory)) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Invalid category "${rawCategory}". Allowed: ${ALLOWED_EXPENSE_CATEGORIES.join(', ')}.`
+    );
+  }
+
+  const vendorName = String(data.vendorName || '').trim().slice(0, 120);
+  const notes = String(data.notes || '').trim().slice(0, 500);
+
+  const callerUid = request.auth.uid;
+  const bucket = admin.storage().bucket();
+
+  const productEvidence = await validateAndNormalizeExpenseEvidence({
+    evidence: data.productEvidence,
+    allowedExtensions: ALLOWED_EXPENSE_PRODUCT_EXTENSIONS,
+    callerUid,
+    label: 'Product/Service photo',
+    bucket,
+    nowMillis,
+  });
+
+  const receiptEvidence = await validateAndNormalizeExpenseEvidence({
+    evidence: data.receiptEvidence,
+    allowedExtensions: ALLOWED_EXPENSE_RECEIPT_EXTENSIONS,
+    callerUid,
+    label: 'Receipt/Invoice',
+    bucket,
+    nowMillis,
+  });
+
+  const db = admin.firestore();
+  let createdByName = String(request.auth.token.name || request.auth.token.email || 'Admin').trim();
+  try {
+    const userDoc = await db.collection('users').doc(callerUid).get();
+    if (userDoc.exists) {
+      const userName = String(userDoc.data()?.name || '').trim();
+      if (userName) {
+        createdByName = userName;
+      }
+    }
+  } catch (userLookupErr) {
+    console.warn('Could not resolve admin display name in createExpense:', userLookupErr);
+  }
+
+  const expenseRef = db.collection('expenses').doc();
+  await expenseRef.set({
+    id: expenseRef.id,
+    productOrService,
+    amount: roundedAmount,
+    billablePeriod,
+    expenseDate,
+    category: rawCategory,
+    vendorName,
+    notes,
+    productEvidence,
+    receiptEvidence,
+    status: 'active',
+    createdBy: callerUid,
+    createdByName,
+    createdAt: nowMillis,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  return {
+    success: true,
+    expenseId: expenseRef.id,
+  };
+});
+
+/**
+ * Callable Cloud Function: voidExpense
+ * Soft-voids an active expense record with a mandatory audit reason while
+ * preserving the Firestore record and Cloud Storage evidence.
+ */
+exports.voidExpense = onCall(callableOptions, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Only administrators can void expenses.');
+  }
+
+  const data = request.data || {};
+  const expenseId = String(data.expenseId || '').trim();
+  if (!expenseId || expenseId.length > 128 || expenseId.includes('/')) {
+    throw new HttpsError('invalid-argument', 'A valid expenseId is required.');
+  }
+
+  const voidReason = String(data.voidReason || '').trim();
+  if (voidReason.length < 3 || voidReason.length > 300) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Void reason must be between 3 and 300 characters.'
+    );
+  }
+
+  const callerUid = request.auth.uid;
+  const db = admin.firestore();
+
+  let voidedByName = String(request.auth.token.name || request.auth.token.email || 'Admin').trim();
+  try {
+    const userDoc = await db.collection('users').doc(callerUid).get();
+    if (userDoc.exists) {
+      const userName = String(userDoc.data()?.name || '').trim();
+      if (userName) {
+        voidedByName = userName;
+      }
+    }
+  } catch (userLookupErr) {
+    console.warn('Could not resolve admin display name in voidExpense:', userLookupErr);
+  }
+
+  const expenseRef = db.collection('expenses').doc(expenseId);
+  const voidedAt = Date.now();
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(expenseRef);
+    if (!snap.exists) {
+      throw new HttpsError('not-found', 'Expense record not found.');
+    }
+    const existing = snap.data() || {};
+    if (existing.status !== 'active') {
+      throw new HttpsError('failed-precondition', 'Only active expenses can be voided.');
+    }
+    tx.update(expenseRef, {
+      status: 'voided',
+      voidedBy: callerUid,
+      voidedByName,
+      voidedAt,
+      voidReason,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+
+  return {
+    success: true,
+    expenseId,
+    status: 'voided',
+  };
+});
+
 // Export internal helper functions and configurations for unit testing
 exports._test = {
   generateSecurePassword,
@@ -4674,6 +5003,12 @@ exports._test = {
   computeBookingAttachmentExpireAtMillis,
   validateDocumentMagicBytes,
   extractBookingAttachmentStoragePath,
+  extractExpenseStoragePath,
+  ALLOWED_EXPENSE_PRODUCT_EXTENSIONS,
+  ALLOWED_EXPENSE_RECEIPT_EXTENSIONS,
+  ALLOWED_EXPENSE_CATEGORIES,
+  MAX_EXPENSE_EVIDENCE_SIZE_BYTES,
+  validateAndNormalizeExpenseEvidence,
   validateAndNormalizeBookingAttachments,
   cleanupDeletedBookingAttachmentResources,
   purgeExpiredBookingAttachments,

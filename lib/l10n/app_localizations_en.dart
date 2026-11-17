@@ -2655,4 +2655,254 @@ class AppLocalizationsEn extends AppLocalizations {
   String reconcileMismatchesButton(int count) {
     return 'Review & Reconcile Mismatches ($count)';
   }
+
+  @override
+  String get expensesMenu => 'Expenses';
+
+  @override
+  String get expensesTitle => 'Community Expenses';
+
+  @override
+  String get recordExpenseButton => 'Record Expense';
+
+  @override
+  String get expenseProductServiceLabel => 'Product / Service';
+
+  @override
+  String get expenseProductServiceHint =>
+      'e.g. Monthly gardening & lawn service';
+
+  @override
+  String get expenseAmountLabel => 'Amount';
+
+  @override
+  String get expenseBillablePeriodLabel => 'Billable Period';
+
+  @override
+  String get expenseDateLabel => 'Expense Date';
+
+  @override
+  String get expenseCategoryLabel => 'Category';
+
+  @override
+  String get expenseVendorLabel => 'Supplier / Vendor (Optional)';
+
+  @override
+  String get expenseVendorHint => 'e.g. GreenCare Landscaping';
+
+  @override
+  String get expenseNotesLabel => 'Notes (Optional)';
+
+  @override
+  String get expenseNotesHint => 'Additional details or invoice folio...';
+
+  @override
+  String get expenseCategoryMaintenance => 'Maintenance';
+
+  @override
+  String get expenseCategoryGardening => 'Gardening';
+
+  @override
+  String get expenseCategorySecurity => 'Security';
+
+  @override
+  String get expenseCategoryUtilities => 'Utilities';
+
+  @override
+  String get expenseCategoryRepairs => 'Repairs';
+
+  @override
+  String get expenseCategorySupplies => 'Supplies';
+
+  @override
+  String get expenseCategoryOther => 'Other';
+
+  @override
+  String get expenseProductEvidenceLabel =>
+      'Photo Evidence of Acquired Product / Service';
+
+  @override
+  String get expenseReceiptEvidenceLabel =>
+      'Receipt / Invoice Evidence (Photo or PDF)';
+
+  @override
+  String get expenseChoosePhotoButton => 'Choose Photo';
+
+  @override
+  String get expenseChooseFileOrPhotoButton => 'Choose Photo / PDF';
+
+  @override
+  String get expenseTakePhotoButton => 'Take Photo';
+
+  @override
+  String expenseEvidenceSelected(String fileName) {
+    return 'Selected: $fileName';
+  }
+
+  @override
+  String get expenseMissingProductService =>
+      '• Enter the Product or Service description';
+
+  @override
+  String get expenseMissingAmount => '• Enter a valid positive amount';
+
+  @override
+  String get expenseMissingPeriod => '• Select a billable period';
+
+  @override
+  String get expenseMissingProductEvidence =>
+      '• Attach a photo of the acquired product or service';
+
+  @override
+  String get expenseMissingReceiptEvidence =>
+      '• Attach a photo or PDF of the receipt/invoice';
+
+  @override
+  String get expenseMissingFieldsWarning =>
+      'Please complete all required expense fields before saving.';
+
+  @override
+  String get expenseRecordedSuccess => 'Expense recorded successfully!';
+
+  @override
+  String get noExpensesFound =>
+      'No expenses recorded for the selected filters.';
+
+  @override
+  String get financialSummaryIncomeLabel => 'Collected Income';
+
+  @override
+  String get financialSummaryExpensesLabel => 'Active Expenses';
+
+  @override
+  String get financialSummaryBudgetLabel => 'Accumulated Budget';
+
+  @override
+  String get expenseStatusActive => 'Active';
+
+  @override
+  String get expenseStatusVoided => 'Voided';
+
+  @override
+  String get expenseFilterAllPeriods => 'All Periods';
+
+  @override
+  String get expenseFilterAllCategories => 'All Categories';
+
+  @override
+  String get expenseRecordedByLabel => 'Recorded by';
+
+  @override
+  String get expenseVoidedByLabel => 'Voided by';
+
+  @override
+  String get expenseVoidButton => 'Void Expense';
+
+  @override
+  String get expenseVoidDialogTitle => 'Void Expense Record';
+
+  @override
+  String get expenseVoidReasonLabel => 'Reason for voiding';
+
+  @override
+  String get expenseVoidReasonHint =>
+      'Explain why this expense is being voided (min 3 chars)';
+
+  @override
+  String get expenseVoidAuditNotice =>
+      'Voided expenses remain visible in the audit trail and are excluded from active totals.';
+
+  @override
+  String get expenseVoidedSuccess => 'Expense voided successfully.';
+
+  @override
+  String expenseVoidedBanner(String reason) {
+    return 'VOIDED: $reason';
+  }
+
+  @override
+  String get openingBudgetBalanceLabel => 'Initial / Opening Budget Balance';
+
+  @override
+  String get openingBudgetBalanceHint => 'e.g. 0.00';
+
+  @override
+  String get openingBudgetBalanceHelper =>
+      'Starting community funds prior to tracked transactions (optional).';
+
+  @override
+  String get openingBalancePeriodLabel => 'Effective From Period (Optional)';
+
+  @override
+  String get openingBalanceAllPrior => 'Prior to all tracked periods';
+
+  @override
+  String get openingBalanceSaveButton => 'Save Budget Balance';
+
+  @override
+  String get openingBalanceSaveSuccess => 'Opening budget settings saved!';
+
+  @override
+  String get openingBalanceInvalidError =>
+      'Please enter a valid non-negative opening balance.';
+
+  @override
+  String get financialReportSubtitle =>
+      'Export the admin-only address payment status matrix and the financial ledger & accumulated budget summary.';
+
+  @override
+  String get downloadReportBundleButton =>
+      'Download Full Report Bundle (2 CSVs)';
+
+  @override
+  String get downloadStatusMatrixCsvButton =>
+      'Download Status Matrix CSV (Admin Only)';
+
+  @override
+  String get downloadFinancialLedgerCsvButton =>
+      'Download Financial Ledger & Budget CSV';
+
+  @override
+  String get reportPreviewTitle => 'Financial Summary Preview';
+
+  @override
+  String get openingBalancePreviewLabel => 'Opening / Brought-Forward Balance';
+
+  @override
+  String get quotaIncomePreviewLabel => 'Maintenance Quotas Income';
+
+  @override
+  String get sanctionIncomePreviewLabel => 'Sanction Fines Income';
+
+  @override
+  String get expensesPreviewLabel => 'Active Expenses';
+
+  @override
+  String get netPeriodBalancePreviewLabel => 'Net Period Balance';
+
+  @override
+  String get accumulatedBudgetPreviewLabel => 'Ending Accumulated Budget';
+
+  @override
+  String get publishToTransparencyButton => 'Publish Summary to Transparency';
+
+  @override
+  String get publishTransparencyDialogTitle => 'Publish Financial Summary';
+
+  @override
+  String get publishTransparencyPrivacyNote =>
+      'Only aggregated community income, expenses, and accumulated budget are published. The address payment status matrix is never disclosed.';
+
+  @override
+  String get publishTransparencyTitleLabel => 'Document Title';
+
+  @override
+  String get publishTransparencyVisibilityLabel => 'Visibility';
+
+  @override
+  String get publishTransparencySuccess =>
+      'Financial summary published to Transparency!';
+
+  @override
+  String get publishTransparencyButtonConfirm => 'Publish';
 }

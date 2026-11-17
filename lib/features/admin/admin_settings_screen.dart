@@ -19,6 +19,12 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
   String _timeZone = 'America/Mexico_City';
   bool _scanOnExitEnabled = false;
   List<String> _paymentRejectionReasons = [];
+  double _savedInitialBudgetBalance = 0.0;
+  String? _savedInitialBalancePeriod;
+  final TextEditingController _initialBalanceController = TextEditingController(
+    text: '0.00',
+  );
+  bool _isSavingOpeningBalance = false;
 
   // SMTP Settings (switches auto-saved; server fields & email template manually saved)
   bool _smtpEnabled = false;
@@ -68,6 +74,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
 
   @override
   void dispose() {
+    _initialBalanceController.dispose();
     _hostController.dispose();
     _portController.dispose();
     _userController.dispose();
@@ -92,6 +99,13 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         _gracePeriodDays = appData['gracePeriodDays'] ?? 10;
         _timeZone = appData['timeZone'] ?? 'America/Mexico_City';
         _scanOnExitEnabled = appData['scanOnExitEnabled'] == true;
+        _savedInitialBudgetBalance =
+            (appData['initialBudgetBalance'] as num?)?.toDouble() ?? 0.0;
+        _initialBalanceController.text =
+            _savedInitialBudgetBalance.toStringAsFixed(2);
+        final rawPeriod = appData['initialBalancePeriod']?.toString().trim();
+        _savedInitialBalancePeriod =
+            (rawPeriod != null && rawPeriod.isNotEmpty) ? rawPeriod : null;
         if (appData['paymentRejectionReasons'] is List) {
           _paymentRejectionReasons = List<String>.from(
             appData['paymentRejectionReasons'],
@@ -155,6 +169,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         'gracePeriodDays': _gracePeriodDays,
         'timeZone': _timeZone,
         'scanOnExitEnabled': _scanOnExitEnabled,
+        'initialBudgetBalance': _savedInitialBudgetBalance,
+        'initialBalancePeriod': _savedInitialBalancePeriod,
         'paymentRejectionReasons': List<String>.from(_paymentRejectionReasons),
         'updatedAt': DbFieldValue.serverTimestamp(),
       });
@@ -597,6 +613,63 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
     }
   }
 
+  List<String> _buildOpeningBalancePeriodOptions() {
+    final now = DateTime.now();
+    final list = <String>[];
+    var current = DateTime(now.year - 3, now.month, 1);
+    final end = DateTime(now.year, now.month + 2, 1);
+    while (!current.isAfter(end)) {
+      list.add('${current.year}-${current.month.toString().padLeft(2, '0')}');
+      current = DateTime(current.year, current.month + 1, 1);
+    }
+    if (_savedInitialBalancePeriod != null &&
+        !list.contains(_savedInitialBalancePeriod)) {
+      list.add(_savedInitialBalancePeriod!);
+    }
+    list.sort((a, b) => b.compareTo(a));
+    return list;
+  }
+
+  Future<void> _saveOpeningBalance() async {
+    final l10n = AppLocalizations.of(context)!;
+    final rawText = _initialBalanceController.text.trim().replaceAll(',', '');
+    final parsed = rawText.isEmpty ? 0.0 : double.tryParse(rawText);
+    if (parsed == null || !parsed.isFinite || parsed < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.openingBalanceInvalidError),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSavingOpeningBalance = true;
+      _savedInitialBudgetBalance = (parsed * 100).round() / 100.0;
+      _initialBalanceController.text =
+          _savedInitialBudgetBalance.toStringAsFixed(2);
+    });
+
+    try {
+      await _autoSaveAppSettings();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.openingBalanceSaveSuccess),
+            backgroundColor: AppConfig.secondaryColor,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingOpeningBalance = false;
+        });
+      }
+    }
+  }
+
   Widget _buildCollapsibleSettingsCard({
     required BuildContext context,
     required String cardId,
@@ -915,6 +988,100 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                                 _autoSaveAppSettings();
                               }
                             },
+                          ),
+                          const Divider(height: 28),
+                          TextFormField(
+                            key: const ValueKey('initial_budget_balance_field'),
+                            controller: _initialBalanceController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: l10n.openingBudgetBalanceLabel,
+                              hintText: l10n.openingBudgetBalanceHint,
+                              helperText: l10n.openingBudgetBalanceHelper,
+                              prefixIcon: const Icon(
+                                Icons.account_balance_wallet_outlined,
+                                color: AppConfig.primaryColor,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Builder(
+                            builder: (context) {
+                              final periodOptions =
+                                  _buildOpeningBalancePeriodOptions();
+                              return DropdownButtonFormField<String>(
+                                key: ValueKey(
+                                  'initial_balance_period_${_savedInitialBalancePeriod ?? 'all'}',
+                                ),
+                                initialValue: (_savedInitialBalancePeriod != null &&
+                                        periodOptions.contains(
+                                          _savedInitialBalancePeriod,
+                                        ))
+                                    ? _savedInitialBalancePeriod
+                                    : '',
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  labelText: l10n.openingBalancePeriodLabel,
+                                  prefixIcon: const Icon(
+                                    Icons.calendar_month_outlined,
+                                    color: AppConfig.primaryColor,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  isDense: true,
+                                ),
+                                items: [
+                                  DropdownMenuItem(
+                                    value: '',
+                                    child: Text(l10n.openingBalanceAllPrior),
+                                  ),
+                                  for (final period in periodOptions)
+                                    DropdownMenuItem(
+                                      value: period,
+                                      child: Text(period),
+                                    ),
+                                ],
+                                onChanged: (val) {
+                                  setState(() {
+                                    _savedInitialBalancePeriod =
+                                        (val == null || val.isEmpty) ? null : val;
+                                  });
+                                  _autoSaveAppSettings();
+                                },
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ElevatedButton.icon(
+                              key: const ValueKey('save_opening_balance_button'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppConfig.primaryColor,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: _isSavingOpeningBalance
+                                  ? null
+                                  : _saveOpeningBalance,
+                              icon: _isSavingOpeningBalance
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.save, size: 18),
+                              label: Text(l10n.openingBalanceSaveButton),
+                            ),
                           ),
                         ],
                       ),

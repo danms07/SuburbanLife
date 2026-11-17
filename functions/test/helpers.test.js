@@ -1166,3 +1166,30 @@ test('normalizeStreetName handles casing, accents, and excessive whitespace', (t
   assert.equal(normalizeStreetName(''), '');
   assert.equal(normalizeStreetName(null), '');
 });
+
+test('extractExpenseStoragePath extracts valid expenses/<uid>/<file> paths and blocks traversal or out-of-scope prefixes', () => {
+  const { extractExpenseStoragePath } = _test;
+
+  assert.equal(
+    extractExpenseStoragePath(
+      'https://firebasestorage.googleapis.com/v0/b/suburban-life.appspot.com/o/expenses%2Fadmin_1%2F0123abcd.jpg?alt=media&token=xyz'
+    ),
+    'expenses/admin_1/0123abcd.jpg'
+  );
+  assert.equal(
+    extractExpenseStoragePath('gs://suburban-life.appspot.com/expenses/admin_1/invoice.pdf'),
+    'expenses/admin_1/invoice.pdf'
+  );
+  assert.equal(
+    extractExpenseStoragePath('expenses/admin_1/lawn_photo.png'),
+    'expenses/admin_1/lawn_photo.png'
+  );
+
+  // Reject traversal, extra nesting, null bytes, and out-of-scope prefixes
+  assert.equal(extractExpenseStoragePath('expenses/../documents/admin_only/secret.pdf'), null);
+  assert.equal(extractExpenseStoragePath('expenses/admin_1/sub/extra.pdf'), null);
+  assert.equal(extractExpenseStoragePath('expenses/admin_1/evil\0.pdf'), null);
+  assert.equal(extractExpenseStoragePath('payments/admin_1/receipt.jpg'), null);
+  assert.equal(extractExpenseStoragePath(''), null);
+  assert.equal(extractExpenseStoragePath(null), null);
+});

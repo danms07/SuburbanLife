@@ -37,6 +37,16 @@ service firebase.storage {
         ];
     }
 
+    function isAllowedExpenseEvidence() {
+      return request.resource != null &&
+        request.resource.contentType in [
+          'application/pdf',
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
+    }
+
     match /documents/admin_only/{allPaths=**} {
       allow read, write: if isAdmin();
     }
@@ -86,6 +96,15 @@ service firebase.storage {
       allow create, update: if (isAdmin() || (isAuthenticated() && request.auth.uid == ownerOrAddressId)) &&
         isValidUploadSize() &&
         isAllowedProofOrPhoto();
+      allow delete: if isAdmin();
+    }
+
+    match /expenses/{uploaderUid}/{allPaths=**} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() &&
+        request.auth.uid == uploaderUid &&
+        isValidUploadSize() &&
+        isAllowedExpenseEvidence();
       allow delete: if isAdmin();
     }
 

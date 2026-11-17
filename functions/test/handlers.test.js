@@ -1658,3 +1658,170 @@ test('adminPreCheckPaymentImport and adminBulkImportPayments enforce RBAC and va
     /non-empty array/
   );
 });
+
+test('createExpense and voidExpense enforce admin RBAC, magic-byte validation, and immutable audit voiding', async (t) => {
+  const env = createMockAdminEnvironment({
+    users: {
+      admin_1: { uid: 'admin_1', name: 'Board Treasurer', role: 'admin' },
+      res_1: { uid: 'res_1', name: 'Resident User', role: 'resident' },
+    },
+  });
+  installMockAdmin(t, env);
+
+  const prodPath = 'expenses/admin_1/a1b2c3d4e5f60718293a4b5c6d7e8f90.jpg';
+  const receiptPath = 'expenses/admin_1/f9e8d7c6b5a403122134455667788990.pdf';
+  const spoofedPath = 'expenses/admin_1/badbeef0123456789abcdef012345678.jpg';
+  const otherUidPath = 'expenses/admin_2/a1b2c3d4e5f60718293a4b5c6d7e8f90.jpg';
+
+  // Seed authentic JPEG and PDF headers + a spoofed HTML-disguised-as-JPG file
+  env.savedStorageFiles.set(prodPath, { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]) });
+  env.savedStorageFiles.set(receiptPath, { buffer: Buffer.from('%PDF-1.7\n%invoice\n') });
+  env.savedStorageFiles.set(spoofedPath, { buffer: Buffer.from('<svg onload="alert(1)">') });
+  env.savedStorageFiles.set(otherUidPath, { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]) });
+
+  const validPayload = {
+    productOrService: 'Common area gardening service',
+    amount: 2450.5,
+    billablePeriod: '2026-11',
+    expenseDate: Date.UTC(2026, 10, 15),
+    category: 'gardening',
+    vendorName: 'GreenCare Landscaping',
+    notes: 'Monthly hedge & lawn trim',
+    productEvidence: {
+      fileName: 'garden_after.jpg',
+      fileType: 'jpg',
+      fileSize: 2048,
+      url: 'https://firebasestorage.googleapis.com/v0/b/test/o/expenses%2Fadmin_1%2Fa1b2c3d4e5f60718293a4b5c6d7e8f90.jpg?alt=media',
+      storagePath: prodPath,
+    },
+    receiptEvidence: {
+      fileName: 'invoice_nov.pdf',
+      fileType: 'pdf',
+      fileSize: 4096,
+      url: 'https://firebasestorage.googleapis.com/v0/b/test/o/expenses%2Fadmin_1%2Ff9e8d7c6b5a403122134455667788990.pdf?alt=media',
+      storagePath: receiptPath,
+    },
+  };
+
+  // 1) Unauthenticated and non-admin callers rejected
+  await assert.rejects(
+    () => cloudFunctions.createExpense.run({ auth: null, data: validPayload }),
+    /authenticated/
+  );
+  await assert.rejects(
+    () => cloudFunctions.createExpense.run({ auth: { uid: 'res_1', token: { resident: true } }, data: validPayload }),
+    /Only administrators/
+  );
+
+  // 2) Spoofed magic bytes are rejected and the spoofed Storage object is deleted
+  await assert.rejects(
+    () => cloudFunctions.createExpense.run({
+      auth: { uid: 'admin_1', token: { admin: true } },
+      data: {
+        ...validPayload,
+        productEvidence: {
+          ...validPayload.productEvidence,
+          storagePath: spoofedPath,
+          url: 'https://firebasestorage.googleapis.com/v0/b/test/o/expenses%2Fadmin_1%2Fbadbeef0123456789abcdef012345678.jpg?alt=media',
+        },
+      },
+    }),
+    /does not match declared file type/
+  );
+  assert.equal(env.savedStorageFiles.has(spoofedPath), false);
+
+  // 3) Cross-UID Storage path spoofing is denied
+  await assert.rejects(
+    () => cloudFunctions.createExpense.run({
+      auth: { uid: 'admin_1', token: { admin: true } },
+      data: {
+        ...validPayload,
+        productEvidence: {
+          ...validPayload.productEvidence,
+          storagePath: otherUidPath,
+          url: 'https://firebasestorage.googleapis.com/v0/b/test/o/expenses%2Fadmin_2%2Fa1b2c3d4e5f60718293a4b5c6d7e8f90.jpg?alt=media',
+        },
+      },
+    }),
+    /must belong to the authenticated admin/
+  );
+
+  // 4) PDF disallowed for product photo
+  await assert.rejects(
+    () => cloudFunctions.createExpense.run({
+      auth: { uid: 'admin_1', token: { admin: true } },
+      data: {
+        ...validPayload,
+        productEvidence: validPayload.receiptEvidence,
+      },
+    }),
+    /Unsupported Product\/Service photo/
+  );
+
+  // 5) Invalid billable period rejected
+  await assert.rejects(
+    () => cloudFunctions.createExpense.run({
+      auth: { uid: 'admin_1', token: { admin: true } },
+      data: { ...validPayload, billablePeriod: '2026-13' },
+    }),
+    /YYYY-MM/
+  );
+
+  // 6) Valid expense creation succeeds and resolves admin display name
+  const created = await cloudFunctions.createExpense.run({
+    auth: { uid: 'admin_1', token: { admin: true } },
+    data: validPayload,
+  });
+  assert.equal(created.success, true);
+  assert.ok(created.expenseId);
+
+  const savedDoc = (await env.makeDocRef('expenses', created.expenseId).get()).data();
+  assert.equal(savedDoc.productOrService, 'Common area gardening service');
+  assert.equal(savedDoc.amount, 2450.5);
+  assert.equal(savedDoc.billablePeriod, '2026-11');
+  assert.equal(savedDoc.category, 'gardening');
+  assert.equal(savedDoc.status, 'active');
+  assert.equal(savedDoc.createdBy, 'admin_1');
+  assert.equal(savedDoc.createdByName, 'Board Treasurer');
+  assert.equal(savedDoc.productEvidence.storagePath, prodPath);
+  assert.equal(savedDoc.receiptEvidence.storagePath, receiptPath);
+
+  // 7) voidExpense enforces admin RBAC, reason length, and soft-voids without deleting evidence
+  await assert.rejects(
+    () => cloudFunctions.voidExpense.run({
+      auth: { uid: 'res_1', token: { resident: true } },
+      data: { expenseId: created.expenseId, voidReason: 'Duplicate' },
+    }),
+    /Only administrators/
+  );
+  await assert.rejects(
+    () => cloudFunctions.voidExpense.run({
+      auth: { uid: 'admin_1', token: { admin: true } },
+      data: { expenseId: created.expenseId, voidReason: 'no' },
+    }),
+    /Void reason/
+  );
+
+  const voidResult = await cloudFunctions.voidExpense.run({
+    auth: { uid: 'admin_1', token: { admin: true } },
+    data: { expenseId: created.expenseId, voidReason: 'Entered duplicate receipt' },
+  });
+  assert.equal(voidResult.success, true);
+  assert.equal(voidResult.status, 'voided');
+
+  const voidedDoc = (await env.makeDocRef('expenses', created.expenseId).get()).data();
+  assert.equal(voidedDoc.status, 'voided');
+  assert.equal(voidedDoc.voidedBy, 'admin_1');
+  assert.equal(voidedDoc.voidReason, 'Entered duplicate receipt');
+  assert.equal(env.savedStorageFiles.has(prodPath), true);
+  assert.equal(env.savedStorageFiles.has(receiptPath), true);
+
+  // 8) Double-voiding an already voided expense is blocked
+  await assert.rejects(
+    () => cloudFunctions.voidExpense.run({
+      auth: { uid: 'admin_1', token: { admin: true } },
+      data: { expenseId: created.expenseId, voidReason: 'Retry void' },
+    }),
+    /Only active expenses/
+  );
+});

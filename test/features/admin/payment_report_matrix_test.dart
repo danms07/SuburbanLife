@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -223,6 +224,108 @@ void main() {
       expect(generatedCsv, contains('"Calle Robles","10"'));
       expect(generatedCsv, contains('"paid"'));
       expect(find.byType(SnackBar), findsOneWidget);
+    });
+
+    testWidgets('exports Multi-Report Bundle with opening balance, quotas, sanctions, expenses, and accumulated budget, and publishes privacy-safe summary without address status matrix', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final now = DateTime.now();
+      final currentPeriod = AdminPaymentReportScreen.formatPeriodKey(now);
+
+      FakeBackendHelper.db.seedDocument('config', 'app_settings', {
+        'initialBudgetBalance': 2000.0,
+      });
+      FakeBackendHelper.db.seedDocument('addresses', 'addr_1', {
+        'streetName': 'Calle Privada',
+        'number': 42,
+        'residentUid': 'res_1',
+      });
+      FakeBackendHelper.db.seedDocument('payments', 'pay_quota', {
+        'addressRef': FakeBackendHelper.db.createReference('addresses', 'addr_1'),
+        'residentUid': 'res_1',
+        'concept': 'monthly quota',
+        'amount': 800.0,
+        'periods': [currentPeriod],
+        'status': 'approved',
+        'timestamp': now.millisecondsSinceEpoch,
+      });
+      FakeBackendHelper.db.seedDocument('payments', 'pay_sanction', {
+        'addressRef': FakeBackendHelper.db.createReference('addresses', 'addr_1'),
+        'residentUid': 'res_1',
+        'concept': 'sanction',
+        'amount': 200.0,
+        'periods': ['Sanction'],
+        'paymentDate': now.millisecondsSinceEpoch,
+        'status': 'approved',
+        'timestamp': now.millisecondsSinceEpoch,
+      });
+      FakeBackendHelper.db.seedDocument('expenses', 'exp_1', {
+        'id': 'exp_1',
+        'productOrService': 'Pool filter maintenance',
+        'amount': 350.0,
+        'billablePeriod': currentPeriod,
+        'expenseDate': now.millisecondsSinceEpoch,
+        'category': 'maintenance',
+        'status': 'active',
+        'createdByName': 'Admin',
+        'productEvidence': {'fileName': 'pool.jpg'},
+        'receiptEvidence': {'fileName': 'inv.pdf'},
+      });
+
+      Map<String, dynamic>? syncedDocPayload;
+      FakeBackendHelper.functions.registerHandler('syncTransparencyDocument', (params) {
+        syncedDocPayload = params;
+        return {'success': true, 'docId': 'doc_fin_1'};
+      });
+
+      String? matrixCsv;
+      String? ledgerCsv;
+      await tester.pumpWidget(
+        _wrapWithL10n(
+          AdminPaymentReportScreen(
+            onSaveCsv: (csv) async => matrixCsv = csv,
+            onSaveLedgerCsv: (csv) async => ledgerCsv = csv,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Live preview displays Ending Accumulated Budget = 2000 + 800 + 200 - 350 = 2650.00
+      expect(find.byKey(const ValueKey('financial_summary_preview_card')), findsOneWidget);
+      expect(find.text('\$2650.00'), findsOneWidget);
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('download_report_bundle_button')),
+      );
+      await tester.tap(find.byKey(const ValueKey('download_report_bundle_button')));
+      await tester.pumpAndSettle();
+
+      expect(matrixCsv, contains('"Calle Privada","42"'));
+      expect(ledgerCsv, contains('Pool filter maintenance'));
+      expect(ledgerCsv, contains('"Ending Accumulated Budget","2650.00"'));
+
+      // Publish aggregated summary to Transparency -> must NEVER disclose address payment status matrix
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('publish_transparency_report_button')),
+      );
+      await tester.tap(find.byKey(const ValueKey('publish_transparency_report_button')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('confirm_publish_transparency_button')));
+      await tester.pumpAndSettle();
+
+      expect(syncedDocPayload, isNotNull);
+      expect(syncedDocPayload!['fileType'], equals('md'));
+      final decodedMd = utf8.decode(base64Decode(syncedDocPayload!['fileBase64'] as String));
+      expect(decodedMd, contains('\$2650.00'));
+      expect(decodedMd, contains('Pool filter maintenance'));
+      expect(decodedMd, isNot(contains('Calle Privada')));
+      expect(decodedMd, isNot(contains('past due')));
     });
   });
 }

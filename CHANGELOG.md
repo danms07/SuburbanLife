@@ -2,6 +2,26 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.31+32] — 2026-11-16
+
+### Added
+- **Admin Expense Recording & Soft-Void Audit System**:
+  - Added Cloud Functions `createExpense` and `voidExpense` in `functions/index.js` along with `extractScopedStoragePath`, `extractExpenseStoragePath`, and `validateAndNormalizeExpenseEvidence` enforcing admin RBAC, UID-scoped Storage ownership (`expenses/<uid>/`), magic-byte header inspection (rejecting and deleting spoofed uploads), and immutable soft-void audit metadata (`status: 'voided'`, `voidedBy`, `voidedByName`, `voidedAt`, `voidReason`).
+  - Added admin-only Firestore rules for `/expenses/{expenseId}` (`allow read: if isAdmin(); allow write: if false;`), Storage rules for `/expenses/{uploaderUid}/**` (10 MB limit, `isAllowedExpenseEvidence()` for `pdf`/`jpg`/`png`/`webp`), and composite indexes on `expenses` in `firestore.indexes.json`.
+  - Created `lib/features/admin/expense_service.dart` (`ExpenseCategory`, `ExpenseEvidence`, `ExpenseRecord`, `ExpenseService`) with CSPRNG Storage path generation, `Content-Disposition: attachment` metadata, Storage object rollback on callable failures, and local temp camera cleanup via `TempImageCleanupService`.
+  - Created `lib/features/admin/admin_expenses_screen.dart` (`AdminExpensesScreen`, `AdminExpenseDetailScreen`, `_RecordExpenseModal`, `_VoidExpenseDialog`) with live net accumulated budget strip, period/category/status filters, dual evidence pickers (photo for acquired product/service + image/PDF for receipt/invoice), `RotatableImagePreview` inline rotation + full-screen inspection, PDF view/download delegation, and soft-void workflow.
+  - Added `AdminSection.expenses` under **Finance -> Community Expenses** in `AdminShellScreen`.
+- **Accumulated Budget Calculator & Multi-Report Financial Export Bundle**:
+  - Created `lib/features/admin/financial_report_calculator.dart` (`MonthlyLedgerRow`, `FinancialLedgerResult`, `FinancialReportCalculator`) performing integer-cent precision accounting across approved/paid maintenance quotas, approved/paid sanction fines, active (non-voided) expenses, and configurable opening balances, plus CSV formula injection neutralization (`sanitizeCsvTextCell`), `buildFinancialLedgerCsv`, and PII-free `buildTransparencyMarkdownReport`.
+  - Upgraded `AdminPaymentReportScreen` to preview live financial totals (Brought-Forward Balance, Maintenance Income, Sanction Income, Active Expenses, Ending Accumulated Budget) and export a **Multi-Report Financial Bundle** (private Address Payment Status Matrix CSV + Financial Ledger & Accumulated Budget Summary CSV) alongside individual download buttons.
+  - Added **Publish Financial Summary to Transparency** dialog (`_PublishTransparencyDialog`) and extended `syncTransparencyDocument` MIME handling (`.md`, `.csv`, `.txt`, images, `.pdf`). **Privacy Guarantee**: Only aggregated community totals and expense summaries are published as Markdown; the address payment status matrix and resident PII are strictly never disclosed publicly.
+- **Opening Balance Configuration in General Settings**:
+  - Added `initialBudgetBalance` and optional `initialBalancePeriod` (`YYYY-MM`) fields inside the **Payment & Grace Period** card in `AdminSettingsScreen`, persisted via auto-save to `config/app_settings`.
+- **Shared Transfer Helpers, Localization & Automated Tests**:
+  - Extended `DocumentTransferHelper` with `pickAllowedImage`, `pickExpenseReceipt`, and parameterized `pickAllowedDocument`.
+  - Added complete English and Spanish localization keys in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb` and regenerated `lib/l10n/app_localizations*.dart`.
+  - Added backend unit/handler/security rules tests (`functions/test/helpers.test.js`, `functions/test/handlers.test.js`, `functions/test/security_rules.test.js`) and Flutter unit/widget tests (`financial_report_calculator_test.dart`, `expense_service_test.dart`, `admin_expenses_screen_test.dart`, plus updates to `payment_report_matrix_test.dart`, `qr_exit_scanner_and_settings_test.dart`, and `admin_shell_screen_test.dart`).
+
 ## [1.0.30+31] — 2026-11-16
 
 ### Fixed

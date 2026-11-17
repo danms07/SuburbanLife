@@ -81,9 +81,14 @@ test('Static Audit: firestore.rules enforces RBAC, field-level immutability, and
   assert.match(bookingAttBlock, /isCallerAddressResident\(resource\.data\.addressId\)/);
   assert.doesNotMatch(bookingAttBlock, /isConfirmed/);
   assert.match(bookingAttBlock, /allow write:\s*if isAdmin\(\);/);
+
+  // 9. Expenses collection: admin-only read and server-mediated writes via Cloud Functions
+  const expensesBlock = extractMatchBlock(source, 'match /expenses/{expenseId}');
+  assert.match(expensesBlock, /allow read:\s*if isAdmin\(\);/);
+  assert.match(expensesBlock, /allow write:\s*if false;/);
 });
 
-test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list (excluding SVG), /sanctions/, /facility_documents/, and /booking_attachments/ coverage', () => {
+test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list (excluding SVG), /sanctions/, /facility_documents/, /booking_attachments/, and /expenses/ coverage', () => {
   const source = fs.readFileSync(STORAGE_RULES_PATH, 'utf8');
 
   assert.match(source, /request\.resource\.size\s*<\s*10\s*\*\s*1024\s*\*\s*1024/);
@@ -115,6 +120,12 @@ test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list (ex
   const paymentsBlock = extractMatchBlock(source, 'match /payments/{ownerOrAddressId}/{allPaths=**}');
   assert.match(paymentsBlock, /request\.auth\.uid\s*==\s*ownerOrAddressId/);
   assert.match(paymentsBlock, /allow delete:\s*if isAdmin\(\);/);
+
+  const expensesStorageBlock = extractMatchBlock(source, 'match /expenses/{uploaderUid}/{allPaths=**}');
+  assert.match(expensesStorageBlock, /allow read:\s*if isAdmin\(\);/);
+  assert.match(expensesStorageBlock, /request\.auth\.uid\s*==\s*uploaderUid/);
+  assert.match(expensesStorageBlock, /isValidUploadSize\(\)\s*&&\s*isAllowedExpenseEvidence\(\)/);
+  assert.match(expensesStorageBlock, /allow delete:\s*if isAdmin\(\);/);
 });
 
 /**
@@ -217,6 +228,10 @@ test('Live Emulator Audit: evaluates Firestore Security Rules against unauthenti
     token: 'owner',
     body: { bookingId: 'rules_bk_1', userUid: 'rules_res_1', facilityId: 'clubhouse' },
   });
+  await restRequest('PATCH', 'expenses/rules_exp_1', {
+    token: 'owner',
+    body: { id: 'rules_exp_1', productOrService: 'Gardening', amount: 500, billablePeriod: '2026-11', status: 'active' },
+  });
 
   const residentJwt = buildLocalEmulatorJwt('rules_res_1', { resident: true });
   const neighborJwt = buildLocalEmulatorJwt('rules_neighbor_1', { resident: true });
@@ -270,6 +285,18 @@ test('Live Emulator Audit: evaluates Firestore Security Rules against unauthenti
     await restRequest('PATCH', 'booking_attachments/rules_bk_1', {
       token: residentJwt,
       body: { bookingId: 'rules_bk_1', userUid: 'rules_res_1', facilityId: 'tampered' },
+    }),
+    403
+  );
+
+  // 7. Expenses collection is strictly admin-readable and blocks direct client writes
+  assert.equal(await restRequest('GET', 'expenses/rules_exp_1'), 403);
+  assert.equal(await restRequest('GET', 'expenses/rules_exp_1', { token: residentJwt }), 403);
+  assert.equal(await restRequest('GET', 'expenses/rules_exp_1', { token: adminJwt }), 200);
+  assert.equal(
+    await restRequest('PATCH', 'expenses/rules_exp_1', {
+      token: adminJwt,
+      body: { productOrService: 'Tampered', amount: 1 },
     }),
     403
   );

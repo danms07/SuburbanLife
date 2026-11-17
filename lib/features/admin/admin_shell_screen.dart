@@ -13,6 +13,7 @@ import 'admin_booking_approval_screen.dart';
 import 'admin_bulk_address_import_screen.dart';
 import 'admin_bulk_user_import_screen.dart';
 import 'admin_create_user_screen.dart';
+import 'admin_expenses_screen.dart';
 import 'admin_facilities_screen.dart';
 import 'admin_payment_approval_screen.dart';
 import 'admin_payment_report_screen.dart';
@@ -41,6 +42,7 @@ enum AdminSection {
   // Finance
   reviewPayments,
   uploadPayment,
+  expenses,
   downloadPaymentReport,
   importPaymentHistory,
 
@@ -336,6 +338,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
             section: AdminSection.uploadPayment,
             label: l10n.uploadPaymentOnBehalfMenu,
             icon: Icons.upload_file,
+          ),
+          _AdminNavItem(
+            section: AdminSection.expenses,
+            label: l10n.expensesMenu,
+            icon: Icons.receipt_long,
           ),
           _AdminNavItem(
             section: AdminSection.downloadPaymentReport,
@@ -895,6 +902,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return const AdminPaymentApprovalScreen(isEmbedded: true);
       case AdminSection.uploadPayment:
         return const AdminUploadPaymentScreen(isEmbedded: true);
+      case AdminSection.expenses:
+        return const AdminExpensesScreen(isEmbedded: true);
       case AdminSection.downloadPaymentReport:
         return const AdminPaymentReportScreen(isEmbedded: true);
       case AdminSection.importPaymentHistory:

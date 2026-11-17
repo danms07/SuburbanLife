@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/core/config/app_config.dart';
+import 'package:suburban_life/features/admin/admin_expenses_screen.dart';
 import 'package:suburban_life/features/admin/admin_settings_screen.dart';
 import 'package:suburban_life/features/admin/admin_shell_screen.dart';
 import 'package:suburban_life/features/auth/admin_resident_approval_screen.dart';
@@ -651,6 +652,36 @@ void main() {
         await tester.pumpAndSettle();
         expect(logoutCalls, 2);
         expect(find.byKey(const ValueKey('admin_mobile_drawer')), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'navigates to AdminExpensesScreen from Finance sidebar group without duplicate AppBars',
+      (tester) async {
+        tester.view.physicalSize = const Size(1280, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        await tester.pumpWidget(buildShell());
+        await tester.pumpAndSettle();
+
+        final sidebarFinanceGroup = find.descendant(
+          of: find.byKey(const ValueKey('admin_desktop_sidebar')),
+          matching: find.text('Finance'),
+        );
+        await tester.tap(sidebarFinanceGroup);
+        await tester.pumpAndSettle();
+
+        final expensesNav = find.byKey(const ValueKey('admin_nav_expenses'));
+        expect(expensesNav, findsOneWidget);
+        await tester.tap(expensesNav);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AdminExpensesScreen), findsOneWidget);
+        expect(find.byType(AppBar), findsOneWidget);
       },
     );
   });

@@ -439,5 +439,30 @@ void main() {
       expect(find.byType(QrScannerScreen), findsNothing);
       expect(find.byKey(const ValueKey('guard_main_scan_btn')), findsOneWidget);
     });
+
+    testWidgets('persists initialBudgetBalance inside Payment & Grace Period settings card', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(wrapWithApp(const AdminSettingsScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('settings_card_payment')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('initial_budget_balance_field')),
+        '15250.50',
+      );
+      await tester.tap(find.byKey(const ValueKey('save_opening_balance_button')));
+      await tester.pumpAndSettle();
+
+      final savedDoc = await FakeBackendHelper.db.getDocument('config', 'app_settings');
+      expect(savedDoc?['initialBudgetBalance'], equals(15250.5));
+    });
   });
 }

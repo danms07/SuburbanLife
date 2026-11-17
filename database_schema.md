@@ -131,10 +131,33 @@ erDiagram
         number paymentCutoffDay
         number gracePeriodDays
         boolean scanOnExitEnabled "Enable QR scan on exit"
+        number initialBudgetBalance "Opening community budget balance"
+        string initialBalancePeriod "Optional YYYY-MM cutoff start for opening balance"
         boolean smtpEnabled
         string smtpHost
         number smtpPort
         string smtpUser
+        timestamp updatedAt
+    }
+    expenses {
+        string expenseId PK
+        string productOrService
+        number amount
+        string billablePeriod "YYYY-MM"
+        number expenseDate
+        string category "maintenance | gardening | security | utilities | repairs | supplies | other"
+        string vendorName
+        string notes
+        map productEvidence "JPG/PNG/WEBP file metadata & storagePath"
+        map receiptEvidence "JPG/PNG/WEBP/PDF file metadata & storagePath"
+        string status "'active' | 'voided'"
+        string createdBy
+        string createdByName
+        number createdAt
+        string voidedBy
+        string voidedByName
+        number voidedAt
+        string voidReason
         timestamp updatedAt
     }
 
@@ -149,6 +172,7 @@ erDiagram
     access_logs }o--|| qr_codes : "validates"
     access_logs }o--|| users : "verified by guard"
     payments }o--|| addresses : "paid for"
+    expenses }o--|| users : "recorded/voided by admin"
     ownership_claims }o--|| users : "claimed by"
     ownership_claims }o--|| addresses : "claims address"
 ```
@@ -362,6 +386,8 @@ erDiagram
 - `gracePeriodDays`: number (Grace period span before user features restrict automatically, default 10)
 - `timeZone`: string (Configured IANA timezone for cutoff and grace period calculations, default 'America/Mexico_City')
 - `scanOnExitEnabled`: boolean (Optional; enables QR exit scanning workflow for visitors and suppliers, default false)
+- `initialBudgetBalance`: number (Optional; opening community budget balance used as starting accumulated budget, default 0)
+- `initialBalancePeriod`: string (Optional; `'YYYY-MM'` effective starting period for filtering payments/expenses counted toward the accumulated budget)
 - `paymentRejectionReasons`: array of string (Customizable pool of rejection reason templates for payment reviews)
 - `updatedAt`: timestamp
 
@@ -376,6 +402,27 @@ erDiagram
 - `senderName`: string (Optional override sender display label e.g. "Suburban Life Administration")
 - `customSubject`: string (Optional customized welcome email subject with placeholders like %appName%)
 - `customBody`: string (Optional customized multiline message body supporting %name%, %email%, %password%, %address%, %role%, %appName%)
+- `updatedAt`: timestamp
+
+### `expenses` (Collection - Admin Only)
+- `id`: string (Document ID)
+- `productOrService`: string (Required description of acquired product or service, max 200 chars)
+- `amount`: number (Positive monetary amount rounded to 2 decimal places)
+- `billablePeriod`: string (Required `'YYYY-MM'` period aligned with monthly maintenance periods)
+- `expenseDate`: number (Milliseconds epoch timestamp when the expense was incurred)
+- `category`: string (`'maintenance' | 'gardening' | 'security' | 'utilities' | 'repairs' | 'supplies' | 'other'`)
+- `vendorName`: string (Optional vendor or supplier name, max 120 chars)
+- `notes`: string (Optional administrative notes, max 500 chars)
+- `productEvidence`: map (`fileName`, `fileType` in `'jpg' | 'jpeg' | 'png' | 'webp'`, `fileSize`, `url`, `storagePath` under `expenses/<createdBy>/`, `uploadedAt` — photo evidence of the acquired product/service)
+- `receiptEvidence`: map (`fileName`, `fileType` in `'jpg' | 'jpeg' | 'png' | 'webp' | 'pdf'`, `fileSize`, `url`, `storagePath` under `expenses/<createdBy>/`, `uploadedAt` — receipt or invoice evidence)
+- `status`: string (`'active' | 'voided'`)
+- `createdBy`: string (UID of recording administrator)
+- `createdByName`: string (Resolved display name of recording administrator)
+- `createdAt`: number (Milliseconds epoch timestamp)
+- `voidedBy`: string (Nullable; UID of administrator who soft-voided the expense)
+- `voidedByName`: string (Nullable; display name of administrator who soft-voided the expense)
+- `voidedAt`: number (Nullable; milliseconds epoch timestamp when voided)
+- `voidReason`: string (Nullable; mandatory 3-300 char reason recorded when `status == 'voided'`)
 - `updatedAt`: timestamp
 
 ## Firestore Composite Indexes
@@ -489,6 +536,15 @@ The application requires specific composite indexes to execute queries without d
 - **Index 1 (User Directory Role Filter by Name)**:
   - `role` (Ascending)
   - `name` (Ascending)
+
+### `expenses` Collection
+- **Index 1 (Active/Voided Expenses by Period and Creation)**:
+  - `status` (Ascending)
+  - `billablePeriod` (Descending)
+  - `createdAt` (Descending)
+- **Index 2 (Expenses by Period and Creation)**:
+  - `billablePeriod` (Ascending)
+  - `createdAt` (Descending)
 
 ---
 

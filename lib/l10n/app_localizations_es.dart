@@ -2691,4 +2691,255 @@ class AppLocalizationsEs extends AppLocalizations {
   String reconcileMismatchesButton(int count) {
     return 'Revisar y Conciliar Discrepancias ($count)';
   }
+
+  @override
+  String get expensesMenu => 'Gastos';
+
+  @override
+  String get expensesTitle => 'Gastos de la Comunidad';
+
+  @override
+  String get recordExpenseButton => 'Registrar Gasto';
+
+  @override
+  String get expenseProductServiceLabel => 'Producto / Servicio';
+
+  @override
+  String get expenseProductServiceHint =>
+      'ej. Servicio mensual de jardinería y poda';
+
+  @override
+  String get expenseAmountLabel => 'Monto';
+
+  @override
+  String get expenseBillablePeriodLabel => 'Periodo Facturable';
+
+  @override
+  String get expenseDateLabel => 'Fecha del Gasto';
+
+  @override
+  String get expenseCategoryLabel => 'Categoría';
+
+  @override
+  String get expenseVendorLabel => 'Proveedor (Opcional)';
+
+  @override
+  String get expenseVendorHint => 'ej. Jardines del Sur';
+
+  @override
+  String get expenseNotesLabel => 'Notas (Opcional)';
+
+  @override
+  String get expenseNotesHint => 'Detalles adicionales o folio de factura...';
+
+  @override
+  String get expenseCategoryMaintenance => 'Mantenimiento';
+
+  @override
+  String get expenseCategoryGardening => 'Jardinería';
+
+  @override
+  String get expenseCategorySecurity => 'Seguridad';
+
+  @override
+  String get expenseCategoryUtilities => 'Servicios';
+
+  @override
+  String get expenseCategoryRepairs => 'Reparaciones';
+
+  @override
+  String get expenseCategorySupplies => 'Insumos';
+
+  @override
+  String get expenseCategoryOther => 'Otro';
+
+  @override
+  String get expenseProductEvidenceLabel =>
+      'Evidencia Fotográfica del Producto / Servicio';
+
+  @override
+  String get expenseReceiptEvidenceLabel =>
+      'Evidencia de Recibo / Factura (Foto o PDF)';
+
+  @override
+  String get expenseChoosePhotoButton => 'Elegir Foto';
+
+  @override
+  String get expenseChooseFileOrPhotoButton => 'Elegir Foto / PDF';
+
+  @override
+  String get expenseTakePhotoButton => 'Tomar Foto';
+
+  @override
+  String expenseEvidenceSelected(String fileName) {
+    return 'Seleccionado: $fileName';
+  }
+
+  @override
+  String get expenseMissingProductService =>
+      '• Ingrese la descripción del producto o servicio';
+
+  @override
+  String get expenseMissingAmount => '• Ingrese un monto positivo válido';
+
+  @override
+  String get expenseMissingPeriod => '• Seleccione un periodo facturable';
+
+  @override
+  String get expenseMissingProductEvidence =>
+      '• Adjunte una foto del producto o servicio adquirido';
+
+  @override
+  String get expenseMissingReceiptEvidence =>
+      '• Adjunte una foto o PDF del recibo o factura';
+
+  @override
+  String get expenseMissingFieldsWarning =>
+      'Complete todos los campos obligatorios del gasto antes de guardar.';
+
+  @override
+  String get expenseRecordedSuccess => '¡Gasto registrado exitosamente!';
+
+  @override
+  String get noExpensesFound =>
+      'No hay gastos registrados para los filtros seleccionados.';
+
+  @override
+  String get financialSummaryIncomeLabel => 'Ingresos Recaudados';
+
+  @override
+  String get financialSummaryExpensesLabel => 'Gastos Activos';
+
+  @override
+  String get financialSummaryBudgetLabel => 'Presupuesto Acumulado';
+
+  @override
+  String get expenseStatusActive => 'Activo';
+
+  @override
+  String get expenseStatusVoided => 'Anulado';
+
+  @override
+  String get expenseFilterAllPeriods => 'Todos los Periodos';
+
+  @override
+  String get expenseFilterAllCategories => 'Todas las Categorías';
+
+  @override
+  String get expenseRecordedByLabel => 'Registrado por';
+
+  @override
+  String get expenseVoidedByLabel => 'Anulado por';
+
+  @override
+  String get expenseVoidButton => 'Anular Gasto';
+
+  @override
+  String get expenseVoidDialogTitle => 'Anular Registro de Gasto';
+
+  @override
+  String get expenseVoidReasonLabel => 'Motivo de anulación';
+
+  @override
+  String get expenseVoidReasonHint =>
+      'Explique por qué se anula este gasto (mín. 3 caracteres)';
+
+  @override
+  String get expenseVoidAuditNotice =>
+      'Los gastos anulados permanecen visibles en el historial de auditoría y se excluyen de los totales activos.';
+
+  @override
+  String get expenseVoidedSuccess => 'Gasto anulado exitosamente.';
+
+  @override
+  String expenseVoidedBanner(String reason) {
+    return 'ANULADO: $reason';
+  }
+
+  @override
+  String get openingBudgetBalanceLabel => 'Saldo Inicial del Presupuesto';
+
+  @override
+  String get openingBudgetBalanceHint => 'ej. 0.00';
+
+  @override
+  String get openingBudgetBalanceHelper =>
+      'Fondos iniciales de la comunidad previos a los registros del sistema (opcional).';
+
+  @override
+  String get openingBalancePeriodLabel => 'Vigente Desde el Periodo (Opcional)';
+
+  @override
+  String get openingBalanceAllPrior => 'Previo a todos los periodos';
+
+  @override
+  String get openingBalanceSaveButton => 'Guardar Saldo Inicial';
+
+  @override
+  String get openingBalanceSaveSuccess =>
+      '¡Configuración de saldo inicial guardada!';
+
+  @override
+  String get openingBalanceInvalidError =>
+      'Por favor ingrese un saldo inicial válido no negativo.';
+
+  @override
+  String get financialReportSubtitle =>
+      'Exporte la matriz de estatus por dirección (solo administradores) y el libro financiero con presupuesto acumulado.';
+
+  @override
+  String get downloadReportBundleButton =>
+      'Descargar Paquete Completo (2 CSVs)';
+
+  @override
+  String get downloadStatusMatrixCsvButton =>
+      'Descargar Matriz de Estatus CSV (Solo Admin)';
+
+  @override
+  String get downloadFinancialLedgerCsvButton =>
+      'Descargar Libro Financiero y Presupuesto CSV';
+
+  @override
+  String get reportPreviewTitle => 'Vista Previa del Resumen Financiero';
+
+  @override
+  String get openingBalancePreviewLabel => 'Saldo Inicial / Acumulado Previo';
+
+  @override
+  String get quotaIncomePreviewLabel => 'Ingresos por Cuotas de Mantenimiento';
+
+  @override
+  String get sanctionIncomePreviewLabel => 'Ingresos por Sanciones';
+
+  @override
+  String get expensesPreviewLabel => 'Gastos Activos';
+
+  @override
+  String get netPeriodBalancePreviewLabel => 'Balance Neto del Periodo';
+
+  @override
+  String get accumulatedBudgetPreviewLabel => 'Presupuesto Acumulado Final';
+
+  @override
+  String get publishToTransparencyButton => 'Publicar Resumen en Transparencia';
+
+  @override
+  String get publishTransparencyDialogTitle => 'Publicar Resumen Financiero';
+
+  @override
+  String get publishTransparencyPrivacyNote =>
+      'Solo se publican ingresos agregados, gastos y presupuesto acumulado. La matriz de estatus por dirección nunca se divulga.';
+
+  @override
+  String get publishTransparencyTitleLabel => 'Título del Documento';
+
+  @override
+  String get publishTransparencyVisibilityLabel => 'Visibilidad';
+
+  @override
+  String get publishTransparencySuccess =>
+      '¡Resumen financiero publicado en Transparencia!';
+
+  @override
+  String get publishTransparencyButtonConfirm => 'Publicar';
 }

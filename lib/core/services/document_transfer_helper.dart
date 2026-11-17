@@ -58,6 +58,15 @@ class DocumentTransferHelper {
     'webp',
   ];
 
+  /// Allowed extensions for expense receipts/invoices (photos or PDF).
+  static const List<String> expenseReceiptExtensions = [
+    'pdf',
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+  ];
+
   /// Explicit `<input type="file" accept="...">` value for Web uploads.
   /// Avoids `*/*`, `audio/*`, and `video/*` so mobile Chromium/Edge browsers on
   /// Android 13+ launch the document picker without requesting audio/media permissions.
@@ -68,7 +77,14 @@ class DocumentTransferHelper {
       'application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,'
       'image/jpeg,image/png,image/webp';
 
+  static const String webImageAcceptAttribute =
+      '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp';
+
+  static const String webExpenseReceiptAcceptAttribute =
+      '.pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp';
+
   static Future<PickedDocumentData?> Function(BuildContext context)? _pickOverride;
+  static Future<PickedDocumentData?> Function(BuildContext context)? _pickImageOverride;
   static Future<PickedDocumentData?> Function(BuildContext context)? _captureOverride;
   static Future<void> Function({
     required BuildContext context,
@@ -81,6 +97,7 @@ class DocumentTransferHelper {
   @visibleForTesting
   static void setOverridesForTesting({
     Future<PickedDocumentData?> Function(BuildContext context)? pickDocument,
+    Future<PickedDocumentData?> Function(BuildContext context)? pickImage,
     Future<PickedDocumentData?> Function(BuildContext context)? capturePhoto,
     Future<void> Function({
       required BuildContext context,
@@ -91,6 +108,7 @@ class DocumentTransferHelper {
     })? openOrDownload,
   }) {
     _pickOverride = pickDocument;
+    _pickImageOverride = pickImage;
     _captureOverride = capturePhoto;
     _openOverride = openOrDownload;
   }
@@ -98,6 +116,7 @@ class DocumentTransferHelper {
   @visibleForTesting
   static void resetOverridesForTesting() {
     _pickOverride = null;
+    _pickImageOverride = null;
     _captureOverride = null;
     _openOverride = null;
   }
@@ -305,10 +324,17 @@ class DocumentTransferHelper {
 
   /// Launches the platform document picker and validates extension, size, and magic bytes.
   // TODO(security): Integrate server-side malware scanning and CDR active-content stripping for uploaded binary documents.
-  static Future<PickedDocumentData?> pickAllowedDocument(BuildContext context) async {
+  static Future<PickedDocumentData?> pickAllowedDocument(
+    BuildContext context, {
+    List<String>? customAllowedExtensions,
+    String? customWebAccept,
+  }) async {
     if (_pickOverride != null) {
       return _pickOverride!(context);
     }
+
+    final effectiveExtensions = customAllowedExtensions ?? allowedExtensions;
+    final effectiveWebAccept = customWebAccept ?? webAcceptAttribute;
 
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
@@ -319,7 +345,7 @@ class DocumentTransferHelper {
 
     try {
       if (kIsWeb) {
-        final uploadInput = html.FileUploadInputElement()..accept = webAcceptAttribute;
+        final uploadInput = html.FileUploadInputElement()..accept = effectiveWebAccept;
         uploadInput.click();
         await uploadInput.onChange.first;
         if (uploadInput.files == null || uploadInput.files!.isEmpty) {
@@ -329,7 +355,8 @@ class DocumentTransferHelper {
         sanitizedName = sanitizeFileName(file.name);
         declaredSize = file.size;
 
-        if (!isAllowedExtension(sanitizedName)) {
+        final extCheck = extractExtension(sanitizedName);
+        if (extCheck.isEmpty || !effectiveExtensions.contains(extCheck)) {
           messenger.showSnackBar(SnackBar(content: Text(l10n.unsupportedDocumentType)));
           return null;
         }
@@ -352,7 +379,7 @@ class DocumentTransferHelper {
       } else {
         final result = await FilePicker.pickFiles(
           type: FileType.custom,
-          allowedExtensions: allowedExtensions,
+          allowedExtensions: effectiveExtensions,
           withData: true,
         );
         if (result == null || result.files.isEmpty) {
@@ -362,7 +389,8 @@ class DocumentTransferHelper {
         sanitizedName = sanitizeFileName(file.name);
         declaredSize = file.size;
 
-        if (!isAllowedExtension(sanitizedName)) {
+        final extCheck = extractExtension(sanitizedName);
+        if (extCheck.isEmpty || !effectiveExtensions.contains(extCheck)) {
           messenger.showSnackBar(SnackBar(content: Text(l10n.unsupportedDocumentType)));
           return null;
         }
@@ -410,6 +438,27 @@ class DocumentTransferHelper {
       contentType: contentType,
       fileSize: rawBytes.length,
       bytes: rawBytes,
+    );
+  }
+
+  /// Launches an image-only picker (JPG, PNG, WEBP) with magic-byte validation.
+  static Future<PickedDocumentData?> pickAllowedImage(BuildContext context) {
+    if (_pickImageOverride != null) {
+      return _pickImageOverride!(context);
+    }
+    return pickAllowedDocument(
+      context,
+      customAllowedExtensions: imageExtensions,
+      customWebAccept: webImageAcceptAttribute,
+    );
+  }
+
+  /// Launches a picker restricted to expense receipts/invoices (JPG, PNG, WEBP, PDF).
+  static Future<PickedDocumentData?> pickExpenseReceipt(BuildContext context) {
+    return pickAllowedDocument(
+      context,
+      customAllowedExtensions: expenseReceiptExtensions,
+      customWebAccept: webExpenseReceiptAcceptAttribute,
     );
   }
 

@@ -8,14 +8,17 @@ import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../l10n/app_localizations.dart';
 import 'admin_bulk_payment_import_screen.dart';
+import 'financial_report_calculator.dart';
 
 class AdminPaymentReportScreen extends StatefulWidget {
   final Future<void> Function(String csvContent)? onSaveCsv;
+  final Future<void> Function(String csvContent)? onSaveLedgerCsv;
   final bool isEmbedded;
 
   const AdminPaymentReportScreen({
     super.key,
     this.onSaveCsv,
+    this.onSaveLedgerCsv,
     this.isEmbedded = false,
   });
 
@@ -41,7 +44,10 @@ class AdminPaymentReportScreen extends StatefulWidget {
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}';
   }
 
-  static List<DateTime> generateMonthRange(DateTime startMonth, DateTime endMonth) {
+  static List<DateTime> generateMonthRange(
+    DateTime startMonth,
+    DateTime endMonth,
+  ) {
     final List<DateTime> range = [];
     DateTime current = DateTime(startMonth.year, startMonth.month, 1);
     final end = DateTime(endMonth.year, endMonth.month, 1);
@@ -73,6 +79,7 @@ class AdminPaymentReportScreen extends StatefulWidget {
 
   static int _extractTimestampMs(dynamic rawTs) {
     if (rawTs is int) return rawTs;
+    if (rawTs is num) return rawTs.toInt();
     if (rawTs is DateTime) return rawTs.millisecondsSinceEpoch;
     return 0;
   }
@@ -166,56 +173,187 @@ class AdminPaymentReportScreen extends StatefulWidget {
   }
 
   @override
-  State<AdminPaymentReportScreen> createState() => _AdminPaymentReportScreenState();
+  State<AdminPaymentReportScreen> createState() =>
+      _AdminPaymentReportScreenState();
 }
+
+enum _ExportMode { bundle, matrixOnly, ledgerOnly }
 
 class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
   late DateTime _startMonth;
   late DateTime _endMonth;
   bool _isLoading = false;
+  bool _isPublishing = false;
 
-  final List<DateTime> _availableMonths = [];
+  late final Stream<Map<String, dynamic>?> _settingsStream;
+  late final Stream<List<Map<String, dynamic>>> _paymentsStream;
+  late final Stream<List<Map<String, dynamic>>> _expensesStream;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
-    // Default range: past 6 months to current month
     _startMonth = DateTime(now.year, now.month - 5, 1);
     _endMonth = DateTime(now.year, now.month, 1);
-
-    // Populate dropdown options with last 24 months and next 2 months
-    for (int i = -22; i <= 2; i++) {
-      _availableMonths.add(DateTime(now.year, now.month + i, 1));
-    }
-    _availableMonths.sort((a, b) => a.compareTo(b));
+    _settingsStream = DatabaseService().streamDocument('config', 'app_settings');
+    _paymentsStream = DatabaseService().streamCollection('payments');
+    _expensesStream = DatabaseService().streamCollection('expenses');
   }
 
-  String _formatMonthLabel(DateTime dt) => AdminPaymentReportScreen.formatMonthLabel(dt);
+  String _formatMonthLabel(DateTime dt) =>
+      AdminPaymentReportScreen.formatMonthLabel(dt);
 
   List<DateTime> _generateMonthRange() =>
       AdminPaymentReportScreen.generateMonthRange(_startMonth, _endMonth);
 
-  void _generateAndSaveReport() async {
+  List<DateTime> _buildAvailableMonths(
+    List<Map<String, dynamic>> payments,
+    List<Map<String, dynamic>> expenses,
+  ) {
+    final now = DateTime.now();
+    DateTime earliest = DateTime(now.year, now.month - 22, 1);
+    DateTime latest = DateTime(now.year, now.month + 12, 1);
+
+    void considerPeriod(String periodKey) {
+      final parsed = FinancialReportCalculator.parsePeriodKey(periodKey);
+      if (parsed == null) return;
+      if (parsed.isBefore(earliest)) earliest = parsed;
+      if (parsed.isAfter(latest)) latest = parsed;
+    }
+
+    for (final p in payments) {
+      for (final pk in FinancialReportCalculator.extractValidPaymentPeriods(p)) {
+        considerPeriod(pk);
+      }
+    }
+    for (final e in expenses) {
+      final bp = e['billablePeriod']?.toString() ?? '';
+      considerPeriod(bp);
+    }
+    if (_startMonth.isBefore(earliest)) earliest = _startMonth;
+    if (_endMonth.isAfter(latest)) latest = _endMonth;
+
+    return AdminPaymentReportScreen.generateMonthRange(earliest, latest);
+  }
+
+  String _buildMatrixCsv({
+    required List<Map<String, dynamic>> addresses,
+    required List<Map<String, dynamic>> payments,
+    required int cutoffDay,
+    required int graceDays,
+    required AppLocalizations l10n,
+  }) {
+    final months = _generateMonthRange();
+    final headerCells = ['"Street name"', '"Street number"'];
+    for (final m in months) {
+      headerCells.add('"${_formatMonthLabel(m)}"');
+    }
+
+    final StringBuffer csvBuffer = StringBuffer();
+    csvBuffer.writeln(headerCells.join(','));
+
+    final now = DateTime.now();
+    final currentActiveMonth = DateTime(now.year, now.month, 1);
+
+    for (final addrData in addresses) {
+      final streetName = FinancialReportCalculator.sanitizeCsvTextCell(
+        addrData['streetName']?.toString() ?? '',
+      );
+      final streetNumber = FinancialReportCalculator.sanitizeCsvTextCell(
+        addrData['number']?.toString() ?? '',
+      );
+
+      final rowCells = ['"$streetName"', '"$streetNumber"'];
+
+      for (final targetMonth in months) {
+        final matchingPayments = payments.where((p) {
+          return AdminPaymentReportScreen.doesPaymentMatchAddressAndMonth(
+            payment: p,
+            addressData: addrData,
+            targetMonth: targetMonth,
+          );
+        }).toList();
+
+        final monthStatus = AdminPaymentReportScreen.computeMatrixStatus(
+          targetMonth: targetMonth,
+          currentActiveMonth: currentActiveMonth,
+          currentDay: now.day,
+          cutoffDay: cutoffDay,
+          graceDays: graceDays,
+          matchingPayments: matchingPayments,
+        );
+
+        String localizedStatusVal = monthStatus;
+        if (monthStatus == 'paid') localizedStatusVal = l10n.statusPaid.toLowerCase();
+        if (monthStatus == 'pending') localizedStatusVal = l10n.statusPending.toLowerCase();
+        if (monthStatus == 'past due') localizedStatusVal = l10n.statusPastDue.toLowerCase();
+
+        rowCells.add('"$localizedStatusVal"');
+      }
+
+      csvBuffer.writeln(rowCells.join(','));
+    }
+
+    return csvBuffer.toString();
+  }
+
+  Future<List<String>> _saveCsvOutputs(
+    List<({String fileName, String content})> files,
+  ) async {
+    final savedPaths = <String>[];
+    if (kIsWeb) {
+      for (int i = 0; i < files.length; i++) {
+        final entry = files[i];
+        final bytes = utf8.encode(entry.content);
+        final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        html.AnchorElement(href: url)
+          ..setAttribute('download', entry.fileName)
+          ..click();
+        html.Url.revokeObjectUrl(url);
+        if (i + 1 < files.length) {
+          await Future<void>.delayed(const Duration(milliseconds: 250));
+        }
+      }
+      return savedPaths;
+    }
+
+    final directory = await getApplicationDocumentsDirectory();
+    for (final entry in files) {
+      final filePath = '${directory.path}/${entry.fileName}';
+      final file = File(filePath);
+      await file.writeAsString(entry.content);
+      savedPaths.add(filePath);
+    }
+    return savedPaths;
+  }
+
+  Future<void> _exportReports(_ExportMode mode) async {
     final l10n = AppLocalizations.of(context)!;
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // 1. Fetch global config constants
       int cutoffDay = 1;
       int graceDays = 10;
+      double initialBalance = 0.0;
+      String? initialBalancePeriod;
+      String timeZone = 'America/Mexico_City';
+
       final cData = await DatabaseService().getDocument('config', 'app_settings');
       if (cData != null) {
         cutoffDay = cData['paymentCutoffDay'] ?? 1;
         graceDays = cData['gracePeriodDays'] ?? 10;
+        initialBalance =
+            (cData['initialBudgetBalance'] as num?)?.toDouble() ?? 0.0;
+        final rawInitPeriod = cData['initialBalancePeriod']?.toString().trim();
+        initialBalancePeriod =
+            (rawInitPeriod != null && rawInitPeriod.isNotEmpty)
+                ? rawInitPeriod
+                : null;
+        timeZone = cData['timeZone']?.toString() ?? 'America/Mexico_City';
       }
 
-      // 2. Fetch all addresses
       final addresses = await DatabaseService().getCollection('addresses');
-
-      // Sort logically
       addresses.sort((a, b) {
         final sA = a['streetName']?.toString() ?? '';
         final sB = b['streetName']?.toString() ?? '';
@@ -227,18 +365,37 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
         return nA.toString().compareTo(nB.toString());
       });
 
-      // 3. Fetch all payments to evaluate locally
       final payments = await DatabaseService().getCollection('payments');
+      final expenses = await DatabaseService().getCollection('expenses');
 
-      final hasDataForPeriod = AdminPaymentReportScreen.hasDataForRange(
+      final ledger = FinancialReportCalculator.computeFinancialLedger(
+        payments: payments,
+        expenses: expenses,
+        startMonth: _startMonth,
+        endMonth: _endMonth,
+        initialBudgetBalance: initialBalance,
+        initialBalancePeriod: initialBalancePeriod,
+        timeZone: timeZone,
+      );
+
+      final hasQuotaData = AdminPaymentReportScreen.hasDataForRange(
         payments: payments,
         startMonth: _startMonth,
         endMonth: _endMonth,
       );
+      final hasLedgerData = ledger.rangeTotalIncomeCents > 0 ||
+          ledger.expensesInRange.isNotEmpty ||
+          ledger.initialBudgetBalanceCents != 0;
 
-      if (!hasDataForPeriod) {
+      final bool missingDataForMode = switch (mode) {
+        _ExportMode.bundle => !hasQuotaData && !hasLedgerData,
+        _ExportMode.matrixOnly => !hasQuotaData,
+        _ExportMode.ledgerOnly => !hasLedgerData,
+      };
+
+      if (missingDataForMode) {
         if (mounted) {
-          showDialog(
+          showDialog<void>(
             context: context,
             builder: (context) => AlertDialog(
               title: Text(l10n.noDataAlertTitle),
@@ -251,118 +408,153 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
               ],
             ),
           );
-          setState(() {
-            _isLoading = false;
-          });
+          setState(() => _isLoading = false);
         }
         return;
       }
 
-      // 4. Generate Discrete Month Matrix Header
-      final months = _generateMonthRange();
-      final headerCells = ['"Street name"', '"Street number"'];
-      for (final m in months) {
-        headerCells.add('"${_formatMonthLabel(m)}"');
+      final startKey = AdminPaymentReportScreen.formatPeriodKey(_startMonth);
+      final endKey = AdminPaymentReportScreen.formatPeriodKey(_endMonth);
+      final ts = DateTime.now().millisecondsSinceEpoch;
+
+      final matrixCsv = (mode == _ExportMode.bundle || mode == _ExportMode.matrixOnly)
+          ? _buildMatrixCsv(
+              addresses: addresses,
+              payments: payments,
+              cutoffDay: cutoffDay,
+              graceDays: graceDays,
+              l10n: l10n,
+            )
+          : null;
+
+      final ledgerCsv = (mode == _ExportMode.bundle || mode == _ExportMode.ledgerOnly)
+          ? FinancialReportCalculator.buildFinancialLedgerCsv(ledger)
+          : null;
+
+      final filesToSave = <({String fileName, String content})>[];
+
+      if (matrixCsv != null) {
+        if (widget.onSaveCsv != null) {
+          await widget.onSaveCsv!(matrixCsv);
+        } else {
+          filesToSave.add((
+            fileName: 'payment_status_matrix_${startKey}_to_${endKey}_$ts.csv',
+            content: matrixCsv,
+          ));
+        }
       }
 
-      final StringBuffer csvBuffer = StringBuffer();
-      csvBuffer.writeln(headerCells.join(','));
-
-      final now = DateTime.now();
-      final currentActiveMonth = DateTime(now.year, now.month, 1);
-
-      // 5. Populate Address Matrix Rows
-      for (final addrData in addresses) {
-        final streetName = addrData['streetName']?.toString().replaceAll('"', '""') ?? '';
-        final streetNumber = addrData['number']?.toString().replaceAll('"', '""') ?? '';
-
-        final rowCells = ['"$streetName"', '"$streetNumber"'];
-
-        for (final targetMonth in months) {
-          final matchingPayments = payments.where((p) {
-            return AdminPaymentReportScreen.doesPaymentMatchAddressAndMonth(
-              payment: p,
-              addressData: addrData,
-              targetMonth: targetMonth,
-            );
-          }).toList();
-
-          final monthStatus = AdminPaymentReportScreen.computeMatrixStatus(
-            targetMonth: targetMonth,
-            currentActiveMonth: currentActiveMonth,
-            currentDay: now.day,
-            cutoffDay: cutoffDay,
-            graceDays: graceDays,
-            matchingPayments: matchingPayments,
-          );
-
-          String localizedStatusVal = monthStatus;
-          if (monthStatus == 'paid') localizedStatusVal = l10n.statusPaid.toLowerCase();
-          if (monthStatus == 'pending') localizedStatusVal = l10n.statusPending.toLowerCase();
-          if (monthStatus == 'past due') localizedStatusVal = l10n.statusPastDue.toLowerCase();
-
-          rowCells.add('"$localizedStatusVal"');
+      if (ledgerCsv != null) {
+        if (widget.onSaveLedgerCsv != null) {
+          await widget.onSaveLedgerCsv!(ledgerCsv);
+        } else if (widget.onSaveCsv == null) {
+          // Only write to local disk/browser when no test callback overrides output
+          filesToSave.add((
+            fileName: 'financial_ledger_budget_${startKey}_to_${endKey}_$ts.csv',
+            content: ledgerCsv,
+          ));
         }
-
-        csvBuffer.writeln(rowCells.join(','));
       }
 
-      final csvString = csvBuffer.toString();
+      final savedPaths = filesToSave.isNotEmpty
+          ? await _saveCsvOutputs(filesToSave)
+          : const <String>[];
 
-      // 6. Trigger File Output Flow
-      if (widget.onSaveCsv != null) {
-        await widget.onSaveCsv!(csvString);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.reportSavedSuccess),
-              backgroundColor: AppConfig.secondaryColor,
-            ),
-          );
-        }
-      } else if (kIsWeb) {
-        final bytes = utf8.encode(csvString);
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute('download', 'payment_report_${DateTime.now().millisecondsSinceEpoch}.csv')
-          ..click();
-        html.Url.revokeObjectUrl(url);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.reportSavedSuccess), backgroundColor: AppConfig.secondaryColor),
-          );
-        }
-      } else {
-        final directory = await getApplicationDocumentsDirectory();
-        final String filePath = '${directory.path}/payment_report_${DateTime.now().millisecondsSinceEpoch}.csv';
-        final File file = File(filePath);
-        await file.writeAsString(csvString);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${l10n.reportSavedSuccess} Saved to: $filePath'),
-              backgroundColor: AppConfig.secondaryColor,
-            ),
-          );
-        }
+      if (mounted) {
+        final msg = savedPaths.isEmpty
+            ? l10n.reportSavedSuccess
+            : '${l10n.reportSavedSuccess} ${savedPaths.join(', ')}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: AppConfig.secondaryColor,
+          ),
+        );
       }
     } catch (e, stack) {
-      debugPrint('Error downloading payment report: $e');
-      Backend.crashlytics.recordError(e, stack, reason: 'AdminPaymentReportScreen._downloadCsv');
+      debugPrint('Error downloading financial report: $e');
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'AdminPaymentReportScreen._exportReports',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _publishSummaryToTransparency(
+    FinancialLedgerResult ledger,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final defaultTitle =
+        'Financial Summary ${ledger.startPeriod} to ${ledger.endPeriod}';
+
+    final result = await showDialog<({String title, String visibility})>(
+      context: context,
+      builder: (_) => _PublishTransparencyDialog(initialTitle: defaultTitle),
+    );
+
+    if (result == null || result.title.isEmpty || !mounted) return;
+    setState(() => _isPublishing = true);
+
+    try {
+      // Strictly aggregated Markdown summary; never includes address payment status matrix
+      final markdown = FinancialReportCalculator.buildTransparencyMarkdownReport(
+        title: result.title,
+        ledger: ledger,
+      );
+      final base64Content = base64Encode(utf8.encode(markdown));
+      final fileName =
+          'financial_summary_${ledger.startPeriod}_to_${ledger.endPeriod}.md';
+
+      await FunctionsService().callFunction('syncTransparencyDocument', {
+        'title': result.title,
+        'fileName': fileName,
+        'fileType': 'md',
+        'visibility': result.visibility,
+        'category': 'financial',
+        'categoryName': 'Finanzas / Financial',
+        'folderId': 'financial_reports',
+        'folderName': 'Financial Reports',
+        'fileBase64': base64Content,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.publishTransparencySuccess),
+            backgroundColor: AppConfig.secondaryColor,
+          ),
+        );
+      }
+    } catch (e, stack) {
+      debugPrint('Error publishing financial summary: $e');
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'AdminPaymentReportScreen._publishSummaryToTransparency',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.errorPrefix(e.toString())),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isPublishing = false);
     }
   }
 
@@ -375,137 +567,578 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
       appBar: widget.isEmbedded
           ? null
           : AppBar(
-              title: Text(l10n.generateReportTitle, style: const TextStyle(fontFamily: AppConfig.fontFamily)),
+              title: Text(
+                l10n.generateReportTitle,
+                style: const TextStyle(fontFamily: AppConfig.fontFamily),
+              ),
               backgroundColor: AppConfig.primaryColor,
               foregroundColor: Colors.white,
             ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(Icons.table_chart, size: 60, color: AppConfig.primaryColor),
-                const SizedBox(height: 16),
-                Text(
-                  l10n.generateReportTitle,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppConfig.primaryColor,
-                    fontFamily: AppConfig.fontFamily,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Select custom month boundaries to compile property maintenance payments matrix.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.center,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AdminBulkPaymentImportScreen(),
+      body: StreamBuilder<Map<String, dynamic>?>(
+        stream: _settingsStream,
+        builder: (context, settingsSnap) {
+          final appSettings = settingsSnap.data ?? const <String, dynamic>{};
+          final initialBalance =
+              (appSettings['initialBudgetBalance'] as num?)?.toDouble() ?? 0.0;
+          final rawInitPeriod =
+              appSettings['initialBalancePeriod']?.toString().trim();
+          final initialBalancePeriod =
+              (rawInitPeriod != null && rawInitPeriod.isNotEmpty)
+                  ? rawInitPeriod
+                  : null;
+          final timeZone =
+              appSettings['timeZone']?.toString() ?? 'America/Mexico_City';
+
+          return StreamBuilder<List<Map<String, dynamic>>>(
+            stream: _paymentsStream,
+            builder: (context, paymentsSnap) {
+              final payments = paymentsSnap.data ?? const <Map<String, dynamic>>[];
+
+              return StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _expensesStream,
+                builder: (context, expensesSnap) {
+                  final expenses =
+                      expensesSnap.data ?? const <Map<String, dynamic>>[];
+                  final availableMonths = _buildAvailableMonths(
+                    payments,
+                    expenses,
+                  );
+
+                  final ledger =
+                      FinancialReportCalculator.computeFinancialLedger(
+                    payments: payments,
+                    expenses: expenses,
+                    startMonth: _startMonth,
+                    endMonth: _endMonth,
+                    initialBudgetBalance: initialBalance,
+                    initialBalancePeriod: initialBalancePeriod,
+                    timeZone: timeZone,
+                  );
+
+                  return Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 820),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Icon(
+                                  Icons.table_chart,
+                                  size: 56,
+                                  color: AppConfig.primaryColor,
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  l10n.generateReportTitle,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppConfig.primaryColor,
+                                    fontFamily: AppConfig.fontFamily,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  l10n.financialReportSubtitle,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.center,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const AdminBulkPaymentImportScreen(),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.history_edu, size: 18),
+                                    label: Text(l10n.bulkPaymentImportMenu),
+                                  ),
+                                ),
+                                const SizedBox(height: 22),
+
+                                // Start & End Month Dropdowns
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final startDropdown =
+                                        DropdownButtonFormField<DateTime>(
+                                      key: ValueKey(
+                                        'start_month_${_startMonth.millisecondsSinceEpoch}',
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: l10n.startMonthLabel,
+                                        prefixIcon: const Icon(
+                                          Icons.calendar_today,
+                                          color: AppConfig.primaryColor,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                      initialValue: availableMonths.any(
+                                              (m) => m.isAtSameMomentAs(_startMonth))
+                                          ? _startMonth
+                                          : availableMonths.first,
+                                      items: availableMonths.map((dt) {
+                                        return DropdownMenuItem(
+                                          value: dt,
+                                          child: Text(_formatMonthLabel(dt)),
+                                        );
+                                      }).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() {
+                                            _startMonth = val;
+                                            if (_startMonth.isAfter(_endMonth)) {
+                                              _endMonth = _startMonth;
+                                            }
+                                          });
+                                        }
+                                      },
+                                    );
+
+                                    final endDropdown =
+                                        DropdownButtonFormField<DateTime>(
+                                      key: ValueKey(
+                                        'end_month_${_startMonth.millisecondsSinceEpoch}_${_endMonth.millisecondsSinceEpoch}',
+                                      ),
+                                      decoration: InputDecoration(
+                                        labelText: l10n.endMonthLabel,
+                                        prefixIcon: const Icon(
+                                          Icons.event,
+                                          color: AppConfig.primaryColor,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                      initialValue: availableMonths.any(
+                                              (m) => m.isAtSameMomentAs(_endMonth))
+                                          ? _endMonth
+                                          : availableMonths.last,
+                                      items: availableMonths
+                                          .where(
+                                            (dt) => !dt.isBefore(_startMonth),
+                                          )
+                                          .map((dt) {
+                                        return DropdownMenuItem(
+                                          value: dt,
+                                          child: Text(_formatMonthLabel(dt)),
+                                        );
+                                      }).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setState(() => _endMonth = val);
+                                        }
+                                      },
+                                    );
+
+                                    if (constraints.maxWidth >= 520) {
+                                      return Row(
+                                        children: [
+                                          Expanded(child: startDropdown),
+                                          const SizedBox(width: 14),
+                                          Expanded(child: endDropdown),
+                                        ],
+                                      );
+                                    }
+                                    return Column(
+                                      children: [
+                                        startDropdown,
+                                        const SizedBox(height: 16),
+                                        endDropdown,
+                                      ],
+                                    );
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+
+                                // Primary Bundle Export CTA
+                                ElevatedButton.icon(
+                                  key: const ValueKey(
+                                    'download_report_bundle_button',
+                                  ),
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _exportReports(_ExportMode.bundle),
+                                  icon: const Icon(Icons.download),
+                                  label: _isLoading
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(l10n.downloadReportBundleButton),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppConfig.secondaryColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Live Financial Summary Preview Card
+                                _buildFinancialPreviewCard(l10n, ledger),
+                                const SizedBox(height: 16),
+
+                                // Secondary Individual Exports
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  alignment: WrapAlignment.center,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      key: const ValueKey(
+                                        'download_status_matrix_only_button',
+                                      ),
+                                      onPressed: _isLoading
+                                          ? null
+                                          : () => _exportReports(
+                                                _ExportMode.matrixOnly,
+                                              ),
+                                      icon: const Icon(
+                                        Icons.table_chart_outlined,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        l10n.downloadStatusMatrixCsvButton,
+                                      ),
+                                    ),
+                                    OutlinedButton.icon(
+                                      key: const ValueKey(
+                                        'download_financial_ledger_only_button',
+                                      ),
+                                      onPressed: _isLoading
+                                          ? null
+                                          : () => _exportReports(
+                                                _ExportMode.ledgerOnly,
+                                              ),
+                                      icon: const Icon(
+                                        Icons.receipt_long_outlined,
+                                        size: 18,
+                                      ),
+                                      label: Text(
+                                        l10n.downloadFinancialLedgerCsvButton,
+                                      ),
+                                    ),
+                                    OutlinedButton.icon(
+                                      key: const ValueKey(
+                                        'publish_transparency_report_button',
+                                      ),
+                                      onPressed: (_isLoading || _isPublishing)
+                                          ? null
+                                          : () => _publishSummaryToTransparency(
+                                                ledger,
+                                              ),
+                                      icon: _isPublishing
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Icon(Icons.public, size: 18),
+                                      label: Text(
+                                        l10n.publishToTransparencyButton,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.history_edu, size: 18),
-                    label: Text(l10n.bulkPaymentImportMenu),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 
-                // Start Month Dropdown
-                DropdownButtonFormField<DateTime>(
-                  key: ValueKey('start_month_${_startMonth.millisecondsSinceEpoch}'),
-                  decoration: InputDecoration(
-                    labelText: l10n.startMonthLabel,
-                    prefixIcon: const Icon(Icons.calendar_today, color: AppConfig.primaryColor),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  initialValue: _availableMonths.any((m) => m.isAtSameMomentAs(_startMonth))
-                      ? _startMonth
-                      : _availableMonths.first,
-                  items: _availableMonths.map((dt) {
-                    return DropdownMenuItem(
-                      value: dt,
-                      child: Text(_formatMonthLabel(dt)),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _startMonth = val;
-                        if (_startMonth.isAfter(_endMonth)) {
-                          _endMonth = _startMonth;
-                        }
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 20),
+  Widget _buildFinancialPreviewCard(
+    AppLocalizations l10n,
+    FinancialLedgerResult ledger,
+  ) {
+    String fmt(double val) {
+      final prefix = val < 0 ? '-\$' : '\$';
+      return '$prefix${val.abs().toStringAsFixed(2)}';
+    }
 
-                // End Month Dropdown
-                DropdownButtonFormField<DateTime>(
-                  key: ValueKey(
-                    'end_month_${_startMonth.millisecondsSinceEpoch}_${_endMonth.millisecondsSinceEpoch}',
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l10n.endMonthLabel,
-                    prefixIcon: const Icon(Icons.event, color: AppConfig.primaryColor),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  initialValue: _availableMonths.any((m) => m.isAtSameMomentAs(_endMonth))
-                      ? _endMonth
-                      : _availableMonths.last,
-                  items: _availableMonths.where((dt) => !dt.isBefore(_startMonth)).map((dt) {
-                    return DropdownMenuItem(
-                      value: dt,
-                      child: Text(_formatMonthLabel(dt)),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _endMonth = val;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 40),
-
-                ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _generateAndSaveReport,
-                  icon: const Icon(Icons.download),
-                  label: _isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : Text(l10n.downloadReportMenu),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppConfig.secondaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return Container(
+      key: const ValueKey('financial_summary_preview_card'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppConfig.primaryColor.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppConfig.primaryColor.withValues(alpha: 0.18),
         ),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.account_balance_wallet_outlined,
+                color: AppConfig.primaryColor,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                l10n.reportPreviewTitle,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: AppConfig.primaryColor,
+                  fontFamily: AppConfig.fontFamily,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 18),
+          _PreviewLine(
+            label: l10n.openingBalancePreviewLabel,
+            value: fmt(ledger.broughtForwardBalance),
+          ),
+          _PreviewLine(
+            label: l10n.quotaIncomePreviewLabel,
+            value: fmt(ledger.rangeQuotaIncome),
+            valueColor: Colors.blue.shade700,
+          ),
+          _PreviewLine(
+            label: l10n.sanctionIncomePreviewLabel,
+            value: fmt(ledger.rangeSanctionIncome),
+            valueColor: Colors.teal.shade700,
+          ),
+          _PreviewLine(
+            label: l10n.expensesPreviewLabel,
+            value: '-\$${ledger.rangeActiveExpenses.toStringAsFixed(2)}',
+            valueColor: Colors.deepOrange.shade700,
+          ),
+          _PreviewLine(
+            label: l10n.netPeriodBalancePreviewLabel,
+            value: fmt(ledger.rangeNetBalance),
+            valueColor: ledger.rangeNetBalance >= 0
+                ? AppConfig.secondaryColor
+                : AppConfig.dangerColor,
+          ),
+          const Divider(height: 16),
+          _PreviewLine(
+            label: l10n.accumulatedBudgetPreviewLabel,
+            value: fmt(ledger.endingAccumulatedBudget),
+            isTotal: true,
+            valueColor: ledger.endingAccumulatedBudget >= 0
+                ? AppConfig.secondaryColor
+                : AppConfig.dangerColor,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewLine extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool isTotal;
+
+  const _PreviewLine({
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.isTotal = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: isTotal ? 14.5 : 13,
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
+                color: isTotal ? AppConfig.primaryColor : AppConfig.textColor,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isTotal ? 16 : 13.5,
+              fontWeight: FontWeight.bold,
+              color: valueColor ?? AppConfig.textColor,
+              fontFamily: AppConfig.fontFamily,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PublishTransparencyDialog extends StatefulWidget {
+  final String initialTitle;
+
+  const _PublishTransparencyDialog({required this.initialTitle});
+
+  @override
+  State<_PublishTransparencyDialog> createState() =>
+      _PublishTransparencyDialogState();
+}
+
+class _PublishTransparencyDialogState
+    extends State<_PublishTransparencyDialog> {
+  late final TextEditingController _titleController;
+  String _visibility = 'admin';
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.initialTitle);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.publishTransparencyDialogTitle),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppConfig.primaryColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.privacy_tip_outlined,
+                    size: 18,
+                    color: AppConfig.primaryColor,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.publishTransparencyPrivacyNote,
+                      style: const TextStyle(fontSize: 12.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              key: const ValueKey('transparency_report_title_field'),
+              controller: _titleController,
+              decoration: InputDecoration(
+                labelText: l10n.publishTransparencyTitleLabel,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              key: ValueKey('transparency_report_visibility_$_visibility'),
+              initialValue: _visibility,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: l10n.publishTransparencyVisibilityLabel,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              items: [
+                DropdownMenuItem(
+                  value: 'admin',
+                  child: Text(l10n.visibilityAdminOnly),
+                ),
+                DropdownMenuItem(
+                  value: 'all',
+                  child: Text(l10n.visibilityAllResidents),
+                ),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _visibility = val);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.cancel),
+        ),
+        ElevatedButton(
+          key: const ValueKey('confirm_publish_transparency_button'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppConfig.primaryColor,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () {
+            final clean = _titleController.text.trim();
+            if (clean.isEmpty) return;
+            Navigator.of(context).pop((title: clean, visibility: _visibility));
+          },
+          child: Text(l10n.publishTransparencyButtonConfirm),
+        ),
+      ],
     );
   }
 }

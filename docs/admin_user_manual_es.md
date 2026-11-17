@@ -42,9 +42,9 @@ Cuando una categoría del menú lateral está contraída, las notificaciones pen
 El Panel de Administración abre por defecto en **Resumen General** —mostrando **Aprobaciones Pendientes**, **Estado de la Comunidad en Vivo** (**Visitantes actualmente dentro**, visible únicamente cuando **Escanear para salir** está activado en Configuración General, y **Sanciones Activas**; en vista móvil `< 900px`, tanto **Aprobaciones Pendientes** como **Estado de la Comunidad en Vivo** se muestran como secciones desplegables para mantener los **Accesos Rápidos** a la vista), seis tarjetas de **Accesos Rápidos** (*Crear Usuario*, *Directorio de Usuarios*, *Crear Anuncio*, *Subir Pago a Nombre de Usuario*, *Descargar Reporte de Pagos* y *Configuración*) y el botón flotante **Generar Acceso QR** (exclusivo de la vista Resumen General)— y organiza las herramientas en cuatro categorías desplegables más un acceso directo a **Configuración General**:
 * **Gestión de Usuarios**: *Aprobar Residentes*, *Crear Usuario*, *Importación Masiva de Usuarios (CSV)*, *Gestionar Usuarios y Roles*.
 * **Gestión Residencial**: *Gestionar Amenidades*, *Revisar Reservas*, *Historial de Accesos y Bitácora*, *Importación Masiva de Direcciones (CSV)*, *Gestión de Sanciones*.
-* **Finanzas**: *Revisar Pagos Pendientes*, *Subir Pago (Admin)*, *Descargar Reporte de Pagos (CSV)*.
+* **Finanzas**: *Revisar Pagos Pendientes*, *Subir Pago (Admin)*, *Importación Masiva de Pagos (CSV)*, *Gastos Comunitarios*, *Descargar Reporte de Pagos (CSV)*.
 * **Transparencia y Comunidad**: *Gestionar Anuncios*, *Gestionar Documentos de Transparencia*.
-* **Configuración General** *(Acceso directo)*: Tarjetas desplegables con guardado automático en tiempo real (días de corte y gracia, zona horaria, Escanear para salir y motivos de rechazo) y guardado manual para el servidor SMTP y la plantilla de bienvenida.
+* **Configuración General** *(Acceso directo)*: Tarjetas desplegables con guardado automático en tiempo real (días de corte y gracia, zona horaria, Saldo Inicial y periodo efectivo, Escanear para salir y motivos de rechazo) y guardado manual para el servidor SMTP y la plantilla de bienvenida.
 
 ```mermaid
 flowchart TD
@@ -57,7 +57,7 @@ flowchart TD
 
     UM --> UM1["Aprobar Residentes / Crear / CSV / Directorio"]
     RM --> RM1["Amenidades / Reservas / Bitácora / Calles CSV / Sanciones"]
-    Fin --> Fin1["Revisar Pagos / Subir Pago / Reporte CSV"]
+    Fin --> Fin1["Revisar Pagos / Subir Pago / Gastos / Reportes CSV"]
     TC --> TC1["Anuncios / Documentos de Transparencia"]
     GS --> GS1["Corte, Gracia, Salida QR y SMTP"]
 ```
@@ -251,13 +251,27 @@ Cuando un residente realiza su pago directamente en la administración o necesit
 
 ---
 
-### 4.3 Reportes Matriz de Pagos en CSV
-**Navegación:** Panel de Administración $\rightarrow$ **Descargar Reporte de Pagos** (`AdminPaymentReportScreen`)
+### 4.3 Multi-Reporte Financiero y Matriz de Pagos en CSV
+**Navegación:** Panel de Administración $\rightarrow$ **Finanzas** $\rightarrow$ **Descargar Reporte de Pagos** (`AdminPaymentReportScreen`)
 
-Genera una matriz de auditoría financiera completa de todas las propiedades de la comunidad:
+Genera tanto la auditoría privada de pagos por domicilio como el libro mayor del presupuesto acumulado:
 1. Selecciona el **Mes Inicial** y el **Mes Final** (permite consultar hasta 22 meses hacia atrás y 2 meses hacia adelante; por defecto muestra los últimos 6 meses).
-2. Toca **Descargar CSV**.
-3. El sistema evalúa cada domicilio en cada mes del rango seleccionado—tomando en cuenta su `deliveryDate`, pagos multi-periodo aprobados, el `paymentCutoffDay` y los `gracePeriodDays`—y descarga un archivo CSV localizado (`payment_report_AAAA-MM_to_AAAA-MM.csv`) clasificando cada celda como **Pagado**, **Pendiente** o **Vencido**.
+2. Consulta la tarjeta en vivo de **Resumen Financiero** (`Saldo Inicial Arrastrado`, `Ingresos por Cuotas`, `Ingresos por Sanciones`, `Gastos Activos` y `Presupuesto Acumulado Final`, considerando cualquier Saldo Inicial y periodo efectivo configurado en **Configuración General $\rightarrow$ Pagos y Periodo de Gracia**).
+3. Toca **Descargar Paquete de Reportes Financieros** (`Icons.download`) para exportar ambos CSV complementarios en un clic (o descárgalos de forma individual):
+   * **Matriz de Estatus de Pago por Domicilio CSV** (`payment_report_AAAA-MM_to_AAAA-MM.csv`): Reporte privado de uso administrativo que evalúa cada domicilio por mes—tomando en cuenta `deliveryDate`, pagos multi-periodo aprobados, `paymentCutoffDay` y `gracePeriodDays`—clasificando cada celda como **Pagado**, **Pendiente** o **Vencido**.
+   * **Libro Mayor y Presupuesto Acumulado CSV** (`financial_ledger_AAAA-MM_to_AAAA-MM.csv`): Desglose mensual de cuotas aprobadas, multas aprobadas, gastos activos (no anulados), saldo inicial y presupuesto comunitario acumulado.
+4. *(Opcional)* Toca **Publicar Resumen en Transparencia** para compartir un resumen agregado en Markdown dentro de **Transparencia**. **Garantía de Privacidad**: Este documento público incluye únicamente totales agregados y gastos activos; la matriz de estatus de pago por domicilio y los datos de residentes quedan **estrictamente excluidos** y nunca se divulgan públicamente.
+
+### 4.4 Registro y Anulación de Gastos Comunitarios
+**Navegación:** Panel de Administración $\rightarrow$ **Finanzas** $\rightarrow$ **Gastos Comunitarios** (`AdminExpensesScreen`)
+
+Los administradores pueden registrar los egresos operativos del fraccionamiento para mantener un presupuesto acumulado exacto:
+1. Toca **+ Registrar Gasto** para abrir el formulario e ingresar:
+   * Descripción del **Producto / Servicio**, **Monto ($)**, **Periodo Facturable (`AAAA-MM`)** alineado con los periodos de mantenimiento, **Fecha del Gasto** y **Categoría** (`maintenance`, `gardening`, `security`, `utilities`, `repairs`, `supplies`, `other`), además de proveedor y notas opcionales.
+   * **Evidencia del Producto / Servicio Adquirido** *(Obligatoria)*: Fotografía tomada con cámara o seleccionada del dispositivo (`JPG`, `PNG`, `WEBP` de hasta 10 MB).
+   * **Evidencia de Recibo / Factura** *(Obligatoria)*: Imagen o documento (`JPG`, `PNG`, `WEBP`, `PDF` de hasta 10 MB).
+2. Ambas evidencias son verificadas en el servidor mediante propiedad de ruta en Storage y validación binaria de encabezados antes de guardar en `expenses`.
+3. Toca cualquier tarjeta de gasto para abrir `AdminExpenseDetailScreen`, rotar (`90°`) o ampliar imágenes, descargar facturas PDF o **Anular Gasto** registrando un motivo obligatorio (`status: 'voided'`, excluyéndolo del presupuesto mientras se conserva el historial y los archivos de auditoría).
 
 ---
 

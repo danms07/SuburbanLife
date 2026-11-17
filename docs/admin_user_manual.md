@@ -42,9 +42,9 @@ When a sidebar category is collapsed, pending counts roll up onto the category h
 The Admin Workspace opens on **Overview**—displaying **Pending Approvals**, **Live Community Status** (**Visitors currently inside**, shown only when **Scan on exit** is enabled in General Settings, and **Active Sanctions**; on mobile `< 900px`, both **Pending Approvals** and **Live Community Status** become expandable/collapsible cards so **Shortcuts** remain immediately accessible), six **Shortcuts** cards (*Create User*, *User Directory*, *Create Announcement*, *Upload Payment on Behalf*, *Download Payment Report*, and *Settings*), and a floating **Generate Access QR** button (shown exclusively on the Overview screen)—and organizes all modules into four collapsible sidebar groups plus a direct single-tap **General Settings** item:
 * **User Management**: *Approve Residents*, *Create User*, *Bulk User Import (CSV)*, *Manage Users & Roles*.
 * **Residential Management**: *Manage Amenities*, *Review Bookings*, *Access History & Logs*, *Bulk Address Import (CSV)*, *Sanctions Management*.
-* **Finance**: *Review Pending Payments*, *Upload Payment (Admin)*, *Download Payment Report (CSV)*.
+* **Finance**: *Review Pending Payments*, *Upload Payment (Admin)*, *Bulk Payment Import (CSV)*, *Community Expenses*, *Download Payment Report (CSV)*.
 * **Transparency & Community**: *Manage Announcements*, *Manage Transparency Docs*.
-* **General Settings** *(Direct item)*: Expandable/collapsible settings cards with real-time auto-save (cutoff & grace periods, timezone, Scan on exit, rejection templates) and manual saving for SMTP server credentials and custom welcome email templates.
+* **General Settings** *(Direct item)*: Expandable/collapsible settings cards with real-time auto-save (cutoff & grace periods, timezone, Opening Balance & effective period, Scan on exit, rejection templates) and manual saving for SMTP server credentials and custom welcome email templates.
 
 ```mermaid
 flowchart TD
@@ -57,7 +57,7 @@ flowchart TD
 
     UM --> UM1["Approve Residents / Create / Bulk CSV / Directory"]
     RM --> RM1["Amenities / Bookings / Access Logs / Address CSV / Sanctions"]
-    Fin --> Fin1["Review Payments / Upload on Behalf / Report CSV"]
+    Fin --> Fin1["Review Payments / Upload / Expenses / Multi-Report Bundle"]
     TC --> TC1["Announcements / Transparency Docs"]
     GS --> GS1["Cutoff, Grace, Scan on Exit & SMTP"]
 ```
@@ -251,13 +251,27 @@ When a resident pays in person, by bank transfer directly to administration, or 
 
 ---
 
-### 4.3 Payment Matrix CSV Reports
-**Navigation:** Admin Panel $\rightarrow$ **Download Payment Report** (`AdminPaymentReportScreen`)
+### 4.3 Multi-Report Financial Bundle & Matrix Exports
+**Navigation:** Admin Panel $\rightarrow$ **Finance** $\rightarrow$ **Download Payment Report** (`AdminPaymentReportScreen`)
 
-Generate a complete financial audit matrix across all community addresses:
+Generate both private resident audit reports and accumulated budget ledgers across a selected date window:
 1. Select the **Start Month** and **End Month** (supports up to 22 months in the past and 2 months into the future; defaults to a 6-month window).
-2. Tap **Download CSV**.
-3. The system evaluates every address against every month in your selected range—accounting for each property's `deliveryDate`, approved multi-period payments, the global `paymentCutoffDay`, and `gracePeriodDays`—and downloads a localized CSV spreadsheet (`payment_report_YYYY-MM_to_YYYY-MM.csv`) classifying each cell as **Paid**, **Pending**, or **Past Due**.
+2. Inspect the live **Financial Summary Preview** (`Brought-Forward Balance`, `Maintenance Quota Income`, `Sanction Income`, `Active Expenses`, and `Ending Accumulated Budget`, incorporating any optional Opening Balance & effective period configured under **General Settings $\rightarrow$ Payment & Grace Period**).
+3. Tap **Download Financial Report Bundle** (`Icons.download`) to export two companion CSV spreadsheets in one click (or export either CSV separately):
+   * **Address Payment Status Matrix CSV** (`payment_report_YYYY-MM_to_YYYY-MM.csv`): Private admin-only matrix evaluating every physical address against each month—accounting for `deliveryDate`, approved multi-period quotas, `paymentCutoffDay`, and `gracePeriodDays`—classifying each cell as **Paid**, **Pending**, or **Past Due**.
+   * **Financial Ledger & Accumulated Budget Summary CSV** (`financial_ledger_YYYY-MM_to_YYYY-MM.csv`): Monthly breakdown of approved maintenance quotas, approved sanction fines, active (non-voided) expenses, opening balance, and running accumulated community budget.
+4. *(Optional)* Tap **Publish Summary to Transparency** to share an aggregated Markdown summary into **Transparency**. **Privacy Guarantee**: This public summary contains only aggregated totals and active expense descriptions; the address payment status matrix and resident details are **strictly excluded** and never published.
+
+### 4.4 Recording & Voiding Community Expenses
+**Navigation:** Admin Panel $\rightarrow$ **Finance** $\rightarrow$ **Community Expenses** (`AdminExpensesScreen`)
+
+Administrators can record community operational spending so financial reports compute exact accumulated balances:
+1. Tap **+ Record Expense** to open the creation modal and enter:
+   * **Product / Service** description (e.g., *Gardening Service — Common Areas*), **Amount ($)**, **Billable Period (`YYYY-MM`)** aligned with monthly maintenance periods, **Expense Date**, and **Category** (`maintenance`, `gardening`, `security`, `utilities`, `repairs`, `supplies`, `other`), plus optional vendor name and notes.
+   * **Evidence of Acquired Product / Service** *(Required)*: Photo captured via camera or selected from device (`JPG`, `PNG`, `WEBP` up to 10 MB).
+   * **Receipt / Invoice Evidence** *(Required)*: Image or document (`JPG`, `PNG`, `WEBP`, `PDF` up to 10 MB).
+2. Both evidences are verified server-side via Storage path ownership and binary magic-byte checks before saving to `expenses`.
+3. Tap any expense card to open `AdminExpenseDetailScreen`, inspect or rotate (`90°`) image proofs inline or full-screen, download PDF invoices, or **Void Expense** with a mandatory audit reason (`status: 'voided'`, excluding it from budget totals while preserving its audit trail and files).
 
 ---
 

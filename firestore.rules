@@ -220,6 +220,11 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /expenses/{expenseId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /facilities/{facilityId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
