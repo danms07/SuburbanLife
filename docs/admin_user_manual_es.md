@@ -168,27 +168,29 @@ Cuando un usuario se registra por su cuenta y reclama un domicilio disponible, s
 ### 3.4 Directorio de Usuarios y Gestión de Roles
 **Navegación:** Panel de Administración $\rightarrow$ **Gestionar Usuarios** (`AdminUserManagementScreen`)
 
-El directorio **Gestionar Usuarios** brinda visibilidad y control total sobre todas las cuentas registradas en la comunidad.
+El directorio **Gestionar Usuarios** brinda visibilidad y control total sobre todas las cuentas registradas en la comunidad—incluyendo cuentas en Firebase Authentication que aún no concluyen su registro inicial (*onboarding*).
 
 #### Búsqueda, Filtros y Paginación
-* **Búsqueda en Toda la Base de Datos**: Busca en toda la colección `users` por **Nombre**, **Correo** o **Dirección** (con filtro automático en tiempo real).
+* **Búsqueda en Toda la Base de Datos**: Busca en la combinación de cuentas de Firebase Authentication (`adminListAuthUsers` mediante `getAuth().listUsers()`) y perfiles de Firestore `users` por **Nombre**, **Correo** o **Dirección** (con filtro automático en tiempo real).
 * **Filtro por Calle**: Filtra el directorio para mostrar únicamente los residentes de una calle específica.
 * **Filtro por Rol**: Filtra mediante botones segmentados por **Todos**, **Residente**, **Roommate**, **Admin** o **Guardia**.
+* **Filtro de Registro Incompleto (`Registro incompleto`)**: Activa este chip para aislar cuentas creadas en Firebase Authentication sin perfil completo en Firestore o cuentas no administrativas aún sin `addressRef` vinculado.
 * **Paginación por Cursor**: Al explorar sin filtros activos, los usuarios se cargan en bloques de 20. Toca **Cargar Más Usuarios** al final de la lista para obtener el siguiente bloque.
 
 #### Información en cada Tarjeta de Resumen de Usuario
 Para evitar toques accidentales al desplazarse por el directorio, cada usuario en la lista se muestra como una tarjeta de resumen compacta **sin botones de acción directos**, mostrando:
-* **Nombre Completo**, **Correo Electrónico** e **Insignia de Rol** (`ADMIN`, `GUARD`, `RESIDENT`, `ROOMMATE` o `UNVERIFIED`).
-* **Domicilio Vinculado** (`Calle #Número`) e **Insignia de Estatus de Pago en Tiempo Real** (`Pagado`, `Pendiente`, `En Revisión` o `Restringido`).
+* **Nombre Completo**, **Correo Electrónico**, **Insignia de Rol** (`ADMIN`, `GUARD`, `RESIDENT`, `ROOMMATE` o `UNVERIFIED`) e insignia **Registro incompleto** cuando falte completar su alta.
+* **Domicilio Vinculado** (`Calle #Número`) e **Insignia de Estatus de Pago en Tiempo Real** (`Pagado`, `Pendiente`, `En Revisión` o `Restringido`)—o aviso de cuenta solo en Autenticación cuando aún no exista perfil en Firestore.
 * **Fecha de Entrega de la Propiedad**: Muestra la fecha registrada de entrega de la vivienda (o `Sin definir`).
 
 #### Pantalla Dedicada de Datos de la Cuenta (`AdminUserDetailScreen`)
-Toca cualquier tarjeta de usuario para abrir **Datos de la Cuenta**, la cual separa las acciones habituales de las acciones sensibles:
-1. **Cambiar Contraseña de Usuario** (`Icons.lock_reset`): Restablece la contraseña del usuario en Firebase Authentication (`adminUpdatePassword`) validando los requisitos de seguridad.
-2. **Promover a Admin / Revocar Admin** (`Icons.security` / `Icons.shield_outlined`): Otorga o revoca el rol `admin` mediante `setCustomUserClaims`. *(Oculto en cuentas de Guardias de Seguridad para evitar conversiones sin domicilio, y la auto-revocación está bloqueada para evitar bloqueos accidentales; utiliza el botón **Renunciar al Rol de Administrador** en la barra superior si deseas dejar el cargo).*
-3. **Definir / Editar Fecha de Entrega** (`Icons.edit_calendar`): Abre un selector de fecha para definir o actualizar la `deliveryDate` del domicilio vinculado sin modificar su `paymentStatus` actual (los pagos pendientes son evaluados exclusivamente por la Cloud Function programada diaria `checkMonthlyPaymentStatuses`).
-4. **Desvincular Dirección** *(Acciones Sensibles — `Icons.link_off`)*: Desvincula tras confirmación al propietario (y a sus roommates asociados) del domicilio actual, liberando la propiedad (`unbindAddress`).
-5. **Eliminar Cuenta** *(Acciones Sensibles — `Icons.delete_forever`)*: Elimina permanentemente tras confirmación la cuenta de Firebase Authentication y Firestore (`adminDeleteUser`), liberando cualquier propiedad vinculada y regresando automáticamente al directorio. *(La auto-eliminación está bloqueada).*
+Toca cualquier tarjeta de usuario para abrir **Datos de la Cuenta**, la cual muestra avisos de registro incompleto cuando aplique y separa las acciones habituales de las acciones sensibles:
+1. **Actualizar Correo de Usuario** (`Icons.alternate_email`): Actualiza el correo de acceso del usuario en Firebase Authentication (`adminUpdateEmail` mediante `getAuth().updateUser()`) y sincroniza `users/{uid}.email` si existe su perfil en Firestore.
+2. **Cambiar Contraseña de Usuario** (`Icons.lock_reset`): Restablece la contraseña del usuario en Firebase Authentication (`adminUpdatePassword`) validando los requisitos de seguridad.
+3. **Promover a Admin / Revocar Admin** (`Icons.security` / `Icons.shield_outlined`): Otorga o revoca el rol `admin` mediante `setCustomUserClaims`. *(Oculto en cuentas de Guardias de Seguridad para evitar conversiones sin domicilio, y la auto-revocación está bloqueada para evitar bloqueos accidentales; utiliza el botón **Renunciar al Rol de Administrador** en la barra superior si deseas dejar el cargo).*
+4. **Definir / Editar Fecha de Entrega** (`Icons.edit_calendar`): Abre un selector de fecha para definir o actualizar la `deliveryDate` del domicilio vinculado sin modificar su `paymentStatus` actual (los pagos pendientes son evaluados exclusivamente por la Cloud Function programada diaria `checkMonthlyPaymentStatuses`).
+5. **Desvincular Dirección** *(Acciones Sensibles — `Icons.link_off`)*: Desvincula tras confirmación al propietario (y a sus roommates asociados) del domicilio actual, liberando la propiedad (`unbindAddress`).
+6. **Eliminar Cuenta** *(Acciones Sensibles — `Icons.delete_forever`)*: Elimina permanentemente tras confirmación la cuenta de Firebase Authentication y Firestore (`adminDeleteUser`), liberando cualquier propiedad vinculada y regresando automáticamente al directorio. *(La auto-eliminación está bloqueada).*
 
 ---
 

@@ -5273,6 +5273,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Publish'**
   String get publishTransparencyButtonConfirm;
+
+  /// No description provided for @updateEmailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update User Email'**
+  String get updateEmailTitle;
+
+  /// No description provided for @newEmailLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New Email'**
+  String get newEmailLabel;
+
+  /// No description provided for @emailUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'User email updated successfully.'**
+  String get emailUpdatedSuccess;
+
+  /// No description provided for @invalidEmailError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid email address.'**
+  String get invalidEmailError;
+
+  /// No description provided for @onboardingIncompleteBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Onboarding Incomplete'**
+  String get onboardingIncompleteBadge;
+
+  /// No description provided for @incompleteOnboardingFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Onboarding Pending'**
+  String get incompleteOnboardingFilter;
+
+  /// No description provided for @onboardingIncompleteDetailsNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'This user has not finished onboarding yet.'**
+  String get onboardingIncompleteDetailsNotice;
+
+  /// No description provided for @authOnlyAccountNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Auth account only (profile not created yet).'**
+  String get authOnlyAccountNotice;
 }
 
 class _AppLocalizationsDelegate

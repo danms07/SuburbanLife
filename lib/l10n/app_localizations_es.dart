@@ -2942,4 +2942,32 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get publishTransparencyButtonConfirm => 'Publicar';
+
+  @override
+  String get updateEmailTitle => 'Actualizar Correo de Usuario';
+
+  @override
+  String get newEmailLabel => 'Nuevo Correo Electrónico';
+
+  @override
+  String get emailUpdatedSuccess =>
+      'Correo de usuario actualizado exitosamente.';
+
+  @override
+  String get invalidEmailError =>
+      'Por favor ingresa un correo electrónico válido.';
+
+  @override
+  String get onboardingIncompleteBadge => 'Registro Incompleto';
+
+  @override
+  String get incompleteOnboardingFilter => 'Registro Pendiente';
+
+  @override
+  String get onboardingIncompleteDetailsNotice =>
+      'Este usuario aún no ha completado su registro inicial.';
+
+  @override
+  String get authOnlyAccountNotice =>
+      'Solo cuenta de autenticación (sin perfil creado aún).';
 }

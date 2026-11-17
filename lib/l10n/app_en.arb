@@ -1312,5 +1312,13 @@
   "publishTransparencyTitleLabel": "Document Title",
   "publishTransparencyVisibilityLabel": "Visibility",
   "publishTransparencySuccess": "Financial summary published to Transparency!",
-  "publishTransparencyButtonConfirm": "Publish"
+  "publishTransparencyButtonConfirm": "Publish",
+  "updateEmailTitle": "Update User Email",
+  "newEmailLabel": "New Email",
+  "emailUpdatedSuccess": "User email updated successfully.",
+  "invalidEmailError": "Please enter a valid email address.",
+  "onboardingIncompleteBadge": "Onboarding Incomplete",
+  "incompleteOnboardingFilter": "Onboarding Pending",
+  "onboardingIncompleteDetailsNotice": "This user has not finished onboarding yet.",
+  "authOnlyAccountNotice": "Auth account only (profile not created yet)."
 }

@@ -1179,5 +1179,13 @@
   "publishTransparencyTitleLabel": "Título del Documento",
   "publishTransparencyVisibilityLabel": "Visibilidad",
   "publishTransparencySuccess": "¡Resumen financiero publicado en Transparencia!",
-  "publishTransparencyButtonConfirm": "Publicar"
+  "publishTransparencyButtonConfirm": "Publicar",
+  "updateEmailTitle": "Actualizar Correo de Usuario",
+  "newEmailLabel": "Nuevo Correo Electrónico",
+  "emailUpdatedSuccess": "Correo de usuario actualizado exitosamente.",
+  "invalidEmailError": "Por favor ingresa un correo electrónico válido.",
+  "onboardingIncompleteBadge": "Registro Incompleto",
+  "incompleteOnboardingFilter": "Registro Pendiente",
+  "onboardingIncompleteDetailsNotice": "Este usuario aún no ha completado su registro inicial.",
+  "authOnlyAccountNotice": "Solo cuenta de autenticación (sin perfil creado aún)."
 }

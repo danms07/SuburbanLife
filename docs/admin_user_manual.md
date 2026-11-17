@@ -168,27 +168,29 @@ When a self-registered user claims an unlinked address in the app, they upload a
 ### 3.4 User Directory & Role Management
 **Navigation:** Admin Panel $\rightarrow$ **Manage Users** (`AdminUserManagementScreen`)
 
-The **Manage Users** directory gives administrators full visibility and control over every account in the community.
+The **Manage Users** directory gives administrators full visibility and control over every account in the community—including Firebase Authentication accounts whose onboarding is still incomplete.
 
 #### Search, Filtering & Pagination
-* **Whole-Database Search Bar**: Search across the entire Firestore `users` collection by **Name**, **Email**, or **Address** (with automatic debounce).
+* **Whole-Database Search Bar**: Search across all merged Firebase Auth accounts (`adminListAuthUsers` using `getAuth().listUsers()`) and Firestore `users` profiles by **Name**, **Email**, or **Address** (with automatic debounce).
 * **Street Filter Dropdown**: Filter the directory to show only residents on a specific street.
 * **Role Segmented Filter**: Filter by **All**, **Resident**, **Roommate**, **Admin**, or **Guard**.
+* **Incomplete Onboarding Filter (`Onboarding Incomplete`)**: Toggle the `FilterChip` to isolate registered accounts that have not yet finished onboarding (accounts present in Firebase Auth without a Firestore `users` profile yet, or non-staff accounts without a linked `addressRef`).
 * **Cursor Pagination**: When browsing unfiltered results, users load in pages of 20. Tap **Load More Users** at the bottom of the list to fetch the next batch.
 
 #### User Summary Card Information
 To prevent accidental misclicks while browsing or scrolling, each user in the directory list renders as a compact summary card **without inline action buttons**, displaying:
-* **Full Name**, **Email**, and **Role Badge** (`ADMIN`, `GUARD`, `RESIDENT`, `ROOMMATE`, or `UNVERIFIED`).
-* **Linked Address** (`Street #Number`) and **Real-Time Payment Status Badge** (`Paid`, `Pending`, `Reviewing`, or `Restricted`).
+* **Full Name**, **Email**, **Role Badge** (`ADMIN`, `GUARD`, `RESIDENT`, `ROOMMATE`, or `UNVERIFIED`), and an **Onboarding Incomplete** badge when setup is unfinished.
+* **Linked Address** (`Street #Number`) and **Real-Time Payment Status Badge** (`Paid`, `Pending`, `Reviewing`, or `Restricted`)—or an Auth-only indicator when no Firestore profile exists yet.
 * **Property Delivery Date**: Shows the recorded handover date for the resident's property (or `Not configured`).
 
 #### Dedicated User Account Details Screen (`AdminUserDetailScreen`)
-Tap any user summary card to open **User Account Details**, which separates standard operations from sensitive actions:
-1. **Change User Password** (`Icons.lock_reset`): Force-resets the user's Firebase Authentication password (`adminUpdatePassword`). Requires a strong password.
-2. **Promote to Admin / Revoke Admin** (`Icons.security` / `Icons.shield_outlined`): Grants or revokes the `admin` role via `setCustomUserClaims`. *(Hidden on Security Guard accounts to prevent addressless role conversion, and self-demotion is blocked here to prevent accidental lockouts; use the AppBar **Resign Admin** button if stepping down).*
-3. **Set / Edit Delivery Date** (`Icons.edit_calendar`): Opens a date picker to set or update the `deliveryDate` on the user's linked address without altering its current `paymentStatus` (pending payments are evaluated exclusively by the daily scheduled `checkMonthlyPaymentStatuses` Cloud Function).
-4. **Unbind Address** *(Sensitive Actions — `Icons.link_off`)*: Detaches the resident (and any associated roommates) from their current address after confirmation, resetting the unit to unclaimed status (`unbindAddress`).
-5. **Remove Account** *(Sensitive Actions — `Icons.delete_forever`)*: Permanently deletes the user from Firebase Authentication and Firestore (`adminDeleteUser`) after confirmation, unbinding any linked property and returning automatically to the directory. *(Self-deletion is blocked).*
+Tap any user summary card to open **User Account Details**, which displays an onboarding status banner if setup is incomplete and separates standard operations from sensitive actions:
+1. **Update User Email** (`Icons.alternate_email`): Updates the user's sign-in email in Firebase Authentication (`adminUpdateEmail` via `getAuth().updateUser()`) and synchronizes `users/{uid}.email` when a Firestore profile exists.
+2. **Change User Password** (`Icons.lock_reset`): Force-resets the user's Firebase Authentication password (`adminUpdatePassword`). Requires a strong password.
+3. **Promote to Admin / Revoke Admin** (`Icons.security` / `Icons.shield_outlined`): Grants or revokes the `admin` role via `setCustomUserClaims`. *(Hidden on Security Guard accounts to prevent addressless role conversion, and self-demotion is blocked here to prevent accidental lockouts; use the AppBar **Resign Admin** button if stepping down).*
+4. **Set / Edit Delivery Date** (`Icons.edit_calendar`): Opens a date picker to set or update the `deliveryDate` on the user's linked address without altering its current `paymentStatus` (pending payments are evaluated exclusively by the daily scheduled `checkMonthlyPaymentStatuses` Cloud Function).
+5. **Unbind Address** *(Sensitive Actions — `Icons.link_off`)*: Detaches the resident (and any associated roommates) from their current address after confirmation, resetting the unit to unclaimed status (`unbindAddress`).
+6. **Remove Account** *(Sensitive Actions — `Icons.delete_forever`)*: Permanently deletes the user from Firebase Authentication and Firestore (`adminDeleteUser`) after confirmation, unbinding any linked property and returning automatically to the directory. *(Self-deletion is blocked).*
 
 ---
 

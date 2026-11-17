@@ -33,7 +33,9 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   String _searchQuery = '';
   String _selectedStreet = 'all';
   String _selectedRole = 'all';
+  bool _onlyIncompleteOnboarding = false;
   List<String> _availableStreets = [];
+  List<Map<String, dynamic>> _authUsers = [];
 
   @override
   void initState() {
@@ -76,6 +78,24 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     }
   }
 
+  /// Fetches Firebase Authentication accounts via `adminListAuthUsers` (`getAuth().listUsers()`),
+  /// allowing the directory to display users who have not completed onboarding.
+  Future<List<Map<String, dynamic>>> _fetchAuthUsers() async {
+    try {
+      final response = await FunctionsService().callFunction('adminListAuthUsers');
+      if (response is Map && response['users'] is List) {
+        return (response['users'] as List)
+            .whereType<Map>()
+            .map((entry) => Map<String, dynamic>.from(entry))
+            .toList();
+      }
+    } catch (e, stack) {
+      debugPrint('Error fetching auth users list: $e');
+      Backend.crashlytics.recordError(e, stack, reason: 'AdminUserManagementScreen._fetchAuthUsers');
+    }
+    return const [];
+  }
+
   /// Fetches address documents for any users in the list that are not yet in `_addressCache`.
   Future<void> _fetchAddressesForUsers(List<Map<String, dynamic>> userDocs) async {
     final List<String> addressIdsToFetch = [];
@@ -104,11 +124,89 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   /// Checks if any search or filter criteria is actively applied.
   bool get _hasActiveFilter =>
-      _searchQuery.isNotEmpty || _selectedStreet != 'all' || _selectedRole != 'all';
+      _searchQuery.isNotEmpty ||
+      _selectedStreet != 'all' ||
+      _selectedRole != 'all' ||
+      _onlyIncompleteOnboarding;
 
-  /// Loads users from the database.
+  /// Merges Firestore `users` documents with Firebase Auth records from `adminListAuthUsers`,
+  /// surfacing Auth-only accounts that have not finished onboarding without breaking batch pagination.
+  List<Map<String, dynamic>> _mergeDirectoryUsers(
+    List<Map<String, dynamic>> firestoreDocs,
+    List<Map<String, dynamic>> authUsers,
+  ) {
+    final authByUid = <String, Map<String, dynamic>>{};
+    for (final authUser in authUsers) {
+      final uid = (authUser['uid'] ?? '').toString().trim();
+      if (uid.isNotEmpty) {
+        authByUid[uid] = authUser;
+      }
+    }
+
+    final seenUids = <String>{};
+    final merged = <Map<String, dynamic>>[];
+
+    for (final doc in firestoreDocs) {
+      final uid = (doc['id'] ?? doc['uid'] ?? '').toString().trim();
+      if (uid.isNotEmpty) {
+        seenUids.add(uid);
+      }
+      final enriched = Map<String, dynamic>.from(doc);
+      enriched['hasFirestoreProfile'] = true;
+
+      final authMeta = authByUid[uid];
+      if (authMeta != null) {
+        if ((enriched['email'] ?? '').toString().trim().isEmpty &&
+            (authMeta['email'] ?? '').toString().trim().isNotEmpty) {
+          enriched['email'] = authMeta['email'];
+        }
+        if ((enriched['name'] ?? '').toString().trim().isEmpty &&
+            (authMeta['displayName'] ?? '').toString().trim().isNotEmpty) {
+          enriched['name'] = authMeta['displayName'];
+        }
+        enriched['emailVerified'] = authMeta['emailVerified'] == true;
+        enriched['disabled'] = authMeta['disabled'] == true;
+        enriched['createdAt'] ??= authMeta['createdAt'];
+        enriched['lastSignInAt'] ??= authMeta['lastSignInAt'];
+      }
+      merged.add(enriched);
+    }
+
+    for (final authUser in authUsers) {
+      final uid = (authUser['uid'] ?? '').toString().trim();
+      if (uid.isEmpty || seenUids.contains(uid)) continue;
+      // If server metadata confirms a Firestore profile exists, avoid pulling page 2+ docs
+      // prematurely during unfiltered pagination; full-DB filters already load all Firestore docs.
+      if (authUser['hasFirestoreProfile'] == true) continue;
+
+      seenUids.add(uid);
+      final email = (authUser['email'] ?? '').toString().trim();
+      final displayName = (authUser['displayName'] ?? '').toString().trim();
+      final role = (authUser['role'] ?? 'resident').toString().trim().toLowerCase();
+
+      merged.add({
+        'id': uid,
+        'uid': uid,
+        'name': displayName.isNotEmpty
+            ? displayName
+            : (email.isNotEmpty ? email.split('@').first : uid),
+        'email': email,
+        'role': role.isNotEmpty ? role : 'resident',
+        'addressRef': null,
+        'hasFirestoreProfile': false,
+        'emailVerified': authUser['emailVerified'] == true,
+        'disabled': authUser['disabled'] == true,
+        'createdAt': authUser['createdAt'],
+        'lastSignInAt': authUser['lastSignInAt'],
+      });
+    }
+
+    return merged;
+  }
+
+  /// Loads users from Firestore and Firebase Auth (`adminListAuthUsers`).
   /// When search or filters are active (`hasActiveFilter`), queries the entire database.
-  /// When no filters are active, loads in batches of 20 with pagination support.
+  /// When no filters are active, loads Firestore in batches of 20 plus any Auth-only users.
   Future<void> _loadUsers({bool isRefresh = false}) async {
     final hasFilter = _hasActiveFilter;
 
@@ -127,20 +225,25 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         filters = [QueryFilter('role', FilterOperator.equal, _selectedRole)];
       }
 
-      // If filters or search are active, query without batch limit so all matches across the whole DB are inspected.
-      // If browsing without filters, load the first batch of 20 users.
-      final docs = await DatabaseService().getCollection(
+      // Refresh Auth user directory on initial load/refresh (or reuse cached list on minor filter edits).
+      final docsFuture = DatabaseService().getCollection(
         'users',
         filters: filters,
         sorts: filters == null ? [QuerySort('name', descending: false)] : null,
         limit: hasFilter ? null : _batchSize,
       );
+      final authFuture =
+          (isRefresh || _authUsers.isEmpty) ? _fetchAuthUsers() : Future.value(_authUsers);
+
+      final resultsPair = await Future.wait([docsFuture, authFuture]);
+      final docs = resultsPair[0];
+      _authUsers = resultsPair[1];
 
       await _fetchAddressesForUsers(docs);
 
-      List<Map<String, dynamic>> results = docs;
+      List<Map<String, dynamic>> merged = _mergeDirectoryUsers(docs, _authUsers);
       if (hasFilter) {
-        results = docs.where(_matchesFilter).toList()
+        merged = merged.where(_matchesFilter).toList()
           ..sort((a, b) => (a['name'] ?? '')
               .toString()
               .toLowerCase()
@@ -149,7 +252,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
       if (mounted) {
         setState(() {
-          _users = results;
+          _users = merged;
           _hasMore = !hasFilter && docs.length == _batchSize;
           if (!hasFilter && docs.isNotEmpty) {
             _lastDocId = (docs.last['id'] ?? docs.last['uid'])?.toString();
@@ -186,9 +289,17 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
       await _fetchAddressesForUsers(docs);
 
+      final existingUids = _users
+          .map((u) => (u['id'] ?? u['uid'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final nextBatch = _mergeDirectoryUsers(docs, const [])
+          .where((u) => !existingUids.contains((u['id'] ?? u['uid'] ?? '').toString()))
+          .toList();
+
       if (mounted) {
         setState(() {
-          _users.addAll(docs);
+          _users.addAll(nextBatch);
           _hasMore = docs.length == _batchSize;
           if (docs.isNotEmpty) {
             _lastDocId = (docs.last['id'] ?? docs.last['uid'])?.toString();
@@ -244,6 +355,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   /// Determines if a user document matches all current filter criteria.
   bool _matchesFilter(Map<String, dynamic> doc) {
+    // 0. Onboarding status filter
+    if (_onlyIncompleteOnboarding && !_isUserOnboardingIncomplete(doc)) {
+      return false;
+    }
+
     // 1. Role filter
     if (_selectedRole != 'all') {
       final role = (doc['role'] ?? 'resident').toString().toLowerCase();
@@ -294,6 +410,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       _searchQuery = '';
       _selectedStreet = 'all';
       _selectedRole = 'all';
+      _onlyIncompleteOnboarding = false;
     });
     _loadUsers();
   }
@@ -633,6 +750,41 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                         ),
                       ),
 
+                    // Onboarding Incomplete Filter Chip
+                    FilterChip(
+                      key: const ValueKey('onboarding_incomplete_filter_chip'),
+                      avatar: Icon(
+                        Icons.pending_actions_outlined,
+                        size: 16,
+                        color: _onlyIncompleteOnboarding ? Colors.white : Colors.orange.shade800,
+                      ),
+                      label: Text(
+                        l10n.incompleteOnboardingFilter,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _onlyIncompleteOnboarding ? Colors.white : Colors.orange.shade900,
+                        ),
+                      ),
+                      selected: _onlyIncompleteOnboarding,
+                      showCheckmark: false,
+                      selectedColor: Colors.orange.shade700,
+                      backgroundColor: Colors.orange.shade50,
+                      side: BorderSide(
+                        color: _onlyIncompleteOnboarding
+                            ? Colors.orange.shade700
+                            : Colors.orange.shade300,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onSelected: (selected) {
+                        setState(() {
+                          _onlyIncompleteOnboarding = selected;
+                        });
+                        _loadUsers();
+                      },
+                    ),
+
                     // Clear Filters Action Button
                     if (hasActiveFilter)
                       TextButton.icon(
@@ -732,6 +884,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     final name = (doc['name'] ?? 'Unknown').toString();
     final email = (doc['email'] ?? '').toString();
     final role = (doc['role'] ?? 'resident').toString();
+    final hasFirestoreProfile = doc['hasFirestoreProfile'] != false;
+    final isOnboardingIncomplete = _isUserOnboardingIncomplete(doc);
     final addressDisplay = _getUserAddressDisplay(doc);
     final paymentStatus = _getUserPaymentStatus(doc);
     final deliveryDate = _getUserDeliveryDate(doc);
@@ -777,6 +931,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                         _buildRoleBadge(role, l10n),
                       ],
                     ),
+                    if (isOnboardingIncomplete) ...[
+                      const SizedBox(height: 8),
+                      _buildOnboardingIncompleteBadge(l10n),
+                    ],
                     const SizedBox(height: 10),
                     const Divider(height: 1),
                     const SizedBox(height: 10),
@@ -784,15 +942,23 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     // Address and Payment Standing Row
                     Row(
                       children: [
-                        Icon(Icons.home_outlined, size: 16, color: Colors.grey.shade600),
+                        Icon(
+                          hasFirestoreProfile ? Icons.home_outlined : Icons.person_outline,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            addressDisplay.isNotEmpty ? addressDisplay : l10n.noActiveAddressLinked,
+                            addressDisplay.isNotEmpty
+                                ? addressDisplay
+                                : (hasFirestoreProfile
+                                    ? l10n.noActiveAddressLinked
+                                    : l10n.authOnlyAccountNotice),
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: addressDisplay.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
-                              color: addressDisplay.isNotEmpty ? Colors.black87 : Colors.grey.shade500,
+                              color: addressDisplay.isNotEmpty ? Colors.black87 : Colors.grey.shade600,
                             ),
                           ),
                         ),
@@ -1051,13 +1217,25 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
         },
       });
 
-      await DatabaseService().updateDocument('users', targetUid, {
-        'role': newRole,
-      });
+      if (_userDoc['hasFirestoreProfile'] == false) {
+        await DatabaseService().setDocument('users', targetUid, {
+          'uid': targetUid,
+          'name': (_userDoc['name'] ?? '').toString(),
+          'email': (_userDoc['email'] ?? '').toString(),
+          'role': newRole,
+          'addressRef': null,
+          'familyMembers': const <String>[],
+        });
+      } else {
+        await DatabaseService().updateDocument('users', targetUid, {
+          'role': newRole,
+        });
+      }
 
       if (mounted) {
         setState(() {
           _userDoc['role'] = newRole;
+          _userDoc['hasFirestoreProfile'] = true;
         });
         widget.onUserUpdated?.call(_userDoc, _addressDoc);
         messenger.showSnackBar(
@@ -1085,6 +1263,99 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
         });
       }
     }
+  }
+
+  void _updateEmail(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final targetUid = _userId;
+    final controller = TextEditingController(
+      text: (_userDoc['email'] ?? '').toString(),
+    );
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.updateEmailTitle),
+        content: TextField(
+          key: const ValueKey('user_detail_update_email_field'),
+          controller: controller,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            labelText: l10n.newEmailLabel,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConfig.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final nextEmail = controller.text.trim().toLowerCase();
+              if (!EmailValidator.isValid(nextEmail)) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.invalidEmailError),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext);
+              setState(() {
+                _isProcessing = true;
+              });
+              try {
+                await FunctionsService().callFunction('adminUpdateEmail', {
+                  'uid': targetUid,
+                  'newEmail': nextEmail,
+                });
+                if (mounted) {
+                  setState(() {
+                    _userDoc['email'] = nextEmail;
+                  });
+                  widget.onUserUpdated?.call(_userDoc, _addressDoc);
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.emailUpdatedSuccess),
+                      backgroundColor: AppConfig.secondaryColor,
+                    ),
+                  );
+                }
+              } catch (e, stack) {
+                debugPrint('Error updating email: $e');
+                Backend.crashlytics.recordError(
+                  e,
+                  stack,
+                  reason: 'AdminUserDetailScreen._updateEmail',
+                );
+                if (mounted) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.errorPrefix(e.toString())),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _isProcessing = false;
+                  });
+                }
+              }
+            },
+            child: Text(l10n.save),
+          ),
+        ],
+      ),
+    );
   }
 
   void _changePassword(BuildContext context) {
@@ -1328,6 +1599,8 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
     final isGuard = role == 'guard';
     final addressRef = _userDoc['addressRef'] as DbReference?;
     final hasAddress = addressRef != null;
+    final hasFirestoreProfile = _userDoc['hasFirestoreProfile'] != false;
+    final isOnboardingIncomplete = _isUserOnboardingIncomplete(_userDoc);
 
     final addressDisplay = hasAddress ? _formatAddressDisplay(_addressDoc) : '';
     final paymentStatus = (hasAddress && _addressDoc != null)
@@ -1379,6 +1652,10 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                   _buildRoleBadge(role, l10n),
                 ],
               ),
+              if (isOnboardingIncomplete) ...[
+                const SizedBox(height: 12),
+                _buildOnboardingIncompleteBadge(l10n),
+              ],
               const SizedBox(height: 22),
               const Divider(height: 1),
               const SizedBox(height: 20),
@@ -1419,14 +1696,18 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                       Row(
                         children: [
                           Icon(
-                            Icons.home_outlined,
+                            hasFirestoreProfile ? Icons.home_outlined : Icons.person_outline,
                             size: 20,
                             color: hasAddress ? AppConfig.primaryColor : Colors.grey.shade500,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              addressDisplay.isNotEmpty ? addressDisplay : l10n.noActiveAddressLinked,
+                              addressDisplay.isNotEmpty
+                                  ? addressDisplay
+                                  : (hasFirestoreProfile
+                                      ? l10n.noActiveAddressLinked
+                                      : l10n.authOnlyAccountNotice),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: addressDisplay.isNotEmpty ? FontWeight.bold : FontWeight.normal,
@@ -1438,6 +1719,16 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                             _buildPaymentStandingBadge(l10n, paymentStatus),
                         ],
                       ),
+                      if (isOnboardingIncomplete) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          l10n.onboardingIncompleteDetailsNotice,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ],
                       if (hasAddress) ...[
                         const SizedBox(height: 12),
                         Row(
@@ -1486,6 +1777,20 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                 ),
               ),
               const SizedBox(height: 14),
+
+              OutlinedButton.icon(
+                key: const ValueKey('user_detail_update_email_button'),
+                onPressed: _isProcessing ? null : () => _updateEmail(context),
+                icon: const Icon(Icons.alternate_email, size: 18),
+                label: Text(l10n.updateEmailTitle),
+                style: OutlinedButton.styleFrom(
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size.fromHeight(46),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 12),
 
               OutlinedButton.icon(
                 key: const ValueKey('user_detail_change_password_button'),
@@ -1786,6 +2091,43 @@ Widget _buildPaymentStandingBadge(AppLocalizations l10n, String status) {
     child: Text(
       label,
       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: fg),
+    ),
+  );
+}
+
+bool _isUserOnboardingIncomplete(Map<String, dynamic> userDoc) {
+  final hasFirestoreProfile = userDoc['hasFirestoreProfile'] != false;
+  if (!hasFirestoreProfile) return true;
+  final role = (userDoc['role'] ?? 'resident').toString().toLowerCase();
+  final isStaff = role == 'admin' || role == 'guard';
+  return !isStaff && userDoc['addressRef'] == null;
+}
+
+Widget _buildOnboardingIncompleteBadge(AppLocalizations l10n) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: Colors.orange.shade50,
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: Colors.orange.shade300),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.pending_actions_outlined, size: 13, color: Colors.orange.shade900),
+        const SizedBox(width: 5),
+        Flexible(
+          child: Text(
+            l10n.onboardingIncompleteBadge,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.orange.shade900,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     ),
   );
 }

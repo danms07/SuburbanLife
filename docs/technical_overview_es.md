@@ -77,7 +77,7 @@ flowchart TD
 
 ### 2.3 Para Administradores
 
-* **Directorio Residencial y Mapeo de Viviendas**: Permite buscar y filtrar a todos los residentes en toda la base de datos por nombre, correo electrónico o calle/número, con filtros por calle y herramientas para cambiar roles o restablecer contraseñas, además de lotes de 20 cuentas para navegación sin filtros.
+* **Directorio Residencial y Mapeo de Viviendas**: Permite buscar y filtrar todas las cuentas registradas—incluyendo usuarios en Firebase Authentication que aún no completan su registro inicial (`adminListAuthUsers` con `getAuth().listUsers()`)—por nombre, correo electrónico o calle/número, con filtros por calle, rol o registro incompleto, herramientas para actualizar correo (`adminUpdateEmail` con `getAuth().updateUser()`), cambiar roles o restablecer contraseñas, además de lotes de 20 cuentas para navegación sin filtros.
 * **Historial y Bitácora de Accesos**: Permite realizar búsquedas en todo el historial de la base de datos utilizando filtros por dirección física, rangos de fechas, categoría de visitante y búsqueda por nombre, placas, anfitrión o guardia, además de navegación en lotes de 20 eventos para exploración sin filtros.
 * **Validación de Títulos y Entrega de Propiedades**: Los administradores revisan las actas de entrega o escrituras enviadas por nuevos residentes para validar la posesión legal antes de otorgar privilegios de titular residencial.
 * **Aprobación de Comprobantes y Matriz Financiera**: El equipo administrativo revisa los pagos subidos, aprueba o rechaza comprobantes con retroalimentación y exporta la matriz de cobranza mensual completa en formato CSV para la contabilidad del condominio.
@@ -168,6 +168,7 @@ flowchart TD
   * **Publicación Privada a Transparencia** (`syncTransparencyDocument`): Publica archivos aprobados en Transparencia (`.md`, `.csv`, `.txt`, imágenes, `.pdf`) con control de visibilidad (`'all'` vs. `'admin'`), permitiendo compartir resúmenes financieros agregados en Markdown sin exponer nunca matrices de estado de pago por domicilio.
   * **Traducción Automática con IA** (`translateAnnouncement`): Conecta de forma segura y sin claves manuales con Google Vertex AI (Gemini) para traducir boletines entre español e inglés.
   * **Recalculación Automática de Estatus de Pago** (`onPaymentWritten`): Actualiza el estatus de la vivienda inmediatamente después de que un administrador aprueba un comprobante.
+  * **Directorio Auth y Actualización de Correo Administrativo** (`adminListAuthUsers`, `adminUpdateEmail`): Lista cuentas de Firebase Auth mediante `getAuth().listUsers()` enriquecidas con su estado de registro en Firestore para identificar registros incompletos, y actualiza correos de acceso mediante `getAuth().updateUser()` sincronizando `users/{uid}.email`.
   * **Creación Masiva de Residentes y Direcciones** (`adminBulkImportResidents`, `adminBulkImportAddresses`): Procesa archivos CSV en el servidor, asignando roles y generando contraseñas seguras.
   * **Despacho de Correos Institucionales**: Se comunica de forma segura con el servidor SMTP para enviar contraseñas y avisos de bienvenida.
 

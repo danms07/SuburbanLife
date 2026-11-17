@@ -11,7 +11,7 @@ const { _test } = cloudFunctions;
  * injected via `_test.admin` so callable Cloud Function wrappers (`onCall`)
  * execute end-to-end offline without network calls.
  */
-function createMockAdminEnvironment(initialCollections = {}) {
+function createMockAdminEnvironment(initialCollections = {}, initialAuthUsers = []) {
   const store = new Map();
   for (const [colName, docsObj] of Object.entries(initialCollections)) {
     const colMap = new Map();
@@ -23,7 +23,9 @@ function createMockAdminEnvironment(initialCollections = {}) {
 
   const authClaims = new Map();
   const createdAuthUsers = [];
+  const updatedAuthUsers = [];
   const deletedAuthUids = [];
+  const authUsers = initialAuthUsers.map((u) => structuredClone(u));
   const savedStorageFiles = new Map();
   let autoIdCounter = 1;
 
@@ -260,10 +262,32 @@ function createMockAdminEnvironment(initialCollections = {}) {
     async createUser({ email, password, displayName }) {
       const uid = `auth_uid_${autoIdCounter++}`;
       createdAuthUsers.push({ uid, email, hasPassword: Boolean(password), displayName });
-      return { uid, email, displayName };
+      const created = { uid, email, displayName };
+      authUsers.push(created);
+      return created;
     },
     async updateUser(uid, patch) {
+      updatedAuthUsers.push({ uid, patch: structuredClone(patch) });
+      const idx = authUsers.findIndex((u) => u.uid === uid);
+      if (idx !== -1) {
+        authUsers[idx] = { ...authUsers[idx], ...patch };
+        return authUsers[idx];
+      }
+      if (authUsers.length > 0 && patch?.simulateNotFound) {
+        const err = new Error('User not found');
+        err.code = 'auth/user-not-found';
+        throw err;
+      }
       return { uid, ...patch };
+    },
+    async listUsers(maxResults = 1000, pageToken = undefined) {
+      const startIndex = pageToken ? Number.parseInt(String(pageToken), 10) || 0 : 0;
+      const slice = authUsers.slice(startIndex, startIndex + maxResults);
+      const nextIndex = startIndex + slice.length;
+      return {
+        users: slice,
+        pageToken: nextIndex < authUsers.length ? String(nextIndex) : undefined,
+      };
     },
     async deleteUser(uid) {
       deletedAuthUids.push(uid);
@@ -320,7 +344,9 @@ function createMockAdminEnvironment(initialCollections = {}) {
     store,
     authClaims,
     createdAuthUsers,
+    updatedAuthUsers,
     deletedAuthUids,
+    authUsers,
     savedStorageFiles,
     deletedStoragePaths,
     makeDocRef,
@@ -378,6 +404,8 @@ test('Unauthenticated requests are rejected across all protected callable Cloud 
     ['syncTransparencyDocument', { title: 'Doc', fileName: 'a.pdf', url: 'https://example.com/a.pdf' }, 'permission-denied'],
     ['adminCreateUser', { name: 'A', email: 'a@b.com', password: 'Password1!', role: 'guard' }, 'failed-precondition'],
     ['adminDeleteUser', { uid: 'u1' }, 'failed-precondition'],
+    ['adminUpdateEmail', { uid: 'u1', newEmail: 'new@b.com' }, 'failed-precondition'],
+    ['adminListAuthUsers', {}, 'failed-precondition'],
   ];
 
   for (const [fnName, payload, expectedCode] of expectations) {
@@ -419,6 +447,14 @@ test('RBAC: Non-admin resident cannot escalate privileges or invoke admin/guard 
   await assertHttpsErrorCode(
     fft.wrap(cloudFunctions.syncTransparencyDocument)({ data: { title: 'T', fileName: 'f.pdf', url: 'https://x.test/f.pdf' }, auth: residentAuth }),
     'permission-denied'
+  );
+  await assertHttpsErrorCode(
+    fft.wrap(cloudFunctions.adminUpdateEmail)({ data: { uid: 'other_user', newEmail: 'hack@test.com' }, auth: residentAuth }),
+    'failed-precondition'
+  );
+  await assertHttpsErrorCode(
+    fft.wrap(cloudFunctions.adminListAuthUsers)({ data: {}, auth: residentAuth }),
+    'failed-precondition'
   );
   // Resident cannot unbind a DIFFERENT resident's address
   await assertHttpsErrorCode(
@@ -1824,4 +1860,152 @@ test('createExpense and voidExpense enforce admin RBAC, magic-byte validation, a
     }),
     /Only active expenses/
   );
+});
+
+test('adminListAuthUsers lists all Auth accounts with onboarding status without leaking secret hashes', async (t) => {
+  const addrRef = { id: 'addr_1', path: 'addresses/addr_1' };
+  const env = createMockAdminEnvironment(
+    {
+      users: {
+        resident_complete: {
+          uid: 'resident_complete',
+          name: 'Complete Resident',
+          email: 'complete@test.com',
+          role: 'resident',
+          addressRef: addrRef,
+        },
+        resident_no_address: {
+          uid: 'resident_no_address',
+          name: 'Waiting Address',
+          email: 'waiting@test.com',
+          role: 'resident',
+          addressRef: null,
+        },
+        guard_1: {
+          uid: 'guard_1',
+          name: 'Gate Guard',
+          email: 'guard@test.com',
+          role: 'guard',
+          addressRef: null,
+        },
+      },
+    },
+    [
+      {
+        uid: 'resident_complete',
+        email: 'complete@test.com',
+        displayName: 'Complete Resident',
+        emailVerified: true,
+        disabled: false,
+        passwordHash: 'SECRET_HASH_SHOULD_NOT_LEAK',
+        passwordSalt: 'SECRET_SALT',
+        metadata: { creationTime: '2026-01-01T00:00:00.000Z', lastSignInTime: '2026-02-01T00:00:00.000Z' },
+      },
+      {
+        uid: 'resident_no_address',
+        email: 'waiting@test.com',
+        displayName: 'Waiting Address',
+        emailVerified: false,
+        disabled: false,
+        customClaims: { resident: true },
+        metadata: { creationTime: '2026-01-10T00:00:00.000Z' },
+      },
+      {
+        uid: 'auth_only_1',
+        email: 'unboarded@test.com',
+        displayName: 'New Auth Signup',
+        emailVerified: false,
+        disabled: false,
+        customClaims: {},
+        metadata: { creationTime: '2026-03-01T00:00:00.000Z' },
+      },
+      {
+        uid: 'guard_1',
+        email: 'guard@test.com',
+        displayName: 'Gate Guard',
+        emailVerified: true,
+        disabled: false,
+        customClaims: { guard: true },
+      },
+    ]
+  );
+  installMockAdmin(t, env);
+
+  const listWrapped = fft.wrap(cloudFunctions.adminListAuthUsers);
+  const res = await listWrapped({
+    data: {},
+    auth: { uid: 'admin_1', token: { admin: true } },
+  });
+
+  assert.equal(res.success, true);
+  assert.equal(res.users.length, 4);
+
+  const byUid = new Map(res.users.map((u) => [u.uid, u]));
+  assert.equal(byUid.get('resident_complete').hasFirestoreProfile, true);
+  assert.equal(byUid.get('resident_complete').hasAddress, true);
+  assert.equal(byUid.get('resident_complete').onboardingCompleted, true);
+  assert.equal('passwordHash' in byUid.get('resident_complete'), false);
+  assert.equal('passwordSalt' in byUid.get('resident_complete'), false);
+
+  assert.equal(byUid.get('resident_no_address').hasFirestoreProfile, true);
+  assert.equal(byUid.get('resident_no_address').hasAddress, false);
+  assert.equal(byUid.get('resident_no_address').onboardingCompleted, false);
+
+  assert.equal(byUid.get('auth_only_1').hasFirestoreProfile, false);
+  assert.equal(byUid.get('auth_only_1').hasAddress, false);
+  assert.equal(byUid.get('auth_only_1').onboardingCompleted, false);
+  assert.equal(byUid.get('auth_only_1').email, 'unboarded@test.com');
+
+  assert.equal(byUid.get('guard_1').onboardingCompleted, true);
+});
+
+test('adminUpdateEmail validates input, calls Auth updateUser, and syncs Firestore users doc when present', async (t) => {
+  const env = createMockAdminEnvironment(
+    {
+      users: {
+        user_with_doc: {
+          uid: 'user_with_doc',
+          name: 'Resident With Profile',
+          email: 'old@test.com',
+          role: 'resident',
+        },
+      },
+    },
+    [
+      { uid: 'user_with_doc', email: 'old@test.com', displayName: 'Resident With Profile' },
+      { uid: 'auth_only_uid', email: 'incomplete-old@test.com', displayName: 'Incomplete User' },
+    ]
+  );
+  installMockAdmin(t, env);
+
+  const updateWrapped = fft.wrap(cloudFunctions.adminUpdateEmail);
+  const adminAuth = { uid: 'admin_1', token: { admin: true } };
+
+  // Invalid email rejected
+  await assertHttpsErrorCode(
+    updateWrapped({ data: { uid: 'user_with_doc', newEmail: 'not-an-email' }, auth: adminAuth }),
+    'invalid-argument'
+  );
+
+  // Updates both Auth and Firestore doc when Firestore profile exists
+  const res1 = await updateWrapped({
+    data: { uid: 'user_with_doc', newEmail: '  Updated.Email@Test.com  ' },
+    auth: adminAuth,
+  });
+  assert.equal(res1.success, true);
+  assert.equal(res1.email, 'updated.email@test.com');
+  assert.equal(env.updatedAuthUsers[0].uid, 'user_with_doc');
+  assert.deepEqual(env.updatedAuthUsers[0].patch, { email: 'updated.email@test.com' });
+
+  const updatedDoc = (await env.makeDocRef('users', 'user_with_doc').get()).data();
+  assert.equal(updatedDoc.email, 'updated.email@test.com');
+
+  // Updates Auth-only user cleanly when Firestore users doc does not exist yet
+  const res2 = await updateWrapped({
+    data: { uid: 'auth_only_uid', newEmail: 'new-incomplete@test.com' },
+    auth: adminAuth,
+  });
+  assert.equal(res2.success, true);
+  assert.equal(res2.email, 'new-incomplete@test.com');
+  assert.equal(env.authUsers.find((u) => u.uid === 'auth_only_uid').email, 'new-incomplete@test.com');
 });

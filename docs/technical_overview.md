@@ -77,7 +77,7 @@ flowchart TD
 
 ### 2.3 For Condominium Administrators
 
-* **Resident Directory & Property Mapping**: Administrators can view and search all registered residents across the whole database by name, email, or street address, with street filters, role management, and password reset capabilities, plus 20-user batches when browsing without filters.
+* **Resident Directory & Property Mapping**: Administrators can view and search all registered accounts—including Firebase Auth users who have not yet completed onboarding (`adminListAuthUsers` via `getAuth().listUsers()`)—across the whole database by name, email, or street address, with street/role/incomplete-onboarding filters, email updates (`adminUpdateEmail` via `getAuth().updateUser()`), role management, and password reset capabilities, plus 20-user batches when browsing without filters.
 * **Access History & Audit Logs**: Administrators can search through the entire database history using physical address dropdown filters, date range filters, visitor category chips, and keyword search across visitor names, license plates, resident hosts, guards, and reason notes, plus 20-event batch exploration for unfiltered browsing.
 * **Property Ownership Verification Queue**: Administrators review deed or handover documentation submitted by new residents to confirm genuine homeownership before assigning primary resident privileges.
 * **Payment Approval & Financial Matrix**: Administrative staff can review submitted payment receipts, approve or reject them with feedback, and export complete monthly payment status matrices (CSV) for accounting records.
@@ -170,6 +170,7 @@ flowchart TD
   * **Privacy-Preserving Transparency Sync** (`syncTransparencyDocument`): Publishes approved Transparency files (`.md`, `.csv`, `.txt`, images, `.pdf`) with role visibility gating (`'all'` vs. `'admin'`), enabling aggregated Markdown financial summaries to be shared without ever exposing individual address payment status matrices.
   * **AI Announcement Translation** (`translateAnnouncement`): Calls Google Vertex AI (Gemini) keylessly to translate community bulletins between Spanish and English.
   * **Payment Recalculation Trigger** (`onPaymentWritten`): Automatically re-evaluates house payment status whenever a payment receipt is approved.
+  * **Admin Auth Directory & Account Maintenance** (`adminListAuthUsers`, `adminUpdateEmail`): Lists Firebase Auth accounts via `getAuth().listUsers()` enriched with Firestore onboarding state so admins can audit incomplete sign-ups, and updates account sign-in emails via `getAuth().updateUser()` with synchronized Firestore `users/{uid}.email` profiles.
   * **Bulk Account & Address Creation** (`adminBulkImportResidents`, `adminBulkImportAddresses`): Creates accounts, assigns custom claims, and generates complex passwords securely in bulk.
   * **Automated Welcome Emails**: Connects securely to the administrator's SMTP server to send login instructions upon account provisioning.
 

@@ -1648,6 +1648,149 @@ exports.adminUpdatePassword = onCall(callableOptions, async (request) => {
   }
 });
 
+/**
+ * Validates basic email format and max length aligned with Firestore rules (<= 120 chars).
+ */
+function isValidEmail(email) {
+  if (!email || typeof email !== 'string') return false;
+  const trimmed = email.trim().toLowerCase();
+  if (trimmed.length < 3 || trimmed.length > 120) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+}
+
+/**
+ * Updates a user's Firebase Authentication email via getAuth().updateUser() and keeps
+ * their Firestore `users/{uid}.email` document in sync when present.
+ */
+exports.adminUpdateEmail = onCall(callableOptions, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { uid, newEmail } = request.data || {};
+  if (!uid || !newEmail) {
+    throw new HttpsError('invalid-argument', 'Missing uid or newEmail.');
+  }
+
+  const cleanUid = uid.toString().trim();
+  if (!cleanUid || cleanUid.length > 128 || cleanUid.includes('/')) {
+    throw new HttpsError('invalid-argument', 'Invalid user UID.');
+  }
+
+  const cleanEmail = newEmail.toString().trim().toLowerCase();
+  if (!isValidEmail(cleanEmail)) {
+    throw new HttpsError('invalid-argument', 'Invalid email address format.');
+  }
+
+  try {
+    await admin.auth().updateUser(cleanUid, { email: cleanEmail });
+
+    const userRef = admin.firestore().collection('users').doc(cleanUid);
+    const userSnap = await userRef.get();
+    if (userSnap.exists) {
+      await userRef.update({ email: cleanEmail });
+    }
+
+    return { success: true, uid: cleanUid, email: cleanEmail };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    if (error?.code === 'auth/email-already-exists') {
+      throw new HttpsError('already-exists', 'An account with this email already exists.');
+    }
+    if (error?.code === 'auth/user-not-found') {
+      throw new HttpsError('not-found', 'User account not found.');
+    }
+    if (error?.code === 'auth/invalid-email') {
+      throw new HttpsError('invalid-argument', 'Invalid email address.');
+    }
+    throw new HttpsError('internal', error.message || 'Unable to update user email.');
+  }
+});
+
+/**
+ * Lists Firebase Authentication user accounts via getAuth().listUsers(), enriched with
+ * lightweight Firestore onboarding/profile completion metadata so the admin directory
+ * can surface accounts that have not finished onboarding.
+ */
+exports.adminListAuthUsers = onCall(callableOptions, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const maxBatchSize = 1000;
+  const maxPages = 20;
+
+  try {
+    const usersCol = admin.firestore().collection('users');
+    const usersQuery =
+      typeof usersCol.select === 'function'
+        ? usersCol.select('name', 'email', 'role', 'addressRef')
+        : usersCol;
+    const usersSnap = await usersQuery.get();
+
+    const firestoreUsersByUid = new Map();
+    for (const doc of usersSnap.docs) {
+      firestoreUsersByUid.set(doc.id, doc.data() || {});
+    }
+
+    const mappedUsers = [];
+    let nextPageToken;
+    let pageCount = 0;
+
+    do {
+      const listResult = nextPageToken
+        ? await admin.auth().listUsers(maxBatchSize, nextPageToken)
+        : await admin.auth().listUsers(maxBatchSize);
+
+      for (const userRecord of listResult.users || []) {
+        const claims = userRecord.customClaims || {};
+        const fsData = firestoreUsersByUid.get(userRecord.uid);
+        const hasFirestoreProfile = Boolean(fsData);
+        const derivedClaimRole = claims.admin === true
+          ? 'admin'
+          : (claims.guard === true ? 'guard' : 'resident');
+        const role = (fsData?.role || derivedClaimRole || 'resident').toString().toLowerCase();
+        const hasAddress = Boolean(fsData?.addressRef);
+        const isStaff = role === 'admin' || role === 'guard';
+        const onboardingCompleted = hasFirestoreProfile && (isStaff || hasAddress);
+
+        const createdMs = userRecord.metadata?.creationTime
+          ? Date.parse(userRecord.metadata.creationTime)
+          : NaN;
+        const lastSignInMs = userRecord.metadata?.lastSignInTime
+          ? Date.parse(userRecord.metadata.lastSignInTime)
+          : NaN;
+
+        mappedUsers.push({
+          uid: userRecord.uid,
+          email: (userRecord.email || fsData?.email || '').toString(),
+          displayName: (userRecord.displayName || fsData?.name || '').toString(),
+          emailVerified: Boolean(userRecord.emailVerified),
+          disabled: Boolean(userRecord.disabled),
+          role,
+          hasFirestoreProfile,
+          hasAddress,
+          onboardingCompleted,
+          createdAt: Number.isFinite(createdMs) ? createdMs : null,
+          lastSignInAt: Number.isFinite(lastSignInMs) ? lastSignInMs : null,
+        });
+      }
+
+      nextPageToken = listResult.pageToken;
+      pageCount += 1;
+    } while (nextPageToken && pageCount < maxPages);
+
+    return {
+      success: true,
+      users: mappedUsers,
+      truncated: Boolean(nextPageToken),
+    };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError('internal', error.message || 'Unable to list authentication users.');
+  }
+});
+
 exports.adminCreateUser = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
@@ -4958,6 +5101,7 @@ exports.voidExpense = onCall(callableOptions, async (request) => {
 exports._test = {
   generateSecurePassword,
   isPasswordCompliant,
+  isValidEmail,
   replacePlaceholders,
   getDateInTimezone,
   getNowInTimezone,

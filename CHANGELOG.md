@@ -2,6 +2,17 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.36+37] — 2026-11-17
+
+### Added
+- **Admin Auth User Directory & Onboarding Visibility (`adminListAuthUsers` & `AdminUserManagementScreen`)**:
+  - Added the `adminListAuthUsers` HTTPS callable Cloud Function in `functions/index.js` (protected by `admin` RBAC) using `admin.auth().listUsers()` (`getAuth().listUsers()`) paginated across batches and cross-referenced with Firestore `users` metadata (`hasFirestoreProfile`, `hasAddress`, `onboardingCompleted`) without exposing sensitive fields.
+  - Updated `AdminUserManagementScreen` to fetch and merge Auth users with Firestore `users`, render an `Onboarding Incomplete` badge and Auth-only notice on incomplete accounts (`!hasFirestoreProfile` or non-staff accounts missing `addressRef`), and add an `onboarding_incomplete_filter_chip` (`FilterChip`) to isolate incomplete-onboarding users.
+- **Admin User Email Updates (`adminUpdateEmail` & `AdminUserDetailScreen`)**:
+  - Added `adminUpdateEmail` in `functions/index.js` using `admin.auth().updateUser(uid, { email })` (updating Auth email, validating format via `isValidEmail`, mapping Auth conflict/not-found errors, and syncing `users/{uid}.email` when the Firestore profile exists).
+  - Added `EmailValidator` in `lib/core/backend/backend.dart` and an **Update User Email** action (`user_detail_update_email_button`) in `AdminUserDetailScreen`, plus bilingual localization keys (`updateEmailTitle`, `newEmailLabel`, `emailUpdatedSuccess`, `invalidEmailError`, `onboardingIncompleteBadge`, `incompleteOnboardingFilter`, `onboardingIncompleteDetailsNotice`, `authOnlyAccountNotice`) in `app_en.arb` and `app_es.arb`.
+  - Updated `functions/test/handlers.test.js` and `test/features/admin/admin_user_management_test.dart` with coverage for `adminListAuthUsers`, `adminUpdateEmail`, incomplete-onboarding filtering, and Auth-only profile visibility.
+
 ## [1.0.35+36] — 2026-11-16
 
 ### Added & Fixed

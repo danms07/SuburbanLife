@@ -186,7 +186,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('user_detail_delete_user_button')));
       await tester.pumpAndSettle();
 
-      expect(FakeBackendHelper.functions.callHistory, isEmpty);
+      expect(
+        FakeBackendHelper.functions.callHistory.where((c) => c['name'] != 'adminListAuthUsers'),
+        isEmpty,
+      );
       final selfDoc = await FakeBackendHelper.db.getDocument('users', 'self_admin_uid');
       expect(selfDoc?['role'], equals('admin'));
       expect(find.byType(AdminUserDetailScreen), findsOneWidget);
@@ -304,6 +307,8 @@ void main() {
       // Scroll to and tap the "Load More Users" button
       final loadMoreFinder = find.byIcon(Icons.expand_more);
       await tester.scrollUntilVisible(loadMoreFinder, 500, scrollable: verticalScrollable);
+      await tester.ensureVisible(loadMoreFinder);
+      await tester.pumpAndSettle();
       expect(loadMoreFinder, findsOneWidget);
 
       await tester.tap(loadMoreFinder);
@@ -760,6 +765,171 @@ void main() {
       expect(badgeFinder, findsOneWidget);
       expect(tester.getRect(summaryFinder).right, lessThanOrEqualTo(360.0));
       expect(tester.getRect(badgeFinder).right, lessThanOrEqualTo(360.0));
+    });
+
+    testWidgets('Consumes adminListAuthUsers to list and filter onboarding-incomplete Auth-only users', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FakeBackendHelper.functions.registerHandler('adminListAuthUsers', (params) {
+        return {
+          'success': true,
+          'users': [
+            {
+              'uid': 'user_complete',
+              'email': 'complete@example.com',
+              'displayName': 'Complete Resident',
+              'role': 'resident',
+              'hasFirestoreProfile': true,
+              'hasAddress': true,
+              'onboardingCompleted': true,
+            },
+            {
+              'uid': 'auth_only_incomplete',
+              'email': 'pending.signup@example.com',
+              'displayName': 'Pending Auth Signup',
+              'role': 'resident',
+              'hasFirestoreProfile': false,
+              'hasAddress': false,
+              'onboardingCompleted': false,
+            },
+          ],
+        };
+      });
+
+      FakeBackendHelper.db.seedDocument('addresses', 'addr_done', {
+        'id': 'addr_done',
+        'streetName': 'Calle Catania',
+        'number': '101',
+        'paymentStatus': 'paid',
+      });
+      FakeBackendHelper.db.seedDocument('users', 'user_complete', {
+        'id': 'user_complete',
+        'uid': 'user_complete',
+        'name': 'Complete Resident',
+        'email': 'complete@example.com',
+        'role': 'resident',
+        'addressRef': FakeBackendHelper.db.createReference('addresses', 'addr_done'),
+      });
+
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      expect(
+        FakeBackendHelper.functions.callHistory.any((c) => c['name'] == 'adminListAuthUsers'),
+        isTrue,
+      );
+      expect(find.text('Complete Resident'), findsOneWidget);
+
+      final pendingNameFinder = find.text('Pending Auth Signup');
+      final listScrollable = find.byType(Scrollable).first;
+      await tester.scrollUntilVisible(pendingNameFinder, 250, scrollable: listScrollable);
+      await tester.pumpAndSettle();
+
+      expect(pendingNameFinder, findsOneWidget);
+      expect(find.text('pending.signup@example.com'), findsOneWidget);
+      expect(find.text('Onboarding Incomplete'), findsOneWidget);
+      expect(find.text('Auth account only (profile not created yet).'), findsOneWidget);
+
+      final chipFinder = find.byKey(const ValueKey('onboarding_incomplete_filter_chip'));
+      await tester.scrollUntilVisible(chipFinder, -250, scrollable: listScrollable);
+      await tester.ensureVisible(chipFinder);
+      await tester.pumpAndSettle();
+
+      expect(chipFinder, findsOneWidget);
+      expect(tester.getRect(chipFinder).right, lessThanOrEqualTo(360.0));
+
+      await tester.tap(chipFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pending Auth Signup'), findsOneWidget);
+      expect(find.text('Complete Resident'), findsNothing);
+    });
+
+    testWidgets('Admin can update user email via adminUpdateEmail from AdminUserDetailScreen and directory updates', (tester) async {
+      tester.view.physicalSize = const Size(1200, 3000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FakeBackendHelper.functions.registerHandler('adminListAuthUsers', (params) {
+        return {
+          'success': true,
+          'users': [
+            {
+              'uid': 'auth_pending_1',
+              'email': 'old.pending@example.com',
+              'displayName': 'Carlos Pending',
+              'role': 'resident',
+              'hasFirestoreProfile': false,
+              'hasAddress': false,
+              'onboardingCompleted': false,
+            },
+          ],
+        };
+      });
+      FakeBackendHelper.functions.registerHandler('adminUpdateEmail', (params) {
+        return {
+          'success': true,
+          'uid': params?['uid'],
+          'email': params?['newEmail'],
+        };
+      });
+
+      await tester.pumpWidget(createTestWidget());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('user_card_auth_pending_1')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('user_detail_update_email_button')), findsOneWidget);
+      expect(find.text('This user has not finished onboarding yet.'), findsOneWidget);
+
+      // Open Update User Email dialog
+      await tester.tap(find.byKey(const ValueKey('user_detail_update_email_button')));
+      await tester.pumpAndSettle();
+
+      // Reject invalid email without calling adminUpdateEmail
+      await tester.enterText(
+        find.byKey(const ValueKey('user_detail_update_email_field')),
+        'not-an-email',
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+      expect(
+        FakeBackendHelper.functions.callHistory.any((c) => c['name'] == 'adminUpdateEmail'),
+        isFalse,
+      );
+
+      // Enter valid email and save
+      await tester.enterText(
+        find.byKey(const ValueKey('user_detail_update_email_field')),
+        '  Updated.Carlos@Example.com  ',
+      );
+      await tester.tap(find.text('Save'));
+      await tester.pumpAndSettle();
+
+      expect(
+        FakeBackendHelper.functions.callHistory.any(
+          (c) =>
+              c['name'] == 'adminUpdateEmail' &&
+              c['parameters']?['uid'] == 'auth_pending_1' &&
+              c['parameters']?['newEmail'] == 'updated.carlos@example.com',
+        ),
+        isTrue,
+      );
+      expect(find.text('updated.carlos@example.com'), findsOneWidget);
+
+      // Navigating back updates summary card in directory
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('updated.carlos@example.com'), findsOneWidget);
     });
   });
 }

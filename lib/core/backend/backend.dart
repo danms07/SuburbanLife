@@ -136,6 +136,18 @@ class PasswordValidator {
   }
 }
 
+/// Centralized validator for user email addresses aligned with backend rules.
+class EmailValidator {
+  static final RegExp _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
+  static bool isValid(String? email) {
+    if (email == null) return false;
+    final trimmed = email.trim().toLowerCase();
+    if (trimmed.length < 3 || trimmed.length > 120) return false;
+    return _emailRegex.hasMatch(trimmed);
+  }
+}
+
 abstract class DatabaseService {
   factory DatabaseService() => Backend.db;
 

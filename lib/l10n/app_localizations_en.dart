@@ -2905,4 +2905,30 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get publishTransparencyButtonConfirm => 'Publish';
+
+  @override
+  String get updateEmailTitle => 'Update User Email';
+
+  @override
+  String get newEmailLabel => 'New Email';
+
+  @override
+  String get emailUpdatedSuccess => 'User email updated successfully.';
+
+  @override
+  String get invalidEmailError => 'Please enter a valid email address.';
+
+  @override
+  String get onboardingIncompleteBadge => 'Onboarding Incomplete';
+
+  @override
+  String get incompleteOnboardingFilter => 'Onboarding Pending';
+
+  @override
+  String get onboardingIncompleteDetailsNotice =>
+      'This user has not finished onboarding yet.';
+
+  @override
+  String get authOnlyAccountNotice =>
+      'Auth account only (profile not created yet).';
 }
