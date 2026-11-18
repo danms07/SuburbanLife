@@ -2130,3 +2130,140 @@ test('syncTransparencyDocument uploads bilingual translations, seeds localized f
     ]
   );
 });
+
+test('createBooking omits non-JSON-serializable addressRef DocumentReference from onCall HTTP response on create and resubmit', async (t) => {
+  const { onCall } = require('firebase-functions/v2/https');
+  const env = createMockAdminEnvironment();
+
+  // Build a genuine Firestore DocumentReference backed by an initialized GAPIC/google-gax client
+  // so `_firestore._gax.googleAuthLibrary.AuthClient.RequestMethodNameSymbol` exists on the ref.
+  const realDb = _test.admin.firestore();
+  realDb._clientPool.clientFactory(false);
+  const realAddrRef = realDb.doc('addresses/addr_serial_1');
+  assert.equal(
+    typeof realAddrRef._firestore._gax.googleAuthLibrary.AuthClient.RequestMethodNameSymbol,
+    'symbol'
+  );
+
+  // Stub `.get()` on this real DocumentReference so offline test reads resolve from the mock store.
+  const mockAddrRef = env.makeDocRef('addresses', 'addr_serial_1');
+  realAddrRef.get = () => mockAddrRef.get();
+
+  await env.makeDocRef('config', 'app_settings').set({ timeZone: 'UTC' });
+  await mockAddrRef.set({
+    id: 'addr_serial_1',
+    streetName: 'Catania',
+    number: 101,
+    paymentStatus: 'paid',
+    hasActiveSanctions: false,
+  });
+  await env.makeDocRef('users', 'serial_resident_uid').set({
+    uid: 'serial_resident_uid',
+    name: 'Serial Resident',
+    role: 'resident',
+    addressRef: realAddrRef,
+  });
+  await env.makeDocRef('facilities', 'pool_serial').set({
+    id: 'pool_serial',
+    name: 'Pool',
+    quantity: 2,
+    restrictionType: 'cooldown',
+    cooldownUnit: 'hours',
+    cooldownValue: 1,
+    openingTime: '08:00',
+    closingTime: '22:00',
+    anticipationUnit: 'unrestricted',
+    anticipationValue: 0,
+  });
+
+  installMockAdmin(t, env);
+  const createWrapped = fft.wrap(cloudFunctions.createBooking);
+  const residentAuth = { uid: 'serial_resident_uid', token: { resident: true } };
+
+  const invokeOnCallSerializer = async (payload) => {
+    let statusCode = 0;
+    let sentBody = null;
+    const callable = onCall({ enforceAppCheck: false, cors: false }, async () => payload);
+    const req = {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      header(name) {
+        return this.headers[name.toLowerCase()];
+      },
+      body: { data: {} },
+    };
+    const res = {
+      headersSent: false,
+      on() {},
+      status(code) {
+        statusCode = code;
+        return this;
+      },
+      send(body) {
+        sentBody = body;
+        this.headersSent = true;
+        return this;
+      },
+      end() {},
+    };
+    await callable(req, res);
+    return { statusCode, sentBody };
+  };
+
+  // 1. New booking returns JSON-serializable response without addressRef, while Firestore persists realAddrRef
+  const dayBase = Date.UTC(2027, 9, 10, 0, 0, 0);
+  const createRes = await createWrapped({
+    data: {
+      facilityId: 'pool_serial',
+      startTime: dayBase + 10 * 3600_000,
+      endTime: dayBase + 12 * 3600_000,
+    },
+    auth: residentAuth,
+  });
+
+  assert.equal(createRes.success, true);
+  assert.equal(createRes.booking.addressId, 'addr_serial_1');
+  assert.equal('addressRef' in createRes.booking, false);
+  assert.equal(env.store.get('bookings').get(createRes.bookingId).addressRef, realAddrRef);
+
+  const createHttp = await invokeOnCallSerializer(createRes);
+  assert.equal(createHttp.statusCode, 200);
+  assert.equal(createHttp.sentBody.result.bookingId, createRes.bookingId);
+  assert.equal('addressRef' in createHttp.sentBody.result.booking, false);
+  assert.doesNotThrow(() => JSON.stringify(createHttp.sentBody));
+
+  // 2. Resubmitting a rejected booking also returns JSON-serializable response while preserving Firestore addressRef
+  await env.makeDocRef('bookings', createRes.bookingId).update({
+    status: 'rejected',
+    rejectionReason: 'Maintenance',
+  });
+
+  const resubmitRes = await createWrapped({
+    data: {
+      facilityId: 'pool_serial',
+      startTime: dayBase + 14 * 3600_000,
+      endTime: dayBase + 16 * 3600_000,
+      resubmitBookingId: createRes.bookingId,
+    },
+    auth: residentAuth,
+  });
+
+  assert.equal(resubmitRes.success, true);
+  assert.equal(resubmitRes.booking.addressId, 'addr_serial_1');
+  assert.equal('addressRef' in resubmitRes.booking, false);
+  assert.equal(env.store.get('bookings').get(createRes.bookingId).addressRef, realAddrRef);
+
+  const resubmitHttp = await invokeOnCallSerializer(resubmitRes);
+  assert.equal(resubmitHttp.statusCode, 200);
+  assert.equal(resubmitHttp.sentBody.result.bookingId, createRes.bookingId);
+  assert.equal('addressRef' in resubmitHttp.sentBody.result.booking, false);
+  assert.doesNotThrow(() => JSON.stringify(resubmitHttp.sentBody));
+
+  // 3. Direct helper edge cases
+  assert.equal(_test.toSerializableBookingResponse(null), null);
+  const rawObj = { id: 'b_edge', addressId: 'addr_1', addressRef: realAddrRef };
+  const stripped = _test.toSerializableBookingResponse(rawObj);
+  assert.deepEqual(stripped, { id: 'b_edge', addressId: 'addr_1' });
+  assert.equal(rawObj.addressRef, realAddrRef);
+});
+

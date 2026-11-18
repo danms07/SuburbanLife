@@ -5,6 +5,10 @@ All notable changes to the **Suburban Life** project are documented in this file
 ## [1.0.42+43] — 2026-11-18
 
 ### Fixed
+- **Resident Booking Callable JSON Serialization (`createBooking` in `functions/index.js`)**:
+  - Added `toSerializableBookingResponse` to omit the non-JSON-serializable Firestore `DocumentReference` (`addressRef`) from the `booking` payload returned by `createBooking` on both new bookings and rejected-booking resubmissions (`resubmitBookingId`), while continuing to persist `addressRef` and `addressId` in Firestore `bookings/{bookingId}`.
+  - Eliminates the post-write `HTTP 500` (`Error: Data cannot be encoded in JSON. Symbol(request method name)` / `TypeError: Cannot convert a Symbol value to a string`) during `firebase-functions` `onCall` response encoding, preventing false attachment rollback deletions in `BookingService.uploadAndCreateBooking`.
+  - Added a regression test in `functions/test/handlers.test.js` covering real Firestore `DocumentReference` (`google-gax` / `AuthClient`) serialization through the `onCall` HTTP pipeline for both create and resubmit flows.
 - **Web Clipboard JS Interop Compatibility (`dart:js_interop`)**: Replaced removed `dart:js_util` usage and redundant `dart:typed_data` import in `lib/features/announcements/clipboard_image_helper_web.dart` with typed `dart:js_interop` extension types (`_JsNavigator`, `_JsClipboard`, `_JsClipboardItem`, `_JsBlob`), fixing the `uri_does_not_exist` compilation error and `avoid_web_libraries_in_flutter` lint on Flutter 3.50 / Dart 3.14.
 - **Null-Safety Flow Analysis Across Async Gap**: Bound non-nullable `uploadBytes` after null/empty validation in `lib/features/transparency/transparency_screen.dart` (`_uploadDocument`) to eliminate the `unchecked_use_of_nullable_value` error on `rawBytes.length` across `await`.
 - **Deprecated API Migrations**:

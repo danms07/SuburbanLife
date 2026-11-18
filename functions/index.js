@@ -414,6 +414,16 @@ exports.translateAnnouncement = onDocumentCreated('announcements/{announcementId
     }
 });
 
+/**
+ * Strips non-JSON-serializable Firestore objects (such as DocumentReference `addressRef`)
+ * from a booking payload before returning it in an `onCall` response.
+ */
+function toSerializableBookingResponse(booking) {
+  if (!booking || typeof booking !== 'object') return null;
+  const { addressRef: _omittedAddressRef, ...serializable } = booking;
+  return serializable;
+}
+
 exports.createBooking = onCall(callableOptions, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be logged in.');
@@ -713,13 +723,13 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       return {
         success: true,
         bookingId: resubmitBookingId,
-        booking: {
+        booking: toSerializableBookingResponse({
           id: resubmitBookingId,
           bookingId: resubmitBookingId,
           facilityId,
           userUid: uid,
           ...updatedPatch,
-        },
+        }),
       };
     }
 
@@ -759,7 +769,11 @@ exports.createBooking = onCall(callableOptions, async (request) => {
       });
     }
 
-    return { success: true, bookingId: bookingRef.id, booking: bookingData };
+    return {
+      success: true,
+      bookingId: bookingRef.id,
+      booking: toSerializableBookingResponse(bookingData),
+    };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
     throw new HttpsError('internal', error.message);
@@ -5415,6 +5429,7 @@ exports._test = {
   purgeExpiredBookingAttachments,
   parsePeriodHeader,
   normalizeStreetName,
+  toSerializableBookingResponse,
   admin,
 };
 
