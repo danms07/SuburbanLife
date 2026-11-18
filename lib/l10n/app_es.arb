@@ -1241,5 +1241,12 @@
   "transparencyNoActiveExpenses": "No hay gastos activos registrados en este rango de periodos.",
   "transparencyColumnDate": "Fecha",
   "transparencyColumnProductService": "Producto / Servicio",
-  "transparencyColumnCategory": "Categoría"
+  "transparencyColumnCategory": "Categoría",
+  "appVersionLabel": "Versión {version}",
+  "@appVersionLabel": {
+    "description": "Etiqueta de versión de la aplicación mostrada en el menú lateral",
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  }
 }

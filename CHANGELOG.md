@@ -2,6 +2,17 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.44+45] — 2026-11-18
+
+### Added
+- **Localized App Version Label in Resident & Admin Navigation Drawers (`lib/core/widgets/app_version_label.dart`)**:
+  - Bundled `web/version.json` as a Flutter asset in `pubspec.yaml` and created a shared `AppVersionLabel` widget that reads, parses (via `AppUpdateService.parseVersionPayload`), and caches the `version+build_number` string cleanly without adding third-party dependencies or hardcoding version constants.
+  - Added localized `appVersionLabel` strings (`Version {version}` / `Versión {version}`) to `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
+  - Preloaded `AppVersionLabel.loadVersion()` in `main()` and rendered `AppVersionLabel` inside bottom `SafeArea` footers beneath `Logout` in both the Resident hamburger `Drawer` (`_buildDrawer` in `lib/main.dart`, keyed `resident_app_version_label`) and `AdminShellScreen` (`admin_desktop_sidebar` & `admin_mobile_drawer` in `lib/features/admin/admin_shell_screen.dart`, keyed `admin_app_version_label`).
+- **Tests & Documentation**:
+  - Added unit and widget tests in `test/core/services/core_services_test.dart` (`AppVersionLabel`), `test/widget_test.dart` (Resident EN/ES & Admin drawers), and `test/features/admin/admin_shell_screen_test.dart` (Admin EN/ES desktop sidebar & mobile drawer).
+  - Updated `Structure.md`, `widget_catalog.md`, `README.md`, and bumped app version to `1.0.44+45` (`pubspec.yaml` and `web/version.json`).
+
 ## [1.0.43+44] — 2026-11-18
 
 ### Changed

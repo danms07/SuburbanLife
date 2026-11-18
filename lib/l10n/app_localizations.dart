@@ -5537,6 +5537,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Category'**
   String get transparencyColumnCategory;
+
+  /// Displayed app version caption in navigation drawers
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version}'**
+  String appVersionLabel(String version);
 }
 
 class _AppLocalizationsDelegate

@@ -3087,4 +3087,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get transparencyColumnCategory => 'Categoría';
+
+  @override
+  String appVersionLabel(String version) {
+    return 'Versión $version';
+  }
 }

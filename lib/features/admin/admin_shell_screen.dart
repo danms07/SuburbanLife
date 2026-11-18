@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/widgets/app_version_label.dart';
 import '../../l10n/app_localizations.dart';
 import '../announcements/announcements_screen.dart';
 import '../auth/admin_resident_approval_screen.dart';
@@ -687,31 +688,45 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 6, 10, 12),
-            child: ListTile(
-              key: const ValueKey('admin_nav_logout'),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              leading: Icon(
-                Icons.logout,
-                size: 22,
-                color: Colors.grey[700],
-              ),
-              title: Text(
-                l10n.logout,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w500,
-                  color: AppConfig.textColor,
-                  fontFamily: AppConfig.fontFamily,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  key: const ValueKey('admin_nav_logout'),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  leading: Icon(
+                    Icons.logout,
+                    size: 22,
+                    color: Colors.grey[700],
+                  ),
+                  title: Text(
+                    l10n.logout,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppConfig.textColor,
+                      fontFamily: AppConfig.fontFamily,
+                    ),
+                  ),
+                  onTap: () {
+                    if (isMobileDrawer && Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    }
+                    widget.onLogout();
+                  },
                 ),
-              ),
-              onTap: () {
-                if (isMobileDrawer && Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
-                }
-                widget.onLogout();
-              },
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Center(
+                    child: AppVersionLabel(
+                      key: ValueKey('admin_app_version_label'),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

@@ -1374,5 +1374,12 @@
   "transparencyNoActiveExpenses": "No active expenses recorded in this period range.",
   "transparencyColumnDate": "Date",
   "transparencyColumnProductService": "Product / Service",
-  "transparencyColumnCategory": "Category"
+  "transparencyColumnCategory": "Category",
+  "appVersionLabel": "Version {version}",
+  "@appVersionLabel": {
+    "description": "Displayed app version caption in navigation drawers",
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  }
 }

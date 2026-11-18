@@ -421,6 +421,8 @@ void main() {
         expect(find.text('Transparencia y Comunidad'), findsOneWidget);
         expect(find.text('Configuración General'), findsOneWidget);
         expect(find.text('Encuestas'), findsNothing);
+        expect(find.byKey(const ValueKey('admin_app_version_label')), findsOneWidget);
+        expect(find.textContaining('Versión '), findsOneWidget);
       },
     );
 
@@ -613,6 +615,14 @@ void main() {
           matching: find.byKey(const ValueKey('admin_nav_logout')),
         );
         expect(desktopLogoutTile, findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('admin_desktop_sidebar')),
+            matching: find.byKey(const ValueKey('admin_app_version_label')),
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Version '), findsOneWidget);
 
         await tester.tap(desktopLogoutTile);
         await tester.pumpAndSettle();
@@ -647,6 +657,13 @@ void main() {
           matching: find.byKey(const ValueKey('admin_nav_logout')),
         );
         expect(mobileLogoutTile, findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('admin_mobile_drawer')),
+            matching: find.byKey(const ValueKey('admin_app_version_label')),
+          ),
+          findsOneWidget,
+        );
 
         await tester.tap(mobileLogoutTile);
         await tester.pumpAndSettle();

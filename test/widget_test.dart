@@ -1,21 +1,27 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:suburban_life/core/backend/backend.dart';
+import 'package:suburban_life/core/services/app_update_service.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import 'package:suburban_life/main.dart';
 import 'helpers/fake_backend.dart';
 
 void main() {
+  final expectedVersion = AppUpdateService.parseVersionPayload(
+    File('web/version.json').readAsStringSync(),
+  );
+
   setUp(() {
     FakeBackendHelper.setUp();
   });
 
-  Widget createWidgetUnderTest() {
-    return const MaterialApp(
+  Widget createWidgetUnderTest({Locale locale = const Locale('en')}) {
+    return MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      locale: Locale('en'),
-      home: MyHomePage(title: 'Suburban Life'),
+      locale: locale,
+      home: const MyHomePage(title: 'Suburban Life'),
     );
   }
 
@@ -59,6 +65,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('admin_nav_logout')), findsOneWidget);
+      expect(find.byKey(const ValueKey('admin_app_version_label')), findsOneWidget);
+      expect(find.text('Version $expectedVersion'), findsOneWidget);
     },
   );
 
@@ -115,6 +123,60 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('admin_nav_logout')), findsOneWidget);
+      expect(find.byKey(const ValueKey('admin_app_version_label')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Approved resident navigation drawer displays localized app version label in English and Spanish',
+    (WidgetTester tester) async {
+      FakeBackendHelper.auth.currentUserMock = AppUser(
+        uid: 'res_drawer_1',
+        email: 'resident@test.com',
+        displayName: 'Carlos Resident',
+      );
+      FakeBackendHelper.auth.isAdminMock = false;
+      FakeBackendHelper.auth.isResidentMock = true;
+      FakeBackendHelper.auth.isGuardMock = false;
+
+      final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_res_1');
+      FakeBackendHelper.db.seedDocument('addresses', 'addr_res_1', {
+        'id': 'addr_res_1',
+        'streetName': 'Av. Modena',
+        'number': 25,
+        'residentUid': 'res_drawer_1',
+        'paymentStatus': 'paid',
+      });
+      FakeBackendHelper.db.seedDocument('users', 'res_drawer_1', {
+        'uid': 'res_drawer_1',
+        'name': 'Carlos Resident',
+        'email': 'resident@test.com',
+        'role': 'resident',
+        'addressRef': addrRef,
+      });
+
+      // English check
+      await tester.pumpWidget(createWidgetUnderTest(locale: const Locale('en')));
+      await tester.pumpAndSettle();
+
+      final ScaffoldState enScaffold = tester.firstState(find.byType(Scaffold));
+      enScaffold.openDrawer();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('resident_app_version_label')), findsOneWidget);
+      expect(find.text('Version $expectedVersion'), findsOneWidget);
+
+      // Spanish check
+      await tester.pumpWidget(createWidgetUnderTest(locale: const Locale('es')));
+      await tester.pumpAndSettle();
+
+      final ScaffoldState esScaffold = tester.firstState(find.byType(Scaffold));
+      esScaffold.openDrawer();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('resident_app_version_label')), findsOneWidget);
+      expect(find.text('Versión $expectedVersion'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 

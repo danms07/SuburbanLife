@@ -1,6 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -8,6 +8,8 @@ import 'package:suburban_life/core/services/app_update_service.dart';
 import 'package:suburban_life/core/services/cache_io_helper.dart';
 import 'package:suburban_life/core/services/csv_download_helper.dart';
 import 'package:suburban_life/core/services/document_cache_service.dart';
+import 'package:suburban_life/core/widgets/app_version_label.dart';
+import 'package:suburban_life/l10n/app_localizations.dart';
 
 class _InMemoryCacheIoHelper implements CacheIoHelper {
   final Map<String, Uint8List> store = {};
@@ -297,4 +299,97 @@ void main() {
       expect(written, equals(csvContent));
     });
   });
+
+  group('AppVersionLabel', () {
+    setUp(() {
+      AppVersionLabel.resetCacheForTesting();
+    });
+
+    tearDown(() {
+      AppVersionLabel.resetCacheForTesting();
+    });
+
+    test('loadVersion reads bundled web/version.json manifest and caches result', () async {
+      final expectedVersion = AppUpdateService.parseVersionPayload(
+        File('web/version.json').readAsStringSync(),
+      );
+
+      final loaded = await AppVersionLabel.loadVersion();
+      expect(loaded, equals(expectedVersion));
+      expect(AppVersionLabel.cachedVersion, equals(expectedVersion));
+    });
+
+    testWidgets('renders localized version from custom AssetBundle in English and Spanish and handles malformed data safely', (tester) async {
+      final customBundle = _MemoryAssetBundle({
+        AppVersionLabel.versionAssetPath: '{"version":"2.3.4","build_number":"56"}',
+      });
+
+      await tester.pumpWidget(
+        DefaultAssetBundle(
+          bundle: customBundle,
+          child: const MaterialApp(
+            locale: Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: AppVersionLabel()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Version 2.3.4+56'), findsOneWidget);
+      // Custom bundle should not pollute the shared rootBundle cache
+      expect(AppVersionLabel.cachedVersion, isNull);
+
+      await tester.pumpWidget(
+        DefaultAssetBundle(
+          bundle: customBundle,
+          child: const MaterialApp(
+            locale: Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: AppVersionLabel()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Versión 2.3.4+56'), findsOneWidget);
+
+      final malformedBundle = _MemoryAssetBundle({
+        AppVersionLabel.versionAssetPath: 'not-valid-json',
+      });
+      await tester.pumpWidget(
+        DefaultAssetBundle(
+          bundle: malformedBundle,
+          child: const MaterialApp(
+            locale: Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: AppVersionLabel()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Text), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+}
+
+class _MemoryAssetBundle extends CachingAssetBundle {
+  final Map<String, String> _assets;
+
+  _MemoryAssetBundle(this._assets);
+
+  @override
+  Future<ByteData> load(String key) async {
+    final value = _assets[key];
+    if (value == null) {
+      throw FlutterError('Asset not found: $key');
+    }
+    final bytes = Uint8List.fromList(value.codeUnits);
+    return ByteData.sublistView(bytes);
+  }
 }

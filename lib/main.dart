@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,7 @@ import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/core/backend/firebase_backend.dart';
 import 'package:suburban_life/core/services/app_update_service.dart';
 import 'package:suburban_life/core/services/temp_image_cleanup_service.dart';
+import 'package:suburban_life/core/widgets/app_version_label.dart';
 import 'package:suburban_life/core/widgets/error_fallback_screen.dart';
 
 void main() async {
@@ -91,6 +93,9 @@ void main() async {
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return ErrorFallbackScreen(details: details);
   };
+
+  // Preload bundled app version label before rendering UI
+  unawaited(AppVersionLabel.loadVersion());
 
   // Initialize auto-upgrade service for web
   if (kIsWeb) {
@@ -1799,7 +1804,17 @@ class _MyHomePageState extends State<MyHomePage> {
                       Backend.auth.signOut();
                     },
                   ),
-                  const SizedBox(height: 20),
+                  const SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: Center(
+                        child: AppVersionLabel(
+                          key: ValueKey('resident_app_version_label'),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               );
             },
