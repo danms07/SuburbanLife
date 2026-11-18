@@ -144,7 +144,8 @@ void main() {
       await tester.pumpAndSettle();
 
       final l10n = _enL10n(tester);
-      expect(find.text(l10n.noSanctions), findsOneWidget);
+      expect(find.text(l10n.adminNoSanctions), findsOneWidget);
+      expect(find.text(l10n.noSanctions), findsNothing);
 
       // Open Issue Sanction modal
       await tester.tap(find.byType(FloatingActionButton));
@@ -168,7 +169,8 @@ void main() {
       expect(await FakeBackendHelper.db.getCollection('sanctions'), isEmpty);
 
       // Pick evidence photo and submit
-      await tester.tap(find.widgetWithText(TextButton, l10n.takePhotoReceipt));
+      expect(find.widgetWithText(TextButton, l10n.takePhotoReceipt), findsNothing);
+      await tester.tap(find.widgetWithText(TextButton, l10n.uploadEvidencePhoto));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(ElevatedButton, l10n.save));
@@ -214,7 +216,7 @@ void main() {
       await tester.tap(find.byType(FloatingActionButton));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextButton, l10n.takePhotoReceipt));
+      await tester.tap(find.widgetWithText(TextButton, l10n.uploadEvidencePhoto));
       await tester.pumpAndSettle();
       expect(tempUnsaved.existsSync(), isTrue);
 
@@ -338,5 +340,64 @@ void main() {
       expect(dialogRotatedBox, findsOneWidget);
       expect(tester.widget<RotatedBox>(dialogRotatedBox).quarterTurns, equals(1));
     });
+
+    testWidgets(
+      'displays community-wide empty states and evidence upload label in Spanish without overflow',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        FakeBackendHelper.auth.emitUser(
+          AppUser(uid: 'admin_es', email: 'admin@catania.com', displayName: 'Admin'),
+        );
+        FakeBackendHelper.auth.isAdminMock = true;
+
+        FakeBackendHelper.db.seedDocument('addresses', 'addr_target', {
+          'id': 'addr_target',
+          'streetName': 'Catania Poniente',
+          'number': 302,
+          'paymentStatus': 'paid',
+          'deliveryDate': null,
+        });
+
+        await tester.pumpWidget(
+          _wrapWithApp(
+            const AdminSanctionsScreen(),
+            locale: const Locale('es'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+
+        final esL10n = _enL10n(tester);
+        expect(esL10n.adminNoSanctions, equals('No hay sanciones registradas.'));
+        expect(esL10n.adminNoActiveSanctions, equals('No hay sanciones activas.'));
+        expect(esL10n.uploadEvidencePhoto, equals('Subir Evidencia'));
+        expect(esL10n.noSanctions, isNot(equals(esL10n.adminNoSanctions)));
+        expect(esL10n.takePhotoReceipt, isNot(equals(esL10n.uploadEvidencePhoto)));
+
+        // "All" filter empty state with 0 sanctions
+        expect(find.text('No hay sanciones registradas.'), findsOneWidget);
+        expect(find.text(esL10n.noSanctions), findsNothing);
+
+        // Switch to "Active" status filter
+        await tester.tap(find.text(esL10n.sanctionStatusActive));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('No hay sanciones activas.'), findsOneWidget);
+        expect(find.text(esL10n.noSanctions), findsNothing);
+
+        // Open Issue Sanction modal and verify evidence upload button label
+        await tester.tap(find.byType(FloatingActionButton));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.widgetWithText(TextButton, 'Subir Evidencia'), findsOneWidget);
+        expect(find.widgetWithText(TextButton, esL10n.takePhotoReceipt), findsNothing);
+      },
+    );
   });
 }

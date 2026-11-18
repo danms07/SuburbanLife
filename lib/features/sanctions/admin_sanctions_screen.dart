@@ -177,7 +177,10 @@ class _AdminSanctionsScreenState extends State<AdminSanctionsScreen> {
                           Icon(Icons.gavel, size: 64, color: Colors.grey.shade400),
                           const SizedBox(height: 16),
                           Text(
-                            l10n.noSanctions,
+                            _selectedStatusFilter == 'active'
+                                ? l10n.adminNoActiveSanctions
+                                : l10n.adminNoSanctions,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey.shade600,
@@ -601,13 +604,15 @@ class _IssueSanctionModalState extends State<_IssueSanctionModal> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  l10n.issueSanction,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppConfig.primaryColor,
-                    fontFamily: AppConfig.fontFamily,
+                Expanded(
+                  child: Text(
+                    l10n.issueSanction,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppConfig.primaryColor,
+                      fontFamily: AppConfig.fontFamily,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -741,7 +746,11 @@ class _IssueSanctionModalState extends State<_IssueSanctionModal> {
                     ),
                     TextButton(
                       onPressed: _pickEvidence,
-                      child: Text(_evidenceImage != null ? l10n.edit : l10n.takePhotoReceipt),
+                      child: Text(
+                        _evidenceImage != null
+                            ? l10n.edit
+                            : l10n.uploadEvidencePhoto,
+                      ),
                     ),
                   ],
                 ),

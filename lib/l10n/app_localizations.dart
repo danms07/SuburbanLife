@@ -3914,6 +3914,12 @@ abstract class AppLocalizations {
   /// **'Please take or attach a photo of the infraction evidence.'**
   String get sanctionEvidenceRequired;
 
+  /// No description provided for @uploadEvidencePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Evidence'**
+  String get uploadEvidencePhoto;
+
   /// No description provided for @sanctionIssuedSuccess.
   ///
   /// In en, this message translates to:
@@ -3955,6 +3961,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No infractions recorded for this address.'**
   String get noSanctions;
+
+  /// No description provided for @adminNoSanctions.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no recorded sanctions.'**
+  String get adminNoSanctions;
+
+  /// No description provided for @adminNoActiveSanctions.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no active sanctions.'**
+  String get adminNoActiveSanctions;
 
   /// No description provided for @sanctionsList.
   ///

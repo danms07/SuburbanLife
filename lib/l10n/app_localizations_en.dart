@@ -2123,6 +2123,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Please take or attach a photo of the infraction evidence.';
 
   @override
+  String get uploadEvidencePhoto => 'Upload Evidence';
+
+  @override
   String get sanctionIssuedSuccess => 'Sanction issued successfully!';
 
   @override
@@ -2142,6 +2145,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noSanctions => 'No infractions recorded for this address.';
+
+  @override
+  String get adminNoSanctions => 'There are no recorded sanctions.';
+
+  @override
+  String get adminNoActiveSanctions => 'There are no active sanctions.';
 
   @override
   String get sanctionsList => 'Infractions & Sanctions';

@@ -2,6 +2,17 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.40+41] — 2026-11-17
+
+### Admin Sanctions Management Copy Fixes
+- **Community-Wide Empty State Text (`AdminSanctionsScreen`)**:
+  - Added dedicated localization keys `adminNoSanctions` (`"There are no recorded sanctions."` / `"No hay sanciones registradas."`) and `adminNoActiveSanctions` (`"There are no active sanctions."` / `"No hay sanciones activas."`) so `AdminSanctionsScreen` no longer displays the resident address-scoped `"for this address"` / `"para este domicilio"` message when loaded or filtered with zero matching sanctions.
+- **Infraction Evidence Upload Label & Narrow-Viewport Layout (`_IssueSanctionModal`)**:
+  - Added `uploadEvidencePhoto` (`"Upload Evidence"` / `"Subir Evidencia"`) replacing the mistakenly reused receipt string `takePhotoReceipt` (`"Take Photo of Receipt"`) in the sanction issuance modal's photo evidence picker.
+  - Wrapped the `_IssueSanctionModal` header title (`l10n.issueSanction`) in `Expanded` to prevent narrow-viewport horizontal overflow in Spanish.
+- **Tests & Documentation**:
+  - Updated `test/features/sanctions/sanctions_screens_test.dart` to verify `adminNoSanctions`, `adminNoActiveSanctions`, and `uploadEvidencePhoto` in both English and Spanish (`360x800` mobile viewport) without overflow while asserting neither `"for this address"` nor `"Take Photo of Receipt"` appears in Admin Sanctions.
+
 ## [1.0.39+40] — 2026-11-17
 
 ### User Directory Create User FAB & Swipe-to-Refresh Layout
