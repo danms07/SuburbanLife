@@ -2009,3 +2009,124 @@ test('adminUpdateEmail validates input, calls Auth updateUser, and syncs Firesto
   assert.equal(res2.email, 'new-incomplete@test.com');
   assert.equal(env.authUsers.find((u) => u.uid === 'auth_only_uid').email, 'new-incomplete@test.com');
 });
+
+test('syncTransparencyDocument uploads bilingual translations, seeds localized folder/category metadata, and cleans up replaced Storage files on overwrite', async (t) => {
+  const env = createMockAdminEnvironment();
+  installMockAdmin(t, env);
+
+  const syncWrapped = fft.wrap(cloudFunctions.syncTransparencyDocument);
+  const adminAuth = { uid: 'admin_1', token: { admin: true } };
+
+  const esMdV1 = Buffer.from('# Resumen Financiero — 2026-11\nTotal: $100.00').toString('base64');
+  const enMdV1 = Buffer.from('# Financial Summary — 2026-11\nTotal: $100.00').toString('base64');
+
+  // 1. Initial publish with visibility='admin' uploads both language variants under documents/admin_only/
+  const firstRes = await syncWrapped({
+    data: {
+      docId: 'financial_summary_2026-11',
+      title: '2026-11',
+      fileType: 'md',
+      visibility: 'admin',
+      category: 'financial',
+      categoryName: 'Financial',
+      categoryLocalizedNames: { en: 'Financial', es: 'Finanzas' },
+      folderId: 'financial_reports',
+      folderName: 'Financial Reports',
+      folderNameKey: 'financial_reports',
+      folderLocalizedNames: { en: 'Financial Reports', es: 'Reportes Financieros' },
+      translations: {
+        es: {
+          title: '2026-11',
+          fileName: 'financial_summary_2026-11_1000_es.md',
+          fileType: 'md',
+          fileBase64: esMdV1,
+        },
+        en: {
+          title: '2026-11',
+          fileName: 'financial_summary_2026-11_1000_en.md',
+          fileType: 'md',
+          fileBase64: enMdV1,
+        },
+      },
+    },
+    auth: adminAuth,
+  });
+
+  assert.equal(firstRes.success, true);
+  assert.equal(firstRes.docId, 'financial_summary_2026-11');
+  assert.ok(env.savedStorageFiles.has('documents/admin_only/financial_summary_2026-11_financial_summary_2026-11_1000_es.md'));
+  assert.ok(env.savedStorageFiles.has('documents/admin_only/financial_summary_2026-11_financial_summary_2026-11_1000_en.md'));
+
+  const folderDoc = env.store.get('document_folders').get('financial_reports');
+  assert.equal(folderDoc.visibility, 'all');
+  assert.equal(folderDoc.nameKey, 'financial_reports');
+  assert.deepEqual(folderDoc.localizedNames, {
+    en: 'Financial Reports',
+    es: 'Reportes Financieros',
+  });
+
+  const categoryDoc = env.store.get('document_categories').get('financial');
+  assert.deepEqual(categoryDoc.localizedNames, {
+    en: 'Financial',
+    es: 'Finanzas',
+  });
+
+  const savedDocV1 = env.store.get('documents').get('financial_summary_2026-11');
+  assert.equal(savedDocV1.title, '2026-11');
+  assert.deepEqual(savedDocV1.translatedTitles, { es: '2026-11', en: '2026-11' });
+  assert.ok(savedDocV1.translatedFiles.es.url);
+  assert.ok(savedDocV1.translatedFiles.en.url);
+
+  // 2. Republish same docId promoted to visibility='all' with new versioned filenames:
+  //    uploads under documents/ and deletes both superseded documents/admin_only/ files.
+  const esMdV2 = Buffer.from('# Resumen Financiero — 2026-11\nTotal: $250.00').toString('base64');
+  const enMdV2 = Buffer.from('# Financial Summary — 2026-11\nTotal: $250.00').toString('base64');
+
+  const secondRes = await syncWrapped({
+    data: {
+      docId: 'financial_summary_2026-11',
+      title: '2026-11',
+      fileType: 'md',
+      visibility: 'all',
+      category: 'financial',
+      folderId: 'financial_reports',
+      translations: {
+        es: {
+          title: '2026-11',
+          fileName: 'financial_summary_2026-11_2000_es.md',
+          fileType: 'md',
+          fileBase64: esMdV2,
+        },
+        en: {
+          title: '2026-11',
+          fileName: 'financial_summary_2026-11_2000_en.md',
+          fileType: 'md',
+          fileBase64: enMdV2,
+        },
+      },
+    },
+    auth: adminAuth,
+  });
+
+  assert.equal(secondRes.success, true);
+  assert.equal(secondRes.visibility, 'all');
+  assert.ok(env.savedStorageFiles.has('documents/financial_summary_2026-11_financial_summary_2026-11_2000_es.md'));
+  assert.ok(env.savedStorageFiles.has('documents/financial_summary_2026-11_financial_summary_2026-11_2000_en.md'));
+
+  // Superseded admin_only files were cleaned up from Cloud Storage
+  assert.equal(
+    env.savedStorageFiles.has('documents/admin_only/financial_summary_2026-11_financial_summary_2026-11_1000_es.md'),
+    false
+  );
+  assert.equal(
+    env.savedStorageFiles.has('documents/admin_only/financial_summary_2026-11_financial_summary_2026-11_1000_en.md'),
+    false
+  );
+  assert.deepEqual(
+    env.deletedStoragePaths.map((d) => d.storagePath).sort(),
+    [
+      'documents/admin_only/financial_summary_2026-11_financial_summary_2026-11_1000_en.md',
+      'documents/admin_only/financial_summary_2026-11_financial_summary_2026-11_1000_es.md',
+    ]
+  );
+});

@@ -318,16 +318,60 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('publish_transparency_report_button')));
       await tester.pumpAndSettle();
 
+      // Dialog prefills just the numeric ISO period span for the default 6-month window
+      final startPeriod = AdminPaymentReportScreen.formatPeriodKey(
+        DateTime(now.year, now.month - 5, 1),
+      );
+      final expectedPeriodTitle = '$startPeriod – $currentPeriod';
+      final expectedDocId = 'financial_summary_${startPeriod}_to_$currentPeriod';
+
+      final titleField = tester.widget<TextField>(
+        find.byKey(const ValueKey('transparency_report_title_field')),
+      );
+      expect(titleField.controller?.text, equals(expectedPeriodTitle));
+
       await tester.tap(find.byKey(const ValueKey('confirm_publish_transparency_button')));
       await tester.pumpAndSettle();
 
       expect(syncedDocPayload, isNotNull);
+      expect(syncedDocPayload!['docId'], equals(expectedDocId));
+      expect(syncedDocPayload!['title'], equals(expectedPeriodTitle));
       expect(syncedDocPayload!['fileType'], equals('md'));
-      final decodedMd = utf8.decode(base64Decode(syncedDocPayload!['fileBase64'] as String));
-      expect(decodedMd, contains('\$2650.00'));
-      expect(decodedMd, contains('Pool filter maintenance'));
-      expect(decodedMd, isNot(contains('Calle Privada')));
-      expect(decodedMd, isNot(contains('past due')));
+      expect(syncedDocPayload!['folderId'], equals('financial_reports'));
+      expect(syncedDocPayload!['folderNameKey'], equals('financial_reports'));
+      expect(
+        syncedDocPayload!['folderLocalizedNames'],
+        equals({'en': 'Financial Reports', 'es': 'Reportes Financieros'}),
+      );
+      expect(
+        syncedDocPayload!['categoryLocalizedNames'],
+        equals({'en': 'Financial', 'es': 'Finanzas'}),
+      );
+
+      final translations = syncedDocPayload!['translations'] as Map<String, dynamic>?;
+      expect(translations, isNotNull);
+      expect(translations!.keys, containsAll(['es', 'en']));
+
+      final esEntry = translations['es'] as Map<String, dynamic>;
+      final enEntry = translations['en'] as Map<String, dynamic>;
+      expect(esEntry['fileName'], endsWith('_es.md'));
+      expect(enEntry['fileName'], endsWith('_en.md'));
+
+      final decodedEsMd = utf8.decode(base64Decode(esEntry['fileBase64'] as String));
+      expect(decodedEsMd, contains('# Resumen Financiero — $expectedPeriodTitle'));
+      expect(decodedEsMd, contains('\$2650.00'));
+      expect(decodedEsMd, contains('Pool filter maintenance'));
+      expect(decodedEsMd, contains('| Mantenimiento |'));
+      expect(decodedEsMd, isNot(contains('Calle Privada')));
+      expect(decodedEsMd, isNot(contains('past due')));
+
+      final decodedEnMd = utf8.decode(base64Decode(enEntry['fileBase64'] as String));
+      expect(decodedEnMd, contains('# Financial Summary — $expectedPeriodTitle'));
+      expect(decodedEnMd, contains('\$2650.00'));
+      expect(decodedEnMd, contains('Pool filter maintenance'));
+      expect(decodedEnMd, contains('| Maintenance |'));
+      expect(decodedEnMd, isNot(contains('Calle Privada')));
+      expect(decodedEnMd, isNot(contains('past due')));
     });
 
     testWidgets(

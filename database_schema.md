@@ -272,14 +272,17 @@ erDiagram
 - `readBy`: array of user UIDs who have read the announcement
 
 ### `document_categories` (Collection)
-- `catId`: string (Document ID / slug, e.g. 'normatives', 'contracts')
+- `catId`: string (Document ID / slug, e.g. 'normatives', 'contracts', 'financial')
 - `name`: string (Category display label)
+- `localizedNames`: map (Optional `{ "en": "...", "es": "..." }` display labels)
 - `createdAt`: timestamp
 - `updatedAt`: timestamp (Optional)
 
 ### `document_folders` (Collection)
-- `folderId`: string (Document ID)
-- `name`: string (Folder display name)
+- `folderId`: string (Document ID, e.g. 'financial_reports', 'official_manuals')
+- `name`: string (Folder display name; also supports `_token_` system syntax such as `_financial-reports_`)
+- `nameKey`: string (Optional system localization key, e.g. 'financial_reports')
+- `localizedNames`: map (Optional `{ "en": "...", "es": "..." }` display names)
 - `parentId`: string (Parent folder ID or 'root' for root directory)
 - `visibility`: string ('all' | 'admin', optional — when 'admin' and containing 0 resident-visible items, hidden from non-admin residents)
 - `createdAt`: timestamp
@@ -287,13 +290,15 @@ erDiagram
 
 
 ### `documents` (Collection)
-- `docId`: string (Document ID)
-- `title`: string (Display title)
-- `fileName`: string (Original file name with extension, e.g. "Presupuesto_2026.pdf")
+- `docId`: string (Document ID; financial summaries use deterministic `financial_summary_<start>_to_<end>` or `financial_summary_<start>`)
+- `title`: string (Default display title, e.g. period `'2026-06 – 2026-11'` for financial summaries)
+- `translatedTitles`: map (Optional `{ "en": "...", "es": "..." }` locale-specific titles)
+- `fileName`: string (Default file name with extension, e.g. "Presupuesto_2026.pdf")
 - `fileType`: string (Lowercase file extension: 'pdf', 'md', 'txt', 'docx', 'xlsx', 'png', etc.)
-- `fileSize`: number (File size in bytes)
-- `url`: string (Firebase Storage URL)
-- `storagePath`: string (Cloud Storage object path)
+- `fileSize`: number (Default file size in bytes)
+- `url`: string (Default Firebase Storage URL)
+- `storagePath`: string (Default Cloud Storage object path)
+- `translatedFiles`: map (Optional per-locale `{ "en": { "url", "storagePath", "fileName", "fileSize" }, "es": { ... } }` binary/Markdown variants)
 - `category`: string ('normatives', 'contracts', 'financial', 'communiques', 'manuals', etc.)
 - `visibility`: string ('all' | 'admin' — 'all' is visible to admins and residents; 'admin' restricts access exclusively to administrators)
 - `publicationDate`: timestamp (Official publication/issue date of document)

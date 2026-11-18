@@ -2,6 +2,21 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.37+38] — 2026-11-17
+
+### Bilingual Financial Transparency Reports & Localized Explorer Paths
+- **Bilingual Financial Summary Publishing (`es` & `en`)**:
+  - Updated `FinancialReportCalculator.buildTransparencyMarkdownReport` and `formatTransparencyPeriodTitle` / `buildTransparencyDocId` to generate deterministic, period-named financial summaries (`'YYYY-MM – YYYY-MM'` or `'YYYY-MM'`, `docId: financial_summary_<start>_to_<end>` or `financial_summary_<start>`) in both **English (`en`)** and **Spanish (`es`)** with localized `#` headings (`# Financial Summary — ...` / `# Resumen Financiero — ...`) and localized `ExpenseCategory` breakdowns (`maintenance`, `gardening`, `security`, `utilities`, `repairs`, `supplies`, `other`).
+  - Updated `AdminPaymentReportScreen._publishSummaryToTransparency` and Cloud Function `syncTransparencyDocument` to publish a single Firestore `documents/{docId}` entry carrying `translatedTitles`, multi-locale `translatedFiles` (with epoch-versioned filenames for cache busting), `folderNameKey` / `localizedNames`, and `visibility`, while automatically deleting superseded Storage files when republishing the same period and keeping non-`official_manuals` folders visible to `'all'` by default.
+  - Added strict Cloud Function validation for `translatedTitles`, `translatedFiles`, `localizedNames`, `folderNameKey`, and managed `documents/` Storage path ownership (`isManagedTransparencyStoragePath`, `normalizeLocalizedStringMap`, `uploadTransparencyFile`).
+- **Hybrid System Folder & Category Localization (`TransparencyLocalizationHelper`)**:
+  - Introduced `TransparencyLocalizationHelper` resolving display names via `localizedNames[locale]` -> well-known `nameKey` / document ID / underscore marker tokens (such as `_financial-reports_`, `_official-manuals_`, `financial_reports`, `official_manuals`, and seeded categories `financial`, `normatives`, `contracts`, `communiques`, `manuals`, `general`) -> fallback raw name across folder cards, breadcrumbs (`_resolvedBreadcrumbs`), document search, category dropdowns/chips, move dialogs, and `DocumentViewerScreen`.
+- **In-App `ES | EN` Language Switcher & Multi-Variant Cache/Deletion Handling**:
+  - Updated `DocumentViewerScreen` to open the active app locale translation automatically when available, display the `ES | EN` `SegmentedButton` language switcher (`document_viewer_language_switcher`) when multiple language variants exist, prevent stale async load races across language switches, and show the active variant's file size and localized category badge.
+  - Updated `TransparencyScreen` to track active locale cache variants (`_cachedVariantFileByDocId`) and delete every translated Cloud Storage file and cached file (`collectDocumentFilesForDeletion`) upon document removal.
+- **Database Schema, Tests & Localization**:
+  - Updated `database_schema.md`, `app_en.arb`, and `app_es.arb` (22 new Transparency report, category, folder, and language switcher keys), and expanded Flutter unit/widget tests (`financial_report_calculator_test.dart`, `payment_report_matrix_test.dart`, `transparency_explorer_test.dart`) and Cloud Functions Node tests (`helpers.test.js`, `handlers.test.js`).
+
 ## [1.0.36+37] — 2026-11-17
 
 ### Added & Fixed

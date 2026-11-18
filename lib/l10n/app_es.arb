@@ -1187,5 +1187,46 @@
   "onboardingIncompleteBadge": "Registro Incompleto",
   "incompleteOnboardingFilter": "Registro Pendiente",
   "onboardingIncompleteDetailsNotice": "Este usuario aún no ha completado su registro inicial.",
-  "authOnlyAccountNotice": "Solo cuenta de autenticación (sin perfil creado aún)."
+  "authOnlyAccountNotice": "Solo cuenta de autenticación (sin perfil creado aún).",
+  "folderFinancialReports": "Reportes Financieros",
+  "folderOfficialManuals": "Manuales Oficiales",
+  "docCategoryFinancial": "Finanzas",
+  "docCategoryNormatives": "Normativas",
+  "docCategoryContracts": "Contratos",
+  "docCategoryCommuniques": "Comunicados",
+  "docCategoryManuals": "Manuales",
+  "docCategoryGeneral": "General",
+  "documentLanguageLabel": "Idioma del documento",
+  "switchToSpanishTooltip": "Ver documento en Español",
+  "switchToEnglishTooltip": "Ver documento en Inglés",
+  "transparencyReportHeading": "Resumen Financiero — {title}",
+  "@transparencyReportHeading": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "transparencyPeriodRangeLine": "**Rango del Periodo:** {start} a {end}",
+  "@transparencyPeriodRangeLine": {
+    "placeholders": {
+      "start": { "type": "String" },
+      "end": { "type": "String" }
+    }
+  },
+  "transparencySummarySection": "Resumen",
+  "transparencyMetricHeader": "Métrica",
+  "transparencyAmountHeader": "Monto",
+  "transparencyTotalIncomeLabel": "Ingresos Totales",
+  "transparencyMonthlyBreakdownSection": "Desglose Mensual",
+  "transparencyColumnPeriod": "Periodo",
+  "transparencyColumnQuotas": "Cuotas",
+  "transparencyColumnSanctions": "Sanciones",
+  "transparencyColumnTotalIncome": "Ingresos",
+  "transparencyColumnExpenses": "Gastos",
+  "transparencyColumnNet": "Neto",
+  "transparencyColumnAccumulatedBudget": "Presupuesto Acumulado",
+  "transparencyActiveExpensesSection": "Gastos Activos de la Comunidad",
+  "transparencyNoActiveExpenses": "No hay gastos activos registrados en este rango de periodos.",
+  "transparencyColumnDate": "Fecha",
+  "transparencyColumnProductService": "Producto / Servicio",
+  "transparencyColumnCategory": "Categoría"
 }

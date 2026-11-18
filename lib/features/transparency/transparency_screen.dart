@@ -11,6 +11,7 @@ import '../../core/services/document_cache_service.dart';
 import '../../core/widgets/interactive_image_dialog.dart';
 import '../../l10n/app_localizations.dart';
 import 'document_viewer_screen.dart';
+import 'transparency_localization_helper.dart';
 import 'widgets/document_card.dart';
 import 'widgets/file_explorer_breadcrumb.dart';
 import 'widgets/folder_card.dart';
@@ -167,15 +168,12 @@ class TransparencyScreen extends StatefulWidget {
         if (cat != normalizedCat) return false;
       }
 
-      if (normalizedQuery.isNotEmpty) {
-        final title = (doc['title'] ?? '').toString().toLowerCase();
-        final fileName = (doc['fileName'] ?? '').toString().toLowerCase();
-        final cat = (doc['category'] ?? '').toString().toLowerCase();
-        if (!title.contains(normalizedQuery) &&
-            !fileName.contains(normalizedQuery) &&
-            !cat.contains(normalizedQuery)) {
-          return false;
-        }
+      if (normalizedQuery.isNotEmpty &&
+          !TransparencyLocalizationHelper.matchesDocumentSearch(
+            doc,
+            normalizedQuery,
+          )) {
+        return false;
       }
 
       return true;
@@ -195,15 +193,17 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   bool _isCheckingAdmin = true;
   String _currentFolderId = 'root';
   final List<BreadcrumbItem> _breadcrumbs = [];
+  final Map<String, Map<String, dynamic>> _folderDataById = {};
 
   String _selectedCategory = 'all';
-  List<Map<String, String>> _categories = [
+  List<Map<String, dynamic>> _categories = [
     {'id': 'all', 'name': 'ALL'},
   ];
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   final Set<String> _cachedDocIds = {};
+  final Map<String, String> _cachedVariantFileByDocId = {};
   final Set<String> _backfilledVisibilityIds = {};
 
   @override
@@ -280,7 +280,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         _seedDefaultCategories();
         return;
       }
-      final List<Map<String, String>> loaded = [
+      final List<Map<String, dynamic>> loaded = [
         {'id': 'all', 'name': 'ALL'}
       ];
       for (var doc in docs) {
@@ -290,6 +290,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
           loaded.add({
             'id': id,
             'name': name,
+            if (doc['localizedNames'] != null)
+              'localizedNames': doc['localizedNames'],
           });
         }
       }
@@ -305,20 +307,70 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   }
 
   void _seedDefaultCategories() async {
+    final enL10n = lookupAppLocalizations(const Locale('en'));
+    final esL10n = lookupAppLocalizations(const Locale('es'));
     final defaults = {
-      'normatives': 'Normatives',
-      'contracts': 'Contracts',
-      'financial': 'Financial',
-      'communiques': 'Communiques',
+      'normatives': {
+        'en': enL10n.docCategoryNormatives,
+        'es': esL10n.docCategoryNormatives,
+      },
+      'contracts': {
+        'en': enL10n.docCategoryContracts,
+        'es': esL10n.docCategoryContracts,
+      },
+      'financial': {
+        'en': enL10n.docCategoryFinancial,
+        'es': esL10n.docCategoryFinancial,
+      },
+      'communiques': {
+        'en': enL10n.docCategoryCommuniques,
+        'es': esL10n.docCategoryCommuniques,
+      },
     };
     await DatabaseService().runBatch((batch) async {
       for (var entry in defaults.entries) {
         batch.set('document_categories', entry.key, {
-          'name': entry.value,
+          'name': entry.value['en'],
+          'localizedNames': entry.value,
           'createdAt': DbFieldValue.serverTimestamp(),
         });
       }
     });
+  }
+
+  String _resolveFolderDisplayName(
+    String folderId,
+    Map<String, dynamic> folderData,
+    AppLocalizations l10n,
+  ) {
+    return TransparencyLocalizationHelper.resolveFolderDisplayName(
+      folderId: folderId,
+      folderData: folderData,
+      l10n: l10n,
+    );
+  }
+
+  String _resolveCategoryDisplayName(
+    Map<String, dynamic> category,
+    AppLocalizations l10n,
+  ) {
+    final id = category['id']?.toString() ?? '';
+    if (id == 'all') return l10n.allCategories;
+    return TransparencyLocalizationHelper.resolveCategoryDisplayName(
+      categoryId: id,
+      rawName: category['name']?.toString(),
+      localizedNames: category['localizedNames'],
+      l10n: l10n,
+    );
+  }
+
+  String _resolveCategoryLabelById(String? categoryId, AppLocalizations l10n) {
+    if (categoryId == null || categoryId.isEmpty) return '';
+    final match = _categories.firstWhere(
+      (c) => c['id']?.toString().toLowerCase() == categoryId.toLowerCase(),
+      orElse: () => {'id': categoryId, 'name': categoryId},
+    );
+    return _resolveCategoryDisplayName(match, l10n);
   }
 
   void _initBreadcrumbs(AppLocalizations l10n) {
@@ -327,7 +379,27 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     }
   }
 
-  void _navigateToFolder(String folderId, String folderName) {
+  List<BreadcrumbItem> _resolvedBreadcrumbs(AppLocalizations l10n) {
+    return _breadcrumbs.map((b) {
+      if (b.id == 'root') {
+        return BreadcrumbItem(id: 'root', name: l10n.rootFolder);
+      }
+      final folderData = _folderDataById[b.id] ?? {'name': b.name};
+      return BreadcrumbItem(
+        id: b.id,
+        name: _resolveFolderDisplayName(b.id, folderData, l10n),
+      );
+    }).toList();
+  }
+
+  void _navigateToFolder(
+    String folderId,
+    String folderName, [
+    Map<String, dynamic>? folderData,
+  ]) {
+    if (folderData != null && folderId.isNotEmpty) {
+      _folderDataById[folderId] = folderData;
+    }
     setState(() {
       _currentFolderId = folderId;
       _breadcrumbs.add(BreadcrumbItem(id: folderId, name: folderName));
@@ -357,7 +429,11 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   // --- Document Opening ---
 
-  void _checkCachedDocuments(List<Map<String, dynamic>> docs, [List<Map<String, dynamic>> folders = const []]) async {
+  void _checkCachedDocuments(
+    List<Map<String, dynamic>> docs, {
+    List<Map<String, dynamic>> folders = const [],
+    String languageCode = 'en',
+  }) async {
     if (_isAdmin) {
       for (var folder in folders) {
         final folderId = folder['id']?.toString() ?? '';
@@ -382,20 +458,28 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         });
       }
 
-      if (_cachedDocIds.contains(docId)) continue;
-
-      final title = doc['title']?.toString() ?? doc['fileName']?.toString() ?? '';
-      final rawFileName = doc['fileName']?.toString() ?? '$title.bin';
-      final fileType = (doc['fileType']?.toString() ?? (rawFileName.contains('.') ? rawFileName.split('.').last : '')).toLowerCase();
-      String fileName = rawFileName;
-      if (!fileName.contains('.') && fileType.isNotEmpty) {
-        fileName = '$fileName.$fileType';
+      final variant = TransparencyLocalizationHelper.resolveDocumentFileVariant(
+        doc,
+        languageCode: languageCode,
+      );
+      final cachedFileName = _cachedVariantFileByDocId[docId];
+      if (_cachedDocIds.contains(docId) && cachedFileName == variant.fileName) {
+        continue;
       }
 
-      final cached = await _cacheService.isCached(docId, fileName);
-      if (cached && mounted && !_cachedDocIds.contains(docId)) {
+      final cached = await _cacheService.isCached(docId, variant.fileName);
+      if (!mounted) return;
+      if (cached) {
+        if (!_cachedDocIds.contains(docId) || cachedFileName != variant.fileName) {
+          setState(() {
+            _cachedDocIds.add(docId);
+            _cachedVariantFileByDocId[docId] = variant.fileName;
+          });
+        }
+      } else if (_cachedDocIds.contains(docId)) {
         setState(() {
-          _cachedDocIds.add(docId);
+          _cachedDocIds.remove(docId);
+          _cachedVariantFileByDocId.remove(docId);
         });
       }
     }
@@ -403,20 +487,27 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
   void _openDocument(BuildContext context, Map<String, dynamic> doc) async {
     final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    final localeCode = Localizations.localeOf(context).languageCode;
     final docId = doc['id']?.toString() ?? '';
-    final title = doc['title']?.toString() ?? doc['fileName']?.toString() ?? l10n.untitledDocument;
-    final rawFileName = doc['fileName']?.toString() ?? '$title.bin';
-    final fileType = (doc['fileType']?.toString() ?? (rawFileName.contains('.') ? rawFileName.split('.').last : '')).toLowerCase();
-    
-    // Ensure fileName has proper extension if known
-    String fileName = rawFileName;
-    if (!fileName.contains('.') && fileType.isNotEmpty) {
-      fileName = '$fileName.$fileType';
-    }
-
-    final url = doc['url']?.toString() ?? '';
+    final title = TransparencyLocalizationHelper.resolveDocumentTitle(
+      doc,
+      languageCode: localeCode,
+      fallbackTitle: l10n.untitledDocument,
+    );
+    final variant = TransparencyLocalizationHelper.resolveDocumentFileVariant(
+      doc,
+      languageCode: localeCode,
+    );
+    final fileName = variant.fileName;
+    final fileType = variant.fileType;
+    final url = variant.url;
+    final fileSize = variant.fileSize;
     final category = doc['category']?.toString();
-    final fileSize = doc['fileSize'] as int?;
+    final translatedTitles =
+        TransparencyLocalizationHelper.extractTranslatedTitles(doc);
+    final translatedFiles =
+        TransparencyLocalizationHelper.extractTranslatedFiles(doc);
 
     debugPrint('>>> [_openDocument] Document clicked: docId="$docId", title="$title", fileName="$fileName", fileType="$fileType", url="$url"');
 
@@ -434,7 +525,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
     if (url.isEmpty) {
       debugPrint('>>> [_openDocument] ERROR: Document URL is empty.');
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text(l10n.errorLoadingDocument)),
       );
       return;
@@ -443,7 +534,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     // 1. Text / Markdown Files -> Native In-App Document Viewer Screen
     if (fileType == 'md' || fileType == 'txt' || fileName.endsWith('.md') || fileName.endsWith('.txt')) {
       debugPrint('>>> [_openDocument] Opening text/markdown file in DocumentViewerScreen');
-      Navigator.push(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => DocumentViewerScreen(
@@ -455,9 +546,20 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
             category: category,
             publicationDate: publicationDate,
             fileSize: fileSize,
+            initialLanguageCode: localeCode,
+            translatedTitles:
+                translatedTitles.isNotEmpty ? translatedTitles : null,
+            translatedFiles: translatedFiles.isNotEmpty ? translatedFiles : null,
           ),
         ),
       );
+      final isNowCached = await _cacheService.isCached(docId, fileName);
+      if (isNowCached && mounted) {
+        setState(() {
+          _cachedDocIds.add(docId);
+          _cachedVariantFileByDocId[docId] = fileName;
+        });
+      }
       return;
     }
 
@@ -484,7 +586,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         if (!isCached) {
           debugPrint('>>> [_openDocument] Web: downloading bytes for "$fileName"...');
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               SnackBar(
                 content: Text(l10n.downloadingDocument),
                 duration: const Duration(seconds: 2),
@@ -499,6 +601,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         if (mounted) {
           setState(() {
             _cachedDocIds.add(docId);
+            _cachedVariantFileByDocId[docId] = fileName;
           });
         }
 
@@ -514,7 +617,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         html.Url.revokeObjectUrl(blobUrl);
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(
               content: Text(isCached ? l10n.openingExternalDocument : l10n.downloadCodeSuccess),
               backgroundColor: AppConfig.secondaryColor,
@@ -537,7 +640,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       if (!isAlreadyCached) {
         debugPrint('>>> [_openDocument] Native: Document not cached. Notifying user and starting download...');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(
               content: Text(l10n.downloadingDocument),
               duration: const Duration(seconds: 2),
@@ -547,7 +650,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       } else {
         debugPrint('>>> [_openDocument] Native: Document ALREADY cached. Opening directly from disk without re-downloading.');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(
               content: Text(l10n.openingExternalDocument),
               duration: const Duration(seconds: 1),
@@ -563,6 +666,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         if (mounted) {
           setState(() {
             _cachedDocIds.add(docId);
+            _cachedVariantFileByDocId[docId] = fileName;
           });
         }
 
@@ -572,7 +676,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
         if (result.type != ResultType.done) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               SnackBar(
                 content: Text('${l10n.noAppToOpenFile}: ${result.message}'),
                 backgroundColor: Colors.orange.shade800,
@@ -584,7 +688,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       } else {
         debugPrint('>>> [_openDocument] ERROR: filePath was null or empty after cache resolution.');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(content: Text(l10n.errorLoadingDocument)),
           );
         }
@@ -592,7 +696,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     } catch (e, stack) {
       debugPrint('>>> [_openDocument] Exception opening document: $e\n$stack');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text(l10n.errorPrefix(e.toString()))),
         );
       }
@@ -813,7 +917,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     if (availableCategories.isEmpty) {
       availableCategories.add({'id': 'general', 'name': 'General'});
     }
-    final initialCategory = availableCategories.first['id']!;
+    final initialCategory = availableCategories.first['id']?.toString() ?? 'general';
     String uploadCategory = initialCategory;
     String uploadVisibility = 'all';
     DateTime publicationDate = DateTime.now();
@@ -863,8 +967,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                       ),
                       items: availableCategories.map((cat) {
                         return DropdownMenuItem<String>(
-                          value: cat['id'],
-                          child: Text(cat['name']!.toUpperCase()),
+                          value: cat['id']?.toString() ?? '',
+                          child: Text(_resolveCategoryDisplayName(cat, l10n).toUpperCase()),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -1029,7 +1133,13 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   void _showChangeDocumentVisibilityDialog(Map<String, dynamic> doc) {
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
+    final localeCode = Localizations.localeOf(context).languageCode;
     final docId = doc['id']?.toString() ?? '';
+    final resolvedTitle = TransparencyLocalizationHelper.resolveDocumentTitle(
+      doc,
+      languageCode: localeCode,
+      fallbackTitle: l10n.untitledDocument,
+    );
     String selectedVisibility = (doc['visibility']?.toString().toLowerCase() == 'admin') ? 'admin' : 'all';
 
     showDialog(
@@ -1050,7 +1160,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    doc['title']?.toString() ?? doc['fileName']?.toString() ?? '',
+                    resolvedTitle,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1145,9 +1255,18 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       return;
     }
 
-    String selectedCategory = availableCategories.any((c) => c['id']?.toLowerCase() == currentDocCategory.toLowerCase())
-        ? availableCategories.firstWhere((c) => c['id']?.toLowerCase() == currentDocCategory.toLowerCase())['id']!
-        : availableCategories.first['id']!;
+    final localeCode = Localizations.localeOf(context).languageCode;
+    final resolvedTitle = TransparencyLocalizationHelper.resolveDocumentTitle(
+      doc,
+      languageCode: localeCode,
+      fallbackTitle: l10n.untitledDocument,
+    );
+    String selectedCategory = availableCategories.any(
+            (c) => c['id']?.toString().toLowerCase() == currentDocCategory.toLowerCase())
+        ? availableCategories
+            .firstWhere((c) => c['id']?.toString().toLowerCase() == currentDocCategory.toLowerCase())['id']!
+            .toString()
+        : availableCategories.first['id']!.toString();
 
     showDialog(
       context: context,
@@ -1167,7 +1286,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    doc['title']?.toString() ?? doc['fileName']?.toString() ?? '',
+                    resolvedTitle,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1185,8 +1304,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                     ),
                     items: availableCategories.map((cat) {
                       return DropdownMenuItem<String>(
-                        value: cat['id'],
-                        child: Text(cat['name']!.toUpperCase()),
+                        value: cat['id']?.toString() ?? '',
+                        child: Text(_resolveCategoryDisplayName(cat, l10n).toUpperCase()),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -1279,9 +1398,11 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         child: Text('/ [${l10n.rootFolder}]'),
                       ),
                       ...allFolders.map((f) {
-                        return DropdownMenuItem(
-                          value: f['id']?.toString() ?? '',
-                          child: Text('/ ${f['name'] ?? ''}'),
+                        final fid = f['id']?.toString() ?? '';
+                        final folderLabel = _resolveFolderDisplayName(fid, f, l10n);
+                        return DropdownMenuItem<String>(
+                          value: fid,
+                          child: Text('/ $folderLabel'),
                         );
                       }),
                     ],
@@ -1342,10 +1463,14 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
   void _confirmDeleteDocument(Map<String, dynamic> doc) {
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
+    final localeCode = Localizations.localeOf(context).languageCode;
     final docId = doc['id']?.toString() ?? '';
-    final title = doc['title']?.toString() ?? doc['fileName']?.toString() ?? '';
-    final url = doc['url']?.toString() ?? '';
-    final fileName = doc['fileName']?.toString() ?? '';
+    final title = TransparencyLocalizationHelper.resolveDocumentTitle(
+      doc,
+      languageCode: localeCode,
+      fallbackTitle: l10n.untitledDocument,
+    );
+    final filesToDelete = TransparencyLocalizationHelper.collectDocumentFilesForDeletion(doc);
 
     showDialog(
       context: context,
@@ -1363,15 +1488,23 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
               Navigator.pop(dialogCtx);
               try {
                 await DatabaseService().deleteDocument('documents', docId);
-                if (url.isNotEmpty) {
-                  try {
-                    await StorageService().deleteFileFromUrl(url);
-                  } catch (e) {
-                    debugPrint('Storage deletion note: $e');
+                for (final file in filesToDelete) {
+                  if (file.url.isNotEmpty) {
+                    try {
+                      await StorageService().deleteFileFromUrl(file.url);
+                    } catch (e) {
+                      debugPrint('Storage deletion note: $e');
+                    }
+                  }
+                  if (file.fileName.isNotEmpty) {
+                    await _cacheService.removeCachedFile(docId, file.fileName);
                   }
                 }
-                await _cacheService.removeCachedFile(docId, fileName);
                 if (mounted) {
+                  setState(() {
+                    _cachedDocIds.remove(docId);
+                    _cachedVariantFileByDocId.remove(docId);
+                  });
                   messenger.showSnackBar(
                     SnackBar(content: Text(l10n.documentDeleted)),
                   );
@@ -1492,7 +1625,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                               itemBuilder: (context, index) {
                                 final cat = categories[index];
                                 final catId = cat['id']?.toString() ?? '';
-                                final catName = cat['name']?.toString() ?? catId;
+                                final catName = _resolveCategoryDisplayName(cat, l10n);
                                 final docCount = documents.where((d) => (d['category']?.toString().toLowerCase() ?? '') == catId.toLowerCase()).length;
 
                                 return ListTile(
@@ -1550,7 +1683,9 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
     final isEditing = category != null;
-    final nameController = TextEditingController(text: isEditing ? (category['name']?.toString() ?? '') : '');
+    final nameController = TextEditingController(
+      text: isEditing ? _resolveCategoryDisplayName(category, l10n) : '',
+    );
 
     showDialog(
       context: context,
@@ -1586,10 +1721,19 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
               try {
                 if (isEditing) {
                   final catId = category['id']?.toString() ?? '';
-                  await DatabaseService().updateDocument('document_categories', catId, {
+                  final localeCode = Localizations.localeOf(context).languageCode;
+                  final updateData = <String, dynamic>{
                     'name': name,
                     'updatedAt': DbFieldValue.serverTimestamp(),
-                  });
+                  };
+                  if (category['localizedNames'] is Map) {
+                    final localized = Map<String, dynamic>.from(
+                      category['localizedNames'] as Map,
+                    );
+                    localized[localeCode] = name;
+                    updateData['localizedNames'] = localized;
+                  }
+                  await DatabaseService().updateDocument('document_categories', catId, updateData);
                   if (mounted) {
                     messenger.showSnackBar(
                       SnackBar(
@@ -1633,7 +1777,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
     final catId = category['id']?.toString() ?? '';
-    final catName = category['name']?.toString() ?? catId;
+    final catName = _resolveCategoryDisplayName(category, l10n);
 
     if (docsCount > 0) {
       showDialog(
@@ -1753,7 +1897,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
           children: [
             // Breadcrumbs Navigation Bar
             FileExplorerBreadcrumb(
-              items: _breadcrumbs,
+              items: _resolvedBreadcrumbs(l10n),
               onItemTap: _onBreadcrumbTap,
             ),
 
@@ -1831,8 +1975,11 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                       isExpanded: true,
                       items: _categories.map((cat) {
                         return DropdownMenuItem<String>(
-                          value: cat['id'],
-                          child: Text(cat['name']!.toUpperCase(), style: const TextStyle(fontSize: 13)),
+                          value: cat['id']?.toString() ?? '',
+                          child: Text(
+                            _resolveCategoryDisplayName(cat, l10n).toUpperCase(),
+                            style: const TextStyle(fontSize: 13),
+                          ),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -1892,7 +2039,18 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
             final allFolders = folderSnapshot.data ?? [];
             final allDocs = docSnapshot.data ?? [];
-            _checkCachedDocuments(allDocs, allFolders);
+            final localeCode = Localizations.localeOf(context).languageCode;
+            for (final f in allFolders) {
+              final fid = f['id']?.toString() ?? '';
+              if (fid.isNotEmpty) {
+                _folderDataById[fid] = f;
+              }
+            }
+            _checkCachedDocuments(
+              allDocs,
+              folders: allFolders,
+              languageCode: localeCode,
+            );
 
             final adminOnlyFolderIds = TransparencyScreen.collectAdminOnlyFolderIds(allFolders);
 
@@ -1953,6 +2111,19 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
             final isDesktop = MediaQuery.of(context).size.width >= 900;
 
+            Widget buildFolderCard(Map<String, dynamic> folder) {
+              final fid = folder['id']?.toString() ?? '';
+              final name = _resolveFolderDisplayName(fid, folder, l10n);
+              return FolderCard(
+                id: fid,
+                name: name,
+                itemCount: folderItemCounts[fid] ?? 0,
+                isAdmin: _isAdmin,
+                onTap: () => _navigateToFolder(fid, name, folder),
+                onDelete: _isAdmin ? () => _confirmDeleteFolder(fid, name) : null,
+              );
+            }
+
             return ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
@@ -1969,49 +2140,28 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         childAspectRatio: 3.2,
                       ),
                       itemCount: currentFolders.length,
-                      itemBuilder: (context, index) {
-                        final folder = currentFolders[index];
-                        final fid = folder['id']?.toString() ?? '';
-                        final name = folder['name']?.toString() ?? '';
-                        return FolderCard(
-                          id: fid,
-                          name: name,
-                          itemCount: folderItemCounts[fid] ?? 0,
-                          isAdmin: _isAdmin,
-                          onTap: () => _navigateToFolder(fid, name),
-                          onDelete: _isAdmin ? () => _confirmDeleteFolder(fid, name) : null,
-                        );
-                      },
+                      itemBuilder: (context, index) => buildFolderCard(currentFolders[index]),
                     )
                   else
-                    ...currentFolders.map((folder) {
-                      final fid = folder['id']?.toString() ?? '';
-                      final name = folder['name']?.toString() ?? '';
-                      return FolderCard(
-                        id: fid,
-                        name: name,
-                        itemCount: folderItemCounts[fid] ?? 0,
-                        isAdmin: _isAdmin,
-                        onTap: () => _navigateToFolder(fid, name),
-                        onDelete: _isAdmin ? () => _confirmDeleteFolder(fid, name) : null,
-                      );
-                    }),
+                    ...currentFolders.map(buildFolderCard),
                   const SizedBox(height: 16),
                 ],
 
                 // Documents Section
                 ...currentDocs.map((doc) {
                   final docId = doc['id']?.toString() ?? '';
-                  final title = doc['title']?.toString() ?? '';
-                  final fileName = doc['fileName']?.toString() ?? '';
-                  final fileType = doc['fileType']?.toString() ?? '';
-                  final fileSize = doc['fileSize'] as int?;
+                  final title = TransparencyLocalizationHelper.resolveDocumentTitle(
+                    doc,
+                    languageCode: localeCode,
+                    fallbackTitle: l10n.untitledDocument,
+                  );
+                  final variant = TransparencyLocalizationHelper.resolveDocumentFileVariant(
+                    doc,
+                    languageCode: localeCode,
+                  );
                   final categoryId = doc['category']?.toString();
-                  final categoryName = categoryId != null && categoryId.isNotEmpty
-                      ? (_categories.firstWhere(
-                          (c) => c['id']?.toLowerCase() == categoryId.toLowerCase(),
-                          orElse: () => {'id': categoryId, 'name': categoryId},
-                        )['name'])
+                  final categoryName = (categoryId != null && categoryId.isNotEmpty)
+                      ? _resolveCategoryLabelById(categoryId, l10n)
                       : null;
 
                   DateTime? pubDate;
@@ -2031,9 +2181,9 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   return DocumentCard(
                     id: docId,
                     title: title,
-                    fileName: fileName,
-                    fileType: fileType,
-                    fileSize: fileSize,
+                    fileName: variant.fileName,
+                    fileType: variant.fileType,
+                    fileSize: variant.fileSize,
                     category: categoryName,
                     visibility: docVisibility,
                     publicationDate: pubDate,

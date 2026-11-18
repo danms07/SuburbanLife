@@ -4708,37 +4708,129 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
 
 const ALLOWED_DOCUMENT_VISIBILITIES = ['all', 'admin'];
 const ALLOWED_DOCUMENT_FILE_TYPES = ['pdf', 'md', 'txt', 'docx', 'xlsx', 'csv', 'png', 'jpg', 'jpeg', 'webp'];
+const ALLOWED_DOCUMENT_LOCALES = ['en', 'es'];
 const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit
+
+function sanitizeDocumentFileName(rawName) {
+  const normalized = (rawName || '').toString().trim().replace(/\\/g, '/');
+  const baseName = path.basename(normalized);
+  return baseName.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+function resolveValidatedFileType(rawType, safeFileName) {
+  const extFromFile = safeFileName.includes('.')
+    ? safeFileName.split('.').pop().toLowerCase()
+    : '';
+  const fileType = (rawType || extFromFile || 'pdf').toString().trim().toLowerCase();
+  if (!ALLOWED_DOCUMENT_FILE_TYPES.includes(fileType)) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Unsupported fileType "${fileType}". Allowed types: ${ALLOWED_DOCUMENT_FILE_TYPES.join(', ')}`
+    );
+  }
+  return fileType;
+}
+
+function normalizeLocalizedStringMap(rawMap, fieldLabel) {
+  if (rawMap === undefined || rawMap === null) {
+    return null;
+  }
+  if (typeof rawMap !== 'object' || Array.isArray(rawMap)) {
+    throw new HttpsError('invalid-argument', `${fieldLabel} must be an object keyed by locale.`);
+  }
+  const normalized = {};
+  for (const [localeKey, rawVal] of Object.entries(rawMap)) {
+    const locale = localeKey.toString().trim().toLowerCase();
+    if (!ALLOWED_DOCUMENT_LOCALES.includes(locale)) {
+      throw new HttpsError(
+        'invalid-argument',
+        `Unsupported locale "${locale}" in ${fieldLabel}. Allowed locales: ${ALLOWED_DOCUMENT_LOCALES.join(', ')}`
+      );
+    }
+    const cleanVal = (rawVal || '').toString().trim().slice(0, 120);
+    if (cleanVal) {
+      normalized[locale] = cleanVal;
+    }
+  }
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function isManagedTransparencyStoragePath(storagePath) {
+  if (typeof storagePath !== 'string') return false;
+  const trimmed = storagePath.trim();
+  if (!trimmed || trimmed.includes('..') || trimmed.includes('\\')) return false;
+  return trimmed.startsWith('documents/') || trimmed.startsWith('documents/admin_only/');
+}
+
+async function uploadTransparencyFile({
+  bucket,
+  fileBase64,
+  fileType,
+  fileName,
+  visibility,
+  docPrefix,
+  uploaderUid,
+}) {
+  const fileBuffer = Buffer.from(fileBase64, 'base64');
+  if (fileBuffer.length === 0 || fileBuffer.length > MAX_DOCUMENT_SIZE_BYTES) {
+    throw new HttpsError('invalid-argument', 'File size must be between 1 byte and 10 MB.');
+  }
+
+  // Validate PDF magic bytes header (%PDF-) when fileType is pdf
+  if (fileType === 'pdf') {
+    const magicHeader = fileBuffer.subarray(0, 5).toString('ascii');
+    if (magicHeader !== '%PDF-') {
+      throw new HttpsError('invalid-argument', 'Invalid PDF content: missing %PDF- magic header.');
+    }
+  }
+
+  // TODO(security): Integrate with an antivirus API and CDR tool to scan and strip active macros/scripts if untrusted uploads are accepted.
+  const fileSize = fileBuffer.length;
+  const prefix = visibility === 'admin' ? 'documents/admin_only' : 'documents';
+  const storagePath = `${prefix}/${docPrefix}_${fileName}`;
+  const downloadToken = crypto.randomUUID();
+
+  const contentTypeMap = {
+    pdf: 'application/pdf',
+    md: 'text/markdown; charset=utf-8',
+    txt: 'text/plain; charset=utf-8',
+    csv: 'text/csv; charset=utf-8',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+  };
+
+  await bucket.file(storagePath).save(fileBuffer, {
+    resumable: false,
+    metadata: {
+      contentType: contentTypeMap[fileType] || 'application/octet-stream',
+      contentDisposition: `attachment; filename="${fileName}"`,
+      metadata: {
+        firebaseStorageDownloadTokens: downloadToken,
+        visibility,
+        uploaderUid,
+      },
+    },
+  });
+
+  const encodedPath = encodeURIComponent(storagePath);
+  const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+  return { url: downloadUrl, storagePath, fileSize };
+}
 
 /**
  * Validates and normalizes input parameters for publishing/syncing a document
- * into the Transparency section.
+ * into the Transparency section (supports both single-file and bilingual payloads).
  */
 function validateTransparencyDocInput(data) {
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new HttpsError('invalid-argument', 'Document payload must be a valid object.');
   }
 
   const rawTitle = (data.title || '').toString().trim();
   if (!rawTitle || rawTitle.length > 200) {
     throw new HttpsError('invalid-argument', 'Document title is required and must be at most 200 characters.');
-  }
-
-  const rawFileName = path.basename((data.fileName || '').toString().trim());
-  const safeFileName = rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-  if (!safeFileName || safeFileName === '.' || safeFileName === '..' || safeFileName.length > 200) {
-    throw new HttpsError('invalid-argument', 'A valid fileName is required.');
-  }
-
-  const extFromFile = safeFileName.includes('.')
-    ? safeFileName.split('.').pop().toLowerCase()
-    : '';
-  const fileType = ((data.fileType || extFromFile || 'pdf').toString().trim().toLowerCase());
-  if (!ALLOWED_DOCUMENT_FILE_TYPES.includes(fileType)) {
-    throw new HttpsError(
-      'invalid-argument',
-      `Unsupported fileType "${fileType}". Allowed types: ${ALLOWED_DOCUMENT_FILE_TYPES.join(', ')}`
-    );
   }
 
   const visibility = ((data.visibility || 'all').toString().trim().toLowerCase());
@@ -4749,6 +4841,54 @@ function validateTransparencyDocInput(data) {
     );
   }
 
+  let validatedTranslations = null;
+  if (data.translations !== undefined && data.translations !== null) {
+    if (typeof data.translations !== 'object' || Array.isArray(data.translations)) {
+      throw new HttpsError('invalid-argument', 'translations must be an object keyed by locale.');
+    }
+    validatedTranslations = {};
+    for (const [localeKey, entry] of Object.entries(data.translations)) {
+      const locale = localeKey.toString().trim().toLowerCase();
+      if (!ALLOWED_DOCUMENT_LOCALES.includes(locale)) {
+        throw new HttpsError(
+          'invalid-argument',
+          `Unsupported locale "${locale}" in translations. Allowed locales: ${ALLOWED_DOCUMENT_LOCALES.join(', ')}`
+        );
+      }
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        throw new HttpsError('invalid-argument', `Translation entry "${locale}" must be an object.`);
+      }
+      const entryTitle = (entry.title || rawTitle).toString().trim();
+      if (!entryTitle || entryTitle.length > 200) {
+        throw new HttpsError('invalid-argument', `Translation title for "${locale}" must be between 1 and 200 characters.`);
+      }
+      const safeEntryFileName = sanitizeDocumentFileName(entry.fileName);
+      if (!safeEntryFileName || safeEntryFileName === '.' || safeEntryFileName === '..' || safeEntryFileName.length > 200) {
+        throw new HttpsError('invalid-argument', `A valid fileName is required for translation "${locale}".`);
+      }
+      const entryFileType = resolveValidatedFileType(entry.fileType || data.fileType, safeEntryFileName);
+      validatedTranslations[locale] = {
+        title: entryTitle,
+        fileName: safeEntryFileName,
+        fileType: entryFileType,
+      };
+    }
+    if (Object.keys(validatedTranslations).length === 0) {
+      validatedTranslations = null;
+    }
+  }
+
+  const fallbackTranslation = validatedTranslations
+    ? (validatedTranslations.en || Object.values(validatedTranslations)[0])
+    : null;
+
+  const safeFileName = sanitizeDocumentFileName(data.fileName || fallbackTranslation?.fileName || '');
+  if (!safeFileName || safeFileName === '.' || safeFileName === '..' || safeFileName.length > 200) {
+    throw new HttpsError('invalid-argument', 'A valid fileName is required.');
+  }
+
+  const fileType = resolveValidatedFileType(data.fileType || fallbackTranslation?.fileType, safeFileName);
+
   const rawDocId = (data.docId || data.id || '').toString().trim();
   const safeDocId = rawDocId ? rawDocId.replace(/[^a-zA-Z0-9_-]/g, '_') : '';
 
@@ -4756,6 +4896,9 @@ function validateTransparencyDocInput(data) {
   const categoryName = (data.categoryName || 'Manuales / Manuals').toString().trim().slice(0, 100);
   const folderId = ((data.folderId || 'root').toString().trim()).replace(/[^a-zA-Z0-9_-]/g, '_') || 'root';
   const folderName = (data.folderName || '').toString().trim().slice(0, 120);
+  const folderNameKey = (data.folderNameKey || '').toString().trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100);
+  const folderLocalizedNames = normalizeLocalizedStringMap(data.folderLocalizedNames, 'folderLocalizedNames');
+  const categoryLocalizedNames = normalizeLocalizedStringMap(data.categoryLocalizedNames, 'categoryLocalizedNames');
 
   return {
     docId: safeDocId,
@@ -4767,110 +4910,176 @@ function validateTransparencyDocInput(data) {
     categoryName,
     folderId,
     folderName,
+    folderNameKey,
+    folderLocalizedNames,
+    categoryLocalizedNames,
+    translations: validatedTranslations,
   };
 }
 
 /**
  * Callable Cloud Function: syncTransparencyDocument
  * Populates or updates a document in the Transparency section (`documents` collection),
- * optionally uploading the binary PDF/file to Cloud Storage using the Service Account
- * and enforcing document visibility ('all' vs 'admin').
+ * supporting single-file or multi-locale (`translations`) uploads via Admin SDK and
+ * safely cleaning up replaced Cloud Storage objects on overwrite.
  */
 exports.syncTransparencyDocument = onCall(callableOptions, async (request) => {
   if (!request.auth || request.auth.token.admin !== true) {
     throw new HttpsError('permission-denied', 'Only administrators can sync transparency documents.');
   }
 
-  const validated = validateTransparencyDocInput(request.data || {});
+  const payload = request.data || {};
+  const validated = validateTransparencyDocInput(payload);
   const db = admin.firestore();
+  const bucket = admin.storage().bucket();
   const uploaderUid = request.auth.uid;
+  const docPrefix = validated.docId || crypto.randomUUID();
 
-  let downloadUrl = (request.data.url || '').toString().trim();
-  let storagePath = (request.data.storagePath || '').toString().trim();
-  let fileSize = typeof request.data.fileSize === 'number' && request.data.fileSize >= 0
-    ? request.data.fileSize
+  let downloadUrl = (payload.url || '').toString().trim();
+  let storagePath = (payload.storagePath || '').toString().trim();
+  let fileSize = typeof payload.fileSize === 'number' && payload.fileSize >= 0
+    ? payload.fileSize
     : 0;
+  let primaryTitle = validated.title;
+  let primaryFileName = validated.fileName;
+  let primaryFileType = validated.fileType;
 
-  // If base64 file content is provided, upload directly to Cloud Storage via Admin SDK
-  if (request.data.fileBase64 && typeof request.data.fileBase64 === 'string') {
-    const fileBuffer = Buffer.from(request.data.fileBase64, 'base64');
-    if (fileBuffer.length === 0 || fileBuffer.length > MAX_DOCUMENT_SIZE_BYTES) {
-      throw new HttpsError('invalid-argument', 'File size must be between 1 byte and 10 MB.');
-    }
+  let translatedTitles = null;
+  let translatedFiles = null;
 
-    // Validate PDF magic bytes header (%PDF-) when fileType is pdf
-    if (validated.fileType === 'pdf') {
-      const magicHeader = fileBuffer.subarray(0, 5).toString('ascii');
-      if (magicHeader !== '%PDF-') {
-        throw new HttpsError('invalid-argument', 'Invalid PDF content: missing %PDF- magic header.');
-      }
-    }
+  if (validated.translations) {
+    translatedTitles = {};
+    translatedFiles = {};
 
-    // TODO(security): Integrate with an antivirus API and CDR tool to scan and strip active macros/scripts if untrusted uploads are accepted.
-    fileSize = fileBuffer.length;
-    const prefix = validated.visibility === 'admin' ? 'documents/admin_only' : 'documents';
-    const uniqueId = crypto.randomUUID();
-    storagePath = `${prefix}/${validated.docId || uniqueId}_${validated.fileName}`;
+    for (const locale of ALLOWED_DOCUMENT_LOCALES) {
+      const entrySpec = validated.translations[locale];
+      if (!entrySpec) continue;
 
-    const bucket = admin.storage().bucket();
-    const fileRef = bucket.file(storagePath);
-    const downloadToken = crypto.randomUUID();
+      const rawEntry = payload.translations[locale] || {};
+      translatedTitles[locale] = entrySpec.title;
 
-    const contentTypeMap = {
-      pdf: 'application/pdf',
-      md: 'text/markdown; charset=utf-8',
-      txt: 'text/plain; charset=utf-8',
-      csv: 'text/csv; charset=utf-8',
-      png: 'image/png',
-      jpg: 'image/jpeg',
-      jpeg: 'image/jpeg',
-      webp: 'image/webp',
-    };
+      let entryUrl = (rawEntry.url || '').toString().trim();
+      let entryStoragePath = (rawEntry.storagePath || '').toString().trim();
+      let entryFileSize = typeof rawEntry.fileSize === 'number' && rawEntry.fileSize >= 0
+        ? rawEntry.fileSize
+        : 0;
 
-    await fileRef.save(fileBuffer, {
-      resumable: false,
-      metadata: {
-        contentType: contentTypeMap[validated.fileType] || 'application/octet-stream',
-        contentDisposition: `attachment; filename="${validated.fileName}"`,
-        metadata: {
-          firebaseStorageDownloadTokens: downloadToken,
+      if (rawEntry.fileBase64 && typeof rawEntry.fileBase64 === 'string') {
+        const uploaded = await uploadTransparencyFile({
+          bucket,
+          fileBase64: rawEntry.fileBase64,
+          fileType: entrySpec.fileType,
+          fileName: entrySpec.fileName,
           visibility: validated.visibility,
+          docPrefix,
           uploaderUid,
-        },
-      },
-    });
+        });
+        entryUrl = uploaded.url;
+        entryStoragePath = uploaded.storagePath;
+        entryFileSize = uploaded.fileSize;
+      }
 
-    const encodedPath = encodeURIComponent(storagePath);
-    downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
+      if (!entryUrl) {
+        throw new HttpsError(
+          'invalid-argument',
+          `Translation "${locale}" requires either fileBase64 or a valid Storage url.`
+        );
+      }
+
+      translatedFiles[locale] = {
+        url: entryUrl,
+        storagePath: entryStoragePath,
+        fileName: entrySpec.fileName,
+        fileSize: entryFileSize,
+      };
+    }
+
+    const fallbackLocale = translatedFiles.en ? 'en' : Object.keys(translatedFiles)[0];
+    if (fallbackLocale && (!payload.fileBase64 || typeof payload.fileBase64 !== 'string')) {
+      const fallbackMeta = translatedFiles[fallbackLocale];
+      downloadUrl = fallbackMeta.url;
+      storagePath = fallbackMeta.storagePath;
+      fileSize = fallbackMeta.fileSize;
+      primaryFileName = fallbackMeta.fileName;
+      primaryTitle = translatedTitles[fallbackLocale] || validated.title;
+      primaryFileType = validated.translations[fallbackLocale]?.fileType || validated.fileType;
+    }
+  }
+
+  // If explicit top-level base64 file content is provided, upload it directly
+  if (payload.fileBase64 && typeof payload.fileBase64 === 'string') {
+    const uploaded = await uploadTransparencyFile({
+      bucket,
+      fileBase64: payload.fileBase64,
+      fileType: validated.fileType,
+      fileName: validated.fileName,
+      visibility: validated.visibility,
+      docPrefix,
+      uploaderUid,
+    });
+    downloadUrl = uploaded.url;
+    storagePath = uploaded.storagePath;
+    fileSize = uploaded.fileSize;
   }
 
   if (!downloadUrl) {
     throw new HttpsError('invalid-argument', 'Either fileBase64 or a valid Storage url must be provided.');
   }
 
-  // Ensure document category exists
+  // Ensure document category exists (and backfill localizedNames if missing)
   if (validated.category) {
     const catRef = db.collection('document_categories').doc(validated.category);
     const catSnap = await catRef.get();
     if (!catSnap.exists) {
-      await catRef.set({
+      const catDoc = {
         name: validated.categoryName || validated.category,
         createdAt: FieldValue.serverTimestamp(),
-      });
+      };
+      if (validated.categoryLocalizedNames) {
+        catDoc.localizedNames = validated.categoryLocalizedNames;
+      }
+      await catRef.set(catDoc);
+    } else if (validated.categoryLocalizedNames && !catSnap.data()?.localizedNames) {
+      await catRef.set({ localizedNames: validated.categoryLocalizedNames }, { merge: true });
     }
   }
 
-  // Ensure target virtual folder exists if not root
-  if (validated.folderId !== 'root' && validated.folderName) {
+  // Ensure target virtual folder exists if not root (setting visibility and localization metadata)
+  if (validated.folderId !== 'root' && (validated.folderName || validated.folderNameKey || validated.folderLocalizedNames)) {
     const folderRef = db.collection('document_folders').doc(validated.folderId);
     const folderSnap = await folderRef.get();
+    const defaultFolderVisibility = validated.folderId === 'official_manuals' ? 'admin' : 'all';
+
     if (!folderSnap.exists) {
-      await folderRef.set({
-        name: validated.folderName,
+      const folderDoc = {
+        name: validated.folderName || validated.folderId,
         parentId: 'root',
+        visibility: defaultFolderVisibility,
         createdAt: FieldValue.serverTimestamp(),
         createdBy: uploaderUid,
-      });
+      };
+      if (validated.folderNameKey) {
+        folderDoc.nameKey = validated.folderNameKey;
+      }
+      if (validated.folderLocalizedNames) {
+        folderDoc.localizedNames = validated.folderLocalizedNames;
+      }
+      await folderRef.set(folderDoc);
+    } else {
+      const existingFolder = folderSnap.data() || {};
+      const folderPatch = {};
+      if (existingFolder.visibility === undefined || existingFolder.visibility === null) {
+        folderPatch.visibility = defaultFolderVisibility;
+      }
+      if (validated.folderNameKey && !existingFolder.nameKey) {
+        folderPatch.nameKey = validated.folderNameKey;
+      }
+      if (validated.folderLocalizedNames && !existingFolder.localizedNames) {
+        folderPatch.localizedNames = validated.folderLocalizedNames;
+      }
+      if (Object.keys(folderPatch).length > 0) {
+        await folderRef.set(folderPatch, { merge: true });
+      }
     }
   }
 
@@ -4879,12 +5088,13 @@ exports.syncTransparencyDocument = onCall(callableOptions, async (request) => {
     : db.collection('documents').doc();
 
   const existingSnap = await docRef.get();
+  const existingData = existingSnap.exists ? (existingSnap.data() || {}) : {};
   const now = FieldValue.serverTimestamp();
 
   const docData = {
-    title: validated.title,
-    fileName: validated.fileName,
-    fileType: validated.fileType,
+    title: primaryTitle,
+    fileName: primaryFileName,
+    fileType: primaryFileType,
     fileSize,
     category: validated.category,
     folderId: validated.folderId,
@@ -4896,19 +5106,65 @@ exports.syncTransparencyDocument = onCall(callableOptions, async (request) => {
     uploaderUid,
   };
 
+  if (translatedTitles) {
+    docData.translatedTitles = translatedTitles;
+  }
+  if (translatedFiles) {
+    docData.translatedFiles = translatedFiles;
+  }
   if (!existingSnap.exists) {
     docData.uploadedAt = now;
   }
 
   await docRef.set(docData, { merge: true });
 
-  return {
+  // Clean up any overwritten/replaced Storage files inside the managed Transparency prefix
+  if (existingSnap.exists) {
+    const oldPaths = new Set();
+    if (isManagedTransparencyStoragePath(existingData.storagePath)) {
+      oldPaths.add(existingData.storagePath.trim());
+    }
+    if (existingData.translatedFiles && typeof existingData.translatedFiles === 'object') {
+      for (const fileMeta of Object.values(existingData.translatedFiles)) {
+        if (fileMeta && isManagedTransparencyStoragePath(fileMeta.storagePath)) {
+          oldPaths.add(fileMeta.storagePath.trim());
+        }
+      }
+    }
+
+    const activePaths = new Set();
+    if (isManagedTransparencyStoragePath(storagePath)) {
+      activePaths.add(storagePath.trim());
+    }
+    if (translatedFiles) {
+      for (const fileMeta of Object.values(translatedFiles)) {
+        if (fileMeta && isManagedTransparencyStoragePath(fileMeta.storagePath)) {
+          activePaths.add(fileMeta.storagePath.trim());
+        }
+      }
+    }
+
+    for (const stalePath of oldPaths) {
+      if (activePaths.has(stalePath)) continue;
+      try {
+        await bucket.file(stalePath).delete({ ignoreNotFound: true });
+      } catch (cleanupErr) {
+        logger.warn(`Failed to delete replaced Transparency file "${stalePath}": ${cleanupErr.message}`);
+      }
+    }
+  }
+
+  const response = {
     success: true,
     docId: docRef.id,
     visibility: validated.visibility,
     url: downloadUrl,
     storagePath,
   };
+  if (translatedFiles) {
+    response.translatedFiles = translatedFiles;
+  }
+  return response;
 });
 
 /**
@@ -5113,6 +5369,7 @@ exports._test = {
   validateHouseholdBookingRestriction,
   recalculateAddressPaymentStatus,
   validateTransparencyDocInput,
+  isManagedTransparencyStoragePath,
   isEmulator,
   callableOptions,
   BRAND_COLORS,

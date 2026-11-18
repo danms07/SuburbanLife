@@ -2970,4 +2970,100 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get authOnlyAccountNotice =>
       'Solo cuenta de autenticación (sin perfil creado aún).';
+
+  @override
+  String get folderFinancialReports => 'Reportes Financieros';
+
+  @override
+  String get folderOfficialManuals => 'Manuales Oficiales';
+
+  @override
+  String get docCategoryFinancial => 'Finanzas';
+
+  @override
+  String get docCategoryNormatives => 'Normativas';
+
+  @override
+  String get docCategoryContracts => 'Contratos';
+
+  @override
+  String get docCategoryCommuniques => 'Comunicados';
+
+  @override
+  String get docCategoryManuals => 'Manuales';
+
+  @override
+  String get docCategoryGeneral => 'General';
+
+  @override
+  String get documentLanguageLabel => 'Idioma del documento';
+
+  @override
+  String get switchToSpanishTooltip => 'Ver documento en Español';
+
+  @override
+  String get switchToEnglishTooltip => 'Ver documento en Inglés';
+
+  @override
+  String transparencyReportHeading(String title) {
+    return 'Resumen Financiero — $title';
+  }
+
+  @override
+  String transparencyPeriodRangeLine(String start, String end) {
+    return '**Rango del Periodo:** $start a $end';
+  }
+
+  @override
+  String get transparencySummarySection => 'Resumen';
+
+  @override
+  String get transparencyMetricHeader => 'Métrica';
+
+  @override
+  String get transparencyAmountHeader => 'Monto';
+
+  @override
+  String get transparencyTotalIncomeLabel => 'Ingresos Totales';
+
+  @override
+  String get transparencyMonthlyBreakdownSection => 'Desglose Mensual';
+
+  @override
+  String get transparencyColumnPeriod => 'Periodo';
+
+  @override
+  String get transparencyColumnQuotas => 'Cuotas';
+
+  @override
+  String get transparencyColumnSanctions => 'Sanciones';
+
+  @override
+  String get transparencyColumnTotalIncome => 'Ingresos';
+
+  @override
+  String get transparencyColumnExpenses => 'Gastos';
+
+  @override
+  String get transparencyColumnNet => 'Neto';
+
+  @override
+  String get transparencyColumnAccumulatedBudget => 'Presupuesto Acumulado';
+
+  @override
+  String get transparencyActiveExpensesSection =>
+      'Gastos Activos de la Comunidad';
+
+  @override
+  String get transparencyNoActiveExpenses =>
+      'No hay gastos activos registrados en este rango de periodos.';
+
+  @override
+  String get transparencyColumnDate => 'Fecha';
+
+  @override
+  String get transparencyColumnProductService => 'Producto / Servicio';
+
+  @override
+  String get transparencyColumnCategory => 'Categoría';
 }

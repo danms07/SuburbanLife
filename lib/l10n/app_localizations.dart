@@ -5321,6 +5321,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auth account only (profile not created yet).'**
   String get authOnlyAccountNotice;
+
+  /// No description provided for @folderFinancialReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Reports'**
+  String get folderFinancialReports;
+
+  /// No description provided for @folderOfficialManuals.
+  ///
+  /// In en, this message translates to:
+  /// **'Official Manuals'**
+  String get folderOfficialManuals;
+
+  /// No description provided for @docCategoryFinancial.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial'**
+  String get docCategoryFinancial;
+
+  /// No description provided for @docCategoryNormatives.
+  ///
+  /// In en, this message translates to:
+  /// **'Normatives'**
+  String get docCategoryNormatives;
+
+  /// No description provided for @docCategoryContracts.
+  ///
+  /// In en, this message translates to:
+  /// **'Contracts'**
+  String get docCategoryContracts;
+
+  /// No description provided for @docCategoryCommuniques.
+  ///
+  /// In en, this message translates to:
+  /// **'Communiques'**
+  String get docCategoryCommuniques;
+
+  /// No description provided for @docCategoryManuals.
+  ///
+  /// In en, this message translates to:
+  /// **'Manuals'**
+  String get docCategoryManuals;
+
+  /// No description provided for @docCategoryGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get docCategoryGeneral;
+
+  /// No description provided for @documentLanguageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Document language'**
+  String get documentLanguageLabel;
+
+  /// No description provided for @switchToSpanishTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'View document in Spanish'**
+  String get switchToSpanishTooltip;
+
+  /// No description provided for @switchToEnglishTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'View document in English'**
+  String get switchToEnglishTooltip;
+
+  /// No description provided for @transparencyReportHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial Summary — {title}'**
+  String transparencyReportHeading(String title);
+
+  /// No description provided for @transparencyPeriodRangeLine.
+  ///
+  /// In en, this message translates to:
+  /// **'**Period Range:** {start} to {end}'**
+  String transparencyPeriodRangeLine(String start, String end);
+
+  /// No description provided for @transparencySummarySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get transparencySummarySection;
+
+  /// No description provided for @transparencyMetricHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric'**
+  String get transparencyMetricHeader;
+
+  /// No description provided for @transparencyAmountHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get transparencyAmountHeader;
+
+  /// No description provided for @transparencyTotalIncomeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Income'**
+  String get transparencyTotalIncomeLabel;
+
+  /// No description provided for @transparencyMonthlyBreakdownSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly Breakdown'**
+  String get transparencyMonthlyBreakdownSection;
+
+  /// No description provided for @transparencyColumnPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get transparencyColumnPeriod;
+
+  /// No description provided for @transparencyColumnQuotas.
+  ///
+  /// In en, this message translates to:
+  /// **'Quotas'**
+  String get transparencyColumnQuotas;
+
+  /// No description provided for @transparencyColumnSanctions.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanctions'**
+  String get transparencyColumnSanctions;
+
+  /// No description provided for @transparencyColumnTotalIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Income'**
+  String get transparencyColumnTotalIncome;
+
+  /// No description provided for @transparencyColumnExpenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Expenses'**
+  String get transparencyColumnExpenses;
+
+  /// No description provided for @transparencyColumnNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get transparencyColumnNet;
+
+  /// No description provided for @transparencyColumnAccumulatedBudget.
+  ///
+  /// In en, this message translates to:
+  /// **'Accumulated Budget'**
+  String get transparencyColumnAccumulatedBudget;
+
+  /// No description provided for @transparencyActiveExpensesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Community Expenses'**
+  String get transparencyActiveExpensesSection;
+
+  /// No description provided for @transparencyNoActiveExpenses.
+  ///
+  /// In en, this message translates to:
+  /// **'No active expenses recorded in this period range.'**
+  String get transparencyNoActiveExpenses;
+
+  /// No description provided for @transparencyColumnDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get transparencyColumnDate;
+
+  /// No description provided for @transparencyColumnProductService.
+  ///
+  /// In en, this message translates to:
+  /// **'Product / Service'**
+  String get transparencyColumnProductService;
+
+  /// No description provided for @transparencyColumnCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get transparencyColumnCategory;
 }
 
 class _AppLocalizationsDelegate

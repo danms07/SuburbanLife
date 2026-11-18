@@ -1320,5 +1320,46 @@
   "onboardingIncompleteBadge": "Onboarding Incomplete",
   "incompleteOnboardingFilter": "Onboarding Pending",
   "onboardingIncompleteDetailsNotice": "This user has not finished onboarding yet.",
-  "authOnlyAccountNotice": "Auth account only (profile not created yet)."
+  "authOnlyAccountNotice": "Auth account only (profile not created yet).",
+  "folderFinancialReports": "Financial Reports",
+  "folderOfficialManuals": "Official Manuals",
+  "docCategoryFinancial": "Financial",
+  "docCategoryNormatives": "Normatives",
+  "docCategoryContracts": "Contracts",
+  "docCategoryCommuniques": "Communiques",
+  "docCategoryManuals": "Manuals",
+  "docCategoryGeneral": "General",
+  "documentLanguageLabel": "Document language",
+  "switchToSpanishTooltip": "View document in Spanish",
+  "switchToEnglishTooltip": "View document in English",
+  "transparencyReportHeading": "Financial Summary — {title}",
+  "@transparencyReportHeading": {
+    "placeholders": {
+      "title": { "type": "String" }
+    }
+  },
+  "transparencyPeriodRangeLine": "**Period Range:** {start} to {end}",
+  "@transparencyPeriodRangeLine": {
+    "placeholders": {
+      "start": { "type": "String" },
+      "end": { "type": "String" }
+    }
+  },
+  "transparencySummarySection": "Summary",
+  "transparencyMetricHeader": "Metric",
+  "transparencyAmountHeader": "Amount",
+  "transparencyTotalIncomeLabel": "Total Income",
+  "transparencyMonthlyBreakdownSection": "Monthly Breakdown",
+  "transparencyColumnPeriod": "Period",
+  "transparencyColumnQuotas": "Quotas",
+  "transparencyColumnSanctions": "Sanctions",
+  "transparencyColumnTotalIncome": "Total Income",
+  "transparencyColumnExpenses": "Expenses",
+  "transparencyColumnNet": "Net",
+  "transparencyColumnAccumulatedBudget": "Accumulated Budget",
+  "transparencyActiveExpensesSection": "Active Community Expenses",
+  "transparencyNoActiveExpenses": "No active expenses recorded in this period range.",
+  "transparencyColumnDate": "Date",
+  "transparencyColumnProductService": "Product / Service",
+  "transparencyColumnCategory": "Category"
 }

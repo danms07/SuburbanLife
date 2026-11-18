@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/document_cache_service.dart';
 import '../../l10n/app_localizations.dart';
+import 'transparency_localization_helper.dart';
 
 class DocumentViewerScreen extends StatefulWidget {
   final String docId;
@@ -16,6 +17,9 @@ class DocumentViewerScreen extends StatefulWidget {
   final String? category;
   final DateTime? publicationDate;
   final int? fileSize;
+  final String? initialLanguageCode;
+  final Map<String, String>? translatedTitles;
+  final Map<String, Map<String, dynamic>>? translatedFiles;
 
   const DocumentViewerScreen({
     Key? key,
@@ -27,6 +31,9 @@ class DocumentViewerScreen extends StatefulWidget {
     this.category,
     this.publicationDate,
     this.fileSize,
+    this.initialLanguageCode,
+    this.translatedTitles,
+    this.translatedFiles,
   }) : super(key: key);
 
   @override
@@ -40,30 +47,94 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   String? _errorMessage;
   bool _isCached = false;
   double _fontSizeMultiplier = 1.0;
+  late String _activeLang;
+
+  List<String> get _availableLanguages {
+    final files = widget.translatedFiles;
+    if (files == null || files.isEmpty) return const [];
+    final ordered = <String>[];
+    for (final lang in const ['es', 'en']) {
+      final url = files[lang]?['url']?.toString().trim() ?? '';
+      if (url.isNotEmpty) ordered.add(lang);
+    }
+    return ordered;
+  }
+
+  String get _activeTitle {
+    final localized = widget.translatedTitles?[_activeLang]?.trim();
+    if (localized != null && localized.isNotEmpty) return localized;
+    return widget.title;
+  }
+
+  String get _activeFileName {
+    final localized =
+        widget.translatedFiles?[_activeLang]?['fileName']?.toString().trim();
+    if (localized != null && localized.isNotEmpty) return localized;
+    return widget.fileName;
+  }
+
+  String get _activeUrl {
+    final localized =
+        widget.translatedFiles?[_activeLang]?['url']?.toString().trim();
+    if (localized != null && localized.isNotEmpty) return localized;
+    return widget.url;
+  }
+
+  int? get _activeFileSize {
+    final localizedSize =
+        (widget.translatedFiles?[_activeLang]?['fileSize'] as num?)?.toInt();
+    return localizedSize ?? widget.fileSize;
+  }
 
   @override
   void initState() {
     super.initState();
+    _activeLang = _resolveInitialLanguage();
+    _loadDocumentContent();
+  }
+
+  String _resolveInitialLanguage() {
+    final available = _availableLanguages;
+    if (available.isEmpty) {
+      final initial = widget.initialLanguageCode?.trim().toLowerCase() ?? 'en';
+      return initial.startsWith('es') ? 'es' : 'en';
+    }
+    final initial = widget.initialLanguageCode?.trim().toLowerCase() ?? 'en';
+    final normalized = initial.startsWith('es') ? 'es' : 'en';
+    if (available.contains(normalized)) return normalized;
+    if (available.contains('en')) return 'en';
+    return available.first;
+  }
+
+  void _switchLanguage(String lang) {
+    if (lang == _activeLang || !_availableLanguages.contains(lang)) return;
+    setState(() {
+      _activeLang = lang;
+    });
     _loadDocumentContent();
   }
 
   void _loadDocumentContent() async {
+    final requestedLang = _activeLang;
+    final activeFileName = _activeFileName;
+    final activeUrl = _activeUrl;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final isCachedBefore = await _cacheService.isCached(widget.docId, widget.fileName);
+      final isCachedBefore = await _cacheService.isCached(widget.docId, activeFileName);
       final bytes = await _cacheService.getOrDownloadBytes(
         widget.docId,
-        widget.url,
-        widget.fileName,
+        activeUrl,
+        activeFileName,
       );
 
       final text = utf8.decode(bytes, allowMalformed: true);
 
-      if (mounted) {
+      if (mounted && _activeLang == requestedLang) {
         setState(() {
           _content = text;
           _isLoading = false;
@@ -72,7 +143,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       }
     } catch (e) {
       debugPrint('Error loading document content: $e');
-      if (mounted) {
+      if (mounted && _activeLang == requestedLang) {
         setState(() {
           _errorMessage = e.toString();
           _isLoading = false;
@@ -85,7 +156,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     if (_content != null && _content!.isNotEmpty) {
       Share.share(
         _content!,
-        subject: widget.title,
+        subject: _activeTitle,
       );
     }
   }
@@ -116,7 +187,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final isMarkdown = widget.fileType.toLowerCase() == 'md' || widget.fileName.toLowerCase().endsWith('.md');
+    final availableLangs = _availableLanguages;
+    final isMarkdown = widget.fileType.toLowerCase() == 'md' || _activeFileName.toLowerCase().endsWith('.md');
 
     return Scaffold(
       appBar: AppBar(
@@ -125,7 +197,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              widget.title,
+              _activeTitle,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -171,11 +243,16 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           ),
         ],
       ),
-      body: _buildBody(context, l10n, isMarkdown),
+      body: _buildBody(context, l10n, isMarkdown, availableLangs),
     );
   }
 
-  Widget _buildBody(BuildContext context, AppLocalizations l10n, bool isMarkdown) {
+  Widget _buildBody(
+    BuildContext context,
+    AppLocalizations l10n,
+    bool isMarkdown,
+    List<String> availableLangs,
+  ) {
     if (_isLoading) {
       return Center(
         child: Column(
@@ -224,10 +301,20 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       );
     }
 
+    final resolvedCategory = (widget.category != null && widget.category!.isNotEmpty)
+        ? TransparencyLocalizationHelper.resolveCategoryDisplayName(
+            categoryId: widget.category!,
+            rawName: widget.category!,
+            l10n: l10n,
+          )
+        : null;
+    final activeFileSize = _activeFileSize;
+
     return Column(
       children: [
         // Metadata header bar
         Container(
+          width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -235,51 +322,112 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           ),
           child: Row(
             children: [
-              // Category Chip
-              if (widget.category != null && widget.category!.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: AppConfig.primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    widget.category!.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppConfig.primaryColor,
-                    ),
-                  ),
-                ),
-
-              // File Size
-              if (widget.fileSize != null)
-                Text(
-                  _formatFileSize(widget.fileSize!),
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                ),
-
-              const Spacer(),
-
-              // Cache Status
-              if (_isCached)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Icon(Icons.offline_pin, size: 16, color: Colors.green.shade700),
-                    const SizedBox(width: 4),
-                    Text(
-                      l10n.cachedLocally,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.green.shade800,
-                        fontWeight: FontWeight.w600,
+                    // Category Chip
+                    if (resolvedCategory != null && resolvedCategory.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppConfig.primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          resolvedCategory.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppConfig.primaryColor,
+                          ),
+                        ),
                       ),
-                    ),
+
+                    // File Size
+                    if (activeFileSize != null)
+                      Text(
+                        _formatFileSize(activeFileSize),
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+
+                    // Cache Status
+                    if (_isCached)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.offline_pin, size: 16, color: Colors.green.shade700),
+                          const SizedBox(width: 4),
+                          Text(
+                            l10n.cachedLocally,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.green.shade800,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
+              ),
+              if (availableLangs.length > 1) ...[
+                const SizedBox(width: 8),
+                Semantics(
+                  label: l10n.documentLanguageLabel,
+                  child: Container(
+                    key: const ValueKey('document_viewer_language_switcher'),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppConfig.primaryColor.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: availableLangs.map((lang) {
+                        final isSelected = lang == _activeLang;
+                        final tooltip = lang == 'es'
+                            ? l10n.switchToSpanishTooltip
+                            : l10n.switchToEnglishTooltip;
+                        return Tooltip(
+                          message: tooltip,
+                          child: InkWell(
+                            key: ValueKey('document_viewer_lang_$lang'),
+                            onTap: () => _switchLanguage(lang),
+                            borderRadius: BorderRadius.circular(7),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppConfig.primaryColor
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                              child: Text(
+                                lang.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppConfig.primaryColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

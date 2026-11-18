@@ -1,3 +1,6 @@
+import 'dart:ui';
+
+import '../../l10n/app_localizations.dart';
 import 'expense_service.dart';
 
 /// Monthly financial breakdown row for cashflow & running budget reporting.
@@ -418,11 +421,68 @@ class FinancialReportCalculator {
     return sb.toString();
   }
 
+  /// Formats the short card title representing a ledger's period span (e.g. `'2026-06 – 2026-11'` or `'2026-11'`).
+  static String formatTransparencyPeriodTitle(
+    String startPeriod,
+    String endPeriod,
+  ) {
+    final start = startPeriod.trim();
+    final end = endPeriod.trim();
+    if (start.isEmpty) return end;
+    if (end.isEmpty || start == end) return start;
+    return '$start – $end';
+  }
+
+  /// Generates a deterministic Firestore document ID for a published Transparency period span.
+  static String buildTransparencyDocId(String startPeriod, String endPeriod) {
+    String sanitizeSegment(String raw) =>
+        raw.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final start = sanitizeSegment(startPeriod);
+    final end = sanitizeSegment(endPeriod);
+    if (end.isEmpty || start == end) {
+      return 'financial_summary_$start';
+    }
+    return 'financial_summary_${start}_to_$end';
+  }
+
+  static AppLocalizations _resolveReportLocalizations(String languageCode) {
+    final code = languageCode.trim().toLowerCase() == 'es' ? 'es' : 'en';
+    return lookupAppLocalizations(Locale(code));
+  }
+
+  /// Translates known [ExpenseCategory] slugs into the target language's localized label.
+  static String localizeExpenseCategory(
+    String rawCategory, {
+    required String languageCode,
+  }) {
+    final l10n = _resolveReportLocalizations(languageCode);
+    switch (rawCategory.trim().toLowerCase()) {
+      case ExpenseCategory.maintenance:
+        return l10n.expenseCategoryMaintenance;
+      case ExpenseCategory.gardening:
+        return l10n.expenseCategoryGardening;
+      case ExpenseCategory.security:
+        return l10n.expenseCategorySecurity;
+      case ExpenseCategory.utilities:
+        return l10n.expenseCategoryUtilities;
+      case ExpenseCategory.repairs:
+        return l10n.expenseCategoryRepairs;
+      case ExpenseCategory.supplies:
+        return l10n.expenseCategorySupplies;
+      case ExpenseCategory.other:
+        return l10n.expenseCategoryOther;
+      default:
+        return rawCategory;
+    }
+  }
+
   /// Generates a privacy-safe Markdown summary for optional Transparency publishing.
   /// Structurally excludes any address-level payment status matrix or resident PII.
   static String buildTransparencyMarkdownReport({
     required String title,
     required FinancialLedgerResult ledger,
+    String languageCode = 'en',
+    bool useDescriptiveHeading = false,
   }) {
     String cleanMd(String s) => s
         .replaceAll('\r', ' ')
@@ -430,26 +490,55 @@ class FinancialReportCalculator {
         .replaceAll('|', '\\|')
         .trim();
 
+    final l10n = _resolveReportLocalizations(languageCode);
+    final cleanTitle = cleanMd(title);
+    final headingText = useDescriptiveHeading
+        ? cleanMd(l10n.transparencyReportHeading(cleanTitle))
+        : cleanTitle;
+
     final sb = StringBuffer();
-    sb.writeln('# ${cleanMd(title)}');
+    sb.writeln('# $headingText');
     sb.writeln();
-    sb.writeln('**Period Range:** `${ledger.startPeriod}` to `${ledger.endPeriod}`');
+    sb.writeln(
+      l10n.transparencyPeriodRangeLine(
+        '`${ledger.startPeriod}`',
+        '`${ledger.endPeriod}`',
+      ),
+    );
     sb.writeln();
-    sb.writeln('## Summary');
+    sb.writeln('## ${l10n.transparencySummarySection}');
     sb.writeln();
-    sb.writeln('| Metric | Amount |');
+    sb.writeln(
+      '| ${l10n.transparencyMetricHeader} | ${l10n.transparencyAmountHeader} |',
+    );
     sb.writeln('| :--- | ---: |');
-    sb.writeln('| Opening / Brought-Forward Balance | \$${_formatCents(ledger.broughtForwardBalanceCents)} |');
-    sb.writeln('| Maintenance Quotas Income | \$${_formatCents(ledger.rangeQuotaIncomeCents)} |');
-    sb.writeln('| Sanction Fines Income | \$${_formatCents(ledger.rangeSanctionIncomeCents)} |');
-    sb.writeln('| **Total Income** | **\$${_formatCents(ledger.rangeTotalIncomeCents)}** |');
-    sb.writeln('| Active Expenses | -\$${_formatCents(ledger.rangeActiveExpensesCents)} |');
-    sb.writeln('| Net Period Balance | \$${_formatCents(ledger.rangeNetBalanceCents)} |');
-    sb.writeln('| **Ending Accumulated Budget** | **\$${_formatCents(ledger.endingAccumulatedBudgetCents)}** |');
+    sb.writeln(
+      '| ${l10n.openingBalancePreviewLabel} | \$${_formatCents(ledger.broughtForwardBalanceCents)} |',
+    );
+    sb.writeln(
+      '| ${l10n.quotaIncomePreviewLabel} | \$${_formatCents(ledger.rangeQuotaIncomeCents)} |',
+    );
+    sb.writeln(
+      '| ${l10n.sanctionIncomePreviewLabel} | \$${_formatCents(ledger.rangeSanctionIncomeCents)} |',
+    );
+    sb.writeln(
+      '| **${l10n.transparencyTotalIncomeLabel}** | **\$${_formatCents(ledger.rangeTotalIncomeCents)}** |',
+    );
+    sb.writeln(
+      '| ${l10n.expensesPreviewLabel} | -\$${_formatCents(ledger.rangeActiveExpensesCents)} |',
+    );
+    sb.writeln(
+      '| ${l10n.netPeriodBalancePreviewLabel} | \$${_formatCents(ledger.rangeNetBalanceCents)} |',
+    );
+    sb.writeln(
+      '| **${l10n.accumulatedBudgetPreviewLabel}** | **\$${_formatCents(ledger.endingAccumulatedBudgetCents)}** |',
+    );
     sb.writeln();
-    sb.writeln('## Monthly Breakdown');
+    sb.writeln('## ${l10n.transparencyMonthlyBreakdownSection}');
     sb.writeln();
-    sb.writeln('| Period | Quotas | Sanctions | Total Income | Expenses | Net | Accumulated Budget |');
+    sb.writeln(
+      '| ${l10n.transparencyColumnPeriod} | ${l10n.transparencyColumnQuotas} | ${l10n.transparencyColumnSanctions} | ${l10n.transparencyColumnTotalIncome} | ${l10n.transparencyColumnExpenses} | ${l10n.transparencyColumnNet} | ${l10n.transparencyColumnAccumulatedBudget} |',
+    );
     sb.writeln('| :--- | ---: | ---: | ---: | ---: | ---: | ---: |');
     for (final row in ledger.monthlyRows) {
       sb.writeln(
@@ -457,19 +546,26 @@ class FinancialReportCalculator {
       );
     }
 
-    final activeExpenses = ledger.expensesInRange.where((e) => e.isActive).toList();
+    final activeExpenses =
+        ledger.expensesInRange.where((e) => e.isActive).toList();
     sb.writeln();
-    sb.writeln('## Active Community Expenses');
+    sb.writeln('## ${l10n.transparencyActiveExpensesSection}');
     sb.writeln();
     if (activeExpenses.isEmpty) {
-      sb.writeln('_No active expenses recorded in this period range._');
+      sb.writeln('_${l10n.transparencyNoActiveExpenses}_');
     } else {
-      sb.writeln('| Period | Date | Product / Service | Category | Amount |');
+      sb.writeln(
+        '| ${l10n.transparencyColumnPeriod} | ${l10n.transparencyColumnDate} | ${l10n.transparencyColumnProductService} | ${l10n.transparencyColumnCategory} | ${l10n.transparencyAmountHeader} |',
+      );
       sb.writeln('| :--- | :--- | :--- | :--- | ---: |');
       for (final exp in activeExpenses) {
         final expCents = (exp.amount * 100).round();
+        final localizedCategory = localizeExpenseCategory(
+          exp.category,
+          languageCode: languageCode,
+        );
         sb.writeln(
-          '| ${exp.billablePeriod} | ${_formatDateIso(exp.expenseDateMs)} | ${cleanMd(exp.productOrService)} | ${cleanMd(exp.category)} | \$${_formatCents(expCents)} |',
+          '| ${exp.billablePeriod} | ${_formatDateIso(exp.expenseDateMs)} | ${cleanMd(exp.productOrService)} | ${cleanMd(localizedCategory)} | \$${_formatCents(expCents)} |',
         );
       }
     }

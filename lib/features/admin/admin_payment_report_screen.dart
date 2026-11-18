@@ -497,8 +497,10 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
     FinancialLedgerResult ledger,
   ) async {
     final l10n = AppLocalizations.of(context)!;
-    final defaultTitle =
-        'Financial Summary ${ledger.startPeriod} to ${ledger.endPeriod}';
+    final defaultTitle = FinancialReportCalculator.formatTransparencyPeriodTitle(
+      ledger.startPeriod,
+      ledger.endPeriod,
+    );
 
     final result = await showDialog<({String title, String visibility})>(
       context: context,
@@ -509,25 +511,50 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
     setState(() => _isPublishing = true);
 
     try {
-      // Strictly aggregated Markdown summary; never includes address payment status matrix
-      final markdown = FinancialReportCalculator.buildTransparencyMarkdownReport(
-        title: result.title,
-        ledger: ledger,
+      final docId = FinancialReportCalculator.buildTransparencyDocId(
+        ledger.startPeriod,
+        ledger.endPeriod,
       );
-      final base64Content = base64Encode(utf8.encode(markdown));
-      final fileName =
-          'financial_summary_${ledger.startPeriod}_to_${ledger.endPeriod}.md';
+      final publishVersion = DateTime.now().millisecondsSinceEpoch;
+      final enL10n = lookupAppLocalizations(const Locale('en'));
+      final esL10n = lookupAppLocalizations(const Locale('es'));
+
+      // Strictly aggregated Markdown summaries in ES & EN; never includes address payment status matrix.
+      final Map<String, Map<String, String>> translations = {};
+      for (final lang in const ['es', 'en']) {
+        final md = FinancialReportCalculator.buildTransparencyMarkdownReport(
+          title: result.title,
+          ledger: ledger,
+          languageCode: lang,
+          useDescriptiveHeading: true,
+        );
+        translations[lang] = {
+          'title': result.title,
+          'fileName': '${docId}_${publishVersion}_$lang.md',
+          'fileType': 'md',
+          'fileBase64': base64Encode(utf8.encode(md)),
+        };
+      }
 
       await FunctionsService().callFunction('syncTransparencyDocument', {
+        'docId': docId,
         'title': result.title,
-        'fileName': fileName,
         'fileType': 'md',
         'visibility': result.visibility,
         'category': 'financial',
-        'categoryName': 'Finanzas / Financial',
+        'categoryName': enL10n.docCategoryFinancial,
+        'categoryLocalizedNames': {
+          'en': enL10n.docCategoryFinancial,
+          'es': esL10n.docCategoryFinancial,
+        },
         'folderId': 'financial_reports',
-        'folderName': 'Financial Reports',
-        'fileBase64': base64Content,
+        'folderName': enL10n.folderFinancialReports,
+        'folderNameKey': 'financial_reports',
+        'folderLocalizedNames': {
+          'en': enL10n.folderFinancialReports,
+          'es': esL10n.folderFinancialReports,
+        },
+        'translations': translations,
       });
 
       if (mounted) {

@@ -244,4 +244,124 @@ void main() {
       expect(md, isNot(contains('past due')));
     });
   });
+
+  group('FinancialReportCalculator - Bilingual Transparency Helpers', () {
+    test('formatTransparencyPeriodTitle and buildTransparencyDocId format single and multi-month spans deterministically', () {
+      expect(
+        FinancialReportCalculator.formatTransparencyPeriodTitle('2026-06', '2026-11'),
+        equals('2026-06 – 2026-11'),
+      );
+      expect(
+        FinancialReportCalculator.formatTransparencyPeriodTitle('2026-11', '2026-11'),
+        equals('2026-11'),
+      );
+
+      expect(
+        FinancialReportCalculator.buildTransparencyDocId('2026-06', '2026-11'),
+        equals('financial_summary_2026-06_to_2026-11'),
+      );
+      expect(
+        FinancialReportCalculator.buildTransparencyDocId('2026-11', '2026-11'),
+        equals('financial_summary_2026-11'),
+      );
+    });
+
+    test('localizeExpenseCategory translates all known slugs into English and Spanish and preserves unknown slugs', () {
+      const slugs = [
+        'maintenance',
+        'gardening',
+        'security',
+        'utilities',
+        'repairs',
+        'supplies',
+        'other',
+      ];
+      for (final slug in slugs) {
+        final en = FinancialReportCalculator.localizeExpenseCategory(
+          slug,
+          languageCode: 'en',
+        );
+        final es = FinancialReportCalculator.localizeExpenseCategory(
+          slug,
+          languageCode: 'es',
+        );
+        expect(en, isNotEmpty);
+        expect(es, isNotEmpty);
+        expect(en.toLowerCase(), isNot(equals(slug == 'other' ? '' : '')));
+      }
+
+      expect(
+        FinancialReportCalculator.localizeExpenseCategory('maintenance', languageCode: 'es'),
+        equals('Mantenimiento'),
+      );
+      expect(
+        FinancialReportCalculator.localizeExpenseCategory('maintenance', languageCode: 'en'),
+        equals('Maintenance'),
+      );
+      expect(
+        FinancialReportCalculator.localizeExpenseCategory('custom_category', languageCode: 'es'),
+        equals('custom_category'),
+      );
+    });
+
+    test('buildTransparencyMarkdownReport renders full Spanish & English documents with descriptive headings and zero PII', () {
+      final ledger = FinancialReportCalculator.computeFinancialLedger(
+        payments: [
+          {
+            'id': 'p1',
+            'concept': 'monthly quota',
+            'status': 'approved',
+            'amount': 2000.00,
+            'periods': ['2026-06', '2026-07'],
+            'streetName': 'Privada Confidencial',
+            'number': 12,
+          },
+        ],
+        expenses: [
+          {
+            'id': 'exp_1',
+            'productOrService': 'Guardhouse gate motor',
+            'amount': 350.00,
+            'billablePeriod': '2026-06',
+            'expenseDate': DateTime.utc(2026, 6, 15).millisecondsSinceEpoch,
+            'category': 'maintenance',
+            'status': 'active',
+          },
+        ],
+        startMonth: DateTime(2026, 6, 1),
+        endMonth: DateTime(2026, 7, 1),
+      );
+
+      final periodTitle = FinancialReportCalculator.formatTransparencyPeriodTitle('2026-06', '2026-07');
+
+      final esMd = FinancialReportCalculator.buildTransparencyMarkdownReport(
+        title: periodTitle,
+        ledger: ledger,
+        languageCode: 'es',
+        useDescriptiveHeading: true,
+      );
+      expect(esMd, contains('# Resumen Financiero — 2026-06 – 2026-07'));
+      expect(esMd, contains('## Resumen'));
+      expect(esMd, contains('## Desglose Mensual'));
+      expect(esMd, contains('## Gastos Activos de la Comunidad'));
+      expect(esMd, contains('| Mantenimiento |'));
+      expect(esMd, contains('\$2000.00'));
+      expect(esMd, contains('\$350.00'));
+      expect(esMd, isNot(contains('Privada Confidencial')));
+
+      final enMd = FinancialReportCalculator.buildTransparencyMarkdownReport(
+        title: periodTitle,
+        ledger: ledger,
+        languageCode: 'en',
+        useDescriptiveHeading: true,
+      );
+      expect(enMd, contains('# Financial Summary — 2026-06 – 2026-07'));
+      expect(enMd, contains('## Summary'));
+      expect(enMd, contains('## Monthly Breakdown'));
+      expect(enMd, contains('## Active Community Expenses'));
+      expect(enMd, contains('| Maintenance |'));
+      expect(enMd, contains('\$2000.00'));
+      expect(enMd, isNot(contains('Privada Confidencial')));
+    });
+  });
 }

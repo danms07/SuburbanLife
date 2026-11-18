@@ -7,6 +7,7 @@ import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/core/services/cache_io_helper.dart';
 import 'package:suburban_life/core/services/document_cache_service.dart';
 import 'package:suburban_life/features/transparency/document_viewer_screen.dart';
+import 'package:suburban_life/features/transparency/transparency_localization_helper.dart';
 import 'package:suburban_life/features/transparency/transparency_screen.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
@@ -227,6 +228,162 @@ void main() {
     });
   });
 
+  group('TransparencyLocalizationHelper - Hybrid Resolution & Multi-Locale Support', () {
+    test('resolveFolderDisplayName prioritizes localizedNames, then nameKey/folderId/_token_ patterns, then raw name', () {
+      final enL10n = lookupAppLocalizations(const Locale('en'));
+      final esL10n = lookupAppLocalizations(const Locale('es'));
+
+      // 1. Explicit localizedNames wins over nameKey
+      expect(
+        TransparencyLocalizationHelper.resolveFolderDisplayName(
+          folderId: 'financial_reports',
+          folderData: {
+            'name': '_financial-reports_',
+            'nameKey': 'financial_reports',
+            'localizedNames': {'en': 'Custom Budgets', 'es': 'Presupuestos Propios'},
+          },
+          l10n: esL10n,
+          languageCode: 'es',
+        ),
+        equals('Presupuestos Propios'),
+      );
+
+      // 2. `_financial-reports_` token resolves on arbitrary folderId
+      expect(
+        TransparencyLocalizationHelper.resolveFolderDisplayName(
+          folderId: 'arbitrary_doc_id',
+          folderData: {'name': '_financial-reports_'},
+          l10n: enL10n,
+          languageCode: 'en',
+        ),
+        equals('Financial Reports'),
+      );
+      expect(
+        TransparencyLocalizationHelper.resolveFolderDisplayName(
+          folderId: 'arbitrary_doc_id',
+          folderData: {'name': '_financial-reports_'},
+          l10n: esL10n,
+          languageCode: 'es',
+        ),
+        equals('Reportes Financieros'),
+      );
+
+      // 3. `official_manuals` via folderId or `_official-manuals_`
+      expect(
+        TransparencyLocalizationHelper.resolveFolderDisplayName(
+          folderId: 'official_manuals',
+          folderData: {'name': 'Manuales'},
+          l10n: enL10n,
+          languageCode: 'en',
+        ),
+        equals('Official Manuals'),
+      );
+      expect(
+        TransparencyLocalizationHelper.resolveFolderDisplayName(
+          folderId: 'x',
+          folderData: {'name': '_official-manuals_'},
+          l10n: esL10n,
+          languageCode: 'es',
+        ),
+        equals('Manuales Oficiales'),
+      );
+
+      // 4. Custom folder preserves raw name
+      expect(
+        TransparencyLocalizationHelper.resolveFolderDisplayName(
+          folderId: 'folder_2026',
+          folderData: {'name': 'Asambleas 2026'},
+          l10n: enL10n,
+          languageCode: 'en',
+        ),
+        equals('Asambleas 2026'),
+      );
+    });
+
+    test('resolveCategoryDisplayName localizes known category slugs and custom categories', () {
+      final enL10n = lookupAppLocalizations(const Locale('en'));
+      final esL10n = lookupAppLocalizations(const Locale('es'));
+
+      expect(
+        TransparencyLocalizationHelper.resolveCategoryDisplayName(
+          categoryId: 'financial',
+          rawName: 'Financial',
+          l10n: esL10n,
+          languageCode: 'es',
+        ),
+        equals('Finanzas'),
+      );
+      expect(
+        TransparencyLocalizationHelper.resolveCategoryDisplayName(
+          categoryId: 'normatives',
+          rawName: 'Normatives',
+          l10n: esL10n,
+          languageCode: 'es',
+        ),
+        equals('Normativas'),
+      );
+      expect(
+        TransparencyLocalizationHelper.resolveCategoryDisplayName(
+          categoryId: 'custom_cat',
+          rawName: 'Custom Label',
+          l10n: enL10n,
+          languageCode: 'en',
+        ),
+        equals('Custom Label'),
+      );
+    });
+
+    test('resolveDocumentFileVariant, matchesDocumentSearch, and collectDocumentFilesForDeletion handle bilingual docs', () {
+      final doc = {
+        'id': 'financial_summary_2026-11',
+        'title': '2026-11',
+        'fileName': 'financial_summary_2026-11_en.md',
+        'fileType': 'md',
+        'category': 'financial',
+        'url': 'https://storage.local/en.md',
+        'fileSize': 500,
+        'translatedTitles': {
+          'en': '2026-11 Summary',
+          'es': '2026-11 Resumen',
+        },
+        'translatedFiles': {
+          'en': {
+            'url': 'https://storage.local/en.md',
+            'fileName': 'financial_summary_2026-11_en.md',
+            'fileSize': 500,
+          },
+          'es': {
+            'url': 'https://storage.local/es.md',
+            'fileName': 'financial_summary_2026-11_es.md',
+            'fileSize': 650,
+          },
+        },
+      };
+
+      final esVariant = TransparencyLocalizationHelper.resolveDocumentFileVariant(
+        doc,
+        languageCode: 'es',
+      );
+      expect(esVariant.url, equals('https://storage.local/es.md'));
+      expect(esVariant.fileName, equals('financial_summary_2026-11_es.md'));
+      expect(esVariant.fileSize, equals(650));
+
+      expect(TransparencyLocalizationHelper.matchesDocumentSearch(doc, 'resumen'), isTrue);
+      expect(TransparencyLocalizationHelper.matchesDocumentSearch(doc, 'summary'), isTrue);
+      expect(TransparencyLocalizationHelper.matchesDocumentSearch(doc, 'missing_term'), isFalse);
+
+      final filesForDeletion = TransparencyLocalizationHelper.collectDocumentFilesForDeletion(doc);
+      expect(
+        filesForDeletion.map((f) => f.url).where((u) => u.isNotEmpty).toSet(),
+        equals({'https://storage.local/en.md', 'https://storage.local/es.md'}),
+      );
+      expect(
+        filesForDeletion.map((f) => f.fileName).where((n) => n.isNotEmpty).toSet(),
+        equals({'financial_summary_2026-11_en.md', 'financial_summary_2026-11_es.md'}),
+      );
+    });
+  });
+
   group('TransparencyScreen & DocumentViewerScreen - Widget Flows', () {
     testWidgets('resident view hides admin-only items, navigates folders, searches, and disposes cleanly', (tester) async {
       FakeBackendHelper.auth.isAdminMock = true; // Even with stale claim, isAdminView: false forces resident mode!
@@ -346,6 +503,127 @@ void main() {
       await tester.tap(find.byIcon(Icons.copy));
       await tester.pumpAndSettle();
       expect(copiedClipboardText, equals(markdownText));
+    });
+
+    testWidgets('TransparencyScreen renders bilingual folder, category, and doc variant in Spanish and searches translated titles', (tester) async {
+      FakeBackendHelper.db.seedDocument('document_categories', 'financial', {
+        'name': 'Financial',
+        'localizedNames': {'en': 'Financial', 'es': 'Finanzas'},
+      });
+      FakeBackendHelper.db.seedDocument('document_folders', 'fin_custom_id', {
+        'name': '_financial-reports_',
+        'parentId': 'root',
+        'visibility': 'all',
+      });
+      FakeBackendHelper.db.seedDocument('documents', 'financial_summary_2026-06_to_2026-11', {
+        'title': '2026-06 – 2026-11',
+        'fileName': 'financial_summary_2026-06_to_2026-11_en.md',
+        'fileType': 'md',
+        'folderId': 'fin_custom_id',
+        'category': 'financial',
+        'visibility': 'all',
+        'url': 'https://fake-storage.local/fin_en.md',
+        'translatedTitles': {
+          'en': '2026-06 – 2026-11',
+          'es': '2026-06 – 2026-11',
+        },
+        'translatedFiles': {
+          'en': {
+            'url': 'https://fake-storage.local/fin_en.md',
+            'fileName': 'financial_summary_2026-06_to_2026-11_en.md',
+            'fileSize': 1024,
+          },
+          'es': {
+            'url': 'https://fake-storage.local/fin_es.md',
+            'fileName': 'financial_summary_2026-06_to_2026-11_es.md',
+            'fileSize': 1200,
+          },
+        },
+      });
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('en'), Locale('es')],
+          locale: const Locale('es'),
+          home: const TransparencyScreen(isAdminView: false),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // `_financial-reports_` token resolves cleanly in Spanish!
+      expect(find.text('Reportes Financieros'), findsOneWidget);
+      await tester.tap(find.text('Reportes Financieros'));
+      await tester.pumpAndSettle();
+
+      // Breadcrumb & category chip & doc card render in Spanish
+      expect(find.text('Reportes Financieros'), findsWidgets);
+      expect(find.text('2026-06 – 2026-11'), findsOneWidget);
+      expect(find.text('FINANZAS'), findsWidgets);
+    });
+
+    testWidgets('DocumentViewerScreen switches between ES and EN cached variants using header language toggle', (tester) async {
+      const esMarkdown = '# Resumen Financiero — 2026-11\n\nSaldo acumulado: \$1500.00';
+      const enMarkdown = '# Financial Summary — 2026-11\n\nAccumulated budget: \$1500.00';
+
+      final esKey = DocumentCacheService.buildCacheKey('fin_doc_1', 'fin_2026_11_es.md');
+      final enKey = DocumentCacheService.buildCacheKey('fin_doc_1', 'fin_2026_11_en.md');
+      await memoryCache.saveCachedBytes(esKey, Uint8List.fromList(utf8.encode(esMarkdown)));
+      await memoryCache.saveCachedBytes(enKey, Uint8List.fromList(utf8.encode(enMarkdown)));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [Locale('en'), Locale('es')],
+          locale: const Locale('es'),
+          home: DocumentViewerScreen(
+            docId: 'fin_doc_1',
+            title: '2026-11',
+            fileName: 'fin_2026_11_es.md',
+            fileType: 'md',
+            url: 'https://fake-storage.local/fin_2026_11_es.md',
+            category: 'financial',
+            fileSize: 1024,
+            initialLanguageCode: 'es',
+            translatedTitles: const {'es': '2026-11', 'en': '2026-11'},
+            translatedFiles: const {
+              'es': {
+                'url': 'https://fake-storage.local/fin_2026_11_es.md',
+                'fileName': 'fin_2026_11_es.md',
+                'fileSize': 1536,
+              },
+              'en': {
+                'url': 'https://fake-storage.local/fin_2026_11_en.md',
+                'fileName': 'fin_2026_11_en.md',
+                'fileSize': 2048,
+              },
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('document_viewer_language_switcher')), findsOneWidget);
+      expect(find.text('FINANZAS'), findsOneWidget);
+      expect(find.text('1.5 KB'), findsOneWidget);
+      expect(find.textContaining('Saldo acumulado: \$1500.00'), findsOneWidget);
+
+      // Switch to EN
+      await tester.tap(find.byKey(const ValueKey('document_viewer_lang_en')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2.0 KB'), findsOneWidget);
+      expect(find.textContaining('Accumulated budget: \$1500.00'), findsOneWidget);
     });
   });
 }

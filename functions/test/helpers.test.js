@@ -1202,3 +1202,73 @@ test('extractExpenseStoragePath extracts valid expenses/<uid>/<file> paths and b
   assert.equal(extractExpenseStoragePath(''), null);
   assert.equal(extractExpenseStoragePath(null), null);
 });
+
+test('validateTransparencyDocInput supports bilingual translations, folderNameKey, localizedNames, and rejects invalid locales', () => {
+  const { validateTransparencyDocInput, isManagedTransparencyStoragePath } = _test;
+
+  const bilingual = validateTransparencyDocInput({
+    docId: 'financial_summary_2026-06_to_2026-11',
+    title: '2026-06 – 2026-11',
+    fileType: 'md',
+    visibility: 'all',
+    category: 'financial',
+    categoryName: 'Financial',
+    categoryLocalizedNames: { en: 'Financial', es: 'Finanzas' },
+    folderId: 'financial_reports',
+    folderName: 'Financial Reports',
+    folderNameKey: 'financial_reports',
+    folderLocalizedNames: { en: 'Financial Reports', es: 'Reportes Financieros' },
+    translations: {
+      es: {
+        title: '2026-06 – 2026-11',
+        fileName: '../../evil/financial_summary_2026-06_to_2026-11_es.md',
+        fileType: 'md',
+      },
+      en: {
+        title: '2026-06 – 2026-11',
+        fileName: 'financial_summary_2026-06_to_2026-11_en.md',
+        fileType: 'md',
+      },
+    },
+  });
+
+  assert.equal(bilingual.docId, 'financial_summary_2026-06_to_2026-11');
+  assert.equal(bilingual.folderNameKey, 'financial_reports');
+  assert.deepEqual(bilingual.folderLocalizedNames, {
+    en: 'Financial Reports',
+    es: 'Reportes Financieros',
+  });
+  assert.deepEqual(bilingual.categoryLocalizedNames, {
+    en: 'Financial',
+    es: 'Finanzas',
+  });
+  assert.equal(
+    bilingual.translations.es.fileName,
+    'financial_summary_2026-06_to_2026-11_es.md'
+  );
+  assert.equal(
+    bilingual.translations.en.fileName,
+    'financial_summary_2026-06_to_2026-11_en.md'
+  );
+  assert.equal(bilingual.fileName, 'financial_summary_2026-06_to_2026-11_en.md');
+
+  assert.throws(() => {
+    validateTransparencyDocInput({
+      title: '2026-11',
+      fileType: 'md',
+      translations: {
+        fr: {
+          title: '2026-11',
+          fileName: 'fin_fr.md',
+          fileType: 'md',
+        },
+      },
+    });
+  }, /Unsupported locale/);
+
+  assert.equal(isManagedTransparencyStoragePath('documents/fin_en.md'), true);
+  assert.equal(isManagedTransparencyStoragePath('documents/admin_only/fin_en.md'), true);
+  assert.equal(isManagedTransparencyStoragePath('documents/../payments/receipt.pdf'), false);
+  assert.equal(isManagedTransparencyStoragePath('payments/receipt.pdf'), false);
+  assert.equal(isManagedTransparencyStoragePath(null), false);
+});
