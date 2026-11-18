@@ -123,22 +123,25 @@ class _AdminSanctionsScreenState extends State<AdminSanctionsScreen> {
       ),
       body: Column(
         children: [
-          // Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                _buildFilterChip('all', l10n.filterAll),
-                const SizedBox(width: 8),
-                _buildFilterChip('active', l10n.sanctionStatusActive),
-                const SizedBox(width: 8),
-                _buildFilterChip('pending_review', l10n.sanctionStatusPendingReview),
-                const SizedBox(width: 8),
-                _buildFilterChip('paid', l10n.sanctionStatusPaid),
-                const SizedBox(width: 8),
-                _buildFilterChip('cancelled', l10n.sanctionStatusCancelled),
-              ],
+          // Filter Chips (wrap across rows so all statuses remain visible on narrow portrait viewports)
+          SizedBox(
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final (filterKey, label) in [
+                    ('all', l10n.filterAll),
+                    ('active', l10n.sanctionStatusActive),
+                    ('pending_review', l10n.sanctionStatusPendingReview),
+                    ('paid', l10n.sanctionStatusPaid),
+                    ('cancelled', l10n.sanctionStatusCancelled),
+                  ])
+                    _buildFilterChip(filterKey, label),
+                ],
+              ),
             ),
           ),
           const Divider(height: 1),
@@ -215,11 +218,19 @@ class _AdminSanctionsScreenState extends State<AdminSanctionsScreen> {
   Widget _buildFilterChip(String filterKey, String label) {
     final isSelected = _selectedStatusFilter == filterKey;
     return FilterChip(
+      key: ValueKey('sanction_filter_chip_$filterKey'),
       selected: isSelected,
-      label: Text(label),
+      label: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       selectedColor: AppConfig.primaryColor.withValues(alpha: 0.2),
       checkmarkColor: AppConfig.primaryColor,
       labelStyle: TextStyle(
+        fontSize: 13,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         color: isSelected ? AppConfig.primaryColor : Colors.black87,
       ),
@@ -269,48 +280,60 @@ class _AdminSanctionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                FutureBuilder<Map<String, dynamic>?>(
-                  future: DatabaseService().getDocument('addresses', addressId),
-                  builder: (context, snap) {
-                    final addr = snap.data;
-                    final street = addr?['streetName'] ?? 'Address';
-                    final number = addr?['number'] ?? '';
-                    return Text(
-                      '$street $number',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: AppConfig.primaryColor,
-                      ),
-                    );
-                  },
-                ),
-                _buildStatusChip(context, l10n, status),
-              ],
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FutureBuilder<Map<String, dynamic>?>(
+                    future: DatabaseService().getDocument('addresses', addressId),
+                    builder: (context, snap) {
+                      final addr = snap.data;
+                      final street = addr?['streetName'] ?? 'Address';
+                      final number = addr?['number'] ?? '';
+                      return Text(
+                        '$street $number',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppConfig.primaryColor,
+                        ),
+                      );
+                    },
+                  ),
+                  _buildStatusChip(context, l10n, status),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (amount != null)
-                  Text(
-                    '\$${amount.toStringAsFixed(2)} MXN',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (amount != null)
+                    Text(
+                      '\$${amount.toStringAsFixed(2)} MXN',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                if (createdDate != null)
-                  Text(
-                    '${createdDate.year}-${createdDate.month.toString().padLeft(2, '0')}-${createdDate.day.toString().padLeft(2, '0')}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-              ],
+                  if (createdDate != null)
+                    Text(
+                      '${createdDate.year}-${createdDate.month.toString().padLeft(2, '0')}-${createdDate.day.toString().padLeft(2, '0')}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 6),
 

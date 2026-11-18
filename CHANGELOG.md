@@ -2,6 +2,16 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.41+42] — 2026-11-17
+
+### Sanctions Management Portrait Filter Wrapping & Responsive Cards
+- **Wrapped Status Filter Bar (`AdminSanctionsScreen`)**:
+  - Replaced the cropped single-line `SingleChildScrollView(scrollDirection: Axis.horizontal)` + `Row` status filter bar with a full-width `Wrap` (`spacing: 8`, `runSpacing: 8`) rendering compact `FilterChip` controls (`VisualDensity.compact`, `MaterialTapTargetSize.shrinkWrap`, `ValueKey('sanction_filter_chip_<status>')`, single-line ellipsis safeguard) so all five status filters (**All**, **Active**, **Payment Under Review**, **Paid & Cleared**, **Waived / Cancelled**) remain visible simultaneously in portrait mobile viewports without horizontal scrolling.
+- **Responsive Sanction Card Headers (`_AdminSanctionCard`)**:
+  - Replaced fixed `Row` layouts in the address/status header and amount/date metadata bar with `Wrap` (`WrapAlignment.spaceBetween`) so long localized status badges and narrow portrait screens wrap cleanly without right-edge overflow.
+- **Tests & Documentation**:
+  - Added portrait (`360x800`) English and Spanish widget tests in `test/features/sanctions/sanctions_screens_test.dart` asserting all 5 filter chips sit inside a `Wrap` completely within the viewport bounds across multiple rows, work immediately on tap, and render seeded cards across all statuses with zero overflow.
+
 ## [1.0.40+41] — 2026-11-17
 
 ### Admin Sanctions Management Copy Fixes

@@ -399,5 +399,100 @@ void main() {
         expect(find.widgetWithText(TextButton, esL10n.takePhotoReceipt), findsNothing);
       },
     );
+
+    testWidgets(
+      'wraps all status filter chips on portrait mobile viewports without horizontal cropping in EN and ES',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        FakeBackendHelper.auth.emitUser(
+          AppUser(uid: 'admin_filters', email: 'admin@catania.com', displayName: 'Admin'),
+        );
+        FakeBackendHelper.auth.isAdminMock = true;
+
+        final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_f1');
+        FakeBackendHelper.db.seedDocument('addresses', 'addr_f1', {
+          'id': 'addr_f1',
+          'streetName': 'Catania Sur',
+          'number': 105,
+          'paymentStatus': 'restricted',
+        });
+
+        final statusReasons = {
+          'active': 'Blocked visitor lane',
+          'pending_review': 'Unapproved facade paint',
+          'paid': 'Late noise complaint',
+          'cancelled': 'Mistaken parking warning',
+        };
+        var idx = 0;
+        for (final entry in statusReasons.entries) {
+          idx++;
+          FakeBackendHelper.db.seedDocument('sanctions', 'sanction_${entry.key}', {
+            'id': 'sanction_${entry.key}',
+            'addressRef': addrRef,
+            'authorizedUids': ['resident_1'],
+            'reason': entry.value,
+            'amount': 500.0,
+            'status': entry.key,
+            'createdAt': 1700000000000 + idx * 1000,
+          });
+        }
+
+        const filterKeys = ['all', 'active', 'pending_review', 'paid', 'cancelled'];
+
+        for (final locale in const [Locale('en'), Locale('es')]) {
+          await tester.pumpWidget(
+            _wrapWithApp(
+              const AdminSanctionsScreen(isEmbedded: true),
+              locale: locale,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          // Ensure all 5 filter chips are inside a Wrap (no horizontal SingleChildScrollView)
+          final chipRowTops = <double>{};
+          for (final key in filterKeys) {
+            final chipFinder = find.byKey(ValueKey('sanction_filter_chip_$key'));
+            expect(chipFinder, findsOneWidget);
+            expect(
+              find.ancestor(of: chipFinder, matching: find.byType(Wrap)),
+              findsAtLeastNWidgets(1),
+            );
+            final rect = tester.getRect(chipFinder);
+            expect(rect.left, greaterThanOrEqualTo(0));
+            expect(rect.right, lessThanOrEqualTo(360));
+            expect(rect.top, greaterThanOrEqualTo(0));
+            expect(rect.bottom, lessThanOrEqualTo(800));
+            chipRowTops.add(rect.top);
+          }
+
+          // At 360px portrait width, the 5 chips wrap onto multiple rows
+          expect(chipRowTops.length, greaterThanOrEqualTo(2));
+
+          // Tapping each status filter directly works without any horizontal scroll
+          for (final entry in statusReasons.entries) {
+            await tester.tap(find.byKey(ValueKey('sanction_filter_chip_${entry.key}')));
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            expect(find.text(entry.value), findsOneWidget);
+            for (final other in statusReasons.entries) {
+              if (other.key != entry.key) {
+                expect(find.text(other.value), findsNothing);
+              }
+            }
+          }
+
+          await tester.tap(find.byKey(const ValueKey('sanction_filter_chip_all')));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
   });
 }
