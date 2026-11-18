@@ -22,7 +22,7 @@ class DocumentViewerScreen extends StatefulWidget {
   final Map<String, Map<String, dynamic>>? translatedFiles;
 
   const DocumentViewerScreen({
-    Key? key,
+    super.key,
     required this.docId,
     required this.title,
     required this.fileName,
@@ -34,7 +34,7 @@ class DocumentViewerScreen extends StatefulWidget {
     this.initialLanguageCode,
     this.translatedTitles,
     this.translatedFiles,
-  }) : super(key: key);
+  });
 
   @override
   State<DocumentViewerScreen> createState() => _DocumentViewerScreenState();
@@ -154,9 +154,11 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   void _shareContent() {
     if (_content != null && _content!.isNotEmpty) {
-      Share.share(
-        _content!,
-        subject: _activeTitle,
+      SharePlus.instance.share(
+        ShareParams(
+          text: _content!,
+          subject: _activeTitle,
+        ),
       );
     }
   }

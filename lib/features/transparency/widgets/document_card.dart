@@ -20,7 +20,7 @@ class DocumentCard extends StatelessWidget {
   final VoidCallback? onDelete;
 
   const DocumentCard({
-    Key? key,
+    super.key,
     required this.id,
     required this.title,
     required this.fileName,
@@ -36,7 +36,7 @@ class DocumentCard extends StatelessWidget {
     this.onChangeVisibility,
     this.onMove,
     this.onDelete,
-  }) : super(key: key);
+  });
 
   IconData _getFileIcon() {
     final ext = fileType.toLowerCase();

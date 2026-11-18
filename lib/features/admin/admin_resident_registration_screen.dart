@@ -6,10 +6,10 @@ import '../../l10n/app_localizations.dart';
 import 'admin_bulk_user_import_screen.dart';
 
 class AdminResidentRegistrationScreen extends StatefulWidget {
-  const AdminResidentRegistrationScreen({Key? key}) : super(key: key);
+  const AdminResidentRegistrationScreen({super.key});
 
   @override
-  _AdminResidentRegistrationScreenState createState() => _AdminResidentRegistrationScreenState();
+  State<AdminResidentRegistrationScreen> createState() => _AdminResidentRegistrationScreenState();
 }
 
 class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrationScreen> {
@@ -83,6 +83,7 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
         });
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.userRegisteredSuccess), backgroundColor: AppConfig.secondaryColor),
       );
@@ -94,9 +95,11 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
     } catch (e, stack) {
       debugPrint('Error registering resident: $e');
       Backend.crashlytics.recordError(e, stack, reason: 'AdminResidentRegistrationScreen._registerResident');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorPrefix(e.toString())), backgroundColor: Colors.redAccent),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -153,31 +156,33 @@ class _AdminResidentRegistrationScreenState extends State<AdminResidentRegistrat
                 const SizedBox(height: 20),
 
                 // Role Selection Toggle
-                Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: Text(l10n.roleResident),
-                        value: 'resident',
-                        groupValue: _selectedRole,
-                        activeColor: AppConfig.primaryColor,
-                        onChanged: (val) {
-                          if (val != null) setState(() { _selectedRole = val; });
-                        },
+                RadioGroup<String>(
+                  groupValue: _selectedRole,
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedRole = val;
+                      });
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: Text(l10n.roleResident),
+                          value: 'resident',
+                          activeColor: AppConfig.primaryColor,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<String>(
-                        title: Text(l10n.roleRoommate),
-                        value: 'roommate',
-                        groupValue: _selectedRole,
-                        activeColor: AppConfig.primaryColor,
-                        onChanged: (val) {
-                          if (val != null) setState(() { _selectedRole = val; });
-                        },
+                      Expanded(
+                        child: RadioListTile<String>(
+                          title: Text(l10n.roleRoommate),
+                          value: 'roommate',
+                          activeColor: AppConfig.primaryColor,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
 

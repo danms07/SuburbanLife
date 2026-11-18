@@ -10,10 +10,10 @@ import 'facility_document_models.dart';
 import 'widgets/facility_documents_section.dart';
 
 class ManageBookingsScreen extends StatefulWidget {
-  const ManageBookingsScreen({Key? key}) : super(key: key);
+  const ManageBookingsScreen({super.key});
 
   @override
-  _ManageBookingsScreenState createState() => _ManageBookingsScreenState();
+  State<ManageBookingsScreen> createState() => _ManageBookingsScreenState();
 }
 
 class _ManageBookingsScreenState extends State<ManageBookingsScreen> {

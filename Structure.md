@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-17 (v1.0.41+42 — Admin Sanctions Portrait Wrapping Status Filters & Responsive Cards)*
+*Last Verified/Updated: 2026-11-18 (v1.0.42+43 — Flutter 3.50 / Dart 3.14 Analyzer Errors & Non-Material Lints Resolution)*
 
 Current state of project files and folders:
 
@@ -84,7 +84,7 @@ Current state of project files and folders:
         - `announcements/`: Announcements system with AI auto-translations, orientation-aware thumbnail generation, responsive desktop/mobile layouts, clipboard image pasting, full-screen interactive image viewing, and quick emoji bar.
             - `announcement.dart`: Announcement data model with full-res image URL (`imageUrl`), proportional thumbnail URL (`thumbnailUrl`), audience targeting, and translations.
             - `announcements_screen.dart`: Visual responsive feed (side-by-side card on desktop, linear stack on mobile) and administrative announcement publishing dialog (including `autoOpenCreateDialog` trigger from Admin Overview) with gallery picker (bounded dimensions + automatic temp file cleanup), clipboard image pasting, live thumbnail preview, interactive pinch-to-zoom viewer, and quick-access emojis.
-            - `clipboard_image_helper.dart`: Cross-platform conditional adapter for web clipboard image reading and paste event listeners (`clipboard_image_helper_web.dart` and `clipboard_image_helper_stub.dart`).
+            - `clipboard_image_helper.dart`: Cross-platform conditional adapter for web clipboard image reading and paste event listeners (`clipboard_image_helper_web.dart` via `dart:js_interop` and `clipboard_image_helper_stub.dart`).
         - `auth/`: Login and role detection logic.
             - `login_screen.dart`: Main login interface with navigation.
             - `signup_screen.dart`: Resident onboarding with password complexity enforcement (min 8 chars, uppercase, lowercase, digit) and address selection list.

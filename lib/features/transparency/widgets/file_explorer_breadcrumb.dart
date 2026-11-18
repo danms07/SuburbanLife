@@ -13,10 +13,10 @@ class FileExplorerBreadcrumb extends StatelessWidget {
   final ValueChanged<BreadcrumbItem> onItemTap;
 
   const FileExplorerBreadcrumb({
-    Key? key,
+    super.key,
     required this.items,
     required this.onItemTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

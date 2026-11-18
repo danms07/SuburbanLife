@@ -11,14 +11,14 @@ class FolderCard extends StatelessWidget {
   final VoidCallback? onDelete;
 
   const FolderCard({
-    Key? key,
+    super.key,
     required this.id,
     required this.name,
     required this.itemCount,
     required this.isAdmin,
     required this.onTap,
     this.onDelete,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

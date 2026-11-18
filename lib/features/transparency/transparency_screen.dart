@@ -901,8 +901,9 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
       return;
     }
 
-    if (rawBytes.length > TransparencyScreen.maxUploadSizeBytes) {
-      debugPrint('>>> [_uploadDocument] ERROR: Raw bytes exceed maxUploadSizeBytes (${rawBytes.length}).');
+    final Uint8List uploadBytes = rawBytes;
+    if (uploadBytes.length > TransparencyScreen.maxUploadSizeBytes) {
+      debugPrint('>>> [_uploadDocument] ERROR: Raw bytes exceed maxUploadSizeBytes (${uploadBytes.length}).');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.documentExceedsMaxSize)),
@@ -1080,7 +1081,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                       debugPrint('>>> [_uploadDocument] Uploading bytes to Cloud Storage path: $storagePath');
                       final downloadUrl = await StorageService().uploadFile(
                         storagePath,
-                        rawBytes!,
+                        uploadBytes,
                         metadata: {'visibility': uploadVisibility},
                       );
                       debugPrint('>>> [_uploadDocument] Storage upload success. URL: $downloadUrl');
@@ -1091,7 +1092,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         'title': titleController.text.trim(),
                         'fileName': selectedFileName,
                         'fileType': ext.toLowerCase(),
-                        'fileSize': fileSize ?? rawBytes.length,
+                        'fileSize': fileSize ?? uploadBytes.length,
                         'category': uploadCategory,
                         'visibility': uploadVisibility,
                         'url': downloadUrl,

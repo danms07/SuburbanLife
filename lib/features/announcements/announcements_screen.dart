@@ -527,7 +527,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       barrierDismissible: !isUploading,
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setStateDialog) {
+          builder: (dialogBuilderContext, setStateDialog) {
             // Attach document paste listener on Web
             if (kIsWeb && pasteSubscription == null) {
               pasteSubscription = listenToWebPaste((bytes) {

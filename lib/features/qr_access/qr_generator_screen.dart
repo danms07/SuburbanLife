@@ -74,19 +74,24 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
 
     try {
       final docId = await DatabaseService().addDocument('qr_codes', qrData);
+      if (!mounted) return;
       setState(() {
         _generatedQrId = docId;
       });
     } catch (e, stack) {
       debugPrint('Error generating QR: $e');
       Backend.crashlytics.recordError(e, stack, reason: 'QrGeneratorScreen._generateQrCode');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.qrGenerationFailed)),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.qrGenerationFailed)),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -291,12 +296,12 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
                     firstDate: DateTime.now(),
                     lastDate: DateTime.now().add(const Duration(days: 365)),
                   );
-                  if (picked != null) {
+                  if (picked != null && context.mounted) {
                     final time = await showTimePicker(
                       context: context,
                       initialTime: TimeOfDay.fromDateTime(_expiryTime),
                     );
-                    if (time != null) {
+                    if (time != null && mounted) {
                       setState(() {
                         _expiryTime = DateTime(
                           picked.year,
@@ -330,7 +335,14 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
                 data: _generatedQrId!,
                 version: QrVersions.auto,
                 size: 200.0,
-                foregroundColor: AppConfig.textColor,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: AppConfig.textColor,
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: AppConfig.textColor,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -441,8 +453,14 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         data: _generatedQrId!,
         version: QrVersions.auto,
         gapless: true,
-        color: AppConfig.textColor,
-        emptyColor: Colors.white,
+        eyeStyle: const QrEyeStyle(
+          eyeShape: QrEyeShape.square,
+          color: AppConfig.textColor,
+        ),
+        dataModuleStyle: const QrDataModuleStyle(
+          dataModuleShape: QrDataModuleShape.square,
+          color: AppConfig.textColor,
+        ),
       );
       canvas.save();
       canvas.translate(400 - 200, 290);
@@ -520,13 +538,17 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
         }
       }
     } catch (e, stack) {
-      final l10n = AppLocalizations.of(context)!;
       Backend.crashlytics.recordError(e, stack, reason: 'QrGeneratorScreen._shareQrCode');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.qrSharingError(e.toString()))),
-      );
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.qrSharingError(e.toString()))),
+        );
+      }
     } finally {
-      setState(() { _isLoading = false; });
+      if (mounted) {
+        setState(() { _isLoading = false; });
+      }
     }
   }
 
@@ -538,9 +560,11 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
       ..click();
     html.Url.revokeObjectUrl(url);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.downloadCodeSuccess), backgroundColor: AppConfig.secondaryColor),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.downloadCodeSuccess), backgroundColor: AppConfig.secondaryColor),
+      );
+    }
   }
   
   Future<ui.Image> _loadAssetImage(String path) async {

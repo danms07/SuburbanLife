@@ -2,6 +2,24 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.42+43] — 2026-11-18
+
+### Fixed
+- **Web Clipboard JS Interop Compatibility (`dart:js_interop`)**: Replaced removed `dart:js_util` usage and redundant `dart:typed_data` import in `lib/features/announcements/clipboard_image_helper_web.dart` with typed `dart:js_interop` extension types (`_JsNavigator`, `_JsClipboard`, `_JsClipboardItem`, `_JsBlob`), fixing the `uri_does_not_exist` compilation error and `avoid_web_libraries_in_flutter` lint on Flutter 3.50 / Dart 3.14.
+- **Null-Safety Flow Analysis Across Async Gap**: Bound non-nullable `uploadBytes` after null/empty validation in `lib/features/transparency/transparency_screen.dart` (`_uploadDocument`) to eliminate the `unchecked_use_of_nullable_value` error on `rawBytes.length` across `await`.
+- **Deprecated API Migrations**:
+  - Migrated `AdminResidentRegistrationScreen` (`RadioListTile`) from deprecated `groupValue`/`onChanged` parameters to `RadioGroup<String>`.
+  - Migrated `DocumentViewerScreen` from `Share.share` to `SharePlus.instance.share(ShareParams(...))`.
+  - Migrated `QrGeneratorScreen` from deprecated `QrImageView.foregroundColor` and `QrPainter.color`/`emptyColor` parameters to `QrEyeStyle` and `QrDataModuleStyle`.
+- **Static Analysis & Lints Cleanup**:
+  - Added `mounted` / `context.mounted` async-gap guards and resolved shadowed `Builder`/`StatefulBuilder`/`StreamBuilder`/`FutureBuilder`/`ListView.builder` context names (`use_build_context_synchronously`) across `AdminResidentRegistrationScreen`, `AnnouncementsScreen`, `RoommatesScreen`, and `QrGeneratorScreen`.
+  - Switched widget constructors to `super.key` (`use_super_parameters`) and public `State<T>` return types on `createState()` (`library_private_types_in_public_api`) across `AdminResidentRegistrationScreen`, `BookingScreen`, `ManageBookingsScreen`, `DocumentViewerScreen`, `DocumentCard`, `FileExplorerBreadcrumb`, and `FolderCard`.
+  - Removed redundant `dart:typed_data` and `package:cross_file/cross_file.dart` imports, replaced `print` with `debugPrint` in `snippets/shareplus.dart`, and renamed `snippets/LoadImages.dart` to `snippets/load_images.dart` (`file_names`).
+  - Configured `analysis_options.yaml` `analyzer.exclude` (`build/**`, `android/**`, `ios/**`, `web/**`).
+
+### Notes
+- Evaluated Flutter 3.50's `migrate_design_widgets` (`package:material_ui/material_ui.dart`) migration and reverted it because `material_ui`'s `ThemeData` conflicts with `flutter_markdown` (`MarkdownStyleSheet.fromTheme`), `GlobalMaterialLocalizations` collides with `flutter_localizations`, and `flutter gen-l10n` still emits `flutter_localizations` imports. Retained `package:flutter/material.dart` (the 94 remaining `deprecated_member_use` `info` diagnostics are allowed by CI via `flutter analyze --no-fatal-infos`).
+
 ## [1.0.41+42] — 2026-11-17
 
 ### Sanctions Management Portrait Filter Wrapping & Responsive Cards

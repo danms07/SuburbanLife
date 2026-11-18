@@ -188,7 +188,7 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
           ? Center(child: Text(l10n.userNotLoggedIn))
           : StreamBuilder<Map<String, dynamic>?>(
               stream: DatabaseService().streamDocument('users', user.uid),
-              builder: (context, snapshot) {
+              builder: (streamContext, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -321,7 +321,7 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                     Expanded(
                       child: FutureBuilder<List<Map<String, dynamic>>>(
                         future: _fetchRoommatesDetails(familyMembers),
-                        builder: (context, detailsSnapshot) {
+                        builder: (detailsContext, detailsSnapshot) {
                           if (detailsSnapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: CircularProgressIndicator());
                           }
@@ -332,7 +332,7 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                           return ListView.builder(
                                   padding: const EdgeInsets.all(20),
                                   itemCount: roommates.length,
-                                  itemBuilder: (context, index) {
+                                  itemBuilder: (itemContext, index) {
                                     final r = roommates[index];
                                     return Card(
                                       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -370,7 +370,7 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                                                       'removeRoommate',
                                                       {'roommateUid': targetUid},
                                                     );
-                                                    if (mounted) {
+                                                    if (context.mounted) {
                                                       ScaffoldMessenger.of(context).showSnackBar(
                                                         SnackBar(
                                                           content: Text(l10n.roommateRemovedSuccess),
@@ -381,7 +381,7 @@ class _RoommatesScreenState extends State<RoommatesScreen> {
                                                   } catch (e, stack) {
                                                     debugPrint('Error removing roommate: $e');
                                                     Backend.crashlytics.recordError(e, stack, reason: 'RoommatesScreen.removeRoommate');
-                                                    if (mounted) {
+                                                    if (context.mounted) {
                                                       ScaffoldMessenger.of(context).showSnackBar(
                                                         SnackBar(
                                                           content: Text(l10n.errorPrefix(e.toString())),

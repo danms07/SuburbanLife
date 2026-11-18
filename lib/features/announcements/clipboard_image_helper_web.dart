@@ -1,32 +1,39 @@
 import 'dart:async';
-import 'dart:js_util' as js_util;
-import 'dart:typed_data';
+import 'dart:js_interop';
 import 'package:flutter/foundation.dart';
 import 'package:universal_html/html.dart' as html;
 
+@JS('navigator')
+external _JsNavigator? get _navigator;
+
+extension type _JsNavigator(JSObject _) implements JSObject {
+  external _JsClipboard? get clipboard;
+}
+
+extension type _JsClipboard(JSObject _) implements JSObject {
+  external JSPromise<JSArray<_JsClipboardItem>> read();
+}
+
+extension type _JsClipboardItem(JSObject _) implements JSObject {
+  external JSArray<JSString> get types;
+  external JSPromise<_JsBlob> getType(JSString type);
+}
+
+extension type _JsBlob(JSObject _) implements JSObject {
+  external JSPromise<JSArrayBuffer> arrayBuffer();
+}
+
 Future<Uint8List?> getWebClipboardImageBytes() async {
   try {
-    final nav = html.window.navigator;
-    final clipboard = js_util.getProperty(nav, 'clipboard');
+    final clipboard = _navigator?.clipboard;
     if (clipboard != null) {
-      final promise = js_util.callMethod(clipboard, 'read', []);
-      final dynamic items = await js_util.promiseToFuture(promise);
-      final dynamic rawLen = js_util.getProperty(items, 'length');
-      final int length = (rawLen is num) ? rawLen.toInt() : 0;
-      for (int i = 0; i < length; i++) {
-        final item = js_util.callMethod(items, 'item', [i]) ?? js_util.getProperty(items, i.toString());
-        final dynamic types = js_util.getProperty(item, 'types');
-        final dynamic rawTypesLen = js_util.getProperty(types, 'length');
-        final int typesLength = (rawTypesLen is num) ? rawTypesLen.toInt() : 0;
-        for (int j = 0; j < typesLength; j++) {
-          final String type = (js_util.callMethod(types, 'item', [j]) ?? js_util.getProperty(types, j.toString())).toString();
-          if (type.startsWith('image/')) {
-            final dynamic blobPromise = js_util.callMethod(item, 'getType', [type]);
-            final html.Blob blob = await js_util.promiseToFuture(blobPromise);
-            final reader = html.FileReader();
-            reader.readAsArrayBuffer(blob);
-            await reader.onLoadEnd.first;
-            return Uint8List.fromList(reader.result as List<int>);
+      final items = (await clipboard.read().toDart).toDart;
+      for (final item in items) {
+        for (final jsType in item.types.toDart) {
+          if (jsType.toDart.startsWith('image/')) {
+            final blob = await item.getType(jsType).toDart;
+            final buffer = (await blob.arrayBuffer().toDart).toDart;
+            return buffer.asUint8List();
           }
         }
       }
