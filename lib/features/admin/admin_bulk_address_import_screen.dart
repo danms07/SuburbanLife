@@ -8,19 +8,28 @@ import 'package:flutter/services.dart';
 import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/csv_download_helper.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminBulkAddressImportScreen extends StatefulWidget {
   final List<Map<String, dynamic>>? initialParsedItems;
   final String? initialFileName;
   final bool isEmbedded;
+  final Future<String?> Function(String content, String fileName)? onExportCsv;
 
   const AdminBulkAddressImportScreen({
     super.key,
     this.initialParsedItems,
     this.initialFileName,
     this.isEmbedded = false,
+    this.onExportCsv,
   });
+
+  static const String csvTemplate =
+      'streetName,initialNumber,finalNumber,exclusions\n'
+      '"Avenida Olmos",1,50,"12,14"\n'
+      '"Calle Robles",10,30,""\n'
+      '"Paseo del Valle",101,120,"105,115"';
 
   static List<Map<String, dynamic>> parseAddressCsvContent(String content) {
     // Strip UTF-8 BOM if present
@@ -208,21 +217,57 @@ class _AdminBulkAddressImportScreenState
     _fileName = widget.initialFileName;
   }
 
-  static const String _csvTemplate =
-      'streetName,initialNumber,finalNumber,exclusions\n'
-      '"Avenida Olmos",1,50,"12,14"\n'
-      '"Calle Robles",10,30,""\n'
-      '"Paseo del Valle",101,120,"105,115"';
-
   void _copyTemplate() {
     final l10n = AppLocalizations.of(context)!;
-    Clipboard.setData(const ClipboardData(text: _csvTemplate));
+    Clipboard.setData(
+      const ClipboardData(text: AdminBulkAddressImportScreen.csvTemplate),
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(l10n.csvTemplateCopiedSnackbar),
         backgroundColor: AppConfig.secondaryColor,
       ),
     );
+  }
+
+  Future<void> _downloadTemplate() async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final exporter = widget.onExportCsv ??
+          (content, fileName) => CsvDownloadHelper.saveCsvFile(
+                content: content,
+                fileName: fileName,
+              );
+      final savedPath = await exporter(
+        '${AdminBulkAddressImportScreen.csvTemplate}\n',
+        'address_import_template.csv',
+      );
+      if (!mounted) return;
+      final message = savedPath != null
+          ? '${l10n.csvTemplateDownloadedSnackbar} ${l10n.fileSavedToPath(savedPath)}'
+          : l10n.csvTemplateDownloadedSnackbar;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppConfig.secondaryColor,
+        ),
+      );
+    } catch (e, stack) {
+      debugPrint('[BulkAddressImport] Error saving CSV template: $e');
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'AdminBulkAddressImportScreen._downloadTemplate',
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.errorSavingFile(e.toString())),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   Future<void> _pickAndParseCsv() async {
@@ -459,14 +504,31 @@ class _AdminBulkAddressImportScreenState
                       ),
                     ),
                     const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _copyTemplate,
-                      icon: const Icon(Icons.copy, size: 18),
-                      label: Text(l10n.copyCsvTemplateButton),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppConfig.primaryColor,
-                        side: const BorderSide(color: AppConfig.primaryColor),
-                      ),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        OutlinedButton.icon(
+                          key: const Key('bulk_address_download_template_button'),
+                          onPressed: _isLoading ? null : _downloadTemplate,
+                          icon: const Icon(Icons.download, size: 18),
+                          label: Text(l10n.downloadCsvTemplateButton),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppConfig.primaryColor,
+                            side: const BorderSide(color: AppConfig.primaryColor),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('bulk_address_copy_template_button'),
+                          onPressed: _copyTemplate,
+                          icon: const Icon(Icons.copy, size: 18),
+                          label: Text(l10n.copyCsvTemplateButton),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppConfig.primaryColor,
+                            side: const BorderSide(color: AppConfig.primaryColor),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

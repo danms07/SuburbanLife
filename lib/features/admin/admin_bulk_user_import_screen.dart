@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
@@ -6,22 +5,29 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:universal_html/html.dart' as html;
-import 'package:path_provider/path_provider.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/csv_download_helper.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminBulkUserImportScreen extends StatefulWidget {
   final List<Map<String, String>>? initialParsedUsers;
   final String? initialFileName;
   final bool isEmbedded;
+  final Future<String?> Function(String content, String fileName)? onExportCsv;
 
   const AdminBulkUserImportScreen({
     super.key,
     this.initialParsedUsers,
     this.initialFileName,
     this.isEmbedded = false,
+    this.onExportCsv,
   });
+
+  static const String csvTemplate =
+      'name,email,password,street,number\n'
+      'John Doe,john.doe@example.com,,1st Avenue,101\n'
+      'Jane Smith,jane.smith@example.com,SecretPass123!,Oak Street,12\n';
 
   static List<Map<String, String>> parseUserCsv(String csvContent) {
     final List<Map<String, String>> result = [];
@@ -274,13 +280,24 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
       AdminBulkUserImportScreen.parseUserCsv(csvContent);
 
   void _copyCsvTemplate() {
-    const template = 'name,email,password,street,number\nJohn Doe,john.doe@example.com,,1st Avenue,101\nJane Smith,jane.smith@example.com,SecretPass123!,Oak Street,12\n';
-    Clipboard.setData(const ClipboardData(text: template));
+    Clipboard.setData(
+      const ClipboardData(text: AdminBulkUserImportScreen.csvTemplate),
+    );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(AppLocalizations.of(context)!.csvTemplateCopiedSnackbar),
         backgroundColor: AppConfig.secondaryColor,
       ),
+    );
+  }
+
+  Future<void> _downloadCsvTemplate() async {
+    final l10n = AppLocalizations.of(context)!;
+    await _exportCsvFile(
+      content: AdminBulkUserImportScreen.csvTemplate,
+      fileName: 'resident_import_template.csv',
+      successMessage: l10n.csvTemplateDownloadedSnackbar,
+      errorReason: 'AdminBulkUserImportScreen._downloadCsvTemplate',
     );
   }
 
@@ -345,47 +362,53 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
     return AdminBulkUserImportScreen.generateResultCsvString(results);
   }
 
-  void _downloadResultCsv() async {
+  Future<void> _downloadResultCsv() async {
     final csvString = _generateResultCsvString();
     if (csvString.isEmpty) return;
     final l10n = AppLocalizations.of(context)!;
+    await _exportCsvFile(
+      content: csvString,
+      fileName: 'resident_import_results_${DateTime.now().millisecondsSinceEpoch}.csv',
+      successMessage: l10n.csvDownloadedSuccess,
+      errorReason: 'AdminBulkUserImportScreen._downloadResultCsv',
+    );
+  }
 
+  Future<void> _exportCsvFile({
+    required String content,
+    required String fileName,
+    required String successMessage,
+    required String errorReason,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      if (kIsWeb) {
-        final bytes = utf8.encode(csvString);
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute('download', 'resident_import_results_${DateTime.now().millisecondsSinceEpoch}.csv')
-          ..click();
-        html.Url.revokeObjectUrl(url);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.csvDownloadedSuccess), backgroundColor: AppConfig.secondaryColor),
-          );
-        }
-      } else {
-        final directory = await getApplicationDocumentsDirectory();
-        final String filePath = '${directory.path}/resident_import_results_${DateTime.now().millisecondsSinceEpoch}.csv';
-        final File file = File(filePath);
-        await file.writeAsString(csvString);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${l10n.csvDownloadedSuccess} Saved to: $filePath'), backgroundColor: AppConfig.secondaryColor),
-          );
-        }
-      }
+      final exporter = widget.onExportCsv ??
+          (csv, name) => CsvDownloadHelper.saveCsvFile(
+                content: csv,
+                fileName: name,
+              );
+      final savedPath = await exporter(content, fileName);
+      if (!mounted) return;
+      final message = savedPath != null
+          ? '$successMessage ${l10n.fileSavedToPath(savedPath)}'
+          : successMessage;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppConfig.secondaryColor,
+        ),
+      );
     } catch (e, stack) {
-      debugPrint('Error saving result CSV: $e');
-      Backend.crashlytics.recordError(e, stack, reason: 'AdminBulkUserImportScreen._downloadResultCsv');
-      if (mounted) {
-        final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.errorSavingFile(e.toString())), backgroundColor: Colors.redAccent),
-        );
-      }
+      debugPrint('Error saving CSV file ($fileName): $e');
+      Backend.crashlytics.recordError(e, stack, reason: errorReason);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.errorSavingFile(e.toString())),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -494,36 +517,49 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
                             color: _isSmtpConfigured ? Colors.green.shade800 : Colors.orange.shade800,
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            _isSmtpConfigured ? l10n.smtpBadgeActive : l10n.smtpBadgeInactive,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: _isSmtpConfigured ? Colors.green.shade800 : Colors.orange.shade800,
+                          Flexible(
+                            child: Text(
+                              _isSmtpConfigured ? l10n.smtpBadgeActive : l10n.smtpBadgeInactive,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _isSmtpConfigured ? Colors.green.shade800 : Colors.orange.shade800,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isProcessing ? null : _pickCsvFile,
-                            icon: const Icon(Icons.folder_open),
-                            label: Text(l10n.uploadCsvButton),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppConfig.primaryColor,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
+                        ElevatedButton.icon(
+                          key: const Key('bulk_user_upload_csv_button'),
+                          onPressed: _isProcessing ? null : _pickCsvFile,
+                          icon: const Icon(Icons.folder_open),
+                          label: Text(l10n.uploadCsvButton),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppConfig.primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                           ),
                         ),
-                        const SizedBox(width: 12),
                         OutlinedButton.icon(
+                          key: const Key('bulk_user_download_template_button'),
+                          onPressed: _isProcessing ? null : _downloadCsvTemplate,
+                          icon: const Icon(Icons.download, size: 18),
+                          label: Text(l10n.downloadCsvTemplateButton),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('bulk_user_copy_template_button'),
                           onPressed: _copyCsvTemplate,
-                          icon: const Icon(Icons.copy),
+                          icon: const Icon(Icons.copy, size: 18),
                           label: Text(l10n.copyCsvTemplateButton),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),

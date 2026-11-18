@@ -2,6 +2,18 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.38+39] — 2026-11-17
+
+### Bulk Address & Bulk User CSV Template Downloads
+- **Shared Cross-Platform CSV Export Helper (`CsvDownloadHelper`)**:
+  - Created `lib/core/services/csv_download_helper.dart` centralizing cross-platform CSV downloads (`Blob` + `AnchorElement` download on Flutter Web, path-traversal-sanitized `sanitizeFileName` writes to `getApplicationDocumentsDirectory()` on native platforms returning the saved path).
+- **Bulk Address & Bulk Resident CSV Template Download Actions**:
+  - Updated `AdminBulkAddressImportScreen` (`address_import_template.csv`) and `AdminBulkUserImportScreen` (`resident_import_template.csv`) to provide **Download CSV Template** (`bulk_address_download_template_button` / `bulk_user_download_template_button`) alongside clipboard copy, using responsive `Wrap` layouts and `Flexible` badge text wrapping to prevent narrow-viewport (`360x780`) horizontal overflows in Spanish and English.
+  - Unified `AdminBulkUserImportScreen`'s template CSV export and result CSV export through `CsvDownloadHelper` (`_exportCsvFile`) and added optional `onExportCsv` widget test injection hooks on both screens.
+- **Localization & Tests**:
+  - Added bilingual (`en`/`es`) strings `downloadCsvTemplateButton`, `csvTemplateDownloadedSnackbar`, and `fileSavedToPath` in `app_en.arb` / `app_es.arb` (and fixed a trailing typo in Spanish `csvColumnsHint`).
+  - Added unit tests for `CsvDownloadHelper` (`core_services_test.dart`) and widget + responsive `360x780` Spanish layout tests for both screens (`bulk_address_csv_parser_test.dart`, `bulk_user_csv_parser_test.dart`).
+
 ## [1.0.37+38] — 2026-11-17
 
 ### Bilingual Financial Transparency Reports & Localized Explorer Paths

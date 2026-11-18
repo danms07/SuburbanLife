@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:suburban_life/core/services/app_update_service.dart';
 import 'package:suburban_life/core/services/cache_io_helper.dart';
+import 'package:suburban_life/core/services/csv_download_helper.dart';
 import 'package:suburban_life/core/services/document_cache_service.dart';
 
 class _InMemoryCacheIoHelper implements CacheIoHelper {
@@ -241,6 +243,58 @@ void main() {
         throwsException,
       );
       expect(await cacheService.isCached('doc_403', 'private.pdf'), isFalse);
+    });
+  });
+
+  group('CsvDownloadHelper Tests', () {
+    test('sanitizeFileName strips path separators and traversal segments', () {
+      final sanitized = CsvDownloadHelper.sanitizeFileName('../../etc/passwd');
+      expect(sanitized.contains('..'), isFalse);
+      expect(sanitized.contains('/'), isFalse);
+      expect(sanitized.contains(r'\'), isFalse);
+      expect(sanitized, isNotEmpty);
+
+      final windowsSanitized = CsvDownloadHelper.sanitizeFileName(
+        r'..\..\secret\address_import_template.csv',
+      );
+      expect(windowsSanitized.contains('..'), isFalse);
+      expect(windowsSanitized.contains('/'), isFalse);
+      expect(windowsSanitized.contains(r'\'), isFalse);
+      expect(windowsSanitized, endsWith('address_import_template.csv'));
+
+      expect(
+        CsvDownloadHelper.sanitizeFileName('resident_import_template.csv'),
+        equals('resident_import_template.csv'),
+      );
+    });
+
+    test('saveCsvFile writes sanitized CSV content to target directory', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'csv_download_test_',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      const csvContent =
+          'name,email,password,street,number\nAna,ana@test.com,,Elm,1\n';
+      final savedPath = await CsvDownloadHelper.saveCsvFile(
+        content: csvContent,
+        fileName: '../resident_import_template.csv',
+        directoryOverride: () async => tempDir,
+      );
+
+      expect(savedPath, isNotNull);
+      expect(
+        savedPath,
+        equals(
+          '${tempDir.path}${Platform.pathSeparator}resident_import_template.csv',
+        ),
+      );
+      final written = await File(savedPath!).readAsString();
+      expect(written, equals(csvContent));
     });
   });
 }

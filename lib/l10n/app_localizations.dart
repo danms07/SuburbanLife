@@ -1934,6 +1934,12 @@ abstract class AppLocalizations {
   /// **'Upload CSV File'**
   String get uploadCsvButton;
 
+  /// No description provided for @downloadCsvTemplateButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Download CSV Template'**
+  String get downloadCsvTemplateButton;
+
   /// No description provided for @copyCsvTemplateButton.
   ///
   /// In en, this message translates to:
@@ -1993,6 +1999,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'CSV template copied to clipboard.'**
   String get csvTemplateCopiedSnackbar;
+
+  /// No description provided for @csvTemplateDownloadedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV template downloaded successfully.'**
+  String get csvTemplateDownloadedSnackbar;
+
+  /// No description provided for @fileSavedToPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to: {filePath}'**
+  String fileSavedToPath(String filePath);
 
   /// No description provided for @downloadResultCsvButton.
   ///

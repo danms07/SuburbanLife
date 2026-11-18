@@ -142,11 +142,11 @@ The following table maps each visual component to its feature domain and source 
 - **Usage**: Used during initial onboarding in `main.dart` and inside `RoommatesScreen`.
 
 ## 19. Bulk User Import CSV Manager
-- **Description**: An administrative interface allowing bulk creation of resident user accounts from an uploaded CSV file. Features a file picker, a robust CSV parser (detecting headers or positional defaults), an interactive preview list of parsed rows showing assigned or deterministic temporary passwords, a copy template action, and a full results report view with copy-all passwords functionality.
+- **Description**: An administrative interface allowing bulk creation of resident user accounts from an uploaded CSV file. Features a file picker, a robust CSV parser (detecting headers or positional defaults), an interactive preview list of parsed rows showing assigned or deterministic temporary passwords, responsive `Wrap` action buttons for **Upload CSV File**, **Download CSV Template** (`resident_import_template.csv` via `CsvDownloadHelper`), and **Copy CSV Template**, and a full results report view with download/copy CSV and copy-all passwords functionality.
 - **Usage**: Exposed via `AdminBulkUserImportScreen`.
 
 ## 20. Bulk Address Import CSV Manager
-- **Description**: An administrative interface for pre-populating physical neighborhood address records into Firestore from a CSV file. Supports parsing street names, initial house numbers, final house numbers, and optional house number exclusions. Offers a CSV template copy helper, live row preview listing, and collision checks against existing database records.
+- **Description**: An administrative interface for pre-populating physical neighborhood address records into Firestore from a CSV file. Supports parsing street names, initial house numbers, final house numbers, and optional house number exclusions. Offers responsive `Wrap` **Download CSV Template** (`address_import_template.csv` via `CsvDownloadHelper`) and **Copy CSV Template** helpers, live row preview listing, and collision checks against existing database records.
 - **Usage**: Exposed via `AdminBulkAddressImportScreen`.
 
 ## 21. Admin Settings & SMTP Configurator

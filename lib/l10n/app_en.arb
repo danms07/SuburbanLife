@@ -330,6 +330,7 @@
   "bulkUserImportMenu": "Bulk User Creation (CSV)",
   "bulkUserImportTitle": "Bulk Resident Creation",
   "uploadCsvButton": "Upload CSV File",
+  "downloadCsvTemplateButton": "Download CSV Template",
   "copyCsvTemplateButton": "Copy CSV Template",
   "processImportButton": "Create Accounts ({count})",
   "@processImportButton": {
@@ -357,6 +358,15 @@
   "passwordsCopiedSnackbar": "Passwords copied to clipboard.",
   "csvColumnsHint": "Expected CSV columns: name, email, password (optional), street (optional), number (optional)",
   "csvTemplateCopiedSnackbar": "CSV template copied to clipboard.",
+  "csvTemplateDownloadedSnackbar": "CSV template downloaded successfully.",
+  "fileSavedToPath": "Saved to: {filePath}",
+  "@fileSavedToPath": {
+    "placeholders": {
+      "filePath": {
+        "type": "String"
+      }
+    }
+  },
   "downloadResultCsvButton": "Download Result CSV",
   "copyResultCsvButton": "Copy Result CSV",
   "csvDownloadedSuccess": "Result CSV downloaded successfully.",

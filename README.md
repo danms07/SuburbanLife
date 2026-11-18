@@ -378,7 +378,7 @@ Administrators can create resident user accounts in bulk by uploading a CSV file
 ### Quick Start:
 1. Refer to the sample template at [resident_import_template.csv](resident_import_template.csv).
 2. Populate the CSV with `name`, `email`, `password` (optional), `street` (optional), and `number` (optional).
-3. Open the app as an admin, tap **Bulk User Creation (CSV)** on the dashboard, and select your file.
+3. Open the app as an admin, navigate to **Bulk User Creation (CSV)**, download or copy the sample CSV template directly if needed, and select your populated file.
 4. Accounts are created server-side with instant **`resident`** claims (`{ resident: true }`). If `password` is omitted or does not satisfy complexity requirements, the system generates a cryptographically secure password meeting all Firebase Auth complexity rules (uppercase, lowercase, number, symbol, 12 chars).
 
 For complete architectural details, formula specs, and Cloud Function documentation, see [docs/bulk_user_creation.md](docs/bulk_user_creation.md).

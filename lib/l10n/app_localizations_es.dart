@@ -985,6 +985,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get uploadCsvButton => 'Subir Archivo CSV';
 
   @override
+  String get downloadCsvTemplateButton => 'Descargar Plantilla CSV';
+
+  @override
   String get copyCsvTemplateButton => 'Copiar Plantilla CSV';
 
   @override
@@ -1020,6 +1023,15 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get csvTemplateCopiedSnackbar =>
       'Plantilla CSV copiada al portapapeles.';
+
+  @override
+  String get csvTemplateDownloadedSnackbar =>
+      'Plantilla CSV descargada exitosamente.';
+
+  @override
+  String fileSavedToPath(String filePath) {
+    return 'Guardado en: $filePath';
+  }
 
   @override
   String get downloadResultCsvButton => 'Descargar CSV de Resultados';

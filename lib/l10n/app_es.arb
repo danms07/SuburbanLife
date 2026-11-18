@@ -330,6 +330,7 @@
   "bulkUserImportMenu": "Creación Masiva de Usuarios (CSV)",
   "bulkUserImportTitle": "Creación Masiva de Residentes",
   "uploadCsvButton": "Subir Archivo CSV",
+  "downloadCsvTemplateButton": "Descargar Plantilla CSV",
   "copyCsvTemplateButton": "Copiar Plantilla CSV",
   "processImportButton": "Crear Cuentas ({count})",
   "@processImportButton": {
@@ -357,6 +358,15 @@
   "passwordsCopiedSnackbar": "Contraseñas copiadas al portapapeles.",
   "csvColumnsHint": "Columnas CSV esperadas: name, email, password (opcional), street (opcional), number (opcional)",
   "csvTemplateCopiedSnackbar": "Plantilla CSV copiada al portapapeles.",
+  "csvTemplateDownloadedSnackbar": "Plantilla CSV descargada exitosamente.",
+  "fileSavedToPath": "Guardado en: {filePath}",
+  "@fileSavedToPath": {
+    "placeholders": {
+      "filePath": {
+        "type": "String"
+      }
+    }
+  },
   "downloadResultCsvButton": "Descargar CSV de Resultados",
   "copyResultCsvButton": "Copiar CSV de Resultados",
   "csvDownloadedSuccess": "CSV de resultados descargado exitosamente.",

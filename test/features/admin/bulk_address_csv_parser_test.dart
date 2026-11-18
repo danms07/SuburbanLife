@@ -6,7 +6,10 @@ import 'package:suburban_life/features/admin/admin_bulk_address_import_screen.da
 import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
 
-Widget _wrapWithL10n(Widget child) {
+Widget _wrapWithL10n(
+  Widget child, {
+  Locale locale = const Locale('en'),
+}) {
   return MaterialApp(
     localizationsDelegates: const [
       AppLocalizations.delegate,
@@ -15,7 +18,7 @@ Widget _wrapWithL10n(Widget child) {
       GlobalCupertinoLocalizations.delegate,
     ],
     supportedLocales: const [Locale('en'), Locale('es')],
-    locale: const Locale('en'),
+    locale: locale,
     home: child,
   );
 }
@@ -163,5 +166,73 @@ void main() {
 
       expect(find.byIcon(Icons.task_alt), findsNothing);
     });
+
+    testWidgets(
+      'Download CSV template button exports address_import_template.csv and shows localized confirmation',
+      (WidgetTester tester) async {
+        String? exportedFileName;
+        String? exportedContent;
+
+        await tester.pumpWidget(
+          _wrapWithL10n(
+            AdminBulkAddressImportScreen(
+              onExportCsv: (content, fileName) async {
+                exportedFileName = fileName;
+                exportedContent = content;
+                return null;
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final downloadBtn = find.byKey(
+          const Key('bulk_address_download_template_button'),
+        );
+        expect(downloadBtn, findsOneWidget);
+        await tester.ensureVisible(downloadBtn);
+        await tester.tap(downloadBtn);
+        await tester.pumpAndSettle();
+
+        expect(exportedFileName, equals('address_import_template.csv'));
+        expect(
+          exportedContent,
+          equals('${AdminBulkAddressImportScreen.csvTemplate}\n'),
+        );
+        expect(
+          find.textContaining('CSV template downloaded successfully.'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'Template action buttons wrap cleanly on narrow mobile viewports in Spanish without overflow',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 780);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final errors = <FlutterErrorDetails>[];
+        final oldHandler = FlutterError.onError;
+        FlutterError.onError = (details) {
+          errors.add(details);
+          oldHandler?.call(details);
+        };
+        addTearDown(() => FlutterError.onError = oldHandler);
+
+        await tester.pumpWidget(
+          _wrapWithL10n(
+            const AdminBulkAddressImportScreen(),
+            locale: const Locale('es'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Descargar Plantilla CSV'), findsOneWidget);
+        expect(find.text('Copiar Plantilla CSV'), findsOneWidget);
+        expect(errors, isEmpty);
+      },
+    );
   });
 }

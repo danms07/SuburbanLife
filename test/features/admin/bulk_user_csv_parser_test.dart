@@ -6,7 +6,10 @@ import 'package:suburban_life/features/admin/admin_bulk_user_import_screen.dart'
 import 'package:suburban_life/l10n/app_localizations.dart';
 import '../../helpers/fake_backend.dart';
 
-Widget _wrapWithL10n(Widget child) {
+Widget _wrapWithL10n(
+  Widget child, {
+  Locale locale = const Locale('en'),
+}) {
   return MaterialApp(
     localizationsDelegates: const [
       AppLocalizations.delegate,
@@ -15,7 +18,7 @@ Widget _wrapWithL10n(Widget child) {
       GlobalCupertinoLocalizations.delegate,
     ],
     supportedLocales: const [Locale('en'), Locale('es')],
-    locale: const Locale('en'),
+    locale: locale,
     home: child,
   );
 }
@@ -213,5 +216,81 @@ void main() {
 
       expect(copiedClipboardText, contains('TempPass!23'));
     });
+
+    testWidgets(
+      'Download CSV template button exports resident_import_template.csv and shows saved path confirmation',
+      (WidgetTester tester) async {
+        String? exportedFileName;
+        String? exportedContent;
+
+        await tester.pumpWidget(
+          _wrapWithL10n(
+            AdminBulkUserImportScreen(
+              onExportCsv: (content, fileName) async {
+                exportedFileName = fileName;
+                exportedContent = content;
+                return '/docs/resident_import_template.csv';
+              },
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final downloadBtn = find.byKey(
+          const Key('bulk_user_download_template_button'),
+        );
+        expect(downloadBtn, findsOneWidget);
+        await tester.ensureVisible(downloadBtn);
+        await tester.tap(downloadBtn);
+        await tester.pumpAndSettle();
+
+        expect(exportedFileName, equals('resident_import_template.csv'));
+        expect(exportedContent, equals(AdminBulkUserImportScreen.csvTemplate));
+        expect(
+          find.textContaining('CSV template downloaded successfully.'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Saved to: /docs/resident_import_template.csv'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'Action buttons wrap cleanly on narrow mobile viewports in Spanish without overflow',
+      (WidgetTester tester) async {
+        tester.view.physicalSize = const Size(360, 780);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.reset);
+
+        final errors = <FlutterErrorDetails>[];
+        final oldHandler = FlutterError.onError;
+        FlutterError.onError = (details) {
+          errors.add(details);
+          oldHandler?.call(details);
+        };
+        addTearDown(() => FlutterError.onError = oldHandler);
+
+        await tester.pumpWidget(
+          _wrapWithL10n(
+            const AdminBulkUserImportScreen(),
+            locale: const Locale('es'),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('bulk_user_upload_csv_button')),
+            matching: find.text('Subir Archivo CSV'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('Descargar Plantilla CSV'), findsOneWidget);
+        expect(find.text('Copiar Plantilla CSV'), findsOneWidget);
+        expect(errors, isEmpty);
+      },
+    );
   });
 }
