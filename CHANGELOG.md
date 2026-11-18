@@ -2,6 +2,18 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.43+44] — 2026-11-18
+
+### Changed
+- **Admin Booking Approval Master-Detail Refactor (`lib/features/admin/admin_booking_approval_screen.dart`)**:
+  - Replaced the legacy inline booking cards (`_BookingApprovalCard`, previously displaying contact PII, attachment viewers, and Approve/Reject action buttons directly in the queue list) with compact, button-free `_BookingSummaryCard` items (`ValueKey('booking_card_<bookingId>')`) displaying the facility title, wrapping `Pending Review` badge, localized time slot pill, applicant name, resolved household address (`streetName #number`), attachment count pill, and trailing chevron (`Icons.chevron_right`).
+  - Added dedicated responsive `AdminBookingDetailScreen` aligned with `AdminPaymentDetailScreen` and `AdminResidentDetailScreen`:
+    - Adapts via `LayoutBuilder` across wide (`> 650px`) and narrow (`<= 650px`) viewports: renders a side-by-side **Submitted Documentation** pane (`booking_attachments/{bookingId}` with responsive **View / Download** actions, requirement mode badges, and `RotatableImagePreview` inline rotation + full-screen zoom) alongside schedule/contact details and `Reject` / `Approve Booking` buttons when documentation applies, or a clean centered review card when no documentation pane is needed.
+    - Wraps header badges and metadata pills cleanly so long Spanish labels (`Pendiente de revisión`, `Ver / Descargar`, localized schedules) render without horizontal overflow on `360px` mobile screens, shows feedback banners, and pops back to the summary queue upon approval (`approvalMessage`) or rejection (`rejectionReason`).
+- **Automated Tests & Documentation**:
+  - Updated `test/features/admin/admin_booking_approval_test.dart` and `test/integration/rollout_workflow_test.dart` for Master-Detail booking navigation, wide (`1000x800`) and narrow (`360x760`) layouts (both with and without documentation), Spanish localization overflow checks, and pop-back assertions.
+  - Updated `Structure.md`, `widget_catalog.md`, `README.md`, `docs/admin_user_manual.md`, `docs/admin_user_manual_es.md`, and bumped app version to `1.0.43+44` (`pubspec.yaml` and `web/version.json`).
+
 ## [1.0.42+43] — 2026-11-18
 
 ### Fixed

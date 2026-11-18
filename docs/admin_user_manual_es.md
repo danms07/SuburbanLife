@@ -402,10 +402,10 @@ Puedes **Crear** una nueva instalación desde el formulario superior, **Editar**
 **Navegación:** Panel de Administración $\rightarrow$ **Revisar Reservas** (`AdminBookingApprovalScreen`)
 
 Cuando un residente solicita una reserva, esta ingresa a la cola `pending review`:
-1. Revisa la tarjeta de la solicitud, que incluye el **Nombre de la Instalación**, **Fecha y Horario Solicitado**, la **Tarjeta de Contacto del Solicitante** (**Nombre**, **Correo** y **Teléfono**) y, cuando el residente envió documentos, la sección **Documentación Enviada** con botones **Ver / Descargar** para inspeccionar cada archivo antes de tomar una decisión.
-2. Elige una acción:
-   * **Aprobar**: Abre el **Diálogo de Aprobación de Reserva**, pre-llenado con las **Instrucciones Predeterminadas de Aprobación** de esa instalación. Puedes personalizar el mensaje para ese residente antes de confirmar. Al aprobar, la reserva pasa a estatus `approved` y tus instrucciones quedan visibles para el residente en su pantalla *Mis Reservas*.
-   * **Rechazar**: Solicita ingresar un **Motivo de Rechazo**, cambia el estatus a `rejected` y libera el horario para otros vecinos. El residente podrá editar y reenviar su solicitud rechazada (incluyendo reemplazar cualquier documento adjunto incompleto o sin firma).
+1. Toca cualquier tarjeta resumen de la lista (donde verás **Nombre de la Instalación**, insignia **Pendiente de revisión**, **Fecha y Horario**, **Solicitante**, **Dirección** y contador de adjuntos) para abrir la pantalla dedicada **Detalles de la Reservación** (`AdminBookingDetailScreen`), que muestra los **Datos de Contacto del Solicitante** (**Nombre**, **Correo** y **Teléfono**), horario completo y, cuando existen archivos enviados, el panel **Documentación Enviada** con botones **Ver / Descargar** y visores rotables en línea para imágenes.
+2. Elige una acción desde la pantalla de detalle:
+   * **Aprobar Reservación**: Abre el **Diálogo de Aprobación de Reserva**, pre-llenado con las **Instrucciones Predeterminadas de Aprobación** de esa instalación. Puedes personalizar el mensaje para ese residente antes de confirmar. Al aprobar, la reserva pasa a estatus `approved`, regresa automáticamente a la lista de solicitudes y tus instrucciones quedan visibles para el residente en *Mis Reservas*.
+   * **Rechazar**: Solicita ingresar un **Motivo de Rechazo**, cambia el estatus a `rejected`, libera el horario para otros vecinos y regresa a la lista. El residente podrá editar y reenviar su solicitud rechazada (incluyendo reemplazar cualquier documento adjunto incompleto o sin firma).
 
 ---
 

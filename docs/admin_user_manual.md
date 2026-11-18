@@ -402,10 +402,10 @@ You can **Create** a new facility using the top form, **Edit** any existing faci
 **Navigation:** Admin Panel $\rightarrow$ **Review Bookings** (`AdminBookingApprovalScreen`)
 
 When a resident requests a reservation, it enters the `pending review` queue:
-1. Inspect the booking card, which displays the **Facility Name**, **Requested Date & Time Window**, an **Applicant Contact Card** (**Name**, **Email**, and **Phone Number**), and—whenever documents were attached—a **Submitted Documentation** section with **View / Download** buttons to inspect each resident attachment before deciding.
-2. Choose an action:
-   * **Approve**: Opens the **Approve Booking Dialog**, pre-populated with the facility's **Preset Approval Instructions**. You can customize the instructions for this specific resident before confirming. Approving transitions the booking to `approved` and makes your instructions visible to the resident in their *My Bookings* screen.
-   * **Reject**: Prompts you to enter a **Rejection Reason**, transitions the booking to `rejected`, and frees the time slot for other residents. Residents can edit and resubmit a rejected booking (including replacing any incomplete or unsigned attachment).
+1. Tap a compact booking summary card (showing **Facility Name**, **Pending Review** badge, **Requested Date & Time Window**, **Applicant Name**, **Household Address**, and attachment count badge) to open the dedicated **Booking Details** screen (`AdminBookingDetailScreen`), which presents full **Applicant Contact Details** (**Name**, **Email**, and **Phone Number**), time window, and—whenever documents were attached—the **Submitted Documentation** pane with **View / Download** buttons and inline rotatable image previews.
+2. Choose an action on the detail screen:
+   * **Approve Booking**: Opens the **Approve Booking Dialog**, pre-populated with the facility's **Preset Approval Instructions**. You can customize the instructions for this specific resident before confirming. Approving transitions the booking to `approved` and returns to the queue with your instructions visible to the resident in their *My Bookings* screen.
+   * **Reject**: Prompts you to enter a **Rejection Reason**, transitions the booking to `rejected`, frees the time slot for other residents, and returns to the queue. Residents can edit and resubmit a rejected booking (including replacing any incomplete or unsigned attachment).
 
 ---
 

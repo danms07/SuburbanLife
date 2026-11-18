@@ -834,10 +834,16 @@ void main() {
       await tester.pumpWidget(wrapWithMaterial(const AdminBookingApprovalScreen()));
       await tester.pumpAndSettle();
 
-      // Tap Reject button (OutlinedButton with Icons.close)
-      final rejectIconFinder = find.byIcon(Icons.close);
-      expect(rejectIconFinder, findsOneWidget);
-      await tester.tap(rejectIconFinder);
+      // Navigate into detail screen for booking1
+      final card1Finder = find.byKey(ValueKey('booking_card_${booking1['id']}'));
+      expect(card1Finder, findsOneWidget);
+      await tester.tap(card1Finder);
+      await tester.pumpAndSettle();
+
+      // Tap Reject button on detail screen
+      final rejectBtnFinder = find.byKey(const ValueKey('booking_detail_reject_button'));
+      expect(rejectBtnFinder, findsOneWidget);
+      await tester.tap(rejectBtnFinder);
       await tester.pumpAndSettle();
 
       // Enter rejection reason in the dialog's TextField
@@ -896,10 +902,16 @@ void main() {
       await tester.pumpWidget(wrapWithMaterial(const AdminBookingApprovalScreen()));
       await tester.pumpAndSettle();
 
-      // Tap Approve button (ElevatedButton.icon with Icons.check)
-      final approveIconFinder = find.byIcon(Icons.check);
-      expect(approveIconFinder, findsOneWidget);
-      await tester.tap(approveIconFinder);
+      // Navigate into detail screen for booking2
+      final card2Finder = find.byKey(ValueKey('booking_card_${booking2['id']}'));
+      expect(card2Finder, findsOneWidget);
+      await tester.tap(card2Finder);
+      await tester.pumpAndSettle();
+
+      // Tap Approve Booking button on detail screen
+      final approveBtnFinder = find.byKey(const ValueKey('booking_detail_approve_button'));
+      expect(approveBtnFinder, findsOneWidget);
+      await tester.tap(approveBtnFinder);
       await tester.pumpAndSettle();
 
       // Tap Confirm Booking button in dialog
