@@ -2,6 +2,16 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.46+47] — 2026-11-18
+
+### Fixed
+- **Mobile Web Duplicate Password Eye Icon (`web/index.html`)**:
+  - Added global CSS rules (`input::-ms-reveal`, `input::-ms-clear`, `input[type="password"]::-ms-reveal`, and `input[type="password"]::-ms-clear` set to `display: none !important;`) in `web/index.html` to suppress the browser-native password reveal button on mobile browsers whose user-agent strings bypass Flutter Web's desktop-only `isEdge` check (`EdgA/` on Android Edge and `EdgiOS/` on iOS Edge), leaving only Flutter's working `suffixIcon` password visibility toggle visible.
+- **Auth & Web CSS Regression Tests (`test/features/auth/auth_screens_test.dart`)**:
+  - Added a mobile Spanish (`360x760`) `LoginScreen` widget test confirming strictly one password visibility icon toggles `obscureText`, plus a static HTML guard verifying the `::-ms-reveal` / `::-ms-clear` suppression rules remain in `web/index.html`.
+- **Version Bump (`pubspec.yaml`, `web/version.json`)**:
+  - Bumped application version from `1.0.45+46` to `1.0.46+47`.
+
 ## [1.0.45+46] — 2026-11-18
 
 ### Added

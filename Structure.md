@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-18 (v1.0.45+46 — Guard Panel App Version Footer & QR Scanner Blocking Floating Wheel Overlay)*
+*Last Verified/Updated: 2026-11-18 (v1.0.46+47 — Mobile Web Duplicate Password Eye Icon Suppression)*
 
 Current state of project files and folders:
 
@@ -156,7 +156,7 @@ Current state of project files and folders:
             - `admin_create_user_test.dart`: Production `AdminCreateUserScreen` resident/guard/admin creation, future delivery date validation, address claiming, and callable payload widget tests.
         - `announcements/announcement_model_test.dart`: Announcement serialization and timestamp parsing tests.
         - `auth/`:
-            - `auth_screens_test.dart`: Widget tests for `LoginScreen`, `SignupScreen`, `OwnershipProofScreen` (handover date validation, Storage upload, `ownership_claims` write, Crashlytics & temp-file cleanup on failure), and `AdminResidentApprovalScreen` / `AdminResidentDetailScreen` (empty state, master-detail summary card navigation, wide `> 650px` side-by-side layout, PII email masking, inline + full-screen 90-degree image rotation synchronization, approval workflow, and mobile Spanish rejection workflow).
+            - `auth_screens_test.dart`: Widget tests for `LoginScreen` (including desktop split view, mobile `360x760` Spanish single password visibility toggle verification, and `web/index.html` native reveal-icon CSS suppression guard), `SignupScreen`, `OwnershipProofScreen` (handover date validation, Storage upload, `ownership_claims` write, Crashlytics & temp-file cleanup on failure), and `AdminResidentApprovalScreen` / `AdminResidentDetailScreen` (empty state, master-detail summary card navigation, wide `> 650px` side-by-side layout, PII email masking, inline + full-screen 90-degree image rotation synchronization, approval workflow, and mobile Spanish rejection workflow).
             - `password_validation_test.dart`: Password complexity constraint validation tests.
         - `booking/`:
             - `booking_service_test.dart`: Booking filters, user booking sorting, `resubmitBookingId` cloud function invocation, symmetric cooldown (`hours`, `days`, `months`, `years`) and household quota (`daily`, `monthly`, `yearly`) evaluation, merged `getHouseholdFacilityBookings` (`addressId` + legacy `userUid`), `BookingScreen` quota badge & blocking widget tests, and full booking lifecycle tests.
@@ -176,7 +176,7 @@ Current state of project files and folders:
     - `helpers/fake_backend.dart`: High-fidelity in-memory BaaS fake service locator supporting isolated per-subscriber `Stream.multi` snapshots, compound `QueryFilter` operators, `QuerySort`, `limit`/`startAfter` cursor pagination, `DbFieldValue` mutations, and custom Storage/Functions test handlers (including `uploadedOptions` metadata tracking).
     - `import_boundary_test.dart`: Static architectural & AGENTS.md compliance suite enforcing zero direct Firebase SDK imports in `lib/features/`, zero raw `print()` calls in `lib/`, English/Spanish ARB localization key parity (`app_en.arb` vs `app_es.arb`), zero `.withOpacity()` usages, and zero deprecated `DropdownButtonFormField` `value:` usages.
     - `widget_test.dart`: Widget tests for `MyHomePage` admin AppBar role-switching, drawer logout & `AppVersionLabel` verification across admin and resident EN/ES navigation drawers and the `guard_app_version_label` narrow-screen (`360x640`) Guard Panel footer, resignation button visibility (`_isAdmin && _isResident`), and unassigned resident onboarding (`Claim Property` / `Join as Roommate`) Sign Out action (`onboarding_logout_button`).
-- `web/`: Web entry point and assets including `index.html`, `manifest.json`, `favicon.ico`, `favicon.png`, `icons/`, and base `version.json`.
+- `web/`: Web entry point and assets including `index.html` (with CSS rules suppressing browser-native `::-ms-reveal` / `::-ms-clear` password icons on mobile web), `manifest.json`, `favicon.ico`, `favicon.png`, `icons/`, and base `version.json`.
 - `resident_import_template.csv`: Sample CSV template for administrator bulk user account import.
 - `Structure.md`: This inventory map file.
 

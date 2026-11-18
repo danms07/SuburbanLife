@@ -168,6 +168,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(SignupScreen), findsOneWidget);
     });
+
+    testWidgets('renders single password visibility toggle on mobile layout and toggles obscureText', (tester) async {
+      tester.view.physicalSize = const Size(360, 760);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(_wrapWithApp(const LoginScreen(), locale: const Locale('es')));
+      await tester.pumpAndSettle();
+
+      final textFields = find.byType(TextField);
+      expect(textFields, findsNWidgets(2));
+      expect(tester.widget<TextField>(textFields.at(1)).obscureText, isTrue);
+
+      // Only one eye icon toggle should exist in Flutter's widget tree
+      expect(find.byIcon(Icons.visibility_off), findsOneWidget);
+      expect(find.byIcon(Icons.visibility), findsNothing);
+
+      final toggle = find.byIcon(Icons.visibility_off);
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pump();
+
+      expect(tester.widget<TextField>(textFields.at(1)).obscureText, isFalse);
+      expect(find.byIcon(Icons.visibility), findsOneWidget);
+      expect(find.byIcon(Icons.visibility_off), findsNothing);
+    });
+
+    test('web/index.html suppresses browser-native password reveal and clear controls', () {
+      final indexFile = File('web/index.html');
+      expect(indexFile.existsSync(), isTrue, reason: 'web/index.html must exist');
+      final html = indexFile.readAsStringSync();
+      expect(html, contains('input::-ms-reveal'));
+      expect(html, contains('input::-ms-clear'));
+      expect(html, contains('input[type="password"]::-ms-reveal'));
+      expect(html, contains('input[type="password"]::-ms-clear'));
+      expect(html, contains('display: none !important;'));
+    });
   });
 
   group('ForgotPasswordScreen', () {
