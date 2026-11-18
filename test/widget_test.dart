@@ -181,6 +181,57 @@ void main() {
   );
 
   testWidgets(
+    'Security guard panel displays localized app version label in bottom footer without overflow on narrow screens',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FakeBackendHelper.auth.currentUserMock = AppUser(
+        uid: 'guard_footer_1',
+        email: 'guard@test.com',
+        displayName: 'Guard Test',
+      );
+      FakeBackendHelper.auth.isAdminMock = false;
+      FakeBackendHelper.auth.isResidentMock = false;
+      FakeBackendHelper.auth.isGuardMock = true;
+
+      FakeBackendHelper.db.seedDocument('users', 'guard_footer_1', {
+        'uid': 'guard_footer_1',
+        'name': 'Guard Test',
+        'email': 'guard@test.com',
+        'role': 'guard',
+      });
+
+      // English check
+      await tester.pumpWidget(createWidgetUnderTest(locale: const Locale('en')));
+      await tester.pumpAndSettle();
+
+      final scanCardBtn = find.byKey(const ValueKey('guard_scan_qr_button'));
+      final guardVersionLabel = find.byKey(const ValueKey('guard_app_version_label'));
+      expect(scanCardBtn, findsOneWidget);
+      expect(guardVersionLabel, findsOneWidget);
+      expect(find.text('Version $expectedVersion'), findsOneWidget);
+      expect(
+        tester.getRect(guardVersionLabel).top,
+        greaterThanOrEqualTo(tester.getRect(scanCardBtn).bottom),
+      );
+      expect(tester.takeException(), isNull);
+
+      // Spanish check
+      await tester.pumpWidget(createWidgetUnderTest(locale: const Locale('es')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('guard_app_version_label')), findsOneWidget);
+      expect(find.text('Versión $expectedVersion'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Unassigned resident onboarding screen shows Sign Out button on both claim and family group tabs and signs out when tapped',
     (WidgetTester tester) async {
       FakeBackendHelper.auth.currentUserMock = AppUser(

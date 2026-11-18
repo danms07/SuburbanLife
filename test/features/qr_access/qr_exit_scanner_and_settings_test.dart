@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -439,6 +440,156 @@ void main() {
       expect(find.byType(QrScannerScreen), findsNothing);
       expect(find.byKey(const ValueKey('guard_main_scan_btn')), findsOneWidget);
     });
+
+    testWidgets(
+      'blocks scan and action buttons and displays floating wheel overlay while validating and registering QR access',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final validationCompleter = Completer<Map<String, dynamic>>();
+        final registrationCompleter = Completer<Map<String, dynamic>>();
+
+        FakeBackendHelper.functions.registerHandler('validateAndRegisterQrAccess', (params) {
+          if (params?['mode'] == 'validate_only') {
+            return validationCompleter.future;
+          }
+          return registrationCompleter.future;
+        });
+
+        await tester.pumpWidget(wrapWithApp(const QrScannerScreen(), locale: const Locale('en')));
+        await tester.pump();
+
+        // Trigger QR detection twice in rapid succession to simulate duplicate scanner frames
+        final mobileScanner = tester.widget<MobileScanner>(find.byType(MobileScanner));
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_busy_test')]),
+        );
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_busy_test')]),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        // Only one validation request should be in flight; floating wheel overlay & wait hint visible
+        expect(FakeBackendHelper.functions.callHistory.length, equals(1));
+        final loadingOverlay = find.byKey(const ValueKey('qr_scanner_loading_overlay'));
+        expect(loadingOverlay, findsOneWidget);
+        expect(
+          find.descendant(of: loadingOverlay, matching: find.byType(CircularProgressIndicator)),
+          findsOneWidget,
+        );
+        expect(find.text('Validating QR Code...'), findsOneWidget);
+        expect(
+          find.text('Please wait while the operation completes. Do not tap any other buttons.'),
+          findsOneWidget,
+        );
+        expect(find.byIcon(Icons.error_outline), findsNothing);
+
+        // Scan Again button is visible in disabled state and cannot reset or trigger another scan
+        final scanAgainFinder = find.byKey(const ValueKey('scan_again_button'));
+        expect(scanAgainFinder, findsOneWidget);
+        expect(tester.widget<OutlinedButton>(scanAgainFinder).onPressed, isNull);
+
+        await tester.tap(scanAgainFinder, warnIfMissed: false);
+        await tester.pump();
+        expect(find.byType(MobileScanner), findsNothing);
+        expect(FakeBackendHelper.functions.callHistory.length, equals(1));
+
+        // Resolve visitor info lookup
+        validationCompleter.complete({
+          'granted': true,
+          'isExit': false,
+          'qrData': {
+            'id': 'qr_busy_test',
+            'creatorUid': 'resident_1',
+            'guestName': 'Delayed Visitor',
+            'vehicleType': 'car',
+            'vehiclePlates': 'WAIT-101',
+            'passengers': 2,
+            'type': 'temporary',
+          },
+        });
+        await tester.pumpAndSettle();
+
+        expect(loadingOverlay, findsNothing);
+        expect(find.textContaining('Delayed Visitor'), findsOneWidget);
+
+        final allowBtnFinder = find.byKey(const ValueKey('allow_access_button'));
+        final denyBtnFinder = find.byKey(const ValueKey('deny_access_button'));
+        expect(tester.widget<OutlinedButton>(scanAgainFinder).onPressed, isNotNull);
+        expect(tester.widget<ElevatedButton>(allowBtnFinder).onPressed, isNotNull);
+        expect(tester.widget<ElevatedButton>(denyBtnFinder).onPressed, isNotNull);
+
+        // Tap Allow Access and keep registration pending
+        await tester.ensureVisible(allowBtnFinder);
+        await tester.pumpAndSettle();
+        await tester.tap(allowBtnFinder);
+        await tester.pump();
+        await tester.pump();
+
+        expect(FakeBackendHelper.functions.callHistory.length, equals(2));
+        expect(loadingOverlay, findsOneWidget);
+        expect(find.text('Processing access request...'), findsOneWidget);
+        expect(tester.widget<ElevatedButton>(allowBtnFinder).onPressed, isNull);
+        expect(tester.widget<ElevatedButton>(denyBtnFinder).onPressed, isNull);
+        expect(tester.widget<OutlinedButton>(scanAgainFinder).onPressed, isNull);
+
+        // Additional tap during in-flight registration is blocked
+        await tester.tap(allowBtnFinder, warnIfMissed: false);
+        await tester.pump();
+        expect(FakeBackendHelper.functions.callHistory.length, equals(2));
+
+        registrationCompleter.complete({
+          'granted': true,
+          'isExit': false,
+          'logId': 'log_busy_1',
+        });
+        await tester.pumpAndSettle();
+        expect(find.text('Access registered successfully'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'displays Spanish localized floating loading overlay messages while validating QR code',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final validationCompleter = Completer<Map<String, dynamic>>();
+        FakeBackendHelper.functions.registerHandler('validateAndRegisterQrAccess', (_) {
+          return validationCompleter.future;
+        });
+
+        await tester.pumpWidget(wrapWithApp(const QrScannerScreen(), locale: const Locale('es')));
+        await tester.pump();
+
+        final mobileScanner = tester.widget<MobileScanner>(find.byType(MobileScanner));
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_es_busy')]),
+        );
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('qr_scanner_loading_overlay')), findsOneWidget);
+        expect(find.text('Validando código QR...'), findsOneWidget);
+        expect(
+          find.text('Por favor, espere mientras se completa la operación. No presione otros botones.'),
+          findsOneWidget,
+        );
+
+        validationCompleter.complete({'granted': false, 'reason': 'No encontrado'});
+        await tester.pumpAndSettle();
+      },
+    );
 
     testWidgets('persists initialBudgetBalance inside Payment & Grace Period settings card', (tester) async {
       tester.view.physicalSize = const Size(1200, 1600);

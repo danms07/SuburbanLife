@@ -1381,5 +1381,7 @@
     "placeholders": {
       "version": { "type": "String" }
     }
-  }
+  },
+  "processingAccessOperation": "Processing access request...",
+  "qrProcessingWaitHint": "Please wait while the operation completes. Do not tap any other buttons."
 }

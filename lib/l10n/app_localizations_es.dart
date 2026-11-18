@@ -3092,4 +3092,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String appVersionLabel(String version) {
     return 'Versión $version';
   }
+
+  @override
+  String get processingAccessOperation => 'Procesando solicitud de acceso...';
+
+  @override
+  String get qrProcessingWaitHint =>
+      'Por favor, espere mientras se completa la operación. No presione otros botones.';
 }

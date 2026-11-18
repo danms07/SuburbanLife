@@ -2,6 +2,24 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.45+46] — 2026-11-18
+
+### Added
+- **Guard Panel App Version Footer (`lib/main.dart`)**:
+  - Rendered the localized `AppVersionLabel` widget (`ValueKey('guard_app_version_label')`) in a non-interactive bottom `SafeArea` footer beneath the `Scan QR Code` card (`guard_scan_qr_button`) inside an overflow-safe `Expanded` + `LayoutBuilder` + `SingleChildScrollView` layout, wrapped the Guard Panel header title (`guardPanelTitle`) in `Expanded` to prevent horizontal overflow on narrow mobile devices (`360px`), and added a route-launch double-tap guard (`_isOpeningQrScanner`).
+- **Localized QR Processing & Wait Hint Copy (`lib/l10n/app_en.arb`, `lib/l10n/app_es.arb`)**:
+  - Added bilingual EN/ES strings `processingAccessOperation` and `qrProcessingWaitHint` guiding guards not to tap additional controls while operations are running.
+
+### Fixed
+- **QR Scanner Duplicate Attempts & Blocking Floating Wheel (`lib/features/qr_access/qr_scanner_screen.dart`)**:
+  - Added `_isValidating`, `_isCapturingPhoto`, `_isUploadingImages`, and monotonically incremented `_activeValidationToken` concurrency guards so scanning a QR code immediately blocks duplicate `onDetect` frames and prevents multiple overlapping `validateAndRegisterQrAccess` calls.
+  - Kept `scan_again_button`, photo capture controls, `allow_access_button`, `deny_access_button`, `register_exit_button`, camera switches, and text inputs explicitly disabled (`onPressed: _isBusy ? null`) while visitor information is loading or access/exit registration is in flight, and replaced the premature red error icon flash during validation with a neutral scanner indicator.
+  - Added a centered blocking floating progress wheel overlay (`ValueKey('qr_scanner_loading_overlay')`, combining `AbsorbPointer` with a translucent modal scrim, `CircularProgressIndicator`, operation status label, and wait hint) visible throughout both visitor QR lookup and access/exit submission.
+
+### Tests & Documentation
+- Added `Completer`-driven EN/ES QR scanner concurrency and overlay tests in `test/features/qr_access/qr_exit_scanner_and_settings_test.dart` and narrow-screen (`360x640`) EN/ES Guard Panel version footer tests in `test/widget_test.dart`.
+- Updated `Structure.md`, `widget_catalog.md`, `README.md`, and bumped app version to `1.0.45+46` (`pubspec.yaml` and `web/version.json`).
+
 ## [1.0.44+45] — 2026-11-18
 
 ### Added

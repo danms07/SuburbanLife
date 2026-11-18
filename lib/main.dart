@@ -173,6 +173,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _claimStreet;
   Map<String, dynamic>? _claimAddress;
   bool _isClaimSubmitting = false;
+  bool _isOpeningQrScanner = false;
   int _onboardingModeIndex = 0;
   Stream<List<Map<String, dynamic>>>? _unclaimedAddressesStream;
   String? _userAddressesUid;
@@ -184,6 +185,27 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _checkRoles();
+  }
+
+  Future<void> _openQrScanner() async {
+    if (_isOpeningQrScanner || !mounted) return;
+    setState(() {
+      _isOpeningQrScanner = true;
+    });
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const QrScannerScreen(),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningQrScanner = false;
+        });
+      }
+    }
   }
 
   Stream<List<Map<String, dynamic>>> _getUnclaimedAddressesStream() {
@@ -1446,13 +1468,17 @@ class _MyHomePageState extends State<MyHomePage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        l10n.guardPanelTitle,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: AppConfig.fontFamily,
+                      Expanded(
+                        child: Text(
+                          l10n.guardPanelTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: AppConfig.fontFamily,
+                          ),
                         ),
                       ),
                       IconButton(
@@ -1478,66 +1504,91 @@ class _MyHomePageState extends State<MyHomePage> {
           },
         ),
 
-        const SizedBox(height: 40),
-
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Card(
-            elevation: 6,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const QrScannerScreen(),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        children: [
+                          const SizedBox(height: 40),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Card(
+                              elevation: 6,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: InkWell(
+                                key: const ValueKey('guard_scan_qr_button'),
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: _isOpeningQrScanner ? null : _openQrScanner,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(30),
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(20),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: 0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.qr_code_scanner,
+                                          size: 80,
+                                          color: AppConfig.primaryColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Text(
+                                        l10n.scanQr,
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppConfig.primaryColor,
+                                          fontFamily: AppConfig.fontFamily,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        l10n.guardInstructions,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          color: Colors.black87,
+                                          height: 1.3,
+                                          fontFamily: AppConfig.fontFamily,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(16, 24, 16, 16),
+                          child: AppVersionLabel(
+                            key: ValueKey('guard_app_version_label'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.all(30),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.qr_code_scanner,
-                        size: 80,
-                        color: AppConfig.primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      l10n.scanQr,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: AppConfig.primaryColor,
-                        fontFamily: AppConfig.fontFamily,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      l10n.guardInstructions,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.black87,
-                        height: 1.3,
-                        fontFamily: AppConfig.fontFamily,
-                      ),
-                    ),
-                  ],
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ],

@@ -5543,6 +5543,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Version {version}'**
   String appVersionLabel(String version);
+
+  /// No description provided for @processingAccessOperation.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing access request...'**
+  String get processingAccessOperation;
+
+  /// No description provided for @qrProcessingWaitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait while the operation completes. Do not tap any other buttons.'**
+  String get qrProcessingWaitHint;
 }
 
 class _AppLocalizationsDelegate

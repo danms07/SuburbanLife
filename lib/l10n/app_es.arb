@@ -1248,5 +1248,7 @@
     "placeholders": {
       "version": { "type": "String" }
     }
-  }
+  },
+  "processingAccessOperation": "Procesando solicitud de acceso...",
+  "qrProcessingWaitHint": "Por favor, espere mientras se completa la operación. No presione otros botones."
 }
