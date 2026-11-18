@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
@@ -451,6 +452,21 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     );
   }
 
+  Future<void> _openCreateUserScreen() async {
+    final initialRole = (_selectedRole == 'guard' || _selectedRole == 'admin')
+        ? _selectedRole
+        : 'resident';
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AdminCreateUserScreen(initialRole: initialRole),
+      ),
+    );
+    if (mounted) {
+      await _loadUsers(isRefresh: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -467,120 +483,77 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               backgroundColor: AppConfig.primaryColor,
               foregroundColor: Colors.white,
               elevation: 2,
-              actions: [
-                IconButton(
-                  key: const ValueKey('manage_users_create_user_button'),
-                  icon: const Icon(Icons.person_add_alt_1),
-                  tooltip: l10n.createUserMenu,
-                  onPressed: () async {
-                    final initialRole = (_selectedRole == 'guard' || _selectedRole == 'admin')
-                        ? _selectedRole
-                        : 'resident';
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AdminCreateUserScreen(initialRole: initialRole),
-                      ),
-                    );
-                    if (mounted) {
-                      _loadUsers(isRefresh: true);
-                    }
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  tooltip: MaterialLocalizations.of(context).refreshIndicatorSemanticLabel,
-                  onPressed: _isLoading ? null : () => _loadUsers(isRefresh: true),
-                ),
-              ],
             ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _loadUsers(isRefresh: true);
-        },
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (widget.isEmbedded) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+      floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('manage_users_create_user_button'),
+        backgroundColor: AppConfig.primaryColor,
+        foregroundColor: Colors.white,
+        tooltip: l10n.createUserMenu,
+        icon: const Icon(Icons.person_add_alt_1),
+        label: Text(l10n.createUserMenu),
+        onPressed: _openCreateUserScreen,
+      ),
+      body: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: const {
+            PointerDeviceKind.touch,
+            PointerDeviceKind.mouse,
+            PointerDeviceKind.trackpad,
+            PointerDeviceKind.stylus,
+          },
+        ),
+        child: RefreshIndicator(
+          key: const ValueKey('manage_users_refresh_indicator'),
+          color: AppConfig.primaryColor,
+          onRefresh: () => _loadUsers(isRefresh: true),
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Flexible(
-                        child: ElevatedButton.icon(
-                          key: const ValueKey('manage_users_create_user_button'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppConfig.primaryColor,
-                            foregroundColor: Colors.white,
+                      // 1. Search and Filter Section Card
+                      _buildFilterCard(context, l10n, isDesktop, hasActiveFilter),
+                      const SizedBox(height: 14),
+
+                      // 2. Count & Batch Information Summary Bar
+                      _buildBatchInfoBar(context, l10n, displayedUsers.length, hasActiveFilter),
+                      const SizedBox(height: 14),
+
+                      // 3. User Summary Cards or Empty / Loading States
+                      if (_isLoading && displayedUsers.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 48),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(),
+                                const SizedBox(height: 16),
+                                Text(l10n.loadingUsers, style: const TextStyle(color: Colors.grey)),
+                              ],
+                            ),
                           ),
-                          icon: const Icon(Icons.person_add_alt_1, size: 18),
-                          label: Text(
-                            l10n.createUserMenu,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          onPressed: () async {
-                            final initialRole = (_selectedRole == 'guard' || _selectedRole == 'admin')
-                                ? _selectedRole
-                                : 'resident';
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AdminCreateUserScreen(initialRole: initialRole),
-                              ),
-                            );
-                            if (mounted) {
-                              _loadUsers(isRefresh: true);
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, color: AppConfig.primaryColor),
-                        tooltip: MaterialLocalizations.of(context).refreshIndicatorSemanticLabel,
-                        onPressed: _isLoading ? null : () => _loadUsers(isRefresh: true),
-                      ),
+                        )
+                      else if (displayedUsers.isEmpty)
+                        _buildEmptyState(context, l10n, hasActiveFilter)
+                      else ...[
+                        ...displayedUsers.map((userDoc) => _buildUserSummaryCard(context, l10n, userDoc)),
+                        const SizedBox(height: 8),
+
+                        // 4. Batch Exploration Load More Footer
+                        _buildLoadMoreFooter(context, l10n, hasActiveFilter, displayedUsers.length),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 12),
-                ],
-                // 1. Search and Filter Section Card
-                _buildFilterCard(context, l10n, isDesktop, hasActiveFilter),
-                const SizedBox(height: 14),
-
-                // 2. Count & Batch Information Summary Bar
-                _buildBatchInfoBar(context, l10n, displayedUsers.length, hasActiveFilter),
-                const SizedBox(height: 14),
-
-                // 3. User Summary Cards or Empty / Loading States
-                if (_isLoading && displayedUsers.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 48),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 16),
-                          Text(l10n.loadingUsers, style: const TextStyle(color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (displayedUsers.isEmpty)
-                  _buildEmptyState(context, l10n, hasActiveFilter)
-                else ...[
-                  ...displayedUsers.map((userDoc) => _buildUserSummaryCard(context, l10n, userDoc)),
-                  const SizedBox(height: 8),
-
-                  // 4. Batch Exploration Load More Footer
-                  _buildLoadMoreFooter(context, l10n, hasActiveFilter, displayedUsers.length),
-                ],
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

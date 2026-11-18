@@ -619,8 +619,15 @@ void main() {
       expect(find.text('Pedro Guard'), findsOneWidget);
       expect(find.text('Laura Resident'), findsNothing);
 
-      // Tapping Create User in AppBar while filtered by Guard opens AdminCreateUserScreen preselected to guard
-      await tester.tap(find.byKey(const ValueKey('manage_users_create_user_button')));
+      // No physical refresh button; Create User is a FloatingActionButton preselected to guard
+      expect(find.byIcon(Icons.refresh), findsNothing);
+      final createUserFab = find.byKey(const ValueKey('manage_users_create_user_button'));
+      expect(createUserFab, findsOneWidget);
+      expect(
+        tester.widget<FloatingActionButton>(createUserFab),
+        isA<FloatingActionButton>(),
+      );
+      await tester.tap(createUserFab);
       await tester.pumpAndSettle();
       expect(find.byIcon(Icons.manage_accounts), findsOneWidget);
       await tester.pageBack();
@@ -931,5 +938,88 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('updated.carlos@example.com'), findsOneWidget);
     });
+
+    testWidgets(
+      'Embedded mode renders Create User as FloatingActionButton without physical Refresh button and triggers swipe-to-refresh',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final errors = <FlutterErrorDetails>[];
+        final oldHandler = FlutterError.onError;
+        FlutterError.onError = (details) {
+          errors.add(details);
+          oldHandler?.call(details);
+        };
+        addTearDown(() => FlutterError.onError = oldHandler);
+
+        int authListCalls = 0;
+        FakeBackendHelper.functions.registerHandler('adminListAuthUsers', (params) {
+          authListCalls++;
+          return {'success': true, 'users': const []};
+        });
+
+        FakeBackendHelper.db.seedDocument('users', 'initial_user', {
+          'id': 'initial_user',
+          'uid': 'initial_user',
+          'name': 'Initial Resident',
+          'email': 'initial@example.com',
+          'role': 'resident',
+        });
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            locale: Locale('es'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: AdminUserManagementScreen(isEmbedded: true),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(authListCalls, equals(1));
+        expect(find.text('Initial Resident'), findsOneWidget);
+        expect(find.byIcon(Icons.refresh), findsNothing);
+        expect(
+          find.byKey(const ValueKey('manage_users_refresh_indicator')),
+          findsOneWidget,
+        );
+
+        final createFab = find.byKey(
+          const ValueKey('manage_users_create_user_button'),
+        );
+        expect(createFab, findsOneWidget);
+        expect(
+          tester.widget<FloatingActionButton>(createFab),
+          isA<FloatingActionButton>(),
+        );
+        expect(find.text('Crear Usuario'), findsOneWidget);
+
+        // Seed a second user and trigger swipe-to-refresh downward drag on short list
+        FakeBackendHelper.db.seedDocument('users', 'refreshed_user', {
+          'id': 'refreshed_user',
+          'uid': 'refreshed_user',
+          'name': 'Pulled Refresh User',
+          'email': 'pulled@example.com',
+          'role': 'resident',
+        });
+
+        await tester.drag(
+          find.byType(ListView).first,
+          const Offset(0, 320),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+
+        expect(authListCalls, equals(2));
+        expect(find.text('Pulled Refresh User'), findsOneWidget);
+        expect(errors, isEmpty);
+      },
+    );
   });
 }

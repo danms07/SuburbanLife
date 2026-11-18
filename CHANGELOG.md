@@ -2,6 +2,18 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.39+40] — 2026-11-17
+
+### User Directory Create User FAB & Swipe-to-Refresh Layout
+- **Create User Floating Action Button (`AdminUserManagementScreen`)**:
+  - Replaced the duplicate `AppBar` icon button (standalone mode) and top-row button (embedded `AdminShellScreen` mode) with a unified `FloatingActionButton.extended` (`ValueKey('manage_users_create_user_button')`, `_openCreateUserScreen`) positioned consistently in both standalone and embedded views, pre-selecting `guard` or `admin` when filtered and automatically refreshing the directory on return.
+  - Added bottom scroll clearance (`fromLTRB(16, 16, 16, 96)`) so the FAB does not cover bottom user cards or the `Load More` button.
+- **Swipe-to-Refresh Layout (`RefreshIndicator`)**:
+  - Removed the physical `Icons.refresh` icon buttons from both standalone and embedded layouts.
+  - Enabled full-viewport `AlwaysScrollableScrollPhysics()` with cross-device `ScrollConfiguration` drag support (`touch`, `mouse`, `trackpad`, `stylus`) and `ScrollViewKeyboardDismissBehavior.onDrag` on `RefreshIndicator` (`ValueKey('manage_users_refresh_indicator')`) so downward pull-to-refresh works cleanly across mobile, Web, and desktop even when the directory is empty or short.
+- **Tests & Documentation**:
+  - Updated and expanded `test/features/admin/admin_user_management_test.dart` to verify `FloatingActionButton` rendering, absence of `Icons.refresh` in standalone and embedded modes, and pull-to-refresh gesture reloading.
+
 ## [1.0.38+39] — 2026-11-17
 
 ### Bulk Address & Bulk User CSV Template Downloads
