@@ -128,6 +128,38 @@ test('Static Audit: storage.rules enforces 10 MB upload cap, MIME allow-list (ex
   assert.match(expensesStorageBlock, /allow delete:\s*if isAdmin\(\);/);
 });
 
+test('Static Audit: database.rules.json enforces default deny, UID isolation, server-only notification creation, and preference validation', () => {
+  const dbRulesPath = path.join(REPO_ROOT, 'database.rules.json');
+  const parsed = JSON.parse(fs.readFileSync(dbRulesPath, 'utf8'));
+  const rules = parsed.rules;
+
+  assert.equal(rules['.read'], false);
+  assert.equal(rules['.write'], false);
+
+  const notifUserRule = rules.notifications?.['$uid'];
+  assert.equal(notifUserRule['.read'], 'auth != null && auth.uid === $uid');
+  assert.equal(notifUserRule['.write'], 'auth != null && auth.uid === $uid && !newData.exists()');
+  assert.deepEqual(notifUserRule['.indexOn'], ['createdAt', 'isRead']);
+
+  const notifItemRule = notifUserRule?.['$notificationId'];
+  // Client cannot create items (`data.exists()` required for delete, `data.parent().exists()` required for read-state flags)
+  assert.equal(
+    notifItemRule['.write'],
+    'auth != null && auth.uid === $uid && data.exists() && !newData.exists()'
+  );
+  assert.equal(notifItemRule.isRead['.write'], 'auth != null && auth.uid === $uid && data.parent().exists()');
+  assert.equal(notifItemRule.readAt['.write'], 'auth != null && auth.uid === $uid && data.parent().exists()');
+  assert.equal(notifItemRule['$other']['.validate'], false);
+
+  const settingsRule = rules.user_notification_settings?.['$uid'];
+  assert.equal(settingsRule['.read'], 'auth != null && auth.uid === $uid');
+  assert.equal(settingsRule['.write'], 'auth != null && auth.uid === $uid');
+  assert.equal(settingsRule.locale['.validate'], "newData.val() === 'es' || newData.val() === 'en'");
+  assert.equal(settingsRule.pushEnabled['.validate'], 'newData.isBoolean()');
+  assert.equal(settingsRule.inAppBannerEnabled['.validate'], 'newData.isBoolean()');
+  assert.equal(settingsRule['$other']['.validate'], false);
+});
+
 /**
  * Builds an unsigned Emulator-only JWT accepted exclusively by the local
  * Firebase Firestore Emulator (`alg: "none"`). Never used outside 127.0.0.1/localhost.

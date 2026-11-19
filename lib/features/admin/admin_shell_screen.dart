@@ -6,6 +6,7 @@ import '../../core/widgets/app_version_label.dart';
 import '../../l10n/app_localizations.dart';
 import '../announcements/announcements_screen.dart';
 import '../auth/admin_resident_approval_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../qr_access/qr_generator_screen.dart';
 import '../sanctions/admin_sanctions_screen.dart';
 import '../transparency/transparency_screen.dart';
@@ -100,6 +101,8 @@ class AdminShellScreen extends StatefulWidget {
   final VoidCallback onSwitchToResidentView;
   final Future<void> Function() onResignAdminRole;
   final VoidCallback onLogout;
+  final AdminSection? requestedSection;
+  final int requestedSectionToken;
 
   const AdminShellScreen({
     super.key,
@@ -109,6 +112,8 @@ class AdminShellScreen extends StatefulWidget {
     required this.onSwitchToResidentView,
     required this.onResignAdminRole,
     required this.onLogout,
+    this.requestedSection,
+    this.requestedSectionToken = 0,
   });
 
   static const double desktopBreakpoint = 900.0;
@@ -143,7 +148,42 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.requestedSection != null) {
+      _selectedSection = widget.requestedSection!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final l10n = AppLocalizations.of(context);
+        if (l10n != null) {
+          _selectSection(
+            widget.requestedSection!,
+            groups: _buildGroups(l10n),
+            expandParentGroup: true,
+          );
+        }
+      });
+    }
     _initBadgeStreams();
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminShellScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.requestedSection != null &&
+        (widget.requestedSection != oldWidget.requestedSection ||
+            widget.requestedSectionToken != oldWidget.requestedSectionToken)) {
+      final l10n = AppLocalizations.of(context);
+      if (l10n != null) {
+        _selectSection(
+          widget.requestedSection!,
+          groups: _buildGroups(l10n),
+          expandParentGroup: true,
+        );
+      } else {
+        setState(() {
+          _selectedSection = widget.requestedSection!;
+        });
+      }
+    }
   }
 
   void _initBadgeStreams() {
@@ -538,6 +578,33 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                       ],
                     ),
               actions: [
+                if (Backend.auth.currentUser != null)
+                  NotificationBellButton(
+                    uid: Backend.auth.currentUser!.uid,
+                    iconColor: Colors.white,
+                    onPressed: () {
+                      final uid = Backend.auth.currentUser?.uid;
+                      if (uid == null) return;
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => NotificationsScreen(
+                            uid: uid,
+                            isAdmin: widget.isAdmin,
+                            isResident: widget.isResident,
+                            isAdminWorkspace: true,
+                            onOpenAdminSection: (section) {
+                              if (!mounted) return;
+                              _selectSection(
+                                section,
+                                groups: groups,
+                                expandParentGroup: true,
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 if (widget.isAdmin && widget.isResident) ...[
                   IconButton(
                     icon: const Icon(Icons.waving_hand),

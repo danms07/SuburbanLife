@@ -3059,4 +3059,174 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get qrProcessingWaitHint =>
       'Please wait while the operation completes. Do not tap any other buttons.';
+
+  @override
+  String get notificationsInboxTitle => 'Notifications';
+
+  @override
+  String get notificationsEmptyTitle => 'No notifications yet';
+
+  @override
+  String get notificationsEmptySubtitle =>
+      'We will notify you here about approvals, fines, QR access, and community updates.';
+
+  @override
+  String get notificationsMarkAllRead => 'Mark all as read';
+
+  @override
+  String get notificationsClearAll => 'Clear all';
+
+  @override
+  String get notificationsClearConfirmTitle => 'Clear notification history?';
+
+  @override
+  String get notificationsClearConfirmBody =>
+      'This will permanently remove all notifications from your inbox.';
+
+  @override
+  String get notificationsPreferencesTooltip => 'Notification preferences';
+
+  @override
+  String get notificationsDeleteTooltip => 'Delete notification';
+
+  @override
+  String get notificationsRetentionNotice =>
+      'Notifications are automatically kept for up to 30 days (max 100).';
+
+  @override
+  String notificationsUnreadBadgeSemantics(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count unread notifications',
+      one: '1 unread notification',
+      zero: 'Notifications',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsAllFilter => 'All';
+
+  @override
+  String get notificationsUnreadFilter => 'Unread';
+
+  @override
+  String get notificationsNoUnreadTitle => 'You\'re all caught up';
+
+  @override
+  String get notificationsNoUnreadSubtitle => 'No unread notifications.';
+
+  @override
+  String get notificationBannerViewButton => 'View';
+
+  @override
+  String get notificationBannerDismissTooltip => 'Dismiss';
+
+  @override
+  String get notificationPreferencesTitle => 'Notification Preferences';
+
+  @override
+  String get notificationPermissionSectionTitle =>
+      'Device & Browser Permissions';
+
+  @override
+  String get notificationPermissionAuthorized =>
+      'Allowed — this device can receive push notifications.';
+
+  @override
+  String get notificationPermissionDenied =>
+      'Blocked — notifications are disabled in system or browser settings. You can still read everything from the bell icon.';
+
+  @override
+  String get notificationPermissionNotDetermined =>
+      'Not enabled yet — tap below to allow push notifications on this device.';
+
+  @override
+  String get notificationPermissionUnsupported =>
+      'Push notifications are unavailable in this browser/device. Use the bell icon to read all alerts.';
+
+  @override
+  String get notificationEnablePermissionButton => 'Allow Push Notifications';
+
+  @override
+  String get notificationSystemSettingsHint =>
+      'To re-enable OS alerts, open system or browser site settings for this app and allow notifications.';
+
+  @override
+  String get notificationMasterPushTitle => 'Push notifications';
+
+  @override
+  String get notificationMasterPushSubtitle =>
+      'Receive instant alerts even when the app is closed. Your inbox in the bell icon is always updated.';
+
+  @override
+  String get notificationInAppBannerTitle => 'In-app foreground banners';
+
+  @override
+  String get notificationInAppBannerSubtitle =>
+      'Show popup banners at the top while using the app. Turn off to read alerts quietly from the bell badge only.';
+
+  @override
+  String get notificationCategoriesSectionTitle => 'Push categories';
+
+  @override
+  String get notificationCategoriesSectionSubtitle =>
+      'Choose which events trigger push notifications on your devices.';
+
+  @override
+  String get notificationCatReviewsTitle => 'Approvals & rejections';
+
+  @override
+  String get notificationCatReviewsDesc =>
+      'Payments, bookings, and residence claims reviewed by admins';
+
+  @override
+  String get notificationCatSanctionsTitle => 'Sanctions & fines';
+
+  @override
+  String get notificationCatSanctionsDesc =>
+      'New sanctions applied to your property';
+
+  @override
+  String get notificationCatQrAccessTitle => 'QR guest entry & exit';
+
+  @override
+  String get notificationCatQrAccessDesc =>
+      'When guests enter or leave using your QR passes';
+
+  @override
+  String get notificationCatRoommatesTitle => 'Roommates';
+
+  @override
+  String get notificationCatRoommatesDesc =>
+      'Additions and removals of household roommates';
+
+  @override
+  String get notificationCatTransparencyTitle => 'Transparency documents';
+
+  @override
+  String get notificationCatTransparencyDesc =>
+      'New reports, manuals, and official community documents';
+
+  @override
+  String get notificationCatAnnouncementsTitle => 'Announcements';
+
+  @override
+  String get notificationCatAnnouncementsDesc =>
+      'Important notices posted by administration';
+
+  @override
+  String get notificationCatAdminReviewsTitle => 'Pending admin reviews';
+
+  @override
+  String get notificationCatAdminReviewsDesc =>
+      'New payments, bookings, and claims waiting for admin review';
+
+  @override
+  String get rejectClaimTitle => 'Reject Ownership Claim';
+
+  @override
+  String get rejectClaimReasonHint =>
+      'Explain why this ownership claim cannot be approved (optional)';
 }

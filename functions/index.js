@@ -6,10 +6,39 @@ const { getFirestore, FieldValue, Timestamp } = require('firebase-admin/firestor
 const { getAuth } = require('firebase-admin/auth');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getStorage } = require('firebase-admin/storage');
+const { getDatabase } = require('firebase-admin/database');
 const { GoogleGenAI } = require('@google/genai');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const path = require('path');
+const {
+  NOTIFICATION_CATEGORIES,
+  ALLOWED_TARGET_ROUTES,
+  NOTIFICATION_RETENTION_DAYS,
+  MAX_NOTIFICATIONS_PER_USER,
+  truncateText,
+  sanitizeRtdbKey,
+  sanitizeTargetRoute,
+  buildPaymentReviewNotification,
+  buildBookingReviewNotification,
+  buildOwnershipClaimReviewNotification,
+  buildSanctionNotification,
+  buildTransparencyNotification,
+  buildQrAccessNotification,
+  buildRoommateNotification,
+  buildAnnouncementNotification,
+  buildAdminReviewRequestNotification,
+  extractAddressId,
+  resolveAddressPrimaryResidentUid,
+  resolveEligibleUidsByRoles,
+  normalizeVisibility,
+  resolveEffectiveDocVisibility,
+  getSafeRtdb,
+  resolveRecipientSettingsMap,
+  dispatchNotification,
+  pruneOldRtdbNotifications,
+  cleanupUserRtdbNotificationData,
+} = require('./notifications');
 
 const admin = {
   initializeApp,
@@ -28,6 +57,7 @@ const admin = {
   auth: () => getAuth(),
   messaging: () => getMessaging(),
   storage: () => getStorage(),
+  database: () => getDatabase(),
 };
 
 admin.initializeApp();
@@ -375,15 +405,15 @@ exports.setCustomUserClaims = onCall(callableOptions, async (request) => {
 
 // Trigger on new announcement creation
 exports.translateAnnouncement = onDocumentCreated('announcements/{announcementId}', async (event) => {
-    const snapshot = event.data;
-    if (!snapshot) return null;
+  const snapshot = event.data;
+  if (!snapshot) return null;
 
-    const data = snapshot.data();
-    const title = data.title;
-    const content = data.content;
+  const data = snapshot.data() || {};
+  const title = data.title;
+  const content = data.content;
+  const resolvedData = { ...data };
 
-    if (!title || !content) return null;
-
+  if (title && content) {
     try {
       const prompt = `Translate the following announcement title and content from Spanish to English. 
       Return the result strictly as a JSON object with keys "title" and "content".
@@ -403,15 +433,56 @@ exports.translateAnnouncement = onDocumentCreated('announcements/{announcementId
       }
 
       const translated = JSON.parse(jsonMatch[0]);
+      resolvedData.translatedTitles = {
+        ...(resolvedData.translatedTitles || {}),
+        en: translated.title,
+      };
+      resolvedData.translatedContents = {
+        ...(resolvedData.translatedContents || {}),
+        en: translated.content,
+      };
 
-      return snapshot.ref.update({
+      await snapshot.ref.update({
         'translatedTitles.en': translated.title,
         'translatedContents.en': translated.content,
       });
     } catch (error) {
       console.error('Translation error:', error);
-      return null;
     }
+  }
+
+  if (title || content) {
+    try {
+      const db = admin.firestore();
+      const rawAudience = String(resolvedData.targetAudience || 'all').trim().toLowerCase();
+      const allowedRoles = rawAudience === 'admin'
+        ? ['admin']
+        : ['admin', 'resident', 'roommate'];
+      const excludeUids = resolvedData.creatorUid ? [resolvedData.creatorUid] : [];
+      const { uids, preloadedUserDocs } = await resolveEligibleUidsByRoles(
+        db,
+        admin.auth(),
+        allowedRoles,
+        { excludeUids }
+      );
+      const spec = buildAnnouncementNotification(
+        event.params?.announcementId || snapshot.id,
+        resolvedData
+      );
+      await dispatchNotification({
+        admin,
+        recipientUids: uids,
+        excludeUids,
+        preloadedUserDocs,
+        notificationKey: event.id || `ann_${event.params?.announcementId || snapshot.id}`,
+        ...spec,
+      });
+    } catch (notifyErr) {
+      console.error('Error dispatching announcement notification:', notifyErr);
+    }
+  }
+
+  return null;
 });
 
 /**
@@ -1406,10 +1477,20 @@ exports.checkMonthlyPaymentStatuses = onSchedule({
   } catch (attPurgeError) {
     console.error('Error purging expired booking attachments in scheduled job:', attPurgeError);
   }
+
+  try {
+    const dbRtdb = getSafeRtdb(admin);
+    const prunedNotifsCount = await pruneOldRtdbNotifications(dbRtdb, Date.now());
+    if (prunedNotifsCount > 0) {
+      console.log(`Pruned ${prunedNotifsCount} RTDB notifications past ${NOTIFICATION_RETENTION_DAYS}-day / ${MAX_NOTIFICATIONS_PER_USER}-item retention.`);
+    }
+  } catch (rtdbPruneError) {
+    console.error('Error pruning old RTDB notifications in scheduled job:', rtdbPruneError);
+  }
 });
 
 /**
- * Trigger: Automatically recalculates address payment status whenever a payment is added, updated, or deleted.
+ * Trigger: Automatically recalculates address payment status and dispatches review/admin-request notifications.
  */
 exports.onPaymentWritten = onDocumentWritten('payments/{paymentId}', async (event) => {
   const afterData = event.data?.after?.data();
@@ -1423,10 +1504,64 @@ exports.onPaymentWritten = onDocumentWritten('payments/{paymentId}', async (even
       console.error('Error auto-recalculating payment status in onPaymentWritten trigger:', err);
     }
   }
+
+  if (!afterData) return null;
+
+  const db = admin.firestore();
+  const paymentId = event.params?.paymentId || event.data?.after?.id || '';
+  const beforeStatus = String(beforeData?.status || '').trim().toLowerCase();
+  const afterStatus = String(afterData.status || '').trim().toLowerCase();
+  const isBeforePending = beforeStatus === 'pending' || beforeStatus === 'pending review';
+  const isAfterPending = afterStatus === 'pending' || afterStatus === 'pending review';
+
+  // 1. Resident review outcome notification (pending -> approved | rejected)
+  if (beforeData && isBeforePending && (afterStatus === 'approved' || afterStatus === 'rejected')) {
+    const recipientUid = afterData.uploaderUid || afterData.residentUid;
+    if (recipientUid) {
+      try {
+        const spec = buildPaymentReviewNotification(paymentId, afterData);
+        await dispatchNotification({
+          admin,
+          recipientUids: [recipientUid],
+          notificationKey: event.id || `payment_review_${paymentId}_${afterStatus}`,
+          ...spec,
+        });
+      } catch (notifyErr) {
+        console.error(`Error dispatching payment review notification for ${paymentId}:`, notifyErr);
+      }
+    }
+  }
+
+  // 2. Admin review request notification on new pending or resubmitted pending payment
+  if ((!beforeData || !isBeforePending) && isAfterPending) {
+    const actorUid = afterData.uploaderUid || afterData.residentUid;
+    const excludeUids = actorUid ? [actorUid] : [];
+    try {
+      const { uids, preloadedUserDocs } = await resolveEligibleUidsByRoles(
+        db,
+        admin.auth(),
+        ['admin'],
+        { excludeUids }
+      );
+      const spec = buildAdminReviewRequestNotification('payment', paymentId, afterData);
+      await dispatchNotification({
+        admin,
+        recipientUids: uids,
+        excludeUids,
+        preloadedUserDocs,
+        notificationKey: event.id || `admin_payment_${paymentId}`,
+        ...spec,
+      });
+    } catch (notifyErr) {
+      console.error(`Error dispatching admin pending payment notification for ${paymentId}:`, notifyErr);
+    }
+  }
+
+  return null;
 });
 
 /**
- * Trigger: Automatically recalculates address payment status whenever a sanction is added, updated, or deleted.
+ * Trigger: Recalculates address payment status and notifies the address primary resident on new active sanctions.
  */
 exports.onSanctionWritten = onDocumentWritten('sanctions/{sanctionId}', async (event) => {
   const afterData = event.data?.after?.data();
@@ -1440,6 +1575,32 @@ exports.onSanctionWritten = onDocumentWritten('sanctions/{sanctionId}', async (e
       console.error('Error auto-recalculating payment status in onSanctionWritten trigger:', err);
     }
   }
+
+  const afterStatus = String(afterData?.status || '').trim().toLowerCase();
+  if (!beforeData && afterData && afterStatus === 'active') {
+    try {
+      const db = admin.firestore();
+      const sanctionId = event.params?.sanctionId || event.data?.after?.id || '';
+      const primaryResidentUid = await resolveAddressPrimaryResidentUid(
+        db,
+        afterData.addressRef || afterData.addressId,
+        afterData.residentUid
+      );
+      if (primaryResidentUid) {
+        const spec = buildSanctionNotification(sanctionId, afterData);
+        await dispatchNotification({
+          admin,
+          recipientUids: [primaryResidentUid],
+          notificationKey: event.id || `sanction_${sanctionId}`,
+          ...spec,
+        });
+      }
+    } catch (notifyErr) {
+      console.error('Error dispatching sanction notification:', notifyErr);
+    }
+  }
+
+  return null;
 });
 
 exports.approvePayment = onCall(callableOptions, async (request) => {
@@ -1566,6 +1727,32 @@ exports.addRoommate = onCall(callableOptions, async (request) => {
       familyMembers: FieldValue.arrayUnion(targetUid)
     });
 
+    // 6. Notify both the primary resident and the newly linked roommate
+    const nowMillis = Date.now();
+    const opSuffix = crypto.randomUUID().slice(0, 8);
+    try {
+      await Promise.all([
+        dispatchNotification({
+          admin,
+          recipientUids: [targetUid],
+          notificationKey: `roommate_add_self_${residentUid}_${targetUid}_${nowMillis}_${opSuffix}`,
+          nowMillis,
+          entityId: residentUid,
+          ...buildRoommateNotification({ targetRole: 'roommate', isRemoval: false }),
+        }),
+        dispatchNotification({
+          admin,
+          recipientUids: [residentUid],
+          notificationKey: `roommate_add_res_${residentUid}_${targetUid}_${nowMillis}_${opSuffix}`,
+          nowMillis,
+          entityId: targetUid,
+          ...buildRoommateNotification({ targetRole: 'resident', isRemoval: false }),
+        }),
+      ]);
+    } catch (notifyErr) {
+      console.error('Error dispatching addRoommate notifications:', notifyErr);
+    }
+
     return { success: true };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
@@ -1573,16 +1760,21 @@ exports.addRoommate = onCall(callableOptions, async (request) => {
   }
 });
 
-exports.notifyAccessResult = onDocumentCreated('access_logs/{logId}', async (event) => {
-  const snapshot = event.data;
-  if (!snapshot) return null;
+exports.notifyAccessResult = onDocumentWritten('access_logs/{logId}', async (event) => {
+  const afterSnap = event.data?.after;
+  const beforeSnap = event.data?.before;
+  const afterData = afterSnap?.data?.();
+  if (!afterData) return null;
 
-  const data = snapshot.data();
-  const { creatorUid, status, qrCodeId } = data;
+  const beforeData = beforeSnap?.data?.();
+  const logId = event.params?.logId || afterSnap?.id || '';
+  const { creatorUid, status, qrCodeId } = afterData;
+  const isEntry = !beforeData;
+  const isExit = Boolean(beforeData && !beforeData.exitTimestamp && afterData.exitTimestamp);
 
-  // Invalidate one-time use QR code first, independent of FCM push notification availability.
+  // Invalidate one-time use QR code on initial entry creation only, independent of push availability.
   // Skip immediate invalidation if isInside === true so the visitor can still scan out on exit.
-  if (status === 'allowed' && qrCodeId && data.isInside !== true) {
+  if (isEntry && status === 'allowed' && qrCodeId && afterData.isInside !== true) {
     try {
       const qrDoc = await admin.firestore().collection('qr_codes').doc(qrCodeId).get();
       if (qrDoc.exists) {
@@ -1601,39 +1793,354 @@ exports.notifyAccessResult = onDocumentCreated('access_logs/{logId}', async (eve
     }
   }
 
-  if (!creatorUid) return null;
+  if ((!isEntry && !isExit) || !creatorUid || creatorUid === 'unknown') {
+    return null;
+  }
 
   try {
-    const userDoc = await admin.firestore().collection('users').doc(creatorUid).get();
-    if (!userDoc.exists) return null;
+    const spec = buildQrAccessNotification(logId, afterData, { isExit });
+    await dispatchNotification({
+      admin,
+      recipientUids: [creatorUid],
+      notificationKey: event.id || `qr_${isExit ? 'exit' : 'entry'}_${logId}`,
+      ...spec,
+    });
+  } catch (error) {
+    console.error('Error dispatching access notification:', error);
+  }
 
-    const userData = userDoc.data();
-    const fcmTokens = userData.fcmTokens;
+  return null;
+});
 
-    if (!fcmTokens || !Array.isArray(fcmTokens) || fcmTokens.length === 0) {
-      console.log(`No FCM tokens found for user ${creatorUid}`);
+/**
+ * Callable Cloud Function: reviewOwnershipClaim
+ * Reviews (approves or rejects) a pending residence ownership claim safely on the backend,
+ * deletes the private ownership proof image from Storage, mirrors an idempotent review
+ * outcome notification to RTDB, and sends a localized push notification.
+ */
+exports.reviewOwnershipClaim = onCall(callableOptions, async (request) => {
+  if (!request.auth || request.auth.token.admin !== true) {
+    throw new HttpsError('failed-precondition', 'Function must be called by an authenticated admin.');
+  }
+
+  const { claimId, action, reason = '' } = request.data || {};
+  if (!claimId || typeof claimId !== 'string' || !claimId.trim()) {
+    throw new HttpsError('invalid-argument', 'Missing claimId.');
+  }
+  const normalizedAction = String(action || '').trim().toLowerCase();
+  if (normalizedAction !== 'approve' && normalizedAction !== 'reject') {
+    throw new HttpsError('invalid-argument', 'action must be approve or reject.');
+  }
+
+  const trimmedClaimId = claimId.trim();
+  const db = admin.firestore();
+  const claimRef = db.collection('ownership_claims').doc(trimmedClaimId);
+
+  try {
+    const claimDoc = await claimRef.get();
+    if (!claimDoc.exists) {
+      throw new HttpsError('not-found', 'Ownership claim not found.');
+    }
+
+    const claimData = claimDoc.data() || {};
+    const userUid = typeof claimData.userUid === 'string' ? claimData.userUid.trim() : '';
+    const addressId = extractAddressId(claimData.addressRef || claimData.addressId);
+    const proofUrl = typeof claimData.proofUrl === 'string' ? claimData.proofUrl.trim() : '';
+
+    let addressLabel = '';
+    if (addressId) {
+      const addrSnap = await db.collection('addresses').doc(addressId).get();
+      if (addrSnap.exists) {
+        const addrData = addrSnap.data() || {};
+        const street = String(addrData.streetName || '').trim();
+        const number = String(addrData.number || '').trim();
+        addressLabel = street ? (number ? `${street} #${number}` : street) : '';
+      }
+    }
+
+    if (normalizedAction === 'approve') {
+      if (!userUid || !addressId) {
+        throw new HttpsError('failed-precondition', 'Claim is missing userUid or addressRef.');
+      }
+
+      // Preserve existing admin claim if a dual-role admin claims their personal home.
+      let existingAdmin = false;
+      try {
+        const authUser = await admin.auth().getUser(userUid);
+        existingAdmin = authUser?.customClaims?.admin === true;
+      } catch (authLookupErr) {
+        console.warn(`Could not read existing custom claims for ${userUid}:`, authLookupErr.message);
+      }
+
+      await admin.auth().setCustomUserClaims(userUid, {
+        ...(existingAdmin ? { admin: true } : {}),
+        resident: true,
+      });
+
+      const addressRef = db.collection('addresses').doc(addressId);
+      const addressUpdates = {
+        residentUid: userUid,
+        paymentStatus: 'paid',
+      };
+      if (claimData.deliveryDate !== undefined && claimData.deliveryDate !== null) {
+        addressUpdates.deliveryDate = claimData.deliveryDate;
+      }
+      await addressRef.update(addressUpdates);
+
+      const userSnap = await db.collection('users').doc(userUid).get();
+      if (userSnap.exists) {
+        const userData = userSnap.data() || {};
+        const userUpdates = {};
+        if (!userData.addressRef) {
+          userUpdates.addressRef = addressRef;
+        }
+        if (!userData.role) {
+          userUpdates.role = 'resident';
+        }
+        if (Object.keys(userUpdates).length > 0) {
+          await userSnap.ref.update(userUpdates);
+        }
+      }
+    }
+
+    if (proofUrl) {
+      const storagePath = extractScopedStoragePath(proofUrl, 'ownership_proofs');
+      if (storagePath) {
+        try {
+          await admin.storage().bucket().file(storagePath).delete({ ignoreNotFound: true });
+        } catch (storageErr) {
+          console.error(`Error deleting ownership proof ${storagePath}:`, storageErr);
+        }
+      }
+    }
+
+    // Dispatch BEFORE deleting ownership_claims/{claimId} using a deterministic key so
+    // `onOwnershipClaimDeleted` sees the RTDB key and never double-notifies.
+    if (userUid) {
+      const isApproved = normalizedAction === 'approve';
+      const spec = buildOwnershipClaimReviewNotification(trimmedClaimId, {
+        approved: isApproved,
+        reason: typeof reason === 'string' ? reason : '',
+        addressLabel,
+      });
+      try {
+        await dispatchNotification({
+          admin,
+          recipientUids: [userUid],
+          notificationKey: isApproved
+            ? `claim_approved_${trimmedClaimId}`
+            : `claim_rejected_${trimmedClaimId}`,
+          skipIfExists: true,
+          ...spec,
+        });
+      } catch (notifyErr) {
+        console.error(`Error dispatching claim review notification for ${trimmedClaimId}:`, notifyErr);
+      }
+    }
+
+    await claimRef.delete();
+    return { success: true, action: normalizedAction, claimId: trimmedClaimId };
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError('internal', error.message);
+  }
+});
+
+/**
+ * Trigger: Notifies admins when a new ownership claim is submitted for review.
+ */
+exports.onOwnershipClaimCreated = onDocumentCreated('ownership_claims/{claimId}', async (event) => {
+  const snapshot = event.data;
+  if (!snapshot) return null;
+
+  const data = snapshot.data() || {};
+  const status = String(data.status || 'pending').trim().toLowerCase();
+  if (status !== 'pending' && status !== 'pending review') {
+    return null;
+  }
+
+  try {
+    const db = admin.firestore();
+    const claimId = event.params?.claimId || snapshot.id || '';
+    const excludeUids = data.userUid ? [data.userUid] : [];
+    const { uids, preloadedUserDocs } = await resolveEligibleUidsByRoles(
+      db,
+      admin.auth(),
+      ['admin'],
+      { excludeUids }
+    );
+    const spec = buildAdminReviewRequestNotification('claim', claimId, data);
+    await dispatchNotification({
+      admin,
+      recipientUids: uids,
+      excludeUids,
+      preloadedUserDocs,
+      notificationKey: event.id || `admin_claim_${claimId}`,
+      ...spec,
+    });
+  } catch (err) {
+    console.error('Error dispatching admin claim review request notification:', err);
+  }
+
+  return null;
+});
+
+/**
+ * Trigger: Legacy fallback for older admin clients that delete `ownership_claims/{claimId}`
+ * directly upon approval. Verifies the address points to the claimant and uses the same
+ * deterministic RTDB key as `reviewOwnershipClaim` so upgraded clients never double-notify.
+ */
+exports.onOwnershipClaimDeleted = onDocumentDeleted('ownership_claims/{claimId}', async (event) => {
+  const snapshot = event.data;
+  if (!snapshot) return null;
+
+  const claimId = event.params?.claimId || snapshot.id || '';
+  const data = snapshot.data() || {};
+  const userUid = typeof data.userUid === 'string' ? data.userUid.trim() : '';
+  const addressId = extractAddressId(data.addressRef || data.addressId);
+  if (!userUid || !addressId) return null;
+
+  try {
+    const db = admin.firestore();
+    const addrSnap = await db.collection('addresses').doc(addressId).get();
+    if (!addrSnap.exists) return null;
+    const addrData = addrSnap.data() || {};
+    if (addrData.residentUid !== userUid) {
       return null;
     }
 
-    const title = status === 'allowed' ? 'Acceso Permitido / Access Granted' : 'Acceso Denegado / Access Denied';
-    const body = `El visitante con código ${qrCodeId || ''} ha sido ${status === 'allowed' ? 'permitido' : 'denegado'}.`;
+    const street = String(addrData.streetName || '').trim();
+    const number = String(addrData.number || '').trim();
+    const addressLabel = street ? (number ? `${street} #${number}` : street) : '';
+    const spec = buildOwnershipClaimReviewNotification(claimId, {
+      approved: true,
+      addressLabel,
+    });
 
-    const message = {
-      notification: {
-        title,
-        body,
-      },
-      tokens: fcmTokens,
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message);
-    console.log(`${response.successCount} messages were sent successfully`);
-
-    return null;
-  } catch (error) {
-    console.error('Error sending access notification:', error);
-    return null;
+    await dispatchNotification({
+      admin,
+      recipientUids: [userUid],
+      notificationKey: `claim_approved_${claimId}`,
+      skipIfExists: true,
+      ...spec,
+    });
+  } catch (err) {
+    console.error(`Error in onOwnershipClaimDeleted fallback for ${claimId}:`, err);
   }
+
+  return null;
+});
+
+/**
+ * Trigger: Notifies admins on new/resubmitted bookings awaiting review, and notifies
+ * the booking creator when an admin approves or rejects their booking request.
+ */
+exports.onBookingWritten = onDocumentWritten('bookings/{bookingId}', async (event) => {
+  const afterData = event.data?.after?.data();
+  if (!afterData) return null;
+
+  const beforeData = event.data?.before?.data();
+  const bookingId = event.params?.bookingId || event.data?.after?.id || '';
+  const beforeStatus = String(beforeData?.status || '').trim().toLowerCase();
+  const afterStatus = String(afterData.status || '').trim().toLowerCase();
+  const db = admin.firestore();
+
+  // 1. Admin review request when entering `'pending review'`
+  if (beforeStatus !== 'pending review' && afterStatus === 'pending review') {
+    const excludeUids = afterData.userUid ? [afterData.userUid] : [];
+    try {
+      const { uids, preloadedUserDocs } = await resolveEligibleUidsByRoles(
+        db,
+        admin.auth(),
+        ['admin'],
+        { excludeUids }
+      );
+      const spec = buildAdminReviewRequestNotification('booking', bookingId, afterData);
+      await dispatchNotification({
+        admin,
+        recipientUids: uids,
+        excludeUids,
+        preloadedUserDocs,
+        notificationKey: event.id || `admin_booking_${bookingId}`,
+        ...spec,
+      });
+    } catch (err) {
+      console.error(`Error dispatching admin booking review request for ${bookingId}:`, err);
+    }
+  }
+
+  // 2. Resident review outcome when leaving `'pending review'` for approved/rejected
+  if (
+    beforeData &&
+    beforeStatus === 'pending review' &&
+    (afterStatus === 'approved (upcoming)' || afterStatus === 'rejected')
+  ) {
+    const recipientUid = typeof afterData.userUid === 'string' ? afterData.userUid.trim() : '';
+    if (recipientUid) {
+      try {
+        const spec = buildBookingReviewNotification(bookingId, afterData);
+        await dispatchNotification({
+          admin,
+          recipientUids: [recipientUid],
+          notificationKey: event.id || `booking_review_${bookingId}_${afterStatus}`,
+          ...spec,
+        });
+      } catch (err) {
+        console.error(`Error dispatching booking review outcome for ${bookingId}:`, err);
+      }
+    }
+  }
+
+  return null;
+});
+
+/**
+ * Trigger: Notifies eligible users when a Transparency document is created or promoted
+ * from admin-only to public (`'all'`), intersecting document and parent folder visibility.
+ */
+exports.onTransparencyDocumentWritten = onDocumentWritten('documents/{docId}', async (event) => {
+  const afterData = event.data?.after?.data();
+  if (!afterData) return null;
+
+  const beforeData = event.data?.before?.data();
+  const docId = event.params?.docId || event.data?.after?.id || '';
+  const db = admin.firestore();
+
+  try {
+    const afterEffective = await resolveEffectiveDocVisibility(db, afterData);
+    const beforeEffective = beforeData
+      ? await resolveEffectiveDocVisibility(db, beforeData)
+      : null;
+
+    const shouldNotify = !beforeData || (beforeEffective === 'admin' && afterEffective === 'all');
+    if (!shouldNotify) {
+      return null;
+    }
+
+    const allowedRoles = afterEffective === 'admin'
+      ? ['admin']
+      : ['admin', 'resident', 'roommate'];
+    const excludeUids = afterData.uploaderUid ? [afterData.uploaderUid] : [];
+    const { uids, preloadedUserDocs } = await resolveEligibleUidsByRoles(
+      db,
+      admin.auth(),
+      allowedRoles,
+      { excludeUids }
+    );
+    const spec = buildTransparencyNotification(docId, afterData, afterEffective);
+    await dispatchNotification({
+      admin,
+      recipientUids: uids,
+      excludeUids,
+      preloadedUserDocs,
+      notificationKey: event.id || `doc_${docId}_${afterEffective}`,
+      ...spec,
+    });
+  } catch (err) {
+    console.error(`Error dispatching transparency notification for ${docId}:`, err);
+  }
+
+  return null;
 });
 
 exports.adminUpdatePassword = onCall(callableOptions, async (request) => {
@@ -2216,6 +2723,9 @@ exports.adminDeleteUser = onCall(callableOptions, async (request) => {
       }
     }
 
+    const dbRtdb = getSafeRtdb(admin);
+    await cleanupUserRtdbNotificationData(dbRtdb, uid);
+
     return { success: true };
   } catch (error) {
     throw new HttpsError('internal', error.message);
@@ -2307,6 +2817,8 @@ exports.deleteOwnAccount = onCall(callableOptions, async (request) => {
       await userDoc.ref.delete();
     }
     await admin.auth().deleteUser(uid);
+    const dbRtdb = getSafeRtdb(admin);
+    await cleanupUserRtdbNotificationData(dbRtdb, uid);
     return { success: true };
   } catch (error) {
     if (error instanceof HttpsError) throw error;
@@ -2375,6 +2887,46 @@ exports.removeRoommate = onCall(callableOptions, async (request) => {
 
     // 3. Clear roommate auth custom claims
     await admin.auth().setCustomUserClaims(roommateUid, {});
+
+    // 4. Notify the removed roommate, and notify the primary resident if removed by an admin
+    const initiatedByAdmin = isAdmin && callerUid !== residentUid;
+    const nowMillis = Date.now();
+    const opSuffix = crypto.randomUUID().slice(0, 8);
+    try {
+      const notifyTasks = [
+        dispatchNotification({
+          admin,
+          recipientUids: [roommateUid],
+          notificationKey: `roommate_rem_self_${roommateUid}_${nowMillis}_${opSuffix}`,
+          nowMillis,
+          entityId: residentUid || roommateUid,
+          ...buildRoommateNotification({
+            targetRole: 'roommate',
+            isRemoval: true,
+            initiatedByAdmin,
+          }),
+        }),
+      ];
+      if (initiatedByAdmin && residentUid) {
+        notifyTasks.push(
+          dispatchNotification({
+            admin,
+            recipientUids: [residentUid],
+            notificationKey: `roommate_rem_res_${residentUid}_${roommateUid}_${nowMillis}_${opSuffix}`,
+            nowMillis,
+            entityId: roommateUid,
+            ...buildRoommateNotification({
+              targetRole: 'resident',
+              isRemoval: true,
+              initiatedByAdmin: true,
+            }),
+          })
+        );
+      }
+      await Promise.all(notifyTasks);
+    } catch (notifyErr) {
+      console.error('Error dispatching removeRoommate notifications:', notifyErr);
+    }
 
     return { success: true };
   } catch (error) {
@@ -5430,6 +5982,32 @@ exports._test = {
   parsePeriodHeader,
   normalizeStreetName,
   toSerializableBookingResponse,
+  NOTIFICATION_CATEGORIES,
+  ALLOWED_TARGET_ROUTES,
+  NOTIFICATION_RETENTION_DAYS,
+  MAX_NOTIFICATIONS_PER_USER,
+  truncateText,
+  sanitizeRtdbKey,
+  sanitizeTargetRoute,
+  normalizeVisibility,
+  extractAddressId,
+  resolveAddressPrimaryResidentUid,
+  resolveEligibleUidsByRoles,
+  resolveEffectiveDocVisibility,
+  resolveRecipientSettingsMap,
+  dispatchNotification,
+  pruneOldRtdbNotifications,
+  cleanupUserRtdbNotificationData,
+  buildPaymentReviewNotification,
+  buildBookingReviewNotification,
+  buildOwnershipClaimReviewNotification,
+  buildSanctionNotification,
+  buildTransparencyNotification,
+  buildQrAccessNotification,
+  buildRoommateNotification,
+  buildAnnouncementNotification,
+  buildAdminReviewRequestNotification,
+  ai,
   admin,
 };
 

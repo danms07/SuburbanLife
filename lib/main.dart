@@ -22,11 +22,13 @@ import 'package:suburban_life/features/qr_access/qr_generator_screen.dart';
 import 'package:suburban_life/features/qr_access/manage_qr_screen.dart';
 import 'package:suburban_life/features/qr_access/qr_scanner_screen.dart';
 import 'package:suburban_life/features/admin/admin_shell_screen.dart';
+import 'package:suburban_life/features/notifications/notifications_screen.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'l10n/app_localizations.dart';
 import 'package:suburban_life/core/backend/backend.dart';
 import 'package:suburban_life/core/backend/firebase_backend.dart';
 import 'package:suburban_life/core/services/app_update_service.dart';
+import 'package:suburban_life/core/services/notification_router.dart';
 import 'package:suburban_life/core/services/temp_image_cleanup_service.dart';
 import 'package:suburban_life/core/widgets/app_version_label.dart';
 import 'package:suburban_life/core/widgets/error_fallback_screen.dart';
@@ -70,6 +72,7 @@ void main() async {
     storage: FirebaseStorageService(),
     functions: FirebaseFunctionsService(),
     crashlytics: crashlyticsService,
+    notifications: FirebaseNotificationService(),
   );
 
   // Configure Crashlytics collection (disable in debug/emulator unless forced)
@@ -160,7 +163,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   final AuthService _authService = AuthService();
   bool _isGuard = false;
   bool _isAdmin = false;
@@ -181,10 +184,290 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _claimsUid;
   Stream<List<Map<String, dynamic>>>? _claimsStream;
 
+  String? _notifInitializedUid;
+  String? _lastSyncedLocale;
+  UserNotificationSettings _notificationSettings = const UserNotificationSettings();
+  PushPermissionStatus _permissionStatus = PushPermissionStatus.authorized;
+  bool _permissionBannerDismissed = false;
+  AppNotification? _activeForegroundBanner;
+  Timer? _foregroundBannerTimer;
+  String? _queuedNotificationRoute;
+  AdminSection? _requestedAdminSection;
+  int _requestedAdminSectionToken = 0;
+  StreamSubscription<AppNotification>? _foregroundMessageSub;
+  StreamSubscription<String>? _openedRouteSub;
+  StreamSubscription<UserNotificationSettings>? _settingsSub;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkRoles();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final uid = Backend.auth.currentUser?.uid;
+    final lang = Localizations.localeOf(context).languageCode;
+    if (uid != null && _notifInitializedUid != uid) {
+      _notifInitializedUid = uid;
+      _lastSyncedLocale = lang;
+      unawaited(_setupNotificationsForUser(uid, lang));
+    } else if (uid != null && _lastSyncedLocale != lang) {
+      _lastSyncedLocale = lang;
+      unawaited(Backend.notifications.syncLocale(uid, lang));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshPushPermissionStatus());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _foregroundBannerTimer?.cancel();
+    _foregroundMessageSub?.cancel();
+    _openedRouteSub?.cancel();
+    _settingsSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _setupNotificationsForUser(String uid, String languageCode) async {
+    _settingsSub?.cancel();
+    _foregroundMessageSub?.cancel();
+    _openedRouteSub?.cancel();
+
+    _settingsSub = Backend.notifications.watchSettings(uid).listen((settings) {
+      if (!mounted) return;
+      setState(() {
+        _notificationSettings = settings;
+        if (!settings.inAppBannerEnabled) {
+          _activeForegroundBanner = null;
+        }
+      });
+    });
+
+    _foregroundMessageSub =
+        Backend.notifications.onForegroundMessage.listen((notification) {
+      if (!mounted) return;
+      if (notification.type == 'ownership_claim_approved') {
+        _checkRoles();
+      }
+      if (!_notificationSettings.pushEnabled ||
+          !_notificationSettings.inAppBannerEnabled) {
+        return;
+      }
+      if (notification.category != null &&
+          !_notificationSettings.isCategoryEnabled(notification.category!)) {
+        return;
+      }
+      _showForegroundBanner(notification);
+    });
+
+    _openedRouteSub = Backend.notifications.onNotificationOpenedRoute.listen((route) {
+      if (!mounted) return;
+      if (_isLoadingRoles) {
+        _queuedNotificationRoute = route;
+      } else {
+        unawaited(_handleNotificationRoute(route));
+      }
+    });
+
+    await Backend.notifications.initialize(
+      uid: uid,
+      languageCode: languageCode,
+    );
+    await _refreshPushPermissionStatus();
+
+    final initialRoute = Backend.notifications.consumeInitialRoute();
+    if (initialRoute != null && mounted) {
+      if (_isLoadingRoles) {
+        _queuedNotificationRoute = initialRoute;
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            unawaited(_handleNotificationRoute(initialRoute));
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshPushPermissionStatus() async {
+    final status = await Backend.notifications.getPermissionStatus();
+    if (!mounted) return;
+    setState(() {
+      _permissionStatus = status;
+    });
+  }
+
+  Future<void> _requestPushPermissionFromBanner(String uid) async {
+    final lang = Localizations.localeOf(context).languageCode;
+    final status = await Backend.notifications.requestPermissionAndRegister(
+      uid: uid,
+      languageCode: lang,
+    );
+    if (!mounted) return;
+    setState(() {
+      _permissionStatus = status;
+      if (status.isGranted || status == PushPermissionStatus.denied) {
+        _permissionBannerDismissed = true;
+      }
+    });
+  }
+
+  void _showForegroundBanner(AppNotification notification) {
+    _foregroundBannerTimer?.cancel();
+    setState(() {
+      _activeForegroundBanner = notification;
+    });
+    _foregroundBannerTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) {
+        _dismissForegroundBanner();
+      }
+    });
+  }
+
+  void _dismissForegroundBanner() {
+    _foregroundBannerTimer?.cancel();
+    if (_activeForegroundBanner != null && mounted) {
+      setState(() {
+        _activeForegroundBanner = null;
+      });
+    }
+  }
+
+  Future<void> _handleNotificationRoute(String rawRoute) async {
+    final uid = Backend.auth.currentUser?.uid;
+    if (uid == null || !mounted || _isGuard) return;
+
+    _dismissForegroundBanner();
+    final safeRoute = sanitizeNotificationRoute(rawRoute);
+
+    if (safeRoute == 'notifications') {
+      _openNotificationsScreen(context);
+      return;
+    }
+
+    final adminSection = NotificationRouter.adminSectionForRoute(safeRoute);
+    if (adminSection != null) {
+      if (_isAdmin) {
+        setState(() {
+          _showAdminView = true;
+          _requestedAdminSection = adminSection;
+          _requestedAdminSectionToken++;
+        });
+      }
+      return;
+    }
+
+    await NotificationRouter.navigate(
+      context: context,
+      uid: uid,
+      rawRoute: safeRoute,
+      isAdmin: _isAdmin,
+      isResident: _isResident,
+      isAdminWorkspace: _showAdminView,
+      onOpenAdminSection: (section) {
+        if (!mounted) return;
+        setState(() {
+          _showAdminView = true;
+          _requestedAdminSection = section;
+          _requestedAdminSectionToken++;
+        });
+      },
+      onOpenNotificationsInbox: () => _openNotificationsScreen(context),
+    );
+  }
+
+  void _openNotificationsScreen(BuildContext context) {
+    final uid = Backend.auth.currentUser?.uid;
+    if (uid == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NotificationsScreen(
+          uid: uid,
+          isAdmin: _isAdmin,
+          isResident: _isResident,
+          isAdminWorkspace: _showAdminView,
+          onOpenAdminSection: (section) {
+            if (!mounted) return;
+            setState(() {
+              _showAdminView = true;
+              _requestedAdminSection = section;
+              _requestedAdminSectionToken++;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPushPermissionOptInCard(AppLocalizations l10n, String uid) {
+    if (_isGuard ||
+        _permissionBannerDismissed ||
+        _permissionStatus != PushPermissionStatus.notDetermined) {
+      return const SizedBox.shrink();
+    }
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Material(
+        key: const Key('push_permission_opt_in_card'),
+        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.notifications_active_outlined, color: colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l10n.notificationPermissionNotDetermined,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextButton(
+                      key: const Key('home_enable_push_button'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        minimumSize: const Size(0, 30),
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
+                      ),
+                      onPressed: () => _requestPushPermissionFromBanner(uid),
+                      child: Text(l10n.notificationEnablePermissionButton),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: l10n.notificationBannerDismissTooltip,
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: () {
+                  setState(() {
+                    _permissionBannerDismissed = true;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openQrScanner() async {
@@ -273,6 +556,16 @@ class _MyHomePageState extends State<MyHomePage> {
         _showAdminView = isAdmin && !isResident && !isGuard;
         _isLoadingRoles = false;
       });
+
+      final pendingRoute = _queuedNotificationRoute;
+      if (pendingRoute != null) {
+        _queuedNotificationRoute = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            unawaited(_handleNotificationRoute(pendingRoute));
+          }
+        });
+      }
     } catch (e, stack) {
       debugPrint('Error checking roles: $e');
       Backend.crashlytics.recordError(e, stack, reason: 'MyHomePageState._checkRoles');
@@ -303,15 +596,16 @@ class _MyHomePageState extends State<MyHomePage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    late final Widget workspace;
     if (!_showAdminView && _isGuard) {
-      return Scaffold(body: _buildGuardPanel(l10n));
-    }
-
-    if (_showAdminView) {
-      return AdminShellScreen(
+      workspace = Scaffold(body: _buildGuardPanel(l10n));
+    } else if (_showAdminView) {
+      workspace = AdminShellScreen(
         appTitle: widget.title,
         isAdmin: _isAdmin,
         isResident: _isResident,
+        requestedSection: _requestedAdminSection,
+        requestedSectionToken: _requestedAdminSectionToken,
         onSwitchToResidentView: () {
           setState(() {
             _showAdminView = false;
@@ -339,11 +633,40 @@ class _MyHomePageState extends State<MyHomePage> {
         },
         onLogout: () => Backend.auth.signOut(),
       );
+    } else {
+      workspace = Scaffold(
+        drawer: _buildDrawer(context, l10n),
+        body: _buildResidentPanel(l10n),
+      );
     }
 
-    return Scaffold(
-      drawer: _buildDrawer(context, l10n),
-      body: _buildResidentPanel(l10n),
+    final showBanner = _activeForegroundBanner != null &&
+        _notificationSettings.inAppBannerEnabled;
+
+    return Stack(
+      children: [
+        workspace,
+        if (showBanner)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: InAppNotificationBanner(
+              notification: _activeForegroundBanner!,
+              languageCode: Localizations.localeOf(context).languageCode,
+              onTap: () {
+                final item = _activeForegroundBanner!;
+                _dismissForegroundBanner();
+                final uid = Backend.auth.currentUser?.uid;
+                if (uid != null) {
+                  unawaited(Backend.notifications.markAsRead(uid, item.id));
+                }
+                unawaited(_handleNotificationRoute(item.targetRoute));
+              },
+              onDismiss: _dismissForegroundBanner,
+            ),
+          ),
+      ],
     );
   }
 
@@ -366,21 +689,35 @@ class _MyHomePageState extends State<MyHomePage> {
         return Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
-            child: Card(
-              elevation: 6,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.hourglass_top,
-                      size: 80,
-                      color: AppConfig.secondaryColor,
-                    ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPushPermissionOptInCard(l10n, uid),
+                Card(
+                  elevation: 6,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            NotificationBellButton(
+                              uid: uid,
+                              iconColor: AppConfig.primaryColor,
+                              onPressed: () => _openNotificationsScreen(context),
+                            ),
+                          ],
+                        ),
+                        const Icon(
+                          Icons.hourglass_top,
+                          size: 80,
+                          color: AppConfig.secondaryColor,
+                        ),
                     const SizedBox(height: 24),
                     Text(
                       l10n.accountUnderReviewTitle,
@@ -456,6 +793,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
             ),
+              ],
+            ),
           ),
         );
       },
@@ -516,6 +855,14 @@ class _MyHomePageState extends State<MyHomePage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: NotificationBellButton(
+                        uid: uid,
+                        iconColor: AppConfig.primaryColor,
+                        onPressed: () => _openNotificationsScreen(context),
+                      ),
+                    ),
                     SegmentedButton<int>(
                       segments: [
                         ButtonSegment<int>(
@@ -1141,13 +1488,11 @@ class _MyHomePageState extends State<MyHomePage> {
                                         });
                                       },
                                     ),
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.notifications,
-                                      color: Colors.white,
-                                    ),
+                                  NotificationBellButton(
+                                    uid: user.uid,
+                                    iconColor: Colors.white,
                                     onPressed: () =>
-                                        _showNotificationHistoryDialog(context),
+                                        _openNotificationsScreen(context),
                                   ),
                                 ],
                               ),
@@ -1300,6 +1645,8 @@ class _MyHomePageState extends State<MyHomePage> {
                         },
                       ),
                     ),
+
+            _buildPushPermissionOptInCard(l10n, user.uid),
 
             // Shortcuts Grid
             Expanded(
@@ -1668,6 +2015,14 @@ class _MyHomePageState extends State<MyHomePage> {
                             Navigator.pop(context);
                           },
                         ),
+                        ListTile(
+                          leading: const Icon(Icons.notifications_outlined),
+                          title: Text(l10n.notificationsInboxTitle),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _openNotificationsScreen(context);
+                          },
+                        ),
                         // Multi-Address Option
                         ListTile(
                           leading: const Icon(Icons.add_business),
@@ -1872,25 +2227,6 @@ class _MyHomePageState extends State<MyHomePage> {
           );
         },
       ),
-    );
-  }
-
-  void _showNotificationHistoryDialog(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(l10n.notificationHistoryTitle),
-          content: Text(l10n.notificationHistoryPlaceholder),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(l10n.close),
-            ),
-          ],
-        );
-      },
     );
   }
 }

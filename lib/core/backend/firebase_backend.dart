@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_database/firebase_database.dart' hide Query;
+import 'package:universal_html/html.dart' as html;
 import '../config/app_config.dart';
 import 'backend.dart';
 
@@ -185,6 +190,11 @@ class FirebaseAuthService implements AuthService {
 
   @override
   Future<void> signOut() async {
+    try {
+      await Backend.notifications.unregisterCurrentDeviceToken();
+    } catch (e) {
+      debugPrint('Error unregistering FCM token on signOut: $e');
+    }
     await _auth.signOut();
   }
 
@@ -519,6 +529,47 @@ class FirebaseBackend {
     } catch (e) {
       debugPrint('  ! App Check emulator configuration note: $e');
     }
+
+    try {
+      // 6. Realtime Database Emulator (:9000)
+      final rtdb = getRtdbInstance();
+      if (rtdb != null) {
+        rtdb.useDatabaseEmulator(targetHost, 9000);
+        debugPrint('  ✓ Realtime Database emulator configured (:9000)');
+      }
+    } catch (e) {
+      debugPrint('  ! Realtime Database emulator configuration note: $e');
+    }
+  }
+
+  static String? resolveRtdbDatabaseUrl() {
+    if (AppConfig.rtdbDatabaseUrl.trim().isNotEmpty) {
+      return AppConfig.rtdbDatabaseUrl.trim();
+    }
+    try {
+      final optionsUrl = Firebase.app().options.databaseURL?.trim() ?? '';
+      if (optionsUrl.isNotEmpty) {
+        return optionsUrl;
+      }
+    } catch (_) {}
+    if (AppConfig.useFirebaseEmulator) {
+      return 'https://privadacatania-3a7b8-default-rtdb.firebaseio.com';
+    }
+    return null;
+  }
+
+  static FirebaseDatabase? getRtdbInstance() {
+    final dbUrl = resolveRtdbDatabaseUrl();
+    if (dbUrl == null) return null;
+    try {
+      return FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: dbUrl,
+      );
+    } catch (e) {
+      debugPrint('Failed to resolve FirebaseDatabase instance: $e');
+      return null;
+    }
   }
 }
 
@@ -607,5 +658,613 @@ class FirebaseCrashlyticsService implements CrashlyticsService {
         debugPrint('[Crashlytics Native Error] Failed to set collection enabled: $e');
       }
     }
+  }
+}
+
+class FirebaseNotificationService implements NotificationService {
+  final StreamController<AppNotification> _foregroundController =
+      StreamController<AppNotification>.broadcast();
+  final StreamController<String> _openedRouteController =
+      StreamController<String>.broadcast();
+
+  String? _activeUid;
+  String? _activeToken;
+  String _activeLocale = 'es';
+  bool _listenersAttached = false;
+  bool _initialMessageChecked = false;
+  String? _pendingInitialRoute;
+
+  StreamSubscription<RemoteMessage>? _onMessageSub;
+  StreamSubscription<RemoteMessage>? _onOpenedSub;
+  StreamSubscription<String>? _onTokenRefreshSub;
+
+  FirebaseMessaging get _messaging => FirebaseMessaging.instance;
+  FirebaseDatabase? get _rtdb => FirebaseBackend.getRtdbInstance();
+
+  String _normalizeLocale(String? languageCode) {
+    if (languageCode != null && languageCode.toLowerCase().startsWith('en')) {
+      return 'en';
+    }
+    return 'es';
+  }
+
+  @override
+  Stream<AppNotification> get onForegroundMessage => _foregroundController.stream;
+
+  @override
+  Stream<String> get onNotificationOpenedRoute => _openedRouteController.stream;
+
+  @override
+  Future<void> initialize({
+    required String uid,
+    required String languageCode,
+  }) async {
+    if (uid.trim().isEmpty) return;
+    final previousUid = _activeUid;
+    _activeUid = uid;
+    _activeLocale = _normalizeLocale(languageCode);
+
+    if (previousUid != null && previousUid != uid && _activeToken != null) {
+      await _removeTokenFromUserDoc(previousUid, _activeToken!);
+    }
+
+    _attachListenersIfNeeded();
+    _captureWebQueryInitialRoute();
+    await _checkInitialFcmMessage();
+    await _ensureSettingsAndSyncLocale(uid, _activeLocale);
+
+    // Sync device token only if push delivery is currently enabled in RTDB settings
+    // and OS/browser permission is already granted.
+    final pushEnabled = await _isPushEnabledInRtdb(uid);
+    if (pushEnabled) {
+      final status = await getPermissionStatus();
+      if (status.isGranted) {
+        await _configureForegroundPresentation();
+        await _registerCurrentToken(uid);
+      }
+    }
+  }
+
+  void _attachListenersIfNeeded() {
+    if (_listenersAttached) return;
+    _listenersAttached = true;
+
+    _onMessageSub = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final parsed = AppNotification.fromRemoteData(
+        message.data,
+        fallbackTitle: message.notification?.title,
+        fallbackBody: message.notification?.body,
+        preferredLanguage: _activeLocale,
+      );
+      _foregroundController.add(parsed);
+    });
+
+    _onOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      final route = sanitizeNotificationRoute(message.data['targetRoute']?.toString());
+      _openedRouteController.add(route);
+    });
+
+    _onTokenRefreshSub = _messaging.onTokenRefresh.listen((String newToken) async {
+      final uid = _activeUid;
+      if (uid == null || newToken.trim().isEmpty) return;
+      final pushEnabled = await _isPushEnabledInRtdb(uid);
+      if (!pushEnabled) return;
+      await _saveTokenForUser(uid, newToken.trim());
+    });
+
+    if (kIsWeb) {
+      try {
+        html.window.navigator.serviceWorker?.addEventListener(
+          'message',
+          (html.Event event) {
+            if (event is html.MessageEvent) {
+              final origin = event.origin;
+              if (origin.isNotEmpty && origin != html.window.location.origin) {
+                return;
+              }
+              final data = event.data;
+              if (data is Map && data['type'] == 'NOTIFICATION_CLICK') {
+                final route = sanitizeNotificationRoute(data['targetRoute']?.toString());
+                _openedRouteController.add(route);
+              }
+            }
+          },
+        );
+      } catch (e) {
+        debugPrint('ServiceWorker message listener unavailable: $e');
+      }
+    }
+  }
+
+  void _captureWebQueryInitialRoute() {
+    if (!kIsWeb) return;
+    try {
+      final rawRoute = Uri.base.queryParameters['notificationRoute'];
+      if (rawRoute != null && rawRoute.trim().isNotEmpty) {
+        _pendingInitialRoute = sanitizeNotificationRoute(rawRoute.trim());
+        final cleanedParams = Map<String, String>.from(Uri.base.queryParameters)
+          ..remove('notificationRoute');
+        final cleanUri = Uri.base.replace(
+          queryParameters: cleanedParams.isEmpty ? null : cleanedParams,
+        );
+        html.window.history.replaceState(null, '', cleanUri.toString());
+      }
+    } catch (e) {
+      debugPrint('Failed to inspect Web initial notificationRoute: $e');
+    }
+  }
+
+  Future<void> _checkInitialFcmMessage() async {
+    if (_initialMessageChecked) return;
+    _initialMessageChecked = true;
+    try {
+      final initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) {
+        _pendingInitialRoute = sanitizeNotificationRoute(
+          initialMessage.data['targetRoute']?.toString(),
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to read initial FCM message: $e');
+    }
+  }
+
+  @override
+  String? consumeInitialRoute() {
+    final route = _pendingInitialRoute;
+    _pendingInitialRoute = null;
+    return route;
+  }
+
+  @override
+  Future<PushPermissionStatus> getPermissionStatus() async {
+    try {
+      if (kIsWeb) {
+        final supported = await _messaging.isSupported();
+        if (!supported) {
+          return PushPermissionStatus.unsupported;
+        }
+      }
+      final settings = await _messaging.getNotificationSettings();
+      return _mapAuthStatus(settings.authorizationStatus);
+    } catch (e) {
+      debugPrint('Unable to determine notification permission status: $e');
+      return PushPermissionStatus.unsupported;
+    }
+  }
+
+  @override
+  Future<PushPermissionStatus> requestPermissionAndRegister({
+    required String uid,
+    String? languageCode,
+  }) async {
+    if (uid.trim().isEmpty) return PushPermissionStatus.denied;
+    _activeUid = uid;
+    if (languageCode != null) {
+      _activeLocale = _normalizeLocale(languageCode);
+    }
+
+    try {
+      if (kIsWeb) {
+        final supported = await _messaging.isSupported();
+        if (!supported) {
+          return PushPermissionStatus.unsupported;
+        }
+      }
+
+      final settings = await _messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+
+      final mapped = _mapAuthStatus(settings.authorizationStatus);
+      if (mapped.isGranted) {
+        await _configureForegroundPresentation();
+        await setPushEnabled(uid, true, languageCode: _activeLocale);
+        await _registerCurrentToken(uid);
+      }
+      return mapped;
+    } catch (e, stack) {
+      debugPrint('Error requesting notification permission: $e');
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'FirebaseNotificationService.requestPermissionAndRegister',
+      );
+      return PushPermissionStatus.denied;
+    }
+  }
+
+  PushPermissionStatus _mapAuthStatus(AuthorizationStatus status) {
+    switch (status) {
+      case AuthorizationStatus.authorized:
+        return PushPermissionStatus.authorized;
+      case AuthorizationStatus.provisional:
+        return PushPermissionStatus.provisional;
+      case AuthorizationStatus.denied:
+      case AuthorizationStatus.deniedPermanently:
+        return PushPermissionStatus.denied;
+      case AuthorizationStatus.notDetermined:
+        return PushPermissionStatus.notDetermined;
+    }
+  }
+
+  Future<void> _configureForegroundPresentation() async {
+    if (kIsWeb) return;
+    try {
+      // Keep native foreground alerts muted on Apple platforms so foreground alerts
+      // render uniformly via Flutter's toggleable InAppNotificationBanner.
+      await _messaging.setForegroundNotificationPresentationOptions(
+        alert: false,
+        badge: true,
+        sound: false,
+      );
+    } catch (e) {
+      debugPrint('Foreground presentation options skipped: $e');
+    }
+  }
+
+  Future<String?> _getSafeFcmToken() async {
+    try {
+      final status = await getPermissionStatus();
+      if (!status.isGranted) return null;
+
+      if (kIsWeb) {
+        final vapid = AppConfig.webPushVapidKey.trim();
+        if (vapid.isEmpty) {
+          debugPrint('WEB_PUSH_VAPID_KEY not configured; skipping Web push token retrieval.');
+          return null;
+        }
+        return await _messaging.getToken(vapidKey: vapid);
+      }
+
+      if (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS) {
+        final apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken == null) {
+          debugPrint('APNs token not yet available (simulator or pending registration).');
+          return null;
+        }
+      }
+
+      return await _messaging.getToken();
+    } catch (e) {
+      debugPrint('FCM getToken skipped safely: $e');
+      return null;
+    }
+  }
+
+  Future<void> _registerCurrentToken(String uid) async {
+    final token = await _getSafeFcmToken();
+    if (token == null || token.trim().isEmpty) return;
+    await _saveTokenForUser(uid, token.trim());
+  }
+
+  Future<void> _saveTokenForUser(String uid, String token) async {
+    _activeToken = token;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'fcmTokens': FieldValue.arrayUnion([token]),
+      });
+    } catch (e) {
+      debugPrint('Could not persist FCM token to user profile: $e');
+    }
+  }
+
+  Future<void> _removeTokenFromUserDoc(String uid, String token) async {
+    if (uid.trim().isEmpty || token.trim().isEmpty) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({
+        'fcmTokens': FieldValue.arrayRemove([token]),
+      });
+    } catch (e) {
+      debugPrint('Could not remove FCM token from user profile (ignored): $e');
+    }
+  }
+
+  Future<void> _deactivateCurrentDevicePush(String uid) async {
+    var token = _activeToken;
+    if (token == null || token.isEmpty) {
+      final status = await getPermissionStatus();
+      if (status.isGranted) {
+        token = await _getSafeFcmToken();
+      }
+    }
+    if (token != null && token.isNotEmpty) {
+      await _removeTokenFromUserDoc(uid, token);
+    }
+    try {
+      final status = await getPermissionStatus();
+      if (status.isGranted) {
+        await _messaging.deleteToken();
+      }
+    } catch (e) {
+      debugPrint('FCM deleteToken skipped: $e');
+    }
+    _activeToken = null;
+  }
+
+  @override
+  Future<void> unregisterCurrentDeviceToken() async {
+    final uid = _activeUid ?? fb_auth.FirebaseAuth.instance.currentUser?.uid;
+    _activeUid = null;
+    if (uid != null && uid.isNotEmpty) {
+      await _deactivateCurrentDevicePush(uid);
+    } else {
+      _activeToken = null;
+    }
+  }
+
+  Future<void> _ensureSettingsAndSyncLocale(String uid, String locale) async {
+    final rtdb = _rtdb;
+    if (rtdb == null) return;
+    try {
+      final ref = rtdb.ref('user_notification_settings/$uid');
+      final snapshot = await ref.get();
+      if (!snapshot.exists || snapshot.value is! Map) {
+        await ref.set({
+          'locale': locale,
+          'pushEnabled': true,
+          'inAppBannerEnabled': true,
+          'updatedAt': ServerValue.timestamp,
+        });
+      } else {
+        final raw = snapshot.value as Map;
+        if (raw['locale']?.toString() != locale ||
+            raw['inAppBannerEnabled'] == null ||
+            raw['pushEnabled'] == null) {
+          await ref.update({
+            'locale': locale,
+            if (raw['pushEnabled'] == null) 'pushEnabled': true,
+            if (raw['inAppBannerEnabled'] == null) 'inAppBannerEnabled': true,
+            'updatedAt': ServerValue.timestamp,
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error synchronizing initial notification settings: $e');
+    }
+  }
+
+  Future<bool> _isPushEnabledInRtdb(String uid) async {
+    final rtdb = _rtdb;
+    if (rtdb == null) return true;
+    try {
+      final snap = await rtdb.ref('user_notification_settings/$uid/pushEnabled').get();
+      if (!snap.exists) return true;
+      return snap.value != false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  @override
+  Future<void> syncLocale(String uid, String languageCode) async {
+    if (uid.trim().isEmpty) return;
+    final normLocale = _normalizeLocale(languageCode);
+    _activeLocale = normLocale;
+    final rtdb = _rtdb;
+    if (rtdb == null) return;
+    try {
+      await rtdb.ref('user_notification_settings/$uid').update({
+        'locale': normLocale,
+        'updatedAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Failed to sync notification locale: $e');
+    }
+  }
+
+  @override
+  Future<void> setPushEnabled(
+    String uid,
+    bool enabled, {
+    String? languageCode,
+  }) async {
+    if (uid.trim().isEmpty) return;
+    final rtdb = _rtdb;
+    if (languageCode != null) {
+      _activeLocale = _normalizeLocale(languageCode);
+    }
+    if (rtdb != null) {
+      try {
+        await rtdb.ref('user_notification_settings/$uid').update({
+          'pushEnabled': enabled,
+          if (languageCode != null) 'locale': _normalizeLocale(languageCode),
+          'updatedAt': ServerValue.timestamp,
+        });
+      } catch (e) {
+        debugPrint('Failed to update pushEnabled in RTDB: $e');
+      }
+    }
+
+    if (enabled) {
+      final status = await getPermissionStatus();
+      if (status.isGranted) {
+        await _configureForegroundPresentation();
+        await _registerCurrentToken(uid);
+      }
+    } else {
+      await _deactivateCurrentDevicePush(uid);
+    }
+  }
+
+  @override
+  Future<void> setInAppBannerEnabled(String uid, bool enabled) async {
+    if (uid.trim().isEmpty) return;
+    final rtdb = _rtdb;
+    if (rtdb == null) return;
+    try {
+      await rtdb.ref('user_notification_settings/$uid').update({
+        'inAppBannerEnabled': enabled,
+        'updatedAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Failed to update inAppBannerEnabled in RTDB: $e');
+    }
+  }
+
+  @override
+  Future<void> setCategoryEnabled(
+    String uid,
+    NotificationCategory category,
+    bool enabled,
+  ) async {
+    if (uid.trim().isEmpty) return;
+    final rtdb = _rtdb;
+    if (rtdb == null) return;
+    try {
+      await rtdb.ref('user_notification_settings/$uid').update({
+        'categories/${category.key}': enabled,
+        'updatedAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Failed to update notification category in RTDB: $e');
+    }
+  }
+
+  @override
+  Stream<UserNotificationSettings> watchSettings(String uid) {
+    final rtdb = _rtdb;
+    if (rtdb == null || uid.trim().isEmpty) {
+      return Stream.value(const UserNotificationSettings());
+    }
+    return rtdb
+        .ref('user_notification_settings/$uid')
+        .onValue
+        .transform(
+          StreamTransformer<DatabaseEvent, UserNotificationSettings>.fromHandlers(
+            handleData: (event, sink) {
+              final raw = event.snapshot.value;
+              sink.add(
+                raw is Map
+                    ? UserNotificationSettings.fromRtdbMap(raw)
+                    : const UserNotificationSettings(),
+              );
+            },
+            handleError: (error, stackTrace, sink) {
+              debugPrint('RTDB watchSettings stream error (ignored): $error');
+            },
+          ),
+        );
+  }
+
+  @override
+  Stream<List<AppNotification>> watchNotifications(String uid) {
+    final rtdb = _rtdb;
+    if (rtdb == null || uid.trim().isEmpty) {
+      return Stream.value(const <AppNotification>[]);
+    }
+    return rtdb
+        .ref('notifications/$uid')
+        .orderByChild('createdAt')
+        .limitToLast(100)
+        .onValue
+        .transform(
+          StreamTransformer<DatabaseEvent, List<AppNotification>>.fromHandlers(
+            handleData: (event, sink) {
+              final raw = event.snapshot.value;
+              if (raw is! Map) {
+                sink.add(const <AppNotification>[]);
+                return;
+              }
+              final items = <AppNotification>[];
+              raw.forEach((key, value) {
+                if (key != null && value is Map) {
+                  items.add(AppNotification.fromRtdbMap(key.toString(), value));
+                }
+              });
+              items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              sink.add(items);
+            },
+            handleError: (error, stackTrace, sink) {
+              debugPrint('RTDB watchNotifications stream error (ignored): $error');
+            },
+          ),
+        );
+  }
+
+  @override
+  Stream<int> watchUnreadCount(String uid) {
+    return watchNotifications(uid).map(
+      (items) => items.where((item) => !item.isRead).length,
+    );
+  }
+
+  @override
+  Future<void> markAsRead(String uid, String notificationId) async {
+    final rtdb = _rtdb;
+    if (rtdb == null || uid.trim().isEmpty || notificationId.trim().isEmpty) return;
+    try {
+      await rtdb.ref('notifications/$uid/$notificationId').update({
+        'isRead': true,
+        'readAt': ServerValue.timestamp,
+      });
+    } catch (e) {
+      debugPrint('Failed to mark notification as read: $e');
+    }
+  }
+
+  @override
+  Future<void> markAllAsRead(String uid) async {
+    final rtdb = _rtdb;
+    if (rtdb == null || uid.trim().isEmpty) return;
+    try {
+      final snap = await rtdb
+          .ref('notifications/$uid')
+          .orderByChild('isRead')
+          .equalTo(false)
+          .get();
+      if (!snap.exists || snap.value is! Map) return;
+      final raw = snap.value as Map;
+      final futures = <Future<void>>[];
+      for (final key in raw.keys) {
+        if (key == null) continue;
+        futures.add(
+          rtdb.ref('notifications/$uid/${key.toString()}').update({
+            'isRead': true,
+            'readAt': ServerValue.timestamp,
+          }),
+        );
+      }
+      await Future.wait(futures);
+    } catch (e) {
+      debugPrint('Failed to mark all notifications as read: $e');
+    }
+  }
+
+  @override
+  Future<void> deleteNotification(String uid, String notificationId) async {
+    final rtdb = _rtdb;
+    if (rtdb == null || uid.trim().isEmpty || notificationId.trim().isEmpty) return;
+    try {
+      await rtdb.ref('notifications/$uid/$notificationId').remove();
+    } catch (e) {
+      debugPrint('Failed to delete notification: $e');
+    }
+  }
+
+  @override
+  Future<void> clearAllNotifications(String uid) async {
+    final rtdb = _rtdb;
+    if (rtdb == null || uid.trim().isEmpty) return;
+    try {
+      await rtdb.ref('notifications/$uid').remove();
+    } catch (e) {
+      debugPrint('Failed to clear notifications: $e');
+    }
+  }
+
+  void dispose() {
+    _onMessageSub?.cancel();
+    _onOpenedSub?.cancel();
+    _onTokenRefreshSub?.cancel();
+    _foregroundController.close();
+    _openedRouteController.close();
   }
 }

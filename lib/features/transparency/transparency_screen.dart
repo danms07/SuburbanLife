@@ -1206,16 +1206,16 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   onPressed: () async {
                     Navigator.pop(dialogCtx);
                     try {
-                      await DatabaseService().updateDocument('documents', docId, {
-                        'visibility': selectedVisibility,
-                        'updatedAt': DbFieldValue.serverTimestamp(),
-                      });
                       final folderId = doc['folderId']?.toString() ?? 'root';
                       if (selectedVisibility == 'all' && folderId.isNotEmpty && folderId != 'root') {
                         await DatabaseService().updateDocument('document_folders', folderId, {
                           'visibility': 'all',
                         });
                       }
+                      await DatabaseService().updateDocument('documents', docId, {
+                        'visibility': selectedVisibility,
+                        'updatedAt': DbFieldValue.serverTimestamp(),
+                      });
                       if (mounted) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -1426,15 +1426,15 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   onPressed: () async {
                     Navigator.pop(dialogCtx);
                     try {
-                      await DatabaseService().updateDocument('documents', docId, {
-                        'folderId': targetFolderId,
-                      });
                       final docVis = (doc['visibility'] ?? 'all').toString().toLowerCase();
                       if (docVis == 'all' && targetFolderId.isNotEmpty && targetFolderId != 'root') {
                         await DatabaseService().updateDocument('document_folders', targetFolderId, {
                           'visibility': 'all',
                         });
                       }
+                      await DatabaseService().updateDocument('documents', docId, {
+                        'folderId': targetFolderId,
+                      });
                       if (mounted) {
                         messenger.showSnackBar(
                           SnackBar(

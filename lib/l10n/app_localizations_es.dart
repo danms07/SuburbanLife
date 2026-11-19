@@ -3099,4 +3099,179 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get qrProcessingWaitHint =>
       'Por favor, espere mientras se completa la operación. No presione otros botones.';
+
+  @override
+  String get notificationsInboxTitle => 'Notificaciones';
+
+  @override
+  String get notificationsEmptyTitle => 'Aún no tienes notificaciones';
+
+  @override
+  String get notificationsEmptySubtitle =>
+      'Te avisaremos aquí sobre aprobaciones, sanciones, accesos QR y avisos de la comunidad.';
+
+  @override
+  String get notificationsMarkAllRead => 'Marcar todas como leídas';
+
+  @override
+  String get notificationsClearAll => 'Vaciar historial';
+
+  @override
+  String get notificationsClearConfirmTitle =>
+      '¿Vaciar historial de notificaciones?';
+
+  @override
+  String get notificationsClearConfirmBody =>
+      'Esta acción eliminará permanentemente todas las notificaciones de tu bandeja.';
+
+  @override
+  String get notificationsPreferencesTooltip =>
+      'Preferencias de notificaciones';
+
+  @override
+  String get notificationsDeleteTooltip => 'Eliminar notificación';
+
+  @override
+  String get notificationsRetentionNotice =>
+      'Las notificaciones se conservan automáticamente hasta por 30 días (máx. 100).';
+
+  @override
+  String notificationsUnreadBadgeSemantics(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count notificaciones sin leer',
+      one: '1 notificación sin leer',
+      zero: 'Notificaciones',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get notificationsAllFilter => 'Todas';
+
+  @override
+  String get notificationsUnreadFilter => 'Sin leer';
+
+  @override
+  String get notificationsNoUnreadTitle => 'Estás al día';
+
+  @override
+  String get notificationsNoUnreadSubtitle => 'No hay notificaciones sin leer.';
+
+  @override
+  String get notificationBannerViewButton => 'Ver';
+
+  @override
+  String get notificationBannerDismissTooltip => 'Descartar';
+
+  @override
+  String get notificationPreferencesTitle => 'Preferencias de Notificaciones';
+
+  @override
+  String get notificationPermissionSectionTitle =>
+      'Permisos del Dispositivo y Navegador';
+
+  @override
+  String get notificationPermissionAuthorized =>
+      'Permitidas — este dispositivo puede recibir notificaciones push.';
+
+  @override
+  String get notificationPermissionDenied =>
+      'Bloqueadas — las notificaciones están desactivadas en el sistema o navegador. Puedes seguir leyendo todo desde la campanita.';
+
+  @override
+  String get notificationPermissionNotDetermined =>
+      'Aún no activadas — toca abajo para permitir notificaciones push en este dispositivo.';
+
+  @override
+  String get notificationPermissionUnsupported =>
+      'Las notificaciones push no están disponibles en este navegador o dispositivo. Usa la campanita para leer tus avisos.';
+
+  @override
+  String get notificationEnablePermissionButton =>
+      'Permitir Notificaciones Push';
+
+  @override
+  String get notificationSystemSettingsHint =>
+      'Para volver a activar las alertas del sistema, abre la configuración de la app o del sitio en tu navegador y permite las notificaciones.';
+
+  @override
+  String get notificationMasterPushTitle => 'Notificaciones push';
+
+  @override
+  String get notificationMasterPushSubtitle =>
+      'Recibe alertas al instante incluso con la app cerrada. Tu historial en la campanita siempre se actualiza.';
+
+  @override
+  String get notificationInAppBannerTitle =>
+      'Banners flotantes dentro de la app';
+
+  @override
+  String get notificationInAppBannerSubtitle =>
+      'Mostrar avisos emergentes arriba mientras usas la app. Desactívalo para consultar avisos solo desde la campanita.';
+
+  @override
+  String get notificationCategoriesSectionTitle => 'Categorías de envío';
+
+  @override
+  String get notificationCategoriesSectionSubtitle =>
+      'Elige qué eventos generan notificaciones push en tus dispositivos.';
+
+  @override
+  String get notificationCatReviewsTitle => 'Aprobaciones y rechazos';
+
+  @override
+  String get notificationCatReviewsDesc =>
+      'Pagos, reservas y solicitudes de propiedad revisadas por administradores';
+
+  @override
+  String get notificationCatSanctionsTitle => 'Sanciones y multas';
+
+  @override
+  String get notificationCatSanctionsDesc =>
+      'Nuevas sanciones aplicadas a tu domicilio';
+
+  @override
+  String get notificationCatQrAccessTitle => 'Entradas y salidas con QR';
+
+  @override
+  String get notificationCatQrAccessDesc =>
+      'Cuando tus invitados entran o salen usando tus pases QR';
+
+  @override
+  String get notificationCatRoommatesTitle => 'Roomies / Co-residentes';
+
+  @override
+  String get notificationCatRoommatesDesc =>
+      'Altas y bajas de roomies en tu domicilio';
+
+  @override
+  String get notificationCatTransparencyTitle => 'Documentos de transparencia';
+
+  @override
+  String get notificationCatTransparencyDesc =>
+      'Nuevos reportes, manuales y documentos oficiales de la comunidad';
+
+  @override
+  String get notificationCatAnnouncementsTitle => 'Avisos y comunicados';
+
+  @override
+  String get notificationCatAnnouncementsDesc =>
+      'Comunicados importantes publicados por la administración';
+
+  @override
+  String get notificationCatAdminReviewsTitle =>
+      'Solicitudes por aprobar (Admin)';
+
+  @override
+  String get notificationCatAdminReviewsDesc =>
+      'Nuevos pagos, reservas y solicitudes pendientes de revisión';
+
+  @override
+  String get rejectClaimTitle => 'Rechazar Solicitud de Propiedad';
+
+  @override
+  String get rejectClaimReasonHint =>
+      'Explica por qué no se puede aprobar esta solicitud (opcional)';
 }

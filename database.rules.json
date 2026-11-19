@@ -1,0 +1,83 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && !newData.exists()",
+        ".indexOn": ["createdAt", "isRead"],
+        "$notificationId": {
+          ".write": "auth != null && auth.uid === $uid && data.exists() && !newData.exists()",
+          "type": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 64"
+          },
+          "category": {
+            ".validate": "newData.val() === 'reviews' || newData.val() === 'sanctions' || newData.val() === 'qr_access' || newData.val() === 'roommates' || newData.val() === 'transparency' || newData.val() === 'announcements' || newData.val() === 'admin_reviews'"
+          },
+          "titles": {
+            "es": { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "en": { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "$other": { ".validate": false }
+          },
+          "bodies": {
+            "es": { ".validate": "newData.isString() && newData.val().length <= 500" },
+            "en": { ".validate": "newData.isString() && newData.val().length <= 500" },
+            "$other": { ".validate": false }
+          },
+          "targetRoute": {
+            ".validate": "newData.isString() && newData.val().length <= 64"
+          },
+          "entityId": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "isRead": {
+            ".write": "auth != null && auth.uid === $uid && data.parent().exists()",
+            ".validate": "newData.isBoolean()"
+          },
+          "readAt": {
+            ".write": "auth != null && auth.uid === $uid && data.parent().exists()",
+            ".validate": "!newData.exists() || newData.isNumber()"
+          },
+          "metadata": {
+            "$metaKey": {
+              ".validate": "newData.isString() || newData.isNumber() || newData.isBoolean()"
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "user_notification_settings": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "locale": {
+          ".validate": "newData.val() === 'es' || newData.val() === 'en'"
+        },
+        "pushEnabled": {
+          ".validate": "newData.isBoolean()"
+        },
+        "inAppBannerEnabled": {
+          ".validate": "newData.isBoolean()"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "categories": {
+          "$category": {
+            ".validate": "($category === 'reviews' || $category === 'sanctions' || $category === 'qr_access' || $category === 'roommates' || $category === 'transparency' || $category === 'announcements' || $category === 'admin_reviews') && newData.isBoolean()"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

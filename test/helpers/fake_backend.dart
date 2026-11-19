@@ -384,6 +384,7 @@ class FakeAuthService implements AuthService {
 
   @override
   Future<void> signOut() async {
+    await Backend.notifications.unregisterCurrentDeviceToken();
     emitUser(null);
   }
 
@@ -521,6 +522,215 @@ class FakeCrashlyticsService implements CrashlyticsService {
   }
 }
 
+/// In-memory [NotificationService] implementation supporting synchronous seeding,
+/// live reactive RTDB-style streams, permission transitions, and foreground pushes.
+class FakeNotificationService implements NotificationService {
+  final StreamController<AppNotification> _foregroundController =
+      StreamController<AppNotification>.broadcast();
+  final StreamController<String> _openedRouteController =
+      StreamController<String>.broadcast();
+  final StreamController<void> _inboxChangeController =
+      StreamController<void>.broadcast();
+  final StreamController<void> _settingsChangeController =
+      StreamController<void>.broadcast();
+
+  final Map<String, List<AppNotification>> _inboxes = {};
+  final Map<String, UserNotificationSettings> _settings = {};
+
+  PushPermissionStatus permissionStatus = PushPermissionStatus.notDetermined;
+  PushPermissionStatus nextRequestPermissionResult = PushPermissionStatus.authorized;
+  String? pendingInitialRoute;
+  String? initializedUid;
+  final List<String> syncedLocales = [];
+  int unregisterCallCount = 0;
+
+  void clear() {
+    _inboxes.clear();
+    _settings.clear();
+    permissionStatus = PushPermissionStatus.notDetermined;
+    nextRequestPermissionResult = PushPermissionStatus.authorized;
+    pendingInitialRoute = null;
+    initializedUid = null;
+    syncedLocales.clear();
+    unregisterCallCount = 0;
+  }
+
+  void seedNotifications(String uid, List<AppNotification> items) {
+    final sorted = List<AppNotification>.from(items)
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _inboxes[uid] = sorted;
+    _inboxChangeController.add(null);
+  }
+
+  void seedSettings(String uid, UserNotificationSettings settings) {
+    _settings[uid] = settings;
+    _settingsChangeController.add(null);
+  }
+
+  UserNotificationSettings currentSettings(String uid) {
+    return _settings[uid] ?? const UserNotificationSettings();
+  }
+
+  List<AppNotification> currentNotifications(String uid) {
+    return List<AppNotification>.unmodifiable(_inboxes[uid] ?? const []);
+  }
+
+  void emitForegroundMessage(AppNotification notification) {
+    _foregroundController.add(notification);
+  }
+
+  void emitOpenedRoute(String route) {
+    _openedRouteController.add(sanitizeNotificationRoute(route));
+  }
+
+  @override
+  Stream<AppNotification> get onForegroundMessage => _foregroundController.stream;
+
+  @override
+  Stream<String> get onNotificationOpenedRoute => _openedRouteController.stream;
+
+  @override
+  Future<void> initialize({required String uid, required String languageCode}) async {
+    initializedUid = uid;
+    final norm = languageCode.toLowerCase().startsWith('en') ? 'en' : 'es';
+    syncedLocales.add(norm);
+    _settings[uid] = currentSettings(uid).copyWith(locale: norm);
+    _settingsChangeController.add(null);
+  }
+
+  @override
+  Future<PushPermissionStatus> getPermissionStatus() async => permissionStatus;
+
+  @override
+  Future<PushPermissionStatus> requestPermissionAndRegister({
+    required String uid,
+    String? languageCode,
+  }) async {
+    permissionStatus = nextRequestPermissionResult;
+    if (permissionStatus.isGranted) {
+      await setPushEnabled(uid, true, languageCode: languageCode);
+    }
+    _settingsChangeController.add(null);
+    return permissionStatus;
+  }
+
+  @override
+  Future<void> syncLocale(String uid, String languageCode) async {
+    final norm = languageCode.toLowerCase().startsWith('en') ? 'en' : 'es';
+    syncedLocales.add(norm);
+    _settings[uid] = currentSettings(uid).copyWith(locale: norm);
+    _settingsChangeController.add(null);
+  }
+
+  @override
+  Future<void> setPushEnabled(
+    String uid,
+    bool enabled, {
+    String? languageCode,
+  }) async {
+    final existing = currentSettings(uid);
+    _settings[uid] = existing.copyWith(
+      pushEnabled: enabled,
+      locale: languageCode != null
+          ? (languageCode.toLowerCase().startsWith('en') ? 'en' : 'es')
+          : existing.locale,
+    );
+    _settingsChangeController.add(null);
+  }
+
+  @override
+  Future<void> setInAppBannerEnabled(String uid, bool enabled) async {
+    _settings[uid] = currentSettings(uid).copyWith(inAppBannerEnabled: enabled);
+    _settingsChangeController.add(null);
+  }
+
+  @override
+  Future<void> setCategoryEnabled(
+    String uid,
+    NotificationCategory category,
+    bool enabled,
+  ) async {
+    final existing = currentSettings(uid);
+    final updatedCats = Map<String, bool>.from(existing.categories)
+      ..[category.key] = enabled;
+    _settings[uid] = existing.copyWith(categories: updatedCats);
+    _settingsChangeController.add(null);
+  }
+
+  @override
+  Future<void> unregisterCurrentDeviceToken() async {
+    unregisterCallCount += 1;
+    initializedUid = null;
+  }
+
+  @override
+  Stream<UserNotificationSettings> watchSettings(String uid) async* {
+    yield currentSettings(uid);
+    await for (final _ in _settingsChangeController.stream) {
+      yield currentSettings(uid);
+    }
+  }
+
+  @override
+  Stream<List<AppNotification>> watchNotifications(String uid) async* {
+    yield currentNotifications(uid);
+    await for (final _ in _inboxChangeController.stream) {
+      yield currentNotifications(uid);
+    }
+  }
+
+  @override
+  Stream<int> watchUnreadCount(String uid) {
+    return watchNotifications(uid).map(
+      (items) => items.where((item) => !item.isRead).length,
+    );
+  }
+
+  @override
+  Future<void> markAsRead(String uid, String notificationId) async {
+    final list = _inboxes[uid];
+    if (list == null) return;
+    _inboxes[uid] = list
+        .map((n) => n.id == notificationId
+            ? n.copyWith(isRead: true, readAt: DateTime.now())
+            : n)
+        .toList();
+    _inboxChangeController.add(null);
+  }
+
+  @override
+  Future<void> markAllAsRead(String uid) async {
+    final list = _inboxes[uid];
+    if (list == null) return;
+    final now = DateTime.now();
+    _inboxes[uid] = list
+        .map((n) => n.isRead ? n : n.copyWith(isRead: true, readAt: now))
+        .toList();
+    _inboxChangeController.add(null);
+  }
+
+  @override
+  Future<void> deleteNotification(String uid, String notificationId) async {
+    final list = _inboxes[uid];
+    if (list == null) return;
+    _inboxes[uid] = list.where((n) => n.id != notificationId).toList();
+    _inboxChangeController.add(null);
+  }
+
+  @override
+  Future<void> clearAllNotifications(String uid) async {
+    _inboxes.remove(uid);
+    _inboxChangeController.add(null);
+  }
+
+  @override
+  String? consumeInitialRoute() {
+    final route = pendingInitialRoute;
+    pendingInitialRoute = null;
+    return route;
+  }
+}
+
 /// Global testing helper to initialize and reset the [Backend] instance.
 class FakeBackendHelper {
   static final FakeAuthService auth = FakeAuthService();
@@ -528,6 +738,7 @@ class FakeBackendHelper {
   static final FakeStorageService storage = FakeStorageService();
   static final FakeFunctionsService functions = FakeFunctionsService();
   static final FakeCrashlyticsService crashlytics = FakeCrashlyticsService();
+  static final FakeNotificationService notifications = FakeNotificationService();
 
   static void setUp() {
     auth.clear();
@@ -535,6 +746,7 @@ class FakeBackendHelper {
     storage.clear();
     functions.clear();
     crashlytics.clear();
+    notifications.clear();
 
     Backend.initialize(
       auth: auth,
@@ -542,6 +754,7 @@ class FakeBackendHelper {
       storage: storage,
       functions: functions,
       crashlytics: crashlytics,
+      notifications: notifications,
     );
   }
 }

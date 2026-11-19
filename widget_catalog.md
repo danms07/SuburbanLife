@@ -50,6 +50,7 @@ The following table maps each visual component to its feature domain and source 
 | **Bulk Payment Import CSV Manager** | Admin Payments | [admin_bulk_payment_import_screen.dart](lib/features/admin/admin_bulk_payment_import_screen.dart) |
 | **Admin Expenses Manager & Record Expense Modal** | Admin Finance | [admin_expenses_screen.dart](lib/features/admin/admin_expenses_screen.dart) |
 | **App Version Footer Label** | Core / Navigation | [app_version_label.dart](lib/core/widgets/app_version_label.dart) |
+| **Notification Bell, Inbox, Foreground Banner & Preferences** | Notifications | [notifications_screen.dart](lib/features/notifications/notifications_screen.dart) & [notification_router.dart](lib/core/services/notification_router.dart) |
 
 ---
 
@@ -230,6 +231,10 @@ The following table maps each visual component to its feature domain and source 
 ## 40. App Version Footer Label
 - **Description**: A reusable caption widget (`AppVersionLabel`) in `lib/core/widgets/app_version_label.dart` that reads the bundled `web/version.json` asset via `DefaultAssetBundle`, parses `version+build_number` with `AppUpdateService.parseVersionPayload`, caches `rootBundle` reads to avoid repeated flicker, and formats the localized version string (`l10n.appVersionLabel(version)` -> `Version {version}` / `Versión {version}`) with ellipsis overflow protection and graceful empty-state fallback.
 - **Usage**: Rendered inside a bottom `SafeArea` footer beneath `Logout` in both the Resident hamburger navigation drawer (`MyHomePage._buildDrawer`, keyed `resident_app_version_label`) and `AdminShellScreen` (`admin_desktop_sidebar` & `admin_mobile_drawer`, keyed `admin_app_version_label`), as well as the non-interactive bottom footer of the Security Guard panel (`MyHomePage._buildGuardPanel`, keyed `guard_app_version_label`).
+
+## 41. Notification Bell, Inbox, Foreground Banner & Preferences
+- **Description**: Cross-platform notification presentation suite in `lib/features/notifications/notifications_screen.dart` paired with allow-listed deep-link navigation (`NotificationRouter` in `lib/core/services/notification_router.dart`). Includes a reactive `NotificationBellButton` (`notification_bell_button`) streaming unread counts from RTDB `/notifications/{uid}` (capped at `99+`), a dismissible & tappable `InAppNotificationBanner` (`in_app_notification_banner`) mounted in `MyHomePage`'s persistent root `Stack`, `NotificationsScreen` (bilingual items, `All`/`Unread` `FilterChip`s, `Mark all read`, individual swipe/button delete, `Clear all` confirmation, 30-day retention helper, and inline `notDetermined` permission opt-in card), and `NotificationPreferencesSheet` (OS/browser permission status card synced with `WidgetsBindingObserver` lifecycle resume, master `pushEnabled` switch, `inAppBannerEnabled` switch for bell-badge-only usage, and role-gated per-category toggles).
+- **Usage**: Mounted in `AdminShellScreen` AppBar actions (`admin_shell_screen.dart`), Resident dashboard header, Review Status card, Onboarding card, and Resident Navigation Drawer (`lib/main.dart`).
 
 
 

@@ -409,12 +409,15 @@ class _AdminResidentDetailScreenState extends State<AdminResidentDetailScreen> {
   }
 
   Future<void> _approveClaim(Map<String, dynamic> claimDoc) async {
+    final claimId = claimDoc['id'] as String?;
     final userUid = claimDoc['userUid'] as String?;
     final addressRef = _resolveClaimAddressRef(claimDoc);
-    final proofUrl = claimDoc['proofUrl'] as String?;
-    final deliveryDate = _parseClaimDateTime(claimDoc['deliveryDate']);
 
-    if (userUid == null || userUid.isEmpty || addressRef == null) {
+    if (claimId == null ||
+        claimId.isEmpty ||
+        userUid == null ||
+        userUid.isEmpty ||
+        addressRef == null) {
       return;
     }
 
@@ -424,41 +427,10 @@ class _AdminResidentDetailScreenState extends State<AdminResidentDetailScreen> {
     });
 
     try {
-      // 1. Invoke setRole Cloud Function to assign resident custom claim
-      await FunctionsService().callFunction('setRole', {
-        'uid': userUid,
-        'role': 'resident',
+      await FunctionsService().callFunction('reviewOwnershipClaim', {
+        'claimId': claimId,
+        'action': 'approve',
       });
-
-      // 2. Assign residentUid, initialize paymentStatus to paid, and propagate deliveryDate on the address
-      await DatabaseService().updateDocument('addresses', addressRef.id, {
-        'residentUid': userUid,
-        'paymentStatus': 'paid',
-        'deliveryDate': ?deliveryDate,
-      });
-
-      // 3. Link addressRef on the user document if not already linked
-      final userData = await DatabaseService().getDocument('users', userUid);
-      if (userData != null && userData['addressRef'] == null) {
-        await DatabaseService().updateDocument('users', userUid, {
-          'addressRef': addressRef,
-        });
-      }
-
-      // 4. Delete the proof image from Storage to protect privacy
-      if (proofUrl != null && proofUrl.isNotEmpty) {
-        try {
-          await StorageService().deleteFileFromUrl(proofUrl);
-        } catch (err) {
-          debugPrint('Error deleting proof storage image: $err');
-        }
-      }
-
-      // 5. Delete the pending ownership claim document
-      await DatabaseService().deleteDocument(
-        'ownership_claims',
-        claimDoc['id'] as String,
-      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -494,30 +466,58 @@ class _AdminResidentDetailScreenState extends State<AdminResidentDetailScreen> {
   }
 
   Future<void> _rejectClaim(Map<String, dynamic> claimDoc) async {
+    final claimId = claimDoc['id'] as String?;
+    if (claimId == null || claimId.isEmpty) return;
+
     final l10n = AppLocalizations.of(context)!;
+    String reasonText = '';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.rejectClaimTitle),
+        content: TextField(
+          key: const Key('reject_claim_reason_input'),
+          maxLines: 3,
+          maxLength: 180,
+          decoration: InputDecoration(
+            labelText: l10n.rejectionReasonOptional,
+            hintText: l10n.rejectClaimReasonHint,
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: (value) => reasonText = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          ElevatedButton(
+            key: const Key('confirm_reject_claim_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(l10n.rejectResidentButton),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     setState(() {
       _isProcessing = true;
     });
 
     try {
-      final proofUrl = claimDoc['proofUrl'] as String?;
-      if (proofUrl != null && proofUrl.isNotEmpty) {
-        try {
-          await StorageService().deleteFileFromUrl(proofUrl);
-        } catch (err, stack) {
-          debugPrint('Error deleting proof storage image: $err');
-          Backend.crashlytics.recordError(
-            err,
-            stack,
-            reason: 'AdminResidentDetailScreen.deleteProofImage',
-          );
-        }
-      }
-
-      await DatabaseService().deleteDocument(
-        'ownership_claims',
-        claimDoc['id'] as String,
-      );
+      final trimmedReason = reasonText.trim();
+      await FunctionsService().callFunction('reviewOwnershipClaim', {
+        'claimId': claimId,
+        'action': 'reject',
+        if (trimmedReason.isNotEmpty) 'reason': trimmedReason,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

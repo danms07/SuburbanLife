@@ -2,6 +2,26 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.47+48] — 2026-11-18
+
+### Added
+- **Cross-Platform Push Notifications & RTDB Mirrored Inbox (`lib/features/notifications/notifications_screen.dart`, `functions/notifications.js`, `database.rules.json`)**:
+  - Added end-to-end Firebase Cloud Messaging (FCM) delivery paired with Firebase Realtime Database (RTDB) mirroring at `/notifications/{uid}/{notifId}` and `/user_notification_settings/{uid}` across all 7 domain event categories (`reviews`, `sanctions`, `transparency`, `qr_access`, `roommates`, `announcements`, `admin_reviews`) with 30-day / 100-item per-user RTDB pruning.
+  - Configured native platform delivery & 7 notification channels across Android (`AndroidManifest.xml`, `MainActivity.kt`), iOS (`Info.plist`, `Runner.entitlements`, `AppDelegate.swift`), and Web (`web/firebase-messaging-sw.js` with strict allow-listed `targetRoute` and exact same-origin validation + VAPID web push token support in `lib/core/config/app_config.dart`).
+  - Added Cloud Function notification dispatch & event triggers in `functions/notifications.js` and `functions/index.js`: payment review (`approvePayment`), booking review (`onBookingWritten`), ownership claim review (`reviewOwnershipClaim`), sanction issuance (`onSanctionWritten`), QR entry/exit access (`notifyAccessResult`), roommate onboarding (`addRoommate` notifying both primary owner & newly linked roommate), announcements (`translateAnnouncement`), transparency document publishing (`onTransparencyDocumentWritten`), and admin review alerts (`onPaymentWritten`, `onOwnershipClaimCreated`, `onBookingWritten`), plus full RTDB cleanup on account deletion (`adminDeleteUser`).
+  - Added `NotificationService`, `AppNotification`, `UserNotificationSettings`, `PushPermissionStatus`, `NotificationCategory`, and allow-listed `sanitizeNotificationRoute` in `lib/core/backend/backend.dart`, `FirebaseNotificationService` (including pre-signOut token cleanup in `FirebaseAuthService.signOut`) in `lib/core/backend/firebase_backend.dart`, and reactive `FakeNotificationService` in `test/helpers/fake_backend.dart`.
+  - Built allow-listed `NotificationRouter` (`lib/core/services/notification_router.dart`), live unread `NotificationBellButton`, swipe/tap `InAppNotificationBanner` inside a state-preserving root `Stack`, `NotificationsScreen` (All/Unread filters, Mark all read, Clear all, swipe/delete, 30-day notice, and permission opt-in banner), and `NotificationPreferencesSheet` (OS permission lifecycle monitoring, master push toggle, in-app banner toggle for silent bell-badge-only usage, and role-gated category toggles), wired into `MyHomePage`, `AdminShellScreen`, and bilingual EN/ES localizations (`app_en.arb`, `app_es.arb`).
+
+### Security & Fixes
+- **Server-Side Ownership Claim Review (`functions/index.js`, `lib/features/auth/admin_resident_approval_screen.dart`)**:
+  - Replaced client-side claim approval/rejection mutations with the `reviewOwnershipClaim` Cloud Function callable and added an optional rejection reason dialog while enforcing atomic Storage cleanup and resident notification delivery.
+- **Transparency Visibility Race Fix (`lib/features/transparency/transparency_screen.dart`)**:
+  - Reordered folder visibility promotion to `'all'` before document visibility updates so RTDB/FCM triggers read resolved public folder visibility consistently.
+- **RTDB Rules & Security Verification (`database.rules.json`, `functions/test/`)**:
+  - Enforced owner-only reads, client-side create prevention, leaf-only read-receipt updates (`isRead`, `readAt`), category/locale validation, and `functions/test/notifications.test.js` + `functions/test/security_rules.test.js` coverage alongside `test/features/notifications/notifications_screen_test.dart`.
+- **Version Bump (`pubspec.yaml`, `web/version.json`)**:
+  - Bumped application version from `1.0.46+47` to `1.0.47+48`.
+
 ## [1.0.46+47] — 2026-11-18
 
 ### Fixed

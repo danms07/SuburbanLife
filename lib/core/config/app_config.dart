@@ -50,4 +50,8 @@ class AppConfig {
   }
 
   static const String emulatorHost = String.fromEnvironment('EMULATOR_HOST', defaultValue: '');
+
+  // Push Notifications & Realtime Database Overrides (set via --dart-define or flutterfire configure)
+  static const String webPushVapidKey = String.fromEnvironment('WEB_PUSH_VAPID_KEY', defaultValue: '');
+  static const String rtdbDatabaseUrl = String.fromEnvironment('FIREBASE_DATABASE_URL', defaultValue: '');
 }

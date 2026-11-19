@@ -51,5 +51,9 @@
 	<string>Suburban Life requires photo library access to upload payment vouchers, ownership documents, and announcement media.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Suburban Life requires permission to save QR codes to your photo library.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

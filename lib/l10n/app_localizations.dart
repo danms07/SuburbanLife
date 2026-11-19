@@ -5555,6 +5555,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please wait while the operation completes. Do not tap any other buttons.'**
   String get qrProcessingWaitHint;
+
+  /// No description provided for @notificationsInboxTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notificationsInboxTitle;
+
+  /// No description provided for @notificationsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No notifications yet'**
+  String get notificationsEmptyTitle;
+
+  /// No description provided for @notificationsEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'We will notify you here about approvals, fines, QR access, and community updates.'**
+  String get notificationsEmptySubtitle;
+
+  /// No description provided for @notificationsMarkAllRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all as read'**
+  String get notificationsMarkAllRead;
+
+  /// No description provided for @notificationsClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get notificationsClearAll;
+
+  /// No description provided for @notificationsClearConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear notification history?'**
+  String get notificationsClearConfirmTitle;
+
+  /// No description provided for @notificationsClearConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This will permanently remove all notifications from your inbox.'**
+  String get notificationsClearConfirmBody;
+
+  /// No description provided for @notificationsPreferencesTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification preferences'**
+  String get notificationsPreferencesTooltip;
+
+  /// No description provided for @notificationsDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete notification'**
+  String get notificationsDeleteTooltip;
+
+  /// No description provided for @notificationsRetentionNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are automatically kept for up to 30 days (max 100).'**
+  String get notificationsRetentionNotice;
+
+  /// No description provided for @notificationsUnreadBadgeSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Notifications} =1{1 unread notification} other{{count} unread notifications}}'**
+  String notificationsUnreadBadgeSemantics(int count);
+
+  /// No description provided for @notificationsAllFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get notificationsAllFilter;
+
+  /// No description provided for @notificationsUnreadFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread'**
+  String get notificationsUnreadFilter;
+
+  /// No description provided for @notificationsNoUnreadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re all caught up'**
+  String get notificationsNoUnreadTitle;
+
+  /// No description provided for @notificationsNoUnreadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No unread notifications.'**
+  String get notificationsNoUnreadSubtitle;
+
+  /// No description provided for @notificationBannerViewButton.
+  ///
+  /// In en, this message translates to:
+  /// **'View'**
+  String get notificationBannerViewButton;
+
+  /// No description provided for @notificationBannerDismissTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get notificationBannerDismissTooltip;
+
+  /// No description provided for @notificationPreferencesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Preferences'**
+  String get notificationPreferencesTitle;
+
+  /// No description provided for @notificationPermissionSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device & Browser Permissions'**
+  String get notificationPermissionSectionTitle;
+
+  /// No description provided for @notificationPermissionAuthorized.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed — this device can receive push notifications.'**
+  String get notificationPermissionAuthorized;
+
+  /// No description provided for @notificationPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked — notifications are disabled in system or browser settings. You can still read everything from the bell icon.'**
+  String get notificationPermissionDenied;
+
+  /// No description provided for @notificationPermissionNotDetermined.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enabled yet — tap below to allow push notifications on this device.'**
+  String get notificationPermissionNotDetermined;
+
+  /// No description provided for @notificationPermissionUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications are unavailable in this browser/device. Use the bell icon to read all alerts.'**
+  String get notificationPermissionUnsupported;
+
+  /// No description provided for @notificationEnablePermissionButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Push Notifications'**
+  String get notificationEnablePermissionButton;
+
+  /// No description provided for @notificationSystemSettingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To re-enable OS alerts, open system or browser site settings for this app and allow notifications.'**
+  String get notificationSystemSettingsHint;
+
+  /// No description provided for @notificationMasterPushTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications'**
+  String get notificationMasterPushTitle;
+
+  /// No description provided for @notificationMasterPushSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive instant alerts even when the app is closed. Your inbox in the bell icon is always updated.'**
+  String get notificationMasterPushSubtitle;
+
+  /// No description provided for @notificationInAppBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'In-app foreground banners'**
+  String get notificationInAppBannerTitle;
+
+  /// No description provided for @notificationInAppBannerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show popup banners at the top while using the app. Turn off to read alerts quietly from the bell badge only.'**
+  String get notificationInAppBannerSubtitle;
+
+  /// No description provided for @notificationCategoriesSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Push categories'**
+  String get notificationCategoriesSectionTitle;
+
+  /// No description provided for @notificationCategoriesSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which events trigger push notifications on your devices.'**
+  String get notificationCategoriesSectionSubtitle;
+
+  /// No description provided for @notificationCatReviewsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Approvals & rejections'**
+  String get notificationCatReviewsTitle;
+
+  /// No description provided for @notificationCatReviewsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments, bookings, and residence claims reviewed by admins'**
+  String get notificationCatReviewsDesc;
+
+  /// No description provided for @notificationCatSanctionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sanctions & fines'**
+  String get notificationCatSanctionsTitle;
+
+  /// No description provided for @notificationCatSanctionsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'New sanctions applied to your property'**
+  String get notificationCatSanctionsDesc;
+
+  /// No description provided for @notificationCatQrAccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'QR guest entry & exit'**
+  String get notificationCatQrAccessTitle;
+
+  /// No description provided for @notificationCatQrAccessDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'When guests enter or leave using your QR passes'**
+  String get notificationCatQrAccessDesc;
+
+  /// No description provided for @notificationCatRoommatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Roommates'**
+  String get notificationCatRoommatesTitle;
+
+  /// No description provided for @notificationCatRoommatesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Additions and removals of household roommates'**
+  String get notificationCatRoommatesDesc;
+
+  /// No description provided for @notificationCatTransparencyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transparency documents'**
+  String get notificationCatTransparencyTitle;
+
+  /// No description provided for @notificationCatTransparencyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'New reports, manuals, and official community documents'**
+  String get notificationCatTransparencyDesc;
+
+  /// No description provided for @notificationCatAnnouncementsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements'**
+  String get notificationCatAnnouncementsTitle;
+
+  /// No description provided for @notificationCatAnnouncementsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Important notices posted by administration'**
+  String get notificationCatAnnouncementsDesc;
+
+  /// No description provided for @notificationCatAdminReviewsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending admin reviews'**
+  String get notificationCatAdminReviewsTitle;
+
+  /// No description provided for @notificationCatAdminReviewsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'New payments, bookings, and claims waiting for admin review'**
+  String get notificationCatAdminReviewsDesc;
+
+  /// No description provided for @rejectClaimTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject Ownership Claim'**
+  String get rejectClaimTitle;
+
+  /// No description provided for @rejectClaimReasonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain why this ownership claim cannot be approved (optional)'**
+  String get rejectClaimReasonHint;
 }
 
 class _AppLocalizationsDelegate

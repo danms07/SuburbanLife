@@ -664,10 +664,12 @@ void main() {
           'deliveryDate': deliveryDate,
         });
 
-        Map<String, dynamic>? setRoleParams;
-        FakeBackendHelper.functions.registerHandler('setRole', (params) async {
-          setRoleParams = params;
-          return {'success': true};
+        Map<String, dynamic>? reviewParams;
+        FakeBackendHelper.functions.registerHandler('reviewOwnershipClaim', (
+          params,
+        ) async {
+          reviewParams = params;
+          return {'success': true, 'action': 'approve'};
         });
 
         await tester.pumpWidget(_wrapWithApp(const AdminResidentApprovalScreen()));
@@ -685,24 +687,16 @@ void main() {
         await tester.tap(find.widgetWithText(ElevatedButton, detailL10n.approveResidentButton));
         await tester.pumpAndSettle();
 
-        expect(setRoleParams, equals({'uid': 'res_new', 'role': 'resident'}));
-
-        final updatedAddr = await FakeBackendHelper.db.getDocument('addresses', 'addr_approve');
-        expect(updatedAddr?['residentUid'], equals('res_new'));
-        expect(updatedAddr?['paymentStatus'], equals('paid'));
-        expect(updatedAddr?['deliveryDate'], equals(deliveryDate));
-
-        final updatedUser = await FakeBackendHelper.db.getDocument('users', 'res_new');
-        expect((updatedUser?['addressRef'] as DbReference).id, equals('addr_approve'));
-
-        expect(FakeBackendHelper.storage.deletedUrls, contains(proofUrl));
-        expect(await FakeBackendHelper.db.getDocument('ownership_claims', 'claim_1'), isNull);
+        expect(
+          reviewParams,
+          equals({'claimId': 'claim_1', 'action': 'approve'}),
+        );
         expect(find.byType(AdminResidentDetailScreen), findsNothing);
       },
     );
 
     testWidgets(
-      'rejects pending claim on mobile Spanish layout: deletes Storage proof and claim doc without calling setRole, and pops detail screen',
+      'rejects pending claim on mobile Spanish layout: prompts optional reason, invokes reviewOwnershipClaim without setRole, and pops detail screen',
       (tester) async {
         tester.view.physicalSize = const Size(420, 900);
         tester.view.devicePixelRatio = 1.0;
@@ -733,6 +727,13 @@ void main() {
           setRoleCalled = true;
           return {'success': true};
         });
+        Map<String, dynamic>? reviewParams;
+        FakeBackendHelper.functions.registerHandler('reviewOwnershipClaim', (
+          params,
+        ) async {
+          reviewParams = params;
+          return {'success': true, 'action': 'reject'};
+        });
 
         await tester.pumpWidget(
           _wrapWithApp(const AdminResidentApprovalScreen(), locale: const Locale('es')),
@@ -758,9 +759,22 @@ void main() {
         await tester.tap(find.widgetWithText(TextButton, esL10n.rejectResidentButton));
         await tester.pumpAndSettle();
 
+        await tester.enterText(
+          find.byKey(const Key('reject_claim_reason_input')),
+          'Document unreadable',
+        );
+        await tester.tap(find.byKey(const Key('confirm_reject_claim_button')));
+        await tester.pumpAndSettle();
+
         expect(setRoleCalled, isFalse);
-        expect(FakeBackendHelper.storage.deletedUrls, contains(proofUrl));
-        expect(await FakeBackendHelper.db.getDocument('ownership_claims', 'claim_rej'), isNull);
+        expect(
+          reviewParams,
+          equals({
+            'claimId': 'claim_rej',
+            'action': 'reject',
+            'reason': 'Document unreadable',
+          }),
+        );
         expect(find.byType(AdminResidentDetailScreen), findsNothing);
       },
     );
