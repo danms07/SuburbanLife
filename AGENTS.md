@@ -13,14 +13,13 @@
     - Create a commit with a short and concise message. The detailed change history should be recorded in a CHANGELOG.md file
 
 - Before running the Firebase emulator
-   - Use `nvm default` to switch to the default node version 
-   - Use `npm i -g firebase-tools` to make sure you are using the latest Firebase CLI version 
+   - Use `nvm default` to switch to the default node version
     
 
 - Always add spanish translations for the UI text
 - Keep the comments in the code updated and concise
 - Keep the README.md updated
-- Refer toR EADME.md and Structure.md to gather information about the project
+- Refer to README.md and Structure.md to gather information about the project
 - For bumping the app version, update pubspec.yaml file and version.json file.
 - Use white_logo.png for the favicon icons in the web version
 
