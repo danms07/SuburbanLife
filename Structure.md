@@ -151,7 +151,9 @@ Current state of project files and folders:
     - `variables.tf`: Declares validated Terraform input variables for project creation, regions, signing fingerprints, App Check, CORS/domains, and IAM/CI options.
     - `versions.tf`: Pins Terraform `>= 1.6.0` and provider constraints (`hashicorp/google-beta`, `hashicorp/time`).
     - `terraform.tfvars.example`: Sample environment variables template for `terraform apply`.
-    - `README.md`: Setup prerequisites, quick start, project import guide, optional CLI provisioner flags, and post-apply manual/client configuration notes.
+    - `generate_imports.js`: Dependency-free Node.js CLI script that inspects an existing Firebase/GCP project via read-only REST calls, matches live Firestore composite indexes (normalizing trailing `__name__` fields) and field overrides against `firestore.indexes.json`, writes `terraform/imports.tf`, and prints suggested `terraform.tfvars` values.
+    - `generate_imports.test.js`: Node.js built-in test suite (`node --test`) covering CLI parsing, `terraform.tfvars` parsing, HCL string escaping, Firestore index matching, GCP REST client checks, and end-to-end mocked resource discovery.
+    - `README.md`: Setup prerequisites, quick start, automated (`generate_imports.js`) and manual existing-project import guides, optional CLI provisioner flags, and post-apply manual/client configuration notes.
 - `test_driver/`: Flutter Driver host scripts.
     - `integration_test.dart`: Standard integration test driver entry point.
 - `test/`: Project unit, widget, and integration test suites.

@@ -93,6 +93,7 @@ To provision a new GCP/Firebase project (or import an existing one) with all req
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
+# Adopting an existing project? Run: node ./generate_imports.js --project <existing-id>
 terraform init
 terraform apply
 ```

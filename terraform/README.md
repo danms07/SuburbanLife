@@ -19,6 +19,8 @@ This directory provisions a complete Google Cloud & Firebase backend for **Subur
 | [`appcheck.tf`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/appcheck.tf) | Strict-domain reCAPTCHA Enterprise Web key + config, conditional Play Integrity / App Attest configs, and service enforcement across Firestore, Storage, RTDB, and Identity Toolkit |
 | [`iam.tf`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/iam.tf) | Eventarc & GCS service agents, least-privilege `functions_runtime` SA + bucket-scoped Storage IAM, optional default Compute SA compatibility binding, `docs_publisher` SA, and optional GitHub OIDC WIF pool/provider |
 | [`outputs.tf`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/outputs.tf) | App IDs, RTDB URL, reCAPTCHA Enterprise site key, strict Storage CORS JSON, SA emails, WIF provider name, and `next_steps` CLI guide |
+| [`generate_imports.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.js) | Zero-dependency Node.js CLI helper that inspects a live Firebase/GCP project via read-only REST calls and generates `imports.tf` + `terraform.tfvars` alignment hints |
+| [`generate_imports.test.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.test.js) | Unit and mocked REST discovery tests (`node --test`) covering index normalization (`__name__`), HCL escaping, and all Terraform import addresses |
 
 ## Prerequisites
 
@@ -31,8 +33,9 @@ This directory provisions a complete Google Cloud & Firebase backend for **Subur
 3. **Blaze Billing Account**: Cloud Functions Gen 2, Cloud Build, Artifact Registry, Eventarc, Cloud Scheduler, Identity Platform, and Vertex AI require an active Cloud Billing account (`billing_account` in `terraform.tfvars`).
 4. **IAM Permissions for the Operator**:
    - Creating a new project: Billing Account User (`roles/billing.user`), Project Creator (`roles/resourcemanager.projectCreator`) on the org/folder (or project creation rights on a standalone account).
-   - Adopting an existing project: Owner (`roles/owner`) or Editor + Security Admin / Firebase Admin so Terraform can enable APIs and manage IAM bindings.
+   - Adopting an existing project: Owner (`roles/owner`) or Editor + Security Admin / Firebase Admin so Terraform can enable APIs and manage IAM bindings ([`generate_imports.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.js) itself only issues read-only `GET` queries).
 5. **Optional CLIs**:
+   - `node` (`>= 20`, no `npm install` needed) when running [`generate_imports.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.js) to adopt an existing project.
    - `firebase` (`firebase-tools`) if setting `enable_rtdb_rules_provisioner = true` or deploying Functions/Hosting.
    - `flutterfire` (`dart pub global activate flutterfire_cli`) for post-apply [`lib/firebase_options.dart`](file:///Users/menddaniel/gitProjects/SuburbanLife/lib/firebase_options.dart) generation.
 
@@ -68,7 +71,97 @@ Leave both `false` (default) to run those commands manually using `terraform out
 
 ## Adopting an Existing Project
 
-To bring an existing SuburbanLife Firebase/GCP project under Terraform management, set `create_project = false` and `project_id = "<existing-id>"` in `terraform.tfvars`, then import existing singletons before running `terraform apply`:
+To bring an existing SuburbanLife Firebase/GCP project under Terraform management without recreating live singletons or composite indexes, set `create_project = false` in `terraform.tfvars` and use Terraform 1.5+ declarative `import {}` blocks.
+
+### Recommended: Automated Import Generation (`generate_imports.js`)
+
+[`generate_imports.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.js) is a zero-dependency Node.js (`>= 20`) CLI helper that queries read-only Google Cloud & Firebase REST endpoints, matches live resources and Firestore composite indexes against [`firestore.indexes.json`](file:///Users/menddaniel/gitProjects/SuburbanLife/firestore.indexes.json) (normalizing Firestore's auto-appended trailing `__name__` index field), writes gitignored `terraform/imports.tf`, and prints aligned `terraform.tfvars` settings.
+
+**What it discovers automatically:**
+
+- Enabled APIs via Service Usage (skips unenabled products cleanly)
+- Firebase Project (`google_firebase_project.default`)
+- Web, Android (including SHA-1 / SHA-256 certificates), Apple (including Team ID & App Store ID) apps, and Firebase Hosting site
+- Identity Platform configuration (`allowDuplicateEmails` and existing `authorizedDomains`)
+- Firestore `(default)` database, matching composite indexes (`google_firestore_index.indexes["..."]`), and single-field / TTL overrides (`google_firestore_field.overrides["..."]`), plus unmatched live/local index counts
+- Default Firebase Realtime Database instance, default Cloud Storage bucket, and active `cloud.firestore` / `firebase.storage` Security Rules releases
+- reCAPTCHA Enterprise site key, App Check provider configs (Web reCAPTCHA Enterprise, conditional Android Play Integrity and Apple App Attest), and per-service enforcement modes
+- Dedicated `functions_runtime` & `docs_publisher` service accounts, plus conditional GitHub OIDC Workload Identity Pool & Provider
+
+**Step-by-step workflow:**
+
+1. **Authenticate** (either via `gcloud` ADC/user credentials or an OAuth access token env var):
+   ```bash
+   gcloud auth login
+   # Optional alternative to letting the script call `gcloud auth print-access-token`:
+   # export GOOGLE_OAUTH_ACCESS_TOKEN="$(gcloud auth print-access-token)"
+   ```
+2. **Initialize `terraform.tfvars`** with existing-project mode enabled:
+   ```bash
+   cd terraform
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars and set:
+   #   create_project = false
+   #   project_id     = "<existing-project-id>"
+   ```
+3. **Preview (`--dry-run`) or generate `imports.tf`**:
+   ```bash
+   node ./generate_imports.js --project <existing-project-id> --dry-run
+   node ./generate_imports.js --project <existing-project-id>
+   ```
+   > [!NOTE]
+   > When `project_id` is already set in `terraform/terraform.tfvars`, `--project` can be omitted. Output `terraform/imports.tf` is ignored by [`.gitignore`](file:///Users/menddaniel/gitProjects/SuburbanLife/.gitignore) so project-specific identifiers are never committed accidentally.
+4. **Align `terraform.tfvars` with printed suggestions**:
+   Copy any suggested settings printed by [`generate_imports.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.js) into `terraform.tfvars` (such as `firestore_location`, `rtdb_region`, `storage_location`, `android_sha256_hashes`, `ios_team_id`, `app_check_enforcement_mode`, or extra custom/authorized domains) so Terraform does not plan unwanted updates or replacement diffs.
+   - Count-gated resources whose prerequisite variable is unset (such as `play_integrity_config.android[0]` without `android_sha256_hashes`, `app_attest_config.apple[0]` without `ios_team_id`, or `github_actions[0]` WIF without `--github-repo`) are emitted under `# Conditional Imports` comments in `imports.tf`; set the corresponding variable in `terraform.tfvars` and uncomment (or re-run [`generate_imports.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.js)) before planning if you want Terraform to import them.
+5. **Review `terraform plan` carefully**:
+   ```bash
+   terraform init
+   terraform plan
+   ```
+   - Verify existing databases, apps, Hosting site, RTDB, Storage bucket, and matched Firestore composite indexes show `will be imported` rather than `must be replaced` (`-/+`).
+   - Missing composite indexes or TTL overrides from [`firestore.indexes.json`](file:///Users/menddaniel/gitProjects/SuburbanLife/firestore.indexes.json) will be planned for creation (`+`), and `firestore.rules` / `storage.rules` rulesets will be uploaded and atomically attached to their `ABANDON`-protected releases.
+   - Any extra live Firestore composite indexes not in [`firestore.indexes.json`](file:///Users/menddaniel/gitProjects/SuburbanLife/firestore.indexes.json) are listed in the script output and left untouched by Terraform.
+6. **Apply imports and clean up `imports.tf`**:
+   ```bash
+   terraform apply
+   rm imports.tf
+   ```
+   Once `terraform apply` finishes importing resources into Terraform state, removing `imports.tf` keeps future runs fast and clean.
+
+**CLI options (`node ./generate_imports.js --help`):**
+
+| Flag | Description |
+| :--- | :--- |
+| `-p, --project <id>` | Target GCP/Firebase project ID (defaults to `project_id` in `terraform.tfvars`) |
+| `--tfvars <path>` | Path to `terraform.tfvars` for reading hints (default: `./terraform.tfvars`) |
+| `-o, --out <path>` | Output path for generated import blocks (default: `./imports.tf`) |
+| `--indexes-file <path>` | Path to `firestore.indexes.json` (default: `../firestore.indexes.json`) |
+| `--web-app-id <id>` | Explicit Firebase Web App ID when multiple Web Apps exist |
+| `--android-package <pkg>` | Android `packageName` override (default: `tfvars` or `com.example.suburban_life`) |
+| `--ios-bundle <id>` | Apple `bundleId` override (default: `tfvars` or `com.example.suburbanLife`) |
+| `--hosting-site <id>` | Hosting site ID override (default: `tfvars` or `<project_id>`) |
+| `--rtdb-instance <id>` | RTDB instance ID override (default: auto-detect `DEFAULT_DATABASE`) |
+| `--recaptcha-site-key <id>` | Explicit reCAPTCHA Enterprise key ID when multiple Web keys exist |
+| `--functions-sa-id <id>` | Cloud Functions SA account ID (default: `suburban-life-functions`) |
+| `--docs-publisher-sa-id <id>` | Docs publisher SA account ID (default: `suburban-life-docs-publisher`) |
+| `--no-docs-publisher` | Skip `google_service_account.docs_publisher[0]` discovery |
+| `--github-repo <owner/repo>` | GitHub slug enabling Workload Identity Pool/Provider import blocks |
+| `--wif-pool <id>` | Workload Identity Pool ID (default: `github-actions-pool`) |
+| `--wif-provider <id>` | Workload Identity Pool Provider ID (default: `github-actions-oidc`) |
+| `--token-env <VAR>` | Environment variable holding OAuth token (default: `GOOGLE_OAUTH_ACCESS_TOKEN`) |
+| `--token <token>` | Explicit OAuth bearer token (prefer `--token-env` or `gcloud` ADC) |
+| `--dry-run` | Print generated `imports.tf` and summary to stdout without writing disk |
+
+To run the unit tests for the import generator:
+
+```bash
+node --test terraform/generate_imports.test.js
+```
+
+### Alternative: Manual `terraform import` Commands
+
+If Node.js or REST inspection is unavailable in your environment, initialize Terraform with `create_project = false` and import singletons manually before running `terraform plan`:
 
 ```bash
 cd terraform
@@ -94,7 +187,7 @@ terraform import google_firebaserules_release.firestore "projects/<project_id>/r
 terraform import google_firebaserules_release.storage "projects/<project_id>/releases/firebase.storage/<bucket_id>"
 ```
 
-Then run `terraform plan` to review any missing composite indexes, TTL policies, App Check configs, or IAM bindings.
+Then inspect missing resources or `for_each` composite indexes / App Check configs / IAM bindings via `terraform plan`.
 
 ## Post-Apply Manual / App Steps
 

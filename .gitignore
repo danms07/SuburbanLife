@@ -82,6 +82,7 @@ terraform/*.tfstate
 terraform/*.tfstate.*
 terraform/*.tfvars
 !terraform/terraform.tfvars.example
+terraform/imports.tf
 terraform/.terraform.tfstate.lock.info
 terraform/crash.log
 terraform/crash.*.log
