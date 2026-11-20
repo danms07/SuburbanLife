@@ -2,6 +2,15 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [Unreleased] — 2026-11-19
+
+### Added
+- **Terraform Firebase & GCP Infrastructure Suite (`terraform/`)**:
+  - Added full Infrastructure-as-Code configuration (`versions.tf`, `providers.tf`, `variables.tf`, `project.tf`, `apis.tf`, `apps.tf`, `auth.tf`, `firestore.tf`, `database.tf`, `storage.tf`, `appcheck.tf`, `iam.tf`, `outputs.tf`, `terraform.tfvars.example`, `README.md`) to provision a new GCP/Firebase project or adopt an existing one.
+  - Configured all required Firebase & Google Cloud APIs (Firestore, RTDB, Cloud Storage, Identity Platform/Auth, Firebaserules, App Check, reCAPTCHA Enterprise, Play Integrity, FCM, Crashlytics, Gen 2 Cloud Functions/Cloud Run/Eventarc/Cloud Build/Artifact Registry/PubSub/Cloud Scheduler, and Vertex AI).
+  - Provisioned Firebase Web, Android, and Apple apps, Firebase Hosting site, Email/Password Identity Platform config, `(default)` Firestore database with PITR/delete protection, all 33 composite indexes & 3 single-field overrides loaded from `firestore.indexes.json`, native Firestore TTL policies on `expireAt` (`access_logs`, `qr_codes`, `booking_attachments`), `firestore.rules` & `storage.rules` releases, default RTDB instance, default Cloud Storage bucket, strict-domain reCAPTCHA Enterprise + App Check enforcement configs (`UNENFORCED` by default), opt-in RTDB rules & Storage lifecycle/CORS CLI provisioners, least-privilege `functions_runtime` & `docs_publisher` service accounts, and optional keyless GitHub Actions OIDC Workload Identity Federation.
+- Updated `.gitignore`, `Structure.md`, and `README.md` with Terraform documentation and ignore rules.
+
 ## [1.0.47+48] — 2026-11-18
 
 ### Added

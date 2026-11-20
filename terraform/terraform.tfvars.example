@@ -1,0 +1,80 @@
+# Copy this file to `terraform.tfvars` (gitignored) and fill in your environment values.
+
+# ------------------------------------------------------------------------------
+# GCP Project & Blaze Billing
+# ------------------------------------------------------------------------------
+create_project  = true
+project_id      = "suburban-life-prod-example"
+project_name    = "Suburban Life"
+billing_account = "012345-6789AB-CDEF01"
+
+# Set at most one of org_id or folder_id when creating inside a GCP Organization.
+# Leave both null for a standalone personal/community project.
+org_id    = null
+folder_id = null
+
+# Safety policy for mutable databases, storage, and apps ("PREVENT", "ABANDON", or "DELETE").
+deletion_policy = "PREVENT"
+
+# ------------------------------------------------------------------------------
+# Databases & Cloud Storage
+# ------------------------------------------------------------------------------
+firestore_location                     = "nam5"
+firestore_delete_protection_enabled    = true
+firestore_point_in_time_recovery_enabled = true
+
+rtdb_region      = "us-central1"
+rtdb_instance_id = null # Defaults to "<project_id>-default-rtdb"
+
+storage_location = "US"
+
+# ------------------------------------------------------------------------------
+# Registered Client Apps & Hosting Domains
+# ------------------------------------------------------------------------------
+web_app_display_name = "Suburban Life Web"
+
+android_app_display_name = "Suburban Life Android"
+android_package_name     = "com.example.suburban_life"
+# Populate SHA-1 / SHA-256 fingerprints before enforcing Android Play Integrity App Check:
+android_sha1_hashes   = []
+android_sha256_hashes = []
+
+ios_app_display_name = "Suburban Life iOS"
+ios_bundle_id        = "com.example.suburbanLife"
+# Set your 10-char Apple Developer Team ID to auto-configure Apple App Attest:
+ios_team_id      = null
+ios_app_store_id = null
+
+hosting_site_id = null # Defaults to project_id
+custom_domains  = []   # e.g., ["portal.yourcommunity.org"]
+
+# ------------------------------------------------------------------------------
+# Authentication & App Check
+# ------------------------------------------------------------------------------
+auth_allow_duplicate_emails    = false
+auth_extra_authorized_domains  = []
+
+# Keep UNENFORCED for initial rollout; switch to ENFORCED once Web & mobile tokens verify cleanly.
+app_check_enforcement_mode      = "UNENFORCED"
+app_check_token_ttl             = "3600s"
+recaptcha_extra_allowed_domains = [] # e.g., ["localhost"] for cloud testing without emulator
+
+# ------------------------------------------------------------------------------
+# Optional Local CLI Provisioners (false by default for hermetic plan/apply)
+# ------------------------------------------------------------------------------
+enable_storage_bucket_config_provisioner = false
+enable_rtdb_rules_provisioner            = false
+extra_cors_origins                       = []
+
+# ------------------------------------------------------------------------------
+# IAM & CI/CD (Workload Identity Federation)
+# ------------------------------------------------------------------------------
+functions_service_account_id         = "suburban-life-functions"
+grant_default_compute_sa_permissions = false
+
+create_docs_publisher_service_account = true
+docs_publisher_service_account_id     = "suburban-life-docs-publisher"
+
+# Set "owner/repo" to provision keyless GitHub Actions OIDC WIF (no JSON key files created).
+github_repository = null
+github_branch     = "main"

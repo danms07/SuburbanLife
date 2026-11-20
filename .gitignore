@@ -76,4 +76,12 @@ StackTrace.txt
 # Intermediate documentation build artifacts
 /docs/pdf/*
 
-
+# Terraform state, local overrides, and downloaded providers
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars
+!terraform/terraform.tfvars.example
+terraform/.terraform.tfstate.lock.info
+terraform/crash.log
+terraform/crash.*.log

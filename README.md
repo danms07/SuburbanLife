@@ -40,6 +40,7 @@ Before configuring and deploying **Suburban Life**, ensure the following SDKs an
   ```bash
   brew install --cask google-cloud-sdk
   ```
+- **Terraform (`>= 1.6.0`, optional)**: Required only if using the [`terraform/`](terraform/README.md) Infrastructure-as-Code suite to automate GCP/Firebase project creation, API enablement, Firestore indexes/TTL/rules, Auth, Storage, App Check, and IAM setup.
 
 ### Google Cloud CLI (`gcloud`) One-Time Retention & Storage CORS Setup
 
@@ -86,6 +87,18 @@ gcloud storage buckets describe gs://<STORAGE_BUCKET> --format="json(lifecycle_c
 ---
 
 ## Setup & Configuration
+
+### Option A: Automated Setup via Terraform (Recommended)
+To provision a new GCP/Firebase project (or import an existing one) with all required APIs, Web/Android/iOS apps, Firestore database/indexes/TTL/rules, RTDB instance, Cloud Storage bucket/rules, reCAPTCHA Enterprise + App Check, and least-privilege IAM roles automatically, follow [`terraform/README.md`](terraform/README.md):
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform apply
+```
+After `apply`, run `terraform output -raw next_steps` to complete `flutterfire configure`, `lib/core/config/app_config.dart`, RTDB rules / Storage CORS/lifecycle (if not enabled via TF provisioners), and Cloud Functions deployment.
+
+### Option B: Manual Setup
 
 ### 1. Create a Firebase Project
 1. Navigate to the [Firebase Console](https://console.firebase.google.com/).

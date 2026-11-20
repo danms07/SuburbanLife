@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-18 (v1.0.47+48 — Cross-Platform Push Notifications & RTDB Mirrored Inbox)*
+*Last Verified/Updated: 2026-11-19 (v1.0.47+48 — Cross-Platform Push Notifications, RTDB Mirrored Inbox & Terraform IaC)*
 
 Current state of project files and folders:
 
@@ -45,7 +45,7 @@ Current state of project files and folders:
 - `ios/`: Native iOS configuration and build files (including `UIBackgroundModes` `remote-notification`, `aps-environment` push entitlement in `Runner.entitlements`, and `UNUserNotificationCenterDelegate` + APNs setup in `AppDelegate.swift`).
 - `LICENSE`: MIT No Attribution (MIT-0) license file.
 - `PRIVACY_POLICY.md`: Bilingual Privacy Policy (LFPDPPP/ARCO compliant, documenting 60-day gatehouse log/photo auto-removal, 7-day inactive QR pass cleanup, and 30-day post-booking resident attachment retention).
-- `README.md`: Project overview, SDK/CLI prerequisites (including one-time `gcloud` Firestore TTL, Cloud Storage lifecycle, and Storage CORS setup commands), Firebase & App Check setup guide, architecture summary, Admin SDK scripts guide, and rollout test instructions.
+- `README.md`: Project overview, SDK/CLI prerequisites (including optional Terraform IaC and one-time `gcloud` Firestore TTL, Cloud Storage lifecycle, and Storage CORS setup commands), Firebase & App Check setup guide, architecture summary, Admin SDK scripts guide, and rollout test instructions.
 - `lib/`: Main Flutter source code.
     - `core/`: Core configuration and themes.
         - `backend/`: Agnostic BaaS service abstractions and service locator.
@@ -136,6 +136,22 @@ Current state of project files and folders:
     - `seed_emulator.js`: Automated Firebase database and Storage seeder supporting both local Emulators (default) and remote/staging projects (`--remote` / `--staging`), provisioning CSV addresses, admin, resident, roommate, guard, and 3 unverified applicant (`applicant@test.com`, `applicant2@test.com`, `applicant3@test.com`) accounts, app settings, neighborhood facilities with operating hours, cooldown rules (`hours`/`days`), and booking quotas (`daily`/`monthly`), sample announcements, sanctions, sample pending payment approval requests, and 3 sample pending ownership claims with sideways (`90°`), upside-down (`180°`), and portrait generated PNG documents.
     - `run_rollout_tests.sh`: Zero-touch test runner orchestrating Firebase Emulator startup, live Security Rules & Cloud Function tests (`functions/`), script tests (`scripts/`), and the complete `flutter test` suite.
     - `test/`: Node.js test suite for script automation (`set_role.test.js`, `set_resident_addresses_paid.test.js`, `build_and_publish_docs.test.js`).
+- `terraform/`: Terraform Infrastructure-as-Code suite for provisioning a complete Firebase & Google Cloud backend for SuburbanLife.
+    - `apis.tf`: Enables bootstrap APIs, attaches Firebase (`google_firebase_project`), and activates Firebase, App Check, Cloud Functions Gen 2, Cloud Scheduler, Vertex AI, and conditional Compute/STS APIs.
+    - `appcheck.tf`: Provisions a strict-domain reCAPTCHA Enterprise Web site key, App Check configs (reCAPTCHA Enterprise, conditional Play Integrity and Apple App Attest), and service enforcement (`UNENFORCED` by default).
+    - `apps.tf`: Registers Firebase Web, Android (`com.example.suburban_life`), and Apple (`com.example.suburbanLife`) apps, configures Firebase Hosting, and exposes Web SDK config.
+    - `auth.tf`: Configures Identity Platform Email/Password sign-in and authorized domains allow-list.
+    - `database.tf`: Provisions the default Firebase Realtime Database instance and an opt-in local CLI deployer for `database.rules.json`.
+    - `firestore.tf`: Creates `(default)` `FIRESTORE_NATIVE` DB (PITR + delete protection), loads all 33 composite indexes and 3 single-field overrides from `firestore.indexes.json`, enables native TTL on `expireAt` (`access_logs`, `qr_codes`, `booking_attachments`), and releases `firestore.rules`.
+    - `iam.tf`: Ensures Eventarc and GCS service agents exist, creates dedicated least-privilege `functions_runtime` and `docs_publisher` service accounts with bucket-scoped Storage IAM, optional default Compute SA compatibility fallback, and optional GitHub OIDC Workload Identity Federation.
+    - `outputs.tf`: Outputs project IDs, Firebase App IDs, Web SDK config, RTDB URL, reCAPTCHA site key, strict Storage CORS JSON, SA emails, WIF provider name, and post-apply CLI commands.
+    - `project.tf`: Creates or adopts the GCP project (`create_project`), normalizes identifiers and signing hashes, and defines preflight `check` assertions.
+    - `providers.tf`: Configures `google-beta` with `user_project_override = true` and a `no_user_project_override` alias for bootstrap operations.
+    - `storage.tf`: Creates the default Firebase Cloud Storage bucket, releases `storage.rules`, and provides an opt-in `gcloud` CLI provisioner for `storage_lifecycle.json` and non-wildcard Web CORS.
+    - `variables.tf`: Declares validated Terraform input variables for project creation, regions, signing fingerprints, App Check, CORS/domains, and IAM/CI options.
+    - `versions.tf`: Pins Terraform `>= 1.6.0` and provider constraints (`hashicorp/google-beta`, `hashicorp/time`).
+    - `terraform.tfvars.example`: Sample environment variables template for `terraform apply`.
+    - `README.md`: Setup prerequisites, quick start, project import guide, optional CLI provisioner flags, and post-apply manual/client configuration notes.
 - `test_driver/`: Flutter Driver host scripts.
     - `integration_test.dart`: Standard integration test driver entry point.
 - `test/`: Project unit, widget, and integration test suites.
