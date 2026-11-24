@@ -1,571 +1,183 @@
-# Firestore Database Schema
+# Database & Storage Schema
 
-The following structure is optimized for a residential management application using Flutter and Firebase.
+Canonical schema across Cloud Firestore, Firebase Realtime Database, and Cloud Storage (aligned with `firestore.rules`, `firestore.indexes.json`, `database.rules.json`, and `storage.rules`).
 
-## Entity Relationship Diagram (ERD)
+## Entity Relationships (Firestore)
 
 ```mermaid
 erDiagram
-    users {
-        string uid PK
-        string name
-        string email
-        document_reference addressRef "Link to addresses"
-        array familyMembers "List of user UIDs"
-        array fcmTokens
-    }
-    addresses {
-        string addressId PK "e.g. A-101"
-        string residentUid FK "Primary resident"
-        string streetName
-        number number
-        string paymentStatus "'paid' | 'pending' | 'reviewing' | 'restricted'"
-        timestamp deliveryDate
-        timestamp lastPaymentApproval
-    }
-    qr_codes {
-        string codeId PK
-        string creatorUid FK
-        string guestName
-        string accessCategory "'visitor' | 'supplier'"
-        boolean isOneTimeUse
-        string vehicleType "'car' | 'motorcycle' | 'walking'"
-        string vehiclePlates
-        number passengers
-        string type "'permanent' | 'temporary'"
-        timestamp expiryTime
-        timestamp deactivatedAt "Optional terminal status timestamp"
-        timestamp expireAt "Optional 7-day TTL timestamp (null when active permanent or inside)"
-        string status "'active' | 'deactivated'"
-        boolean isInside "True while visitor is inside"
-        string activeAccessLogId "Open access_logs doc ID"
-        string qrData "Encrypted token"
-    }
-    bookings {
-        string bookingId PK
-        string facilityId FK
-        string userUid FK
-        string addressId FK "Household address ID"
-        reference addressRef FK "Link to addresses"
-        timestamp startTime
-        timestamp endTime
-        string status "'pending review' | 'rejected' | 'approved' | 'closed' | 'cancelled'"
-        boolean hasAttachments "True when resident submitted attachments"
-        number attachmentCount "Count of submitted attachments"
-        number attachmentsPurgedAt "Optional epoch ms when 30d TTL purged files"
-        string notes
-        string rejectionReason "Optional rejection rationale from admin"
-    }
-    booking_attachments {
-        string bookingId PK "1:1 with bookings/{bookingId}"
-        string facilityId FK
-        string userUid FK
-        string addressId FK "Household isolation scope"
-        number bookingEndTime "Epoch ms indexed for fallback sweep"
-        timestamp expireAt "30-day post-endTime TTL timestamp"
-        array attachments "Submitted file metadata & URLs"
-    }
-    announcements {
-        string announcementId PK
-        string title
-        string content
-        string imageUrl "Optional full-resolution image URL"
-        string thumbnailUrl "Optional optimized thumbnail URL"
-        map translatedTitles "Languages map (en/es)"
-        map translatedContents "Languages map (en/es)"
-        string creatorUid FK
-        timestamp timestamp
-        string targetAudience "'all' | 'residents' | 'specific_uid'"
-        array readBy "Array of user UIDs who have read"
-    }
-    access_logs {
-        string logId PK
-        string qrCodeId FK
-        string guardUid FK
-        string creatorUid FK
-        timestamp timestamp "Entry timestamp"
-        timestamp exitTimestamp "Optional exit timestamp"
-        timestamp expireAt "60-day TTL timestamp (entry + 60d, or exit + 60d)"
-        boolean isInside "True while visitor has not scanned out"
-        string exitGuardUid "Optional guard UID who registered exit"
-        string exitGuardName "Optional guard name on exit"
-        string visitorIdPhotoUrl
-        string visitorPlatePhotoUrl
-        string status "'allowed' | 'denied'"
-        string reason
-        string exitReason "Optional exit notes"
-    }
-    payments {
-        string paymentId PK
-        reference addressRef FK
-        timestamp timestamp
-        number amount
-        string status "'paid' | 'pending' | 'approved' | 'rejected'"
-        array periods "Array of 'YYYY-MM' strings"
-        string period "Legacy / display format: 'YYYY-MM'"
-        string receiptUrl
-    }
-    ownership_claims {
-        string claimId PK
-        string userUid FK
-        reference addressRef FK
-        string proofUrl
-        timestamp deliveryDate
-        string status "'pending' | 'approved' | 'rejected'"
-        timestamp timestamp
-    }
-    facilities {
-        string id PK "e.g. multipurpose_room"
-        string name
-        boolean isUnique
-        number quantity
-        string restrictionType "'unrestricted' | 'cooldown' | 'quota'"
-        string cooldownUnit "'unrestricted' | 'hours' | 'days' | 'months' | 'years'"
-        number cooldownValue
-        string quotaPeriod "'unrestricted' | 'daily' | 'monthly' | 'yearly'"
-        number quotaLimit
-        array facilityDocuments "Optional facility document templates"
-    }
-    config {
-        string documentId PK "app_settings | smtp_settings"
-        number paymentCutoffDay
-        number gracePeriodDays
-        boolean scanOnExitEnabled "Enable QR scan on exit"
-        number initialBudgetBalance "Opening community budget balance"
-        string initialBalancePeriod "Optional YYYY-MM cutoff start for opening balance"
-        boolean smtpEnabled
-        string smtpHost
-        number smtpPort
-        string smtpUser
-        timestamp updatedAt
-    }
-    expenses {
-        string expenseId PK
-        string productOrService
-        number amount
-        string billablePeriod "YYYY-MM"
-        number expenseDate
-        string category "maintenance | gardening | security | utilities | repairs | supplies | other"
-        string vendorName
-        string notes
-        map productEvidence "JPG/PNG/WEBP file metadata & storagePath"
-        map receiptEvidence "JPG/PNG/WEBP/PDF file metadata & storagePath"
-        string status "'active' | 'voided'"
-        string createdBy
-        string createdByName
-        number createdAt
-        string voidedBy
-        string voidedByName
-        number voidedAt
-        string voidReason
-        timestamp updatedAt
-    }
-
-    users ||--o| addresses : "references address"
-    addresses ||--o| users : "claims primary resident"
-    qr_codes }o--|| users : "created by"
-    bookings }o--|| users : "booked by"
-    bookings }o--o| addresses : "belongs to household"
-    bookings }o--|| facilities : "reserves"
-    booking_attachments |o--|| bookings : "isolates attachments for"
-    announcements }o--|| users : "created by"
-    access_logs }o--|| qr_codes : "validates"
-    access_logs }o--|| users : "verified by guard"
-    payments }o--|| addresses : "paid for"
-    expenses }o--|| users : "recorded/voided by admin"
-    ownership_claims }o--|| users : "claimed by"
-    ownership_claims }o--|| addresses : "claims address"
+    users }o--o| addresses : "addressRef / familyMembers"
+    addresses ||--o| ownership_claims : "claimed via"
+    users ||--o{ qr_codes : "creatorUid"
+    qr_codes ||--o{ access_logs : "qrCodeId"
+    users ||--o{ bookings : "userUid"
+    addresses ||--o{ bookings : "addressId / addressRef"
+    facilities ||--o{ bookings : "facilityId"
+    bookings ||--o| booking_attachments : "1:1 isolated attachments"
+    addresses ||--o{ payments : "addressRef"
+    addresses ||--o{ sanctions : "addressRef / addressId"
+    users ||--o{ announcements : "creatorUid"
+    users ||--o{ expenses : "createdBy / voidedBy"
+    document_folders ||--o{ documents : "folderId"
+    document_categories ||--o{ documents : "category"
 ```
-
-## Collections
-
-### `users` (Collection)
-- `uid`: string (Document ID)
-- `name`: string
-- `email`: string
-- `addressRef`: document_reference (to `addresses` collection)
-- `familyMembers`: array of uids (for residents)
-- `fcmTokens`: array of strings (for push notifications)
-
-### `addresses` (Collection)
-- `addressId`: string (Document ID, e.g., 'A-101' or fixed 'admin_office')
-- `residentUid`: string (UID of primary resident, null if unclaimed)
-- `streetName`: string (Exact name of street, e.g. 'Admin office' for administration)
-- `number`: number (Physical house number, 0 for Admin office)
-- `paymentStatus`: string ('paid', 'pending', 'restricted', 'reviewing')
-    - `paid`: All OK / all periods approved
-    - `pending`: Required payment due or proof of payment submitted pending admin approval. When `isWithinGracePeriod` is true, resident is considered 'paid' and has unrestricted access.
-    - `restricted`: Account restricted for missing payment after grace period expired or overdue historical debt
-    - `reviewing`: Legacy synonym for 'pending'
-- `isWithinGracePeriod`: boolean (Indicates whether the address is currently within the active payment grace period with no overdue past debt)
-- `hasActiveSanctions`: boolean (True if the address has at least one active unpaid sanction, restricting access)
-- `activeSanctionsCount`: number (Count of currently active unpaid sanctions)
-- `deliveryDate`: timestamp (Date the property was handed over to the resident)
-- `lastPaymentApproval`: timestamp
-
-### `qr_codes` (Collection)
-- `codeId`: string (Document ID)
-- `creatorUid`: string
-- `guestName`: string
-- `accessCategory`: string ('visitor', 'supplier')
-- `isOneTimeUse`: boolean
-- `vehicleType`: string ('car', 'motorcycle', 'walking')
-- `vehiclePlates`: string (Optional, for vehicles)
-- `passengers`: number (Optional, for vehicles)
-- `type`: string ('permanent', 'temporary')
-- `expiryTime`: timestamp | null (Expiration timestamp for temporary/supplier passes; null for permanent passes)
-- `deactivatedAt`: timestamp | null (Optional timestamp recorded when a pass is expired, validated, or revoked)
-- `expireAt`: timestamp | null (Firestore TTL timestamp set to 7 days after expiration/deactivation; held `null` for active permanent passes and while `isInside == true`)
-- `status`: string ("active", "deactivated (validated|revoked|expired)")
-- `isInside`: boolean (Optional; true when visitor has entered and has not yet scanned out while `scanOnExitEnabled` is active. Legacy same-day allowed logs without `isInside` default to `true` upon second scan on the same day.)
-- `activeAccessLogId`: string | null (Optional ID of the currently open `access_logs` entry for O(1) transactional exit updates)
-- `qrData`: string (encrypted or unique token)
-
-### `bookings` (Collection)
-- `bookingId`: string (Document ID)
-- `facilityId`: string ('multipurpose_room', 'bicycle_1', etc.)
-- `userUid`: string (UID of the resident who created the reservation)
-- `addressId`: string (Optional/populated on creation; physical household address ID shared across primary resident and roommates for cooldown/quota enforcement)
-- `addressRef`: document_reference (Optional/populated on creation; reference to `addresses/{addressId}`)
-- `startTime`: timestamp
-- `endTime`: timestamp
-- `status`: string ("pending review", "rejected", "cancelled", "approved (upcoming)", "approved (in use)", "closed")
-- `isConfirmed`: boolean (True for approved/closed bookings; allows public calendar availability query)
-- `hasAttachments`: boolean (True when the booking has resident-submitted documentation stored in `booking_attachments/{bookingId}`)
-- `attachmentCount`: number (Count of resident-submitted files; keeps `bookings` free of private Storage URLs so neighbor schedule queries never leak PII)
-- `attachmentsPurgedAt`: number (Optional epoch ms recorded when `booking_attachments/{bookingId}` and Cloud Storage files are purged 30 days after `endTime`)
-- `notes`: string
-- `rejectionReason`: string (Optional rationale provided by administrator upon rejection)
-- `approvalMessage`: string (Custom instructions/next steps provided by administrator or populated from facility preset)
-
-### `booking_attachments` (Collection — Household & Admin Isolated)
-- `bookingId`: string (Document ID, 1:1 with `bookings/{bookingId}`)
-- `facilityId`: string
-- `userUid`: string (UID of the resident who submitted the booking)
-- `addressId`: string | null (Physical household address ID enabling primary resident and linked roommates via `isCallerAddressResident(addressId)` to inspect or resubmit attachments, while strictly blocking other neighbors)
-- `bookingEndTime`: number (Booking `endTime` in epoch milliseconds, single-field indexed for `purgeExpiredBookingAttachments` fallback queries without indexing `expireAt`)
-- `expireAt`: timestamp (Firestore TTL timestamp set to `endTime + 30 days`; exempted from single-field indexing to prevent sequential write hotspots)
-- `attachments`: array of maps:
-    - `facilityDocId`: string (Matches `facilities.facilityDocuments[].docId`)
-    - `title`: string
-    - `requirementMode`: string (`'mandatory_return'` | `'optional_return'`)
-    - `fileName`: string (Sanitized display filename)
-    - `fileType`: string (`'pdf'` | `'doc'` | `'docx'` | `'xls'` | `'xlsx'` | `'jpg'` | `'jpeg'` | `'png'` | `'webp'`)
-    - `fileSize`: number (Bytes, max 10 MB)
-    - `url`: string (Firebase Storage download URL under `booking_attachments/{uid}/...`)
-    - `storagePath`: string (Validated `booking_attachments/{uid}/<random_token>.<ext>` path)
-    - `uploadedAt`: number (Epoch milliseconds)
-- `createdAt`: timestamp
-- `updatedAt`: timestamp
-
-### `announcements` (Collection)
-- `announcementId`: string (Document ID)
-- `title`: string (Original)
-- `content`: string (Original)
-- `imageUrl`: string (Optional Firebase Storage URL of full-resolution image)
-- `thumbnailUrl`: string (Optional Firebase Storage URL of proportional thumbnail)
-- `translatedTitles`: map (e.g., `{ "en": "...", "es": "..." }`) - Populated by Gemini Cloud Function
-- `translatedContents`: map (e.g., `{ "en": "...", "es": "..." }`) - Populated by Gemini Cloud Function
-- `creatorUid`: string
-- `timestamp`: timestamp
-- `targetAudience`: string ('all', 'residents', 'specific_uid')
-- `readBy`: array of user UIDs who have read the announcement
-
-### `document_categories` (Collection)
-- `catId`: string (Document ID / slug, e.g. 'normatives', 'contracts', 'financial')
-- `name`: string (Category display label)
-- `localizedNames`: map (Optional `{ "en": "...", "es": "..." }` display labels)
-- `createdAt`: timestamp
-- `updatedAt`: timestamp (Optional)
-
-### `document_folders` (Collection)
-- `folderId`: string (Document ID, e.g. 'financial_reports', 'official_manuals')
-- `name`: string (Folder display name; also supports `_token_` system syntax such as `_financial-reports_`)
-- `nameKey`: string (Optional system localization key, e.g. 'financial_reports')
-- `localizedNames`: map (Optional `{ "en": "...", "es": "..." }` display names)
-- `parentId`: string (Parent folder ID or 'root' for root directory)
-- `visibility`: string ('all' | 'admin', optional — when 'admin' and containing 0 resident-visible items, hidden from non-admin residents)
-- `createdAt`: timestamp
-- `createdBy`: string (Admin UID or 'system_docs_pipeline')
-
-
-### `documents` (Collection)
-- `docId`: string (Document ID; financial summaries use deterministic `financial_summary_<start>_to_<end>` or `financial_summary_<start>`)
-- `title`: string (Default display title, e.g. period `'2026-06 – 2026-11'` for financial summaries)
-- `translatedTitles`: map (Optional `{ "en": "...", "es": "..." }` locale-specific titles)
-- `fileName`: string (Default file name with extension, e.g. "Presupuesto_2026.pdf")
-- `fileType`: string (Lowercase file extension: 'pdf', 'md', 'txt', 'docx', 'xlsx', 'png', etc.)
-- `fileSize`: number (Default file size in bytes)
-- `url`: string (Default Firebase Storage URL)
-- `storagePath`: string (Default Cloud Storage object path)
-- `translatedFiles`: map (Optional per-locale `{ "en": { "url", "storagePath", "fileName", "fileSize" }, "es": { ... } }` binary/Markdown variants)
-- `category`: string ('normatives', 'contracts', 'financial', 'communiques', 'manuals', etc.)
-- `visibility`: string ('all' | 'admin' — 'all' is visible to admins and residents; 'admin' restricts access exclusively to administrators)
-- `publicationDate`: timestamp (Official publication/issue date of document)
-- `uploadedAt`: timestamp (Creation timestamp)
-- `folderId`: string (Folder ID or 'root' for root directory)
-- `uploaderUid`: string (Admin UID or 'system_docs_pipeline')
-
-### `access_logs` (Collection)
-- `logId`: string (Document ID)
-- `qrCodeId`: string
-- `guardUid`: string
-- `guardName`: string (Name of guard verifying entry)
-- `creatorUid`: string
-- `timestamp`: timestamp (Entry timestamp)
-- `exitTimestamp`: timestamp | null (Optional timestamp recorded when visitor scans out)
-- `expireAt`: timestamp (Firestore TTL timestamp set to `timestamp + 60 days` on entry, refreshed to `exitTimestamp + 60 days` when an exit scan is recorded; triggers `onAccessLogDeleted` to delete `visitor_ids/` and `visitor_plates/` media)
-- `isInside`: boolean (True while visitor is currently inside; false once exited or denied)
-- `exitGuardUid`: string (Optional UID of guard who registered visitor exit)
-- `exitGuardName`: string (Optional name of guard who registered visitor exit)
-- `visitorIdPhotoUrl`: string
-- `visitorPlatePhotoUrl`: string (Optional)
-- `status`: string ('allowed', 'denied')
-- `reason`: string
-- `exitReason`: string (Optional exit notes recorded by guard)
-
-### `payments` (Collection)
-- `paymentId`: string (Document ID)
-- `addressRef`: document_reference (to `addresses` collection)
-- `residentUid`: string (UID of resident associated with the payment)
-- `uploaderUid`: string (UID of user/admin who uploaded receipt)
-- `timestamp`: timestamp (or integer milliseconds)
-- `amount`: number (Monetary amount captured from transfer receipt)
-- `status`: string ('paid' | 'pending' | 'approved' | 'rejected')
-- `folio`: string (Receipt tracking/folio number reported by resident)
-- `concept`: string ('monthly quota' | 'sanction')
-- `paymentDate`: timestamp (Date the bank transfer / transaction took place)
-- `sanctionId`: string (Optional ID of linked sanction when paying a sanction)
-- `rejectionReason`: string (Rationale provided by administrator upon rejection)
-- `periods`: array of string (List of periods covered by the receipt e.g. `['2026-09', '2026-10']`)
-- `period`: string (Format: 'YYYY-MM' or comma-joined periods for backward compatibility)
-- `receiptUrl`: string (Optional)
-
-### `sanctions` (Collection)
-- `id`: string (Document ID)
-- `addressRef`: document_reference (to `addresses` collection)
-- `addressId`: string (Address ID, e.g. 'A-101')
-- `residentUid`: string (UID of primary resident linked to the address)
-- `authorizedUids`: array of string (UIDs of primary resident and linked roommates)
-- `streetName`: string (Denormalized address display street)
-- `number`: number (Denormalized physical house number)
-- `reason`: string (Infraction description)
-- `evidenceUrl`: string (Firebase Storage URL of photographic evidence)
-- `amount`: number (Monetary fine amount)
-- `status`: string ('active' | 'pending_review' | 'paid' | 'cancelled')
-- `rejectionReason`: string (Optional rationale if sanction payment proof was rejected)
-- `paymentId`: string (Optional ID of linked payment document in `payments`)
-- `createdAt`: timestamp (Creation timestamp)
-- `createdBy`: string (Admin UID who issued sanction)
-- `resolvedAt`: timestamp (Timestamp when paid or cancelled)
-
-### `ownership_claims` (Collection)
-- `claimId`: string (Document ID)
-- `userUid`: string (UID of claimant)
-- `addressRef`: document_reference (to `addresses` collection)
-- `proofUrl`: string (Firebase Storage URL of uploaded deed/receipt)
-- `deliveryDate`: timestamp (Target delivery date selected by the resident)
-- `status`: string ('pending' | 'pending review' | 'approved' | 'rejected')
-- `timestamp`: timestamp
-
-### `facilities` (Collection)
-- `id`: string (Document ID, unique facility code e.g., 'multipurpose_room')
-- `name`: string (Localized or descriptive display label)
-- `isUnique`: boolean (True if single capacity unique amenity, False for multi-item amenities)
-- `quantity`: number (Available inventorial capacity, locked to 1 if isUnique is true)
-- `restrictionType`: string ('unrestricted' | 'cooldown' | 'quota' — optional; legacy documents without `restrictionType` infer `'cooldown'` when `cooldownUnit != 'unrestricted'` and `cooldownValue > 0`)
-- `cooldownUnit`: string ('unrestricted' | 'hours' | 'days' | 'months' | 'years')
-- `cooldownValue`: number (Minimum waiting duration measured from one booking's `endTime` to the next booking's `startTime` per household, 0 if unrestricted/quota)
-- `quotaPeriod`: string ('unrestricted' | 'daily' | 'monthly' | 'yearly')
-- `quotaLimit`: number (Maximum bookings allowed per household within the calendar `quotaPeriod` in the community timezone, 0 if unrestricted/cooldown)
-- `anticipationUnit`: string ('unrestricted', 'hours', 'days', 'weeks')
-- `anticipationValue`: number (Minimum advance notice required prior to reservation time)
-- `openingTime`: string (Daily opening hour in 24-hour HH:mm format, e.g. '08:00', default '00:00')
-- `closingTime`: string (Daily closing hour in 24-hour HH:mm format, e.g. '21:00', default '23:59')
-- `presetApprovalMessage`: string (Optional default instructions/next steps for approved bookings)
-- `facilityDocuments`: array of maps (Optional facility templates/forms/rules uploaded by administrators under `facility_documents/{facilityId}/<token>.<ext>`; each item contains `docId`, `title`, `requirementMode` in `'mandatory_return' | 'optional_return' | 'informative'`, `fileName`, `fileType`, `fileSize`, `url`, `storagePath`, and `uploadedAt`)
-
-### `config` (Collection)
-#### `app_settings` (Document)
-- `paymentCutoffDay`: number (Configured day of the month serving as cutoff date, default 1)
-- `gracePeriodDays`: number (Grace period span before user features restrict automatically, default 10)
-- `timeZone`: string (Configured IANA timezone for cutoff and grace period calculations, default 'America/Mexico_City')
-- `scanOnExitEnabled`: boolean (Optional; enables QR exit scanning workflow for visitors and suppliers, default false)
-- `initialBudgetBalance`: number (Optional; opening community budget balance used as starting accumulated budget, default 0)
-- `initialBalancePeriod`: string (Optional; `'YYYY-MM'` effective starting period for filtering payments/expenses counted toward the accumulated budget)
-- `paymentRejectionReasons`: array of string (Customizable pool of rejection reason templates for payment reviews)
-- `updatedAt`: timestamp
-
-#### `smtp_settings` (Document - Admin Only)
-- `enabled`: boolean (Flag enabling automatic welcome email dispatch upon user creation/import)
-- `host`: string (SMTP server host e.g. `smtp.gmail.com`)
-- `port`: number (SMTP server port e.g. `587`, `465`, `25`)
-- `secure`: boolean (True for port 465 SSL, false for 587 STARTTLS)
-- `user`: string (SMTP authentication username / email)
-- `pass`: string (SMTP authentication password / App Password / API Key)
-- `senderEmail`: string (Optional override sender email address)
-- `senderName`: string (Optional override sender display label e.g. "Suburban Life Administration")
-- `customSubject`: string (Optional customized welcome email subject with placeholders like %appName%)
-- `customBody`: string (Optional customized multiline message body supporting %name%, %email%, %password%, %address%, %role%, %appName%)
-- `updatedAt`: timestamp
-
-### `expenses` (Collection - Admin Only)
-- `id`: string (Document ID)
-- `productOrService`: string (Required description of acquired product or service, max 200 chars)
-- `amount`: number (Positive monetary amount rounded to 2 decimal places)
-- `billablePeriod`: string (Required `'YYYY-MM'` period aligned with monthly maintenance periods)
-- `expenseDate`: number (Milliseconds epoch timestamp when the expense was incurred)
-- `category`: string (`'maintenance' | 'gardening' | 'security' | 'utilities' | 'repairs' | 'supplies' | 'other'`)
-- `vendorName`: string (Optional vendor or supplier name, max 120 chars)
-- `notes`: string (Optional administrative notes, max 500 chars)
-- `productEvidence`: map (`fileName`, `fileType` in `'jpg' | 'jpeg' | 'png' | 'webp'`, `fileSize`, `url`, `storagePath` under `expenses/<createdBy>/`, `uploadedAt` — photo evidence of the acquired product/service)
-- `receiptEvidence`: map (`fileName`, `fileType` in `'jpg' | 'jpeg' | 'png' | 'webp' | 'pdf'`, `fileSize`, `url`, `storagePath` under `expenses/<createdBy>/`, `uploadedAt` — receipt or invoice evidence)
-- `status`: string (`'active' | 'voided'`)
-- `createdBy`: string (UID of recording administrator)
-- `createdByName`: string (Resolved display name of recording administrator)
-- `createdAt`: number (Milliseconds epoch timestamp)
-- `voidedBy`: string (Nullable; UID of administrator who soft-voided the expense)
-- `voidedByName`: string (Nullable; display name of administrator who soft-voided the expense)
-- `voidedAt`: number (Nullable; milliseconds epoch timestamp when voided)
-- `voidReason`: string (Nullable; mandatory 3-300 char reason recorded when `status == 'voided'`)
-- `updatedAt`: timestamp
-
-## Firestore Composite Indexes
-
-The application requires specific composite indexes to execute queries without database errors. Ensure the following indexes are generated in Firebase:
-
-### `bookings` Collection
-- **Index 1 (Cooldown & User Facility Check)**:
-  - `facilityId` (Ascending)
-  - `userUid` (Ascending)
-  - `startTime` (Ascending)
-- **Index 2 (Cooldown Multi-field Status Validation)**:
-  - `facilityId` (Ascending)
-  - `userUid` (Ascending)
-  - `startTime` (Ascending)
-  - `status` (Ascending)
-- **Index 3 (Active Facility Clashes Filter)**:
-  - `facilityId` (Ascending)
-  - `status` (Ascending)
-- **Index 4 (Facility Schedule Stream)**:
-  - `facilityId` (Ascending)
-  - `startTime` (Ascending)
-- **Index 5 (User Bookings History)**:
-  - `userUid` (Ascending)
-  - `startTime` (Descending)
-- **Index 6 (User Bookings by Date)**:
-  - `userUid` (Ascending)
-  - `date` (Descending)
-- **Index 7 (User Bookings by Facility and Creation)**:
-  - `userUid` (Ascending)
-  - `facilityId` (Ascending)
-  - `createdAt` (Ascending)
-- **Index 8 (Facility Bookings by Status and Start Time)**:
-  - `facilityId` (Ascending)
-  - `status` (Ascending)
-  - `startTime` (Ascending)
-- **Index 9 (Facility Bookings by Start Time and Status)**:
-  - `facilityId` (Ascending)
-  - `startTime` (Ascending)
-  - `status` (Ascending)
-- **Index 10 (Household Cooldown & Quota Facility Check)**:
-  - `facilityId` (Ascending)
-  - `addressId` (Ascending)
-  - `startTime` (Ascending)
-
-### `payments` Collection
-- **Index 1 (Address Payments by Period)**:
-  - `addressRef` (Ascending)
-  - `period` (Descending)
-- **Index 2 (Resident Payments by Timestamp)**:
-  - `residentUid` (Ascending)
-  - `timestamp` (Descending)
-- **Index 3 (Uploader Payments by Creation)**:
-  - `uploaderUid` (Ascending)
-  - `createdAt` (Descending)
-- **Index 4 (Payment Status Filter by Timestamp)**:
-  - `status` (Ascending)
-  - `timestamp` (Descending)
-
-### `ownership_claims` Collection
-- **Index 1**:
-  - `status` (Ascending)
-  - `timestamp` (Descending)
-
-### `qr_codes` Collection
-- **Index 1 (User QR Codes by Timestamp)**:
-  - `creatorUid` (Ascending)
-  - `timestamp` (Descending)
-- **Index 2 (User QR Codes by Creation)**:
-  - `creatorUid` (Ascending)
-  - `createdAt` (Descending)
-- **Index 3 (Status Filter by Timestamp)**:
-  - `status` (Ascending)
-  - `timestamp` (Descending)
-
-### `documents` Collection
-- **Index 1 (Category by Upload Date)**:
-  - `category` (Ascending)
-  - `uploadedAt` (Descending)
-- **Index 2 (Category by Publication Date)**:
-  - `category` (Ascending)
-  - `publicationDate` (Descending)
-- **Index 3 (Folder by Upload Date)**:
-  - `folderId` (Ascending)
-  - `uploadedAt` (Descending)
-- **Index 4 (Category by Creation Date)**:
-  - `category` (Ascending)
-  - `createdAt` (Descending)
-
-### `access_logs` Collection
-- **Index 1 (Creator Logs by Timestamp)**:
-  - `creatorUid` (Ascending)
-  - `timestamp` (Descending)
-- **Index 2 (Category Logs by Timestamp)**:
-  - `accessCategory` (Ascending)
-  - `timestamp` (Descending)
-- **Index 3 (Status Logs by Timestamp)**:
-  - `status` (Ascending)
-  - `timestamp` (Descending)
-- **Index 4 (QR Code Logs by Timestamp — Legacy Same-Day Exit Fallback)**:
-  - `qrCodeId` (Ascending)
-  - `timestamp` (Descending)
-- **Index 5 (QR Code Open Visit Lookup)**:
-  - `qrCodeId` (Ascending)
-  - `isInside` (Ascending)
-- **Index 6 (Currently Inside Logs by Timestamp)**:
-  - `isInside` (Ascending)
-  - `timestamp` (Descending)
-
-### `users` Collection
-- **Index 1 (User Directory Role Filter by Name)**:
-  - `role` (Ascending)
-  - `name` (Ascending)
-
-### `expenses` Collection
-- **Index 1 (Active/Voided Expenses by Period and Creation)**:
-  - `status` (Ascending)
-  - `billablePeriod` (Descending)
-  - `createdAt` (Descending)
-- **Index 2 (Expenses by Period and Creation)**:
-  - `billablePeriod` (Ascending)
-  - `createdAt` (Descending)
 
 ---
 
-## Firestore TTL Policies & Single-Field Index Exemptions
+## 1. Cloud Firestore Collections
 
-To prevent unbounded growth of gatehouse audit logs, visitor identification photos, inactive QR passes, and resident booking attachments while avoiding sequential timestamp index hotspots, three native Firestore Time-to-Live (TTL) policies are configured alongside single-field index exemptions (`"indexes": []` in `firestore.indexes.json` `fieldOverrides`):
+### `users/{uid}`
+- `uid`: `string` (doc ID)
+- `name`, `email`: `string`
+- `role`: `string` (`'resident' | 'roommate' | 'admin' | 'guard'`) — note multi-role users also carry Auth custom claims
+- `addressRef`: `DocumentReference?` (`addresses/{id}`)
+- `familyMembers`: `string[]` (roommate UIDs)
+- `fcmTokens`: `string[]` (active push registration tokens; stale tokens auto-pruned)
 
-1. **`access_logs.expireAt` (60-Day Retention)**:
-   - **Single-Field Index Exemption**: Collection group `access_logs`, field `expireAt` (`"indexes": []`).
-   - **TTL Policy**: Enabled on `access_logs.expireAt`. Stamped at `timestamp + 60 days` on entry and refreshed to `exitTimestamp + 60 days` when an exit scan is recorded.
-   - **Cascading Cleanup**: Deletion of an `access_logs` document (via Firestore TTL, daily `purgeExpiredAccessLogs` sweep, or manual deletion) triggers `onAccessLogDeleted`, which deletes allow-listed Cloud Storage objects under `visitor_ids/` and `visitor_plates/` and heals any open-visit `qr_codes` state (`isInside: false`). An independent 62-day GCS Object Lifecycle rule (`storage_lifecycle.json`) removes orphaned uploads under `visitor_ids/` and `visitor_plates/`.
-2. **`qr_codes.expireAt` (7-Day Post-Deactivation Retention)**:
-   - **Single-Field Index Exemption**: Collection group `qr_codes`, field `expireAt` (`"indexes": []`).
-   - **TTL Policy**: Enabled on `qr_codes.expireAt`. Stamped at `expiryTime + 7 days` for temporary passes, `validatedAt + 7 days` (or `exitTimestamp + 7 days` when Scan on Exit completes) for single-use supplier passes, and `deactivatedAt + 7 days` for resident-revoked passes. Active permanent passes (`type == 'permanent'`) keep `expireAt: null`, and passes with an open visit (`isInside == true`) hold `expireAt: null` until exit or log cleanup.
-3. **`booking_attachments.expireAt` (30-Day Post-Booking Retention)**:
-   - **Single-Field Index Exemption**: Collection group `booking_attachments`, field `expireAt` (`"indexes": []`).
-   - **TTL Policy**: Enabled on `booking_attachments.expireAt`. Stamped at `endTime + 30 days` when `createBooking` persists resident attachments (and deleted immediately if `cancelBooking` is called).
-   - **Cascading Cleanup**: Deletion of `booking_attachments/{bookingId}` (via Firestore TTL, daily `purgeExpiredBookingAttachments` sweep querying indexed `bookingEndTime <= now - 30d`, or `cancelBooking`) triggers `onBookingAttachmentDeleted`, which deletes allow-listed Cloud Storage files under `booking_attachments/` and stamps `bookings/{bookingId}.attachmentsPurgedAt`. An independent 125-day GCS Object Lifecycle rule (`storage_lifecycle.json`) removes any orphaned uploads under `booking_attachments/`.
+### `addresses/{addressId}` *(e.g. `A-101` or fixed system doc `admin_office`)*
+- `addressId`: `string` (doc ID)
+- `residentUid`: `string?` (primary resident UID)
+- `streetName`: `string` (`'Admin office'` for administration)
+- `number`: `number` (house number; `0` for `admin_office`)
+- `paymentStatus`: `string` (`'paid' | 'pending' | 'restricted' | 'reviewing'`) — `pending` with `isWithinGracePeriod: true` grants resident access
+- `isWithinGracePeriod`: `boolean`
+- `hasActiveSanctions`: `boolean`, `activeSanctionsCount`: `number`
+- `deliveryDate`: `timestamp`, `lastPaymentApproval`: `timestamp`
 
+### `qr_codes/{codeId}`
+- `codeId`, `creatorUid`, `guestName`, `qrData`: `string`
+- `accessCategory`: `string` (`'visitor' | 'supplier'`), `isOneTimeUse`: `boolean`
+- `vehicleType`: `string` (`'car' | 'motorcycle' | 'walking'`), `vehiclePlates`: `string?`, `passengers`: `number?`
+- `type`: `string` (`'permanent' | 'temporary'`)
+- `status`: `string` (`'active' | 'deactivated (validated|revoked|expired)'`)
+- `expiryTime`: `timestamp?` (`null` for permanent), `deactivatedAt`: `timestamp?`
+- `expireAt`: `timestamp?` — **7-day TTL** after terminal deactivation/expiration; held `null` for active permanent passes and while `isInside == true`
+- `isInside`: `boolean?` (live visitor inside state), `activeAccessLogId`: `string?`
+
+### `access_logs/{logId}`
+- `logId`, `qrCodeId`, `guardUid`, `guardName`, `creatorUid`: `string`
+- `status`: `string` (`'allowed' | 'denied'`), `reason`: `string`
+- `visitorIdPhotoUrl`: `string`, `visitorPlatePhotoUrl`: `string?`
+- `timestamp`: `timestamp` (entry), `exitTimestamp`: `timestamp?`
+- `isInside`: `boolean`, `exitGuardUid`: `string?`, `exitGuardName`: `string?`, `exitReason`: `string?`
+- `expireAt`: `timestamp` — **60-day TTL** (`timestamp + 60d`, refreshed to `exitTimestamp + 60d` on exit)
+
+### `bookings/{bookingId}`
+- `bookingId`, `facilityId`, `userUid`, `addressId`: `string` (`addressId` enforces household cooldown/quota)
+- `addressRef`: `DocumentReference?`
+- `startTime`, `endTime`: `timestamp`
+- `status`: `string` (`'pending review' | 'rejected' | 'cancelled' | 'approved (upcoming)' | 'approved (in use)' | 'closed'`)
+- `isConfirmed`: `boolean` (allows neighbor read for schedule calendar without exposing PII)
+- `hasAttachments`: `boolean`, `attachmentCount`: `number`, `attachmentsPurgedAt`: `number?` (epoch ms)
+- `notes`: `string`, `rejectionReason`: `string?`, `approvalMessage`: `string?`
+
+### `booking_attachments/{bookingId}` *(1:1 with `bookings/{id}`; household & admin isolated)*
+- `bookingId`, `facilityId`, `userUid`: `string`, `addressId`: `string?`
+- `bookingEndTime`: `number` (epoch ms, indexed for cron fallback sweep)
+- `expireAt`: `timestamp` — **30-day TTL** (`endTime + 30d`; exempted from single-field index)
+- `attachments`: `map[]` — `{ facilityDocId, title, requirementMode ('mandatory_return'|'optional_return'), fileName, fileType ('pdf'|'doc'|'docx'|'xls'|'xlsx'|'jpg'|'jpeg'|'png'|'webp'), fileSize (<=10MB), url, storagePath, uploadedAt }`
+- `createdAt`, `updatedAt`: `timestamp`
+
+### `payments/{paymentId}`
+- `paymentId`, `residentUid`, `uploaderUid`, `folio`, `period`: `string`
+- `addressRef`: `DocumentReference`
+- `periods`: `string[]` (`['YYYY-MM', ...]`)
+- `amount`: `number`, `timestamp`, `paymentDate`: `timestamp | number`
+- `concept`: `string` (`'monthly quota' | 'sanction'`), `sanctionId`: `string?`
+- `status`: `string` (`'paid' | 'pending' | 'approved' | 'rejected'`), `rejectionReason`: `string?`, `receiptUrl`: `string?`
+
+### `sanctions/{sanctionId}`
+- `id`, `addressId`, `residentUid`, `streetName`, `reason`, `evidenceUrl`, `createdBy`: `string`
+- `addressRef`: `DocumentReference`, `authorizedUids`: `string[]` (primary + roommates)
+- `number`, `amount`: `number`
+- `status`: `string` (`'active' | 'pending_review' | 'paid' | 'cancelled'`)
+- `paymentId`: `string?`, `rejectionReason`: `string?`
+- `createdAt`: `timestamp`, `resolvedAt`: `timestamp?`
+
+### `ownership_claims/{claimId}`
+- `claimId`, `userUid`, `proofUrl`: `string`, `addressRef`: `DocumentReference`
+- `deliveryDate`, `timestamp`: `timestamp`
+- `status`: `string` (`'pending' | 'pending review' | 'approved' | 'rejected'`)
+
+### `facilities/{facilityId}`
+- `id`, `name`, `openingTime` (`HH:mm`), `closingTime` (`HH:mm`): `string`, `presetApprovalMessage`: `string?`
+- `isUnique`: `boolean`, `quantity`: `number`
+- `restrictionType`: `string` (`'unrestricted' | 'cooldown' | 'quota'`)
+- `cooldownUnit`: `string` (`'unrestricted' | 'hours' | 'days' | 'months' | 'years'`), `cooldownValue`: `number`
+- `quotaPeriod`: `string` (`'unrestricted' | 'daily' | 'monthly' | 'yearly'`), `quotaLimit`: `number`
+- `anticipationUnit`: `string` (`'unrestricted' | 'hours' | 'days' | 'weeks'`), `anticipationValue`: `number`
+- `facilityDocuments`: `map[]` (`{ docId, title, requirementMode ('mandatory_return'|'optional_return'|'informative'), fileName, fileType, fileSize, url, storagePath, uploadedAt }`)
+
+### `expenses/{expenseId}` *(Admin Read-Only; Written Only via Cloud Functions)*
+- `id`, `productOrService` (<=200), `billablePeriod` (`YYYY-MM`), `vendorName` (<=120), `notes` (<=500), `createdBy`, `createdByName`: `string`
+- `category`: `string` (`'maintenance' | 'gardening' | 'security' | 'utilities' | 'repairs' | 'supplies' | 'other'`)
+- `amount`: `number`, `expenseDate`, `createdAt`: `number` (epoch ms)
+- `productEvidence`: `map` (`jpg|jpeg|png|webp`), `receiptEvidence`: `map` (`jpg|jpeg|png|webp|pdf`) — `{ fileName, fileType, fileSize, url, storagePath, uploadedAt }` under `expenses/<createdBy>/`
+- `status`: `string` (`'active' | 'voided'`)
+- `voidedBy`, `voidedByName`, `voidReason` (3–300 chars): `string?`, `voidedAt`: `number?`, `updatedAt`: `timestamp`
+
+### `announcements/{announcementId}`
+- `announcementId`, `title`, `content`, `creatorUid`: `string`, `imageUrl`, `thumbnailUrl`: `string?`
+- `translatedTitles`, `translatedContents`: `map<string, string>` (`en`, `es` via Vertex AI)
+- `targetAudience`: `string` (`'all' | 'residents' | 'specific_uid'`), `readBy`: `string[]`, `timestamp`: `timestamp`
+
+### Transparency (`document_categories`, `document_folders`, `documents`)
+- **`document_categories/{catId}`**: `catId`, `name`, `localizedNames` (`{ en, es }?`), `createdAt`, `updatedAt?`
+- **`document_folders/{folderId}`**: `folderId`, `name`, `nameKey?` (e.g. `financial_reports`, `official_manuals`), `localizedNames?`, `parentId` (`'root'` or folder ID), `visibility` (`'all' | 'admin'`), `createdAt`, `createdBy`
+- **`documents/{docId}`** *(financial summaries use `financial_summary_<start>[_to_<end>]`)*: `docId`, `title`, `translatedTitles?`, `fileName`, `fileType`, `fileSize`, `url`, `storagePath`, `translatedFiles?` (`{ locale: { url, storagePath, fileName, fileSize } }`), `category`, `visibility` (`'all' | 'admin'`), `folderId`, `uploaderUid`, `publicationDate`, `uploadedAt`
+
+### `config/{configId}`
+- **`app_settings`** *(authenticated read)*: `paymentCutoffDay` (default `1`), `gracePeriodDays` (`10`), `timeZone` (`'America/Mexico_City'`), `scanOnExitEnabled` (`false`), `initialBudgetBalance` (`0`), `initialBalancePeriod?` (`YYYY-MM`), `paymentRejectionReasons` (`string[]`), `updatedAt`
+- **`smtp_settings`** *(admin-only)*: `enabled`, `secure`: `boolean`; `host`, `user`, `pass`, `senderEmail?`, `senderName?`, `customSubject?`, `customBody?`: `string`; `port`: `number`; `updatedAt`
+
+---
+
+## 2. Firebase Realtime Database (`database.rules.json`)
+
+Client reads are owner-only (`auth.uid === $uid`); notifications cannot be created/edited by clients except leaf `isRead` / `readAt` updates or deletion.
+
+- **`/notifications/{uid}/{notificationId}`** *(indexed on `createdAt`, `isRead`; pruned at **30 days / 100 items**)*:
+  - `type` (<=64), `category` (`reviews | sanctions | qr_access | roommates | transparency | announcements | admin_reviews`), `titles` (`{ es, en }` <=200), `bodies` (`{ es, en }` <=500), `targetRoute` (<=64), `entityId?` (<=128), `createdAt` (epoch ms), `isRead` (`boolean`), `readAt?` (`number`), `metadata?` (primitive map).
+- **`/user_notification_settings/{uid}`**:
+  - `locale` (`'es' | 'en'`), `pushEnabled`, `inAppBannerEnabled`: `boolean`, `updatedAt` (`number`), `categories`: `{ [category]: boolean }`.
+
+---
+
+## 3. Cloud Storage Paths (`storage.rules`)
+
+All write-gated buckets enforce `< 10 MB` limit (`isValidUploadSize`). SVG/HTML uploads are disallowed for facility docs, booking attachments, and expense evidence.
+
+| Prefix | Read Access | Write / Delete Access | Notes / Allowed Types |
+| :--- | :--- | :--- | :--- |
+| `/documents/admin_only/**` | Admin | Admin | Pipeline manuals (`docs_pipeline.yml`) |
+| `/documents/**` | Admin, or Resident/Roommate if `metadata.visibility != 'admin'` | Admin | Public & translated Transparency docs |
+| `/announcements/**` | Authenticated | Admin | Announcement banners & thumbnails |
+| `/facility_documents/{facilityId}/**` | Authenticated | Admin | `pdf`, `doc/x`, `xls/x`, `jpg/png/webp` |
+| `/booking_attachments/{userId}/**` | Admin or owner `uid` | Admin or owner `uid` | Booking doc modes; 30d TTL + **125d GCS lifecycle** |
+| `/sanctions/{addressId}/**` | Authenticated | Admin | `image/*` or `application/pdf` |
+| `/payments/{ownerOrAddressId}/**` | Admin or owner/uploader | Create/Update: Admin or owner; Delete: Admin | `image/*` or `application/pdf` |
+| `/expenses/{uploaderUid}/**` | Admin | Admin (`uid == uploaderUid`) | `pdf`, `jpg/png/webp` |
+| `/ownership_proofs/{userId}/**` | Admin or owner `uid` | Admin or owner `uid` | Deleted on claim approval/rejection |
+| `/visitor_ids/**`, `/visitor_plates/**` | Guard or Admin | Create/Update: Guard or Admin; Delete: Admin | Deleted via `onAccessLogDeleted` + **62d GCS lifecycle** |
+
+---
+
+## 4. Composite Indexes & TTL Exemptions (`firestore.indexes.json`)
+
+**33 Composite Indexes:**
+
+| Collection | Count | Indexed Field Tuples |
+| :--- | :---: | :--- |
+| `bookings` | 10 | `(facilityId, addressId, startTime)`, `(facilityId, userUid, startTime)`, `(facilityId, userUid, startTime, status)`, `(facilityId, status)`, `(facilityId, status, startTime)`, `(facilityId, startTime, status)`, `(facilityId, startTime)`, `(userUid, startTime DESC)`, `(userUid, date DESC)`, `(userUid, facilityId, createdAt)` |
+| `access_logs` | 6 | `(creatorUid, timestamp DESC)`, `(accessCategory, timestamp DESC)`, `(status, timestamp DESC)`, `(qrCodeId, timestamp DESC)`, `(qrCodeId, isInside)`, `(isInside, timestamp DESC)` |
+| `documents` | 6 | `(category, uploadedAt DESC)`, `(category, publicationDate DESC)`, `(folderId, uploadedAt DESC)`, `(category, createdAt DESC)`, `(visibility, uploadedAt DESC)`, `(visibility, folderId)` |
+| `payments` | 4 | `(addressRef, period DESC)`, `(residentUid, timestamp DESC)`, `(uploaderUid, createdAt DESC)`, `(status, timestamp DESC)` |
+| `qr_codes` | 3 | `(creatorUid, timestamp DESC)`, `(creatorUid, createdAt DESC)`, `(status, timestamp DESC)` |
+| `expenses` | 2 | `(status, billablePeriod DESC, createdAt DESC)`, `(billablePeriod, createdAt DESC)` |
+| `ownership_claims` | 1 | `(status, timestamp DESC)` |
+| `users` | 1 | `(role, name)` |
+
+**3 TTL Policies & `fieldOverrides` (`indexes: []` single-field exemptions preventing write hotspots):**
+1. `access_logs.expireAt` (**60d**): TTL triggers `onAccessLogDeleted` (purges `visitor_ids/`, `visitor_plates/`, heals `qr_codes.isInside`); fallback cron `purgeExpiredAccessLogs`.
+2. `qr_codes.expireAt` (**7d** post-deactivation/expiry; `null` while permanent active or `isInside`): TTL + fallback cron `purgeExpiredQrCodes`.
+3. `booking_attachments.expireAt` (**30d** post-booking `endTime`): TTL triggers `onBookingAttachmentDeleted` (purges `booking_attachments/` + stamps `bookings.attachmentsPurgedAt`); fallback cron `purgeExpiredBookingAttachments` queries indexed `bookingEndTime`.

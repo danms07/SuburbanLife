@@ -1,356 +1,155 @@
 # Changelog
 
-All notable changes to the **Suburban Life** project are documented in this file.
+All notable changes to **Suburban Life** are documented here.
+
+## [Unreleased] — 2026-11-23
+
+### Changed (Documentation & Agent Token Efficiency)
+- Added Context Routing Table and doc-conciseness guidelines in [`AGENTS.md`](AGENTS.md) so agents read only task-relevant docs and avoid multi-file duplication.
+- Created [`functions/README.md`](functions/README.md) documenting all 25 `onCall` callables, 10 Firestore triggers, `checkMonthlyPaymentStatuses` daily cron, and `functions/notifications.js`.
+- Refactored [`Structure.md`](Structure.md) (~70 KB -> concise index), [`widget_catalog.md`](widget_catalog.md) (~54 KB -> compact component/key catalog), [`README.md`](README.md), [`database_schema.md`](database_schema.md) (added RTDB, Storage prefixes, and missing `documents` visibility indexes while removing duplicate ERD field listings), and `CHANGELOG.md`.
+- Updated [`terraform/README.md`](terraform/README.md) links from local filesystem URLs to repository-relative paths.
 
 ## [1.0.49+50] — 2026-11-23
 
 ### Added
-- **Guard QR Scanner Destination Address Display (`lib/features/qr_access/qr_code.dart`, `lib/features/qr_access/qr_scanner_screen.dart`, `functions/index.js`)**:
-  - Added `destinationAddress` and `QrCode.formatAddressParts` to the `QrCode` model, updating `toMap`/`fromMap` to parse `destinationAddress`, `addressDisplay`, and `streetName`/`number` while omitting the `'0'` placeholder number used by `admin_office`.
-  - Updated `QrScannerScreen` to resolve the visitor's destination address from the `validateAndRegisterQrAccess` response (`qrData.addressDisplay`, `openLog.addressDisplay` on exit, or a Firestore `users/{creatorUid}` -> `addresses` fallback when omitted), localize `Admin office` / `Oficina de administración`, and display a highlighted `Destination: ...` / `Destino: ...` row (`ValueKey('qr_scanner_destination_address')`) inside the Visitor Details card on both entry and exit scans.
-  - Added `formatAccessAddressDisplay` in `functions/index.js` and updated `validateAndRegisterQrAccess` to omit placeholder `'0'` numbers (preventing `'Admin office #0'`), resolve `'Admin office'` for admin creators without an `addressRef`, and fall back to `openLog.addressDisplay` during exit validation if a resident address was later unbound.
-
-### Tests & Documentation
-- Added unit tests for `formatAccessAddressDisplay` in `functions/test/helpers.test.js` and `validateAndRegisterQrAccess` address resolution tests (resident, `admin_office`, unlinked admin, and exit `openLog` fallback) in `functions/test/handlers.test.js`.
-- Added `QrCode` destination address model tests in `test/features/qr_access/qr_code_model_test.dart` and EN/ES `360x780` entry/exit destination address, `Admin office` localization, and Firestore fallback widget tests in `test/features/qr_access/qr_exit_scanner_and_settings_test.dart`.
-- Updated `Structure.md`, `widget_catalog.md`, `README.md`, and bumped app version to `1.0.49+50` (`pubspec.yaml` and `web/version.json`).
+- **Guard QR Scanner Destination Address (`qr_code.dart`, `qr_scanner_screen.dart`, `functions/index.js`)**:
+  - Added `destinationAddress` and `QrCode.formatAddressParts` omitting placeholder `'0'` numbers (`admin_office`).
+  - Added `formatAccessAddressDisplay` and `openLog.addressDisplay` exit fallback in `validateAndRegisterQrAccess`; `QrScannerScreen` highlights localized `Admin office` / destination address (`ValueKey('qr_scanner_destination_address')`) via payload or Firestore fallback on both entry and exit scans.
+  - Added unit/widget tests in `functions/test/helpers.test.js`, `functions/test/handlers.test.js`, `test/features/qr_access/qr_code_model_test.dart`, and `test/features/qr_access/qr_exit_scanner_and_settings_test.dart`.
 
 ## [Unreleased] — 2026-11-19
 
 ### Added
-- **Terraform Firebase & GCP Infrastructure Suite (`terraform/`)**:
-  - Added full Infrastructure-as-Code configuration (`versions.tf`, `providers.tf`, `variables.tf`, `project.tf`, `apis.tf`, `apps.tf`, `auth.tf`, `firestore.tf`, `database.tf`, `storage.tf`, `appcheck.tf`, `iam.tf`, `outputs.tf`, `terraform.tfvars.example`, `README.md`) to provision a new GCP/Firebase project or adopt an existing one.
-  - Configured all required Firebase & Google Cloud APIs (Firestore, RTDB, Cloud Storage, Identity Platform/Auth, Firebaserules, App Check, reCAPTCHA Enterprise, Play Integrity, FCM, Crashlytics, Gen 2 Cloud Functions/Cloud Run/Eventarc/Cloud Build/Artifact Registry/PubSub/Cloud Scheduler, and Vertex AI).
-  - Provisioned Firebase Web, Android, and Apple apps, Firebase Hosting site, Email/Password Identity Platform config, `(default)` Firestore database with PITR/delete protection, all 33 composite indexes & 3 single-field overrides loaded from `firestore.indexes.json`, native Firestore TTL policies on `expireAt` (`access_logs`, `qr_codes`, `booking_attachments`), `firestore.rules` & `storage.rules` releases, default RTDB instance, default Cloud Storage bucket, strict-domain reCAPTCHA Enterprise + App Check enforcement configs (`UNENFORCED` by default), opt-in RTDB rules & Storage lifecycle/CORS CLI provisioners, least-privilege `functions_runtime` & `docs_publisher` service accounts, and optional keyless GitHub Actions OIDC Workload Identity Federation.
-  - Added [`terraform/generate_imports.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.js) (`--project`, `--dry-run`, etc.) and [`terraform/generate_imports.test.js`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/generate_imports.test.js) to automate inspecting an existing Firebase/GCP project via read-only REST calls, matching live composite indexes (handling Firestore's trailing `__name__` field) and overrides against `firestore.indexes.json`, generating gitignored Terraform 1.5+ `import {}` blocks in `terraform/imports.tf`, and suggesting aligned `terraform.tfvars` values, documented in [`terraform/README.md`](file:///Users/menddaniel/gitProjects/SuburbanLife/terraform/README.md).
-- Updated `.gitignore`, `Structure.md`, and `README.md` with Terraform documentation and ignore rules (including `terraform/imports.tf`).
+- **Terraform Firebase & GCP IaC (`terraform/`)**:
+  - Provisioned GCP/Firebase project setup, APIs, Web/Android/Apple apps, Hosting, Email/Password Auth, Firestore DB + 33 indexes + 3 TTLs + `firestore.rules`, RTDB, Storage + `storage.rules`, reCAPTCHA Enterprise + App Check, `functions_runtime`/`docs_publisher` SAs, and optional GitHub OIDC WIF.
+  - Added [`terraform/generate_imports.js`](terraform/generate_imports.js), [`terraform/generate_imports.test.js`](terraform/generate_imports.test.js), [`terraform/README.md`](terraform/README.md), and `.gitignore` rules (`terraform/imports.tf`).
 
 ## [1.0.47+48] — 2026-11-18
 
-### Added
-- **Cross-Platform Push Notifications & RTDB Mirrored Inbox (`lib/features/notifications/notifications_screen.dart`, `functions/notifications.js`, `database.rules.json`)**:
-  - Added end-to-end Firebase Cloud Messaging (FCM) delivery paired with Firebase Realtime Database (RTDB) mirroring at `/notifications/{uid}/{notifId}` and `/user_notification_settings/{uid}` across all 7 domain event categories (`reviews`, `sanctions`, `transparency`, `qr_access`, `roommates`, `announcements`, `admin_reviews`) with 30-day / 100-item per-user RTDB pruning.
-  - Configured native platform delivery & 7 notification channels across Android (`AndroidManifest.xml`, `MainActivity.kt`), iOS (`Info.plist`, `Runner.entitlements`, `AppDelegate.swift`), and Web (`web/firebase-messaging-sw.js` with strict allow-listed `targetRoute` and exact same-origin validation + VAPID web push token support in `lib/core/config/app_config.dart`).
-  - Added Cloud Function notification dispatch & event triggers in `functions/notifications.js` and `functions/index.js`: payment review (`approvePayment`), booking review (`onBookingWritten`), ownership claim review (`reviewOwnershipClaim`), sanction issuance (`onSanctionWritten`), QR entry/exit access (`notifyAccessResult`), roommate onboarding (`addRoommate` notifying both primary owner & newly linked roommate), announcements (`translateAnnouncement`), transparency document publishing (`onTransparencyDocumentWritten`), and admin review alerts (`onPaymentWritten`, `onOwnershipClaimCreated`, `onBookingWritten`), plus full RTDB cleanup on account deletion (`adminDeleteUser`).
-  - Added `NotificationService`, `AppNotification`, `UserNotificationSettings`, `PushPermissionStatus`, `NotificationCategory`, and allow-listed `sanitizeNotificationRoute` in `lib/core/backend/backend.dart`, `FirebaseNotificationService` (including pre-signOut token cleanup in `FirebaseAuthService.signOut`) in `lib/core/backend/firebase_backend.dart`, and reactive `FakeNotificationService` in `test/helpers/fake_backend.dart`.
-  - Built allow-listed `NotificationRouter` (`lib/core/services/notification_router.dart`), live unread `NotificationBellButton`, swipe/tap `InAppNotificationBanner` inside a state-preserving root `Stack`, `NotificationsScreen` (All/Unread filters, Mark all read, Clear all, swipe/delete, 30-day notice, and permission opt-in banner), and `NotificationPreferencesSheet` (OS permission lifecycle monitoring, master push toggle, in-app banner toggle for silent bell-badge-only usage, and role-gated category toggles), wired into `MyHomePage`, `AdminShellScreen`, and bilingual EN/ES localizations (`app_en.arb`, `app_es.arb`).
-
-### Security & Fixes
-- **Server-Side Ownership Claim Review (`functions/index.js`, `lib/features/auth/admin_resident_approval_screen.dart`)**:
-  - Replaced client-side claim approval/rejection mutations with the `reviewOwnershipClaim` Cloud Function callable and added an optional rejection reason dialog while enforcing atomic Storage cleanup and resident notification delivery.
-- **Transparency Visibility Race Fix (`lib/features/transparency/transparency_screen.dart`)**:
-  - Reordered folder visibility promotion to `'all'` before document visibility updates so RTDB/FCM triggers read resolved public folder visibility consistently.
-- **RTDB Rules & Security Verification (`database.rules.json`, `functions/test/`)**:
-  - Enforced owner-only reads, client-side create prevention, leaf-only read-receipt updates (`isRead`, `readAt`), category/locale validation, and `functions/test/notifications.test.js` + `functions/test/security_rules.test.js` coverage alongside `test/features/notifications/notifications_screen_test.dart`.
-- **Version Bump (`pubspec.yaml`, `web/version.json`)**:
-  - Bumped application version from `1.0.46+47` to `1.0.47+48`.
+### Added & Fixed
+- **Cross-Platform Push Notifications & RTDB Inbox (`notifications_screen.dart`, `notification_router.dart`, `functions/notifications.js`, `database.rules.json`)**:
+  - Added FCM delivery mirrored to RTDB (`/notifications/{uid}`, `/user_notification_settings/{uid}`) across 7 categories with 30-day / 100-item retention, Android (7 channels), iOS (APNs), Web (`firebase-messaging-sw.js` + VAPID), bell badge (`99+`), dismissible `InAppNotificationBanner`, `NotificationsScreen`, `NotificationPreferencesSheet`, `FakeNotificationService`, and tests.
+- **Server-Side Ownership Claim Review**: Replaced client-side claim mutations with `reviewOwnershipClaim` callable (atomic role/address binding, Storage proof cleanup, optional rejection reason, notification dispatch).
+- **Transparency Visibility Race Fix**: Promoted folder visibility to `'all'` before updating document visibility so triggers read consistent visibility.
 
 ## [1.0.46+47] — 2026-11-18
 
 ### Fixed
-- **Mobile Web Duplicate Password Eye Icon (`web/index.html`)**:
-  - Added global CSS rules (`input::-ms-reveal`, `input::-ms-clear`, `input[type="password"]::-ms-reveal`, and `input[type="password"]::-ms-clear` set to `display: none !important;`) in `web/index.html` to suppress the browser-native password reveal button on mobile browsers whose user-agent strings bypass Flutter Web's desktop-only `isEdge` check (`EdgA/` on Android Edge and `EdgiOS/` on iOS Edge), leaving only Flutter's working `suffixIcon` password visibility toggle visible.
-- **Auth & Web CSS Regression Tests (`test/features/auth/auth_screens_test.dart`)**:
-  - Added a mobile Spanish (`360x760`) `LoginScreen` widget test confirming strictly one password visibility icon toggles `obscureText`, plus a static HTML guard verifying the `::-ms-reveal` / `::-ms-clear` suppression rules remain in `web/index.html`.
-- **Version Bump (`pubspec.yaml`, `web/version.json`)**:
-  - Bumped application version from `1.0.45+46` to `1.0.46+47`.
+- **Mobile Web Duplicate Password Eye (`web/index.html`)**: Suppressed native browser `::-ms-reveal` / `::-ms-clear` password icons across mobile browsers; added regression test in `test/features/auth/auth_screens_test.dart`.
 
 ## [1.0.45+46] — 2026-11-18
 
-### Added
-- **Guard Panel App Version Footer (`lib/main.dart`)**:
-  - Rendered the localized `AppVersionLabel` widget (`ValueKey('guard_app_version_label')`) in a non-interactive bottom `SafeArea` footer beneath the `Scan QR Code` card (`guard_scan_qr_button`) inside an overflow-safe `Expanded` + `LayoutBuilder` + `SingleChildScrollView` layout, wrapped the Guard Panel header title (`guardPanelTitle`) in `Expanded` to prevent horizontal overflow on narrow mobile devices (`360px`), and added a route-launch double-tap guard (`_isOpeningQrScanner`).
-- **Localized QR Processing & Wait Hint Copy (`lib/l10n/app_en.arb`, `lib/l10n/app_es.arb`)**:
-  - Added bilingual EN/ES strings `processingAccessOperation` and `qrProcessingWaitHint` guiding guards not to tap additional controls while operations are running.
-
-### Fixed
-- **QR Scanner Duplicate Attempts & Blocking Floating Wheel (`lib/features/qr_access/qr_scanner_screen.dart`)**:
-  - Added `_isValidating`, `_isCapturingPhoto`, `_isUploadingImages`, and monotonically incremented `_activeValidationToken` concurrency guards so scanning a QR code immediately blocks duplicate `onDetect` frames and prevents multiple overlapping `validateAndRegisterQrAccess` calls.
-  - Kept `scan_again_button`, photo capture controls, `allow_access_button`, `deny_access_button`, `register_exit_button`, camera switches, and text inputs explicitly disabled (`onPressed: _isBusy ? null`) while visitor information is loading or access/exit registration is in flight, and replaced the premature red error icon flash during validation with a neutral scanner indicator.
-  - Added a centered blocking floating progress wheel overlay (`ValueKey('qr_scanner_loading_overlay')`, combining `AbsorbPointer` with a translucent modal scrim, `CircularProgressIndicator`, operation status label, and wait hint) visible throughout both visitor QR lookup and access/exit submission.
-
-### Tests & Documentation
-- Added `Completer`-driven EN/ES QR scanner concurrency and overlay tests in `test/features/qr_access/qr_exit_scanner_and_settings_test.dart` and narrow-screen (`360x640`) EN/ES Guard Panel version footer tests in `test/widget_test.dart`.
-- Updated `Structure.md`, `widget_catalog.md`, `README.md`, and bumped app version to `1.0.45+46` (`pubspec.yaml` and `web/version.json`).
+### Added & Fixed
+- **Guard Panel Footer & QR Scanner Concurrency Locks (`main.dart`, `qr_scanner_screen.dart`)**:
+  - Added `AppVersionLabel` (`guard_app_version_label`) in Guard panel footer and `_isOpeningQrScanner` double-tap guard.
+  - Added `_isValidating`, `_isCapturingPhoto`, `_isUploadingImages`, `_activeValidationToken`, disabled `_isBusy` controls, and blocking `qr_scanner_loading_overlay`; verified via `Completer` tests in EN/ES.
 
 ## [1.0.44+45] — 2026-11-18
 
 ### Added
-- **Localized App Version Label in Resident & Admin Navigation Drawers (`lib/core/widgets/app_version_label.dart`)**:
-  - Bundled `web/version.json` as a Flutter asset in `pubspec.yaml` and created a shared `AppVersionLabel` widget that reads, parses (via `AppUpdateService.parseVersionPayload`), and caches the `version+build_number` string cleanly without adding third-party dependencies or hardcoding version constants.
-  - Added localized `appVersionLabel` strings (`Version {version}` / `Versión {version}`) to `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
-  - Preloaded `AppVersionLabel.loadVersion()` in `main()` and rendered `AppVersionLabel` inside bottom `SafeArea` footers beneath `Logout` in both the Resident hamburger `Drawer` (`_buildDrawer` in `lib/main.dart`, keyed `resident_app_version_label`) and `AdminShellScreen` (`admin_desktop_sidebar` & `admin_mobile_drawer` in `lib/features/admin/admin_shell_screen.dart`, keyed `admin_app_version_label`).
-- **Tests & Documentation**:
-  - Added unit and widget tests in `test/core/services/core_services_test.dart` (`AppVersionLabel`), `test/widget_test.dart` (Resident EN/ES & Admin drawers), and `test/features/admin/admin_shell_screen_test.dart` (Admin EN/ES desktop sidebar & mobile drawer).
-  - Updated `Structure.md`, `widget_catalog.md`, `README.md`, and bumped app version to `1.0.44+45` (`pubspec.yaml` and `web/version.json`).
+- **Drawer Version Labels (`app_version_label.dart`, `main.dart`, `admin_shell_screen.dart`)**: Bundled `web/version.json` asset and rendered cached localized `AppVersionLabel` (`resident_app_version_label`, `admin_app_version_label`) below Logout in EN/ES drawers; added tests in `core_services_test.dart`, `widget_test.dart`, and `admin_shell_screen_test.dart`.
 
 ## [1.0.43+44] — 2026-11-18
 
 ### Changed
-- **Admin Booking Approval Master-Detail Refactor (`lib/features/admin/admin_booking_approval_screen.dart`)**:
-  - Replaced the legacy inline booking cards (`_BookingApprovalCard`, previously displaying contact PII, attachment viewers, and Approve/Reject action buttons directly in the queue list) with compact, button-free `_BookingSummaryCard` items (`ValueKey('booking_card_<bookingId>')`) displaying the facility title, wrapping `Pending Review` badge, localized time slot pill, applicant name, resolved household address (`streetName #number`), attachment count pill, and trailing chevron (`Icons.chevron_right`).
-  - Added dedicated responsive `AdminBookingDetailScreen` aligned with `AdminPaymentDetailScreen` and `AdminResidentDetailScreen`:
-    - Adapts via `LayoutBuilder` across wide (`> 650px`) and narrow (`<= 650px`) viewports: renders a side-by-side **Submitted Documentation** pane (`booking_attachments/{bookingId}` with responsive **View / Download** actions, requirement mode badges, and `RotatableImagePreview` inline rotation + full-screen zoom) alongside schedule/contact details and `Reject` / `Approve Booking` buttons when documentation applies, or a clean centered review card when no documentation pane is needed.
-    - Wraps header badges and metadata pills cleanly so long Spanish labels (`Pendiente de revisión`, `Ver / Descargar`, localized schedules) render without horizontal overflow on `360px` mobile screens, shows feedback banners, and pops back to the summary queue upon approval (`approvalMessage`) or rejection (`rejectionReason`).
-- **Automated Tests & Documentation**:
-  - Updated `test/features/admin/admin_booking_approval_test.dart` and `test/integration/rollout_workflow_test.dart` for Master-Detail booking navigation, wide (`1000x800`) and narrow (`360x760`) layouts (both with and without documentation), Spanish localization overflow checks, and pop-back assertions.
-  - Updated `Structure.md`, `widget_catalog.md`, `README.md`, `docs/admin_user_manual.md`, `docs/admin_user_manual_es.md`, and bumped app version to `1.0.43+44` (`pubspec.yaml` and `web/version.json`).
+- **Admin Booking Approval Master-Detail (`admin_booking_approval_screen.dart`)**: Split inline queue cards into button-free `_BookingSummaryCard` (`booking_card_<bookingId>`) -> responsive `AdminBookingDetailScreen` (`> 650px` side-by-side **Submitted Documentation** pane, `<= 650px` stacked), with Spanish `360x760` layout/test updates.
 
 ## [1.0.42+43] — 2026-11-18
 
 ### Fixed
-- **Resident Booking Callable JSON Serialization (`createBooking` in `functions/index.js`)**:
-  - Added `toSerializableBookingResponse` to omit the non-JSON-serializable Firestore `DocumentReference` (`addressRef`) from the `booking` payload returned by `createBooking` on both new bookings and rejected-booking resubmissions (`resubmitBookingId`), while continuing to persist `addressRef` and `addressId` in Firestore `bookings/{bookingId}`.
-  - Eliminates the post-write `HTTP 500` (`Error: Data cannot be encoded in JSON. Symbol(request method name)` / `TypeError: Cannot convert a Symbol value to a string`) during `firebase-functions` `onCall` response encoding, preventing false attachment rollback deletions in `BookingService.uploadAndCreateBooking`.
-  - Added a regression test in `functions/test/handlers.test.js` covering real Firestore `DocumentReference` (`google-gax` / `AuthClient`) serialization through the `onCall` HTTP pipeline for both create and resubmit flows.
-- **Web Clipboard JS Interop Compatibility (`dart:js_interop`)**: Replaced removed `dart:js_util` usage and redundant `dart:typed_data` import in `lib/features/announcements/clipboard_image_helper_web.dart` with typed `dart:js_interop` extension types (`_JsNavigator`, `_JsClipboard`, `_JsClipboardItem`, `_JsBlob`), fixing the `uri_does_not_exist` compilation error and `avoid_web_libraries_in_flutter` lint on Flutter 3.50 / Dart 3.14.
-- **Null-Safety Flow Analysis Across Async Gap**: Bound non-nullable `uploadBytes` after null/empty validation in `lib/features/transparency/transparency_screen.dart` (`_uploadDocument`) to eliminate the `unchecked_use_of_nullable_value` error on `rawBytes.length` across `await`.
-- **Deprecated API Migrations**:
-  - Migrated `AdminResidentRegistrationScreen` (`RadioListTile`) from deprecated `groupValue`/`onChanged` parameters to `RadioGroup<String>`.
-  - Migrated `DocumentViewerScreen` from `Share.share` to `SharePlus.instance.share(ShareParams(...))`.
-  - Migrated `QrGeneratorScreen` from deprecated `QrImageView.foregroundColor` and `QrPainter.color`/`emptyColor` parameters to `QrEyeStyle` and `QrDataModuleStyle`.
-- **Static Analysis & Lints Cleanup**:
-  - Added `mounted` / `context.mounted` async-gap guards and resolved shadowed `Builder`/`StatefulBuilder`/`StreamBuilder`/`FutureBuilder`/`ListView.builder` context names (`use_build_context_synchronously`) across `AdminResidentRegistrationScreen`, `AnnouncementsScreen`, `RoommatesScreen`, and `QrGeneratorScreen`.
-  - Switched widget constructors to `super.key` (`use_super_parameters`) and public `State<T>` return types on `createState()` (`library_private_types_in_public_api`) across `AdminResidentRegistrationScreen`, `BookingScreen`, `ManageBookingsScreen`, `DocumentViewerScreen`, `DocumentCard`, `FileExplorerBreadcrumb`, and `FolderCard`.
-  - Removed redundant `dart:typed_data` and `package:cross_file/cross_file.dart` imports, replaced `print` with `debugPrint` in `snippets/shareplus.dart`, and renamed `snippets/LoadImages.dart` to `snippets/load_images.dart` (`file_names`).
-  - Configured `analysis_options.yaml` `analyzer.exclude` (`build/**`, `android/**`, `ios/**`, `web/**`).
-
-### Notes
-- Evaluated Flutter 3.50's `migrate_design_widgets` (`package:material_ui/material_ui.dart`) migration and reverted it because `material_ui`'s `ThemeData` conflicts with `flutter_markdown` (`MarkdownStyleSheet.fromTheme`), `GlobalMaterialLocalizations` collides with `flutter_localizations`, and `flutter gen-l10n` still emits `flutter_localizations` imports. Retained `package:flutter/material.dart` (the 94 remaining `deprecated_member_use` `info` diagnostics are allowed by CI via `flutter analyze --no-fatal-infos`).
+- **Callable Serialization (`createBooking`)**: Added `toSerializableBookingResponse` omitting Firestore `DocumentReference` (`addressRef`) to prevent `onCall` JSON HTTP 500 errors and false Storage rollbacks.
+- **Flutter 3.50 / Dart 3.14 Compatibility & Lints**:
+  - Migrated `clipboard_image_helper_web.dart` from `dart:js_util` to `dart:js_interop` extension types.
+  - Bound non-nullable `uploadBytes` across async gap in `transparency_screen.dart`.
+  - Migrated `RadioGroup<String>` (`admin_resident_registration_screen.dart`), `SharePlus.instance.share(ShareParams(...))` (`document_viewer_screen.dart`), `QrEyeStyle`/`QrDataModuleStyle` (`qr_generator_screen.dart`), `mounted`/`context.mounted` guards, `super.key`, public `State<T>`, and `analysis_options.yaml` exclusions. *(Evaluated and reverted `material_ui` migration due to `flutter_markdown` `ThemeData` and `flutter_localizations` collisions; 94 `deprecated_member_use` infos allowed by `--no-fatal-infos`.)*
 
 ## [1.0.41+42] — 2026-11-17
 
-### Sanctions Management Portrait Filter Wrapping & Responsive Cards
-- **Wrapped Status Filter Bar (`AdminSanctionsScreen`)**:
-  - Replaced the cropped single-line `SingleChildScrollView(scrollDirection: Axis.horizontal)` + `Row` status filter bar with a full-width `Wrap` (`spacing: 8`, `runSpacing: 8`) rendering compact `FilterChip` controls (`VisualDensity.compact`, `MaterialTapTargetSize.shrinkWrap`, `ValueKey('sanction_filter_chip_<status>')`, single-line ellipsis safeguard) so all five status filters (**All**, **Active**, **Payment Under Review**, **Paid & Cleared**, **Waived / Cancelled**) remain visible simultaneously in portrait mobile viewports without horizontal scrolling.
-- **Responsive Sanction Card Headers (`_AdminSanctionCard`)**:
-  - Replaced fixed `Row` layouts in the address/status header and amount/date metadata bar with `Wrap` (`WrapAlignment.spaceBetween`) so long localized status badges and narrow portrait screens wrap cleanly without right-edge overflow.
-- **Tests & Documentation**:
-  - Added portrait (`360x800`) English and Spanish widget tests in `test/features/sanctions/sanctions_screens_test.dart` asserting all 5 filter chips sit inside a `Wrap` completely within the viewport bounds across multiple rows, work immediately on tap, and render seeded cards across all statuses with zero overflow.
+### Changed
+- **Sanctions Portrait Wrapping (`admin_sanctions_screen.dart`)**: Replaced horizontal scroll filter bar with multi-row `Wrap` for all 5 `FilterChip`s and responsive `Wrap` card headers (`360x800` EN/ES portrait tests).
 
 ## [1.0.40+41] — 2026-11-17
 
-### Admin Sanctions Management Copy Fixes
-- **Community-Wide Empty State Text (`AdminSanctionsScreen`)**:
-  - Added dedicated localization keys `adminNoSanctions` (`"There are no recorded sanctions."` / `"No hay sanciones registradas."`) and `adminNoActiveSanctions` (`"There are no active sanctions."` / `"No hay sanciones activas."`) so `AdminSanctionsScreen` no longer displays the resident address-scoped `"for this address"` / `"para este domicilio"` message when loaded or filtered with zero matching sanctions.
-- **Infraction Evidence Upload Label & Narrow-Viewport Layout (`_IssueSanctionModal`)**:
-  - Added `uploadEvidencePhoto` (`"Upload Evidence"` / `"Subir Evidencia"`) replacing the mistakenly reused receipt string `takePhotoReceipt` (`"Take Photo of Receipt"`) in the sanction issuance modal's photo evidence picker.
-  - Wrapped the `_IssueSanctionModal` header title (`l10n.issueSanction`) in `Expanded` to prevent narrow-viewport horizontal overflow in Spanish.
-- **Tests & Documentation**:
-  - Updated `test/features/sanctions/sanctions_screens_test.dart` to verify `adminNoSanctions`, `adminNoActiveSanctions`, and `uploadEvidencePhoto` in both English and Spanish (`360x800` mobile viewport) without overflow while asserting neither `"for this address"` nor `"Take Photo of Receipt"` appears in Admin Sanctions.
+### Fixed
+- **Admin Sanctions Copy & Modal (`admin_sanctions_screen.dart`)**: Added community-wide `adminNoSanctions` / `adminNoActiveSanctions`, `uploadEvidencePhoto` label, and `Expanded` modal header wrapping.
 
 ## [1.0.39+40] — 2026-11-17
 
-### User Directory Create User FAB & Swipe-to-Refresh Layout
-- **Create User Floating Action Button (`AdminUserManagementScreen`)**:
-  - Replaced the duplicate `AppBar` icon button (standalone mode) and top-row button (embedded `AdminShellScreen` mode) with a unified `FloatingActionButton.extended` (`ValueKey('manage_users_create_user_button')`, `_openCreateUserScreen`) positioned consistently in both standalone and embedded views, pre-selecting `guard` or `admin` when filtered and automatically refreshing the directory on return.
-  - Added bottom scroll clearance (`fromLTRB(16, 16, 16, 96)`) so the FAB does not cover bottom user cards or the `Load More` button.
-- **Swipe-to-Refresh Layout (`RefreshIndicator`)**:
-  - Removed the physical `Icons.refresh` icon buttons from both standalone and embedded layouts.
-  - Enabled full-viewport `AlwaysScrollableScrollPhysics()` with cross-device `ScrollConfiguration` drag support (`touch`, `mouse`, `trackpad`, `stylus`) and `ScrollViewKeyboardDismissBehavior.onDrag` on `RefreshIndicator` (`ValueKey('manage_users_refresh_indicator')`) so downward pull-to-refresh works cleanly across mobile, Web, and desktop even when the directory is empty or short.
-- **Tests & Documentation**:
-  - Updated and expanded `test/features/admin/admin_user_management_test.dart` to verify `FloatingActionButton` rendering, absence of `Icons.refresh` in standalone and embedded modes, and pull-to-refresh gesture reloading.
+### Changed
+- **User Directory FAB & Pull-to-Refresh (`admin_user_management_screen.dart`)**: Replaced header/icon refresh buttons with `FloatingActionButton.extended` (`manage_users_create_user_button`) and cross-device `RefreshIndicator` (`manage_users_refresh_indicator`).
 
 ## [1.0.38+39] — 2026-11-17
 
-### Bulk Address & Bulk User CSV Template Downloads
-- **Shared Cross-Platform CSV Export Helper (`CsvDownloadHelper`)**:
-  - Created `lib/core/services/csv_download_helper.dart` centralizing cross-platform CSV downloads (`Blob` + `AnchorElement` download on Flutter Web, path-traversal-sanitized `sanitizeFileName` writes to `getApplicationDocumentsDirectory()` on native platforms returning the saved path).
-- **Bulk Address & Bulk Resident CSV Template Download Actions**:
-  - Updated `AdminBulkAddressImportScreen` (`address_import_template.csv`) and `AdminBulkUserImportScreen` (`resident_import_template.csv`) to provide **Download CSV Template** (`bulk_address_download_template_button` / `bulk_user_download_template_button`) alongside clipboard copy, using responsive `Wrap` layouts and `Flexible` badge text wrapping to prevent narrow-viewport (`360x780`) horizontal overflows in Spanish and English.
-  - Unified `AdminBulkUserImportScreen`'s template CSV export and result CSV export through `CsvDownloadHelper` (`_exportCsvFile`) and added optional `onExportCsv` widget test injection hooks on both screens.
-- **Localization & Tests**:
-  - Added bilingual (`en`/`es`) strings `downloadCsvTemplateButton`, `csvTemplateDownloadedSnackbar`, and `fileSavedToPath` in `app_en.arb` / `app_es.arb` (and fixed a trailing typo in Spanish `csvColumnsHint`).
-  - Added unit tests for `CsvDownloadHelper` (`core_services_test.dart`) and widget + responsive `360x780` Spanish layout tests for both screens (`bulk_address_csv_parser_test.dart`, `bulk_user_csv_parser_test.dart`).
+### Added
+- **CSV Template Downloads (`csv_download_helper.dart`)**: Added cross-platform sanitized `CsvDownloadHelper` and responsive **Download CSV Template** buttons on `AdminBulkAddressImportScreen` and `AdminBulkUserImportScreen`.
 
 ## [1.0.37+38] — 2026-11-17
 
-### Bilingual Financial Transparency Reports & Localized Explorer Paths
-- **Bilingual Financial Summary Publishing (`es` & `en`)**:
-  - Updated `FinancialReportCalculator.buildTransparencyMarkdownReport` and `formatTransparencyPeriodTitle` / `buildTransparencyDocId` to generate deterministic, period-named financial summaries (`'YYYY-MM – YYYY-MM'` or `'YYYY-MM'`, `docId: financial_summary_<start>_to_<end>` or `financial_summary_<start>`) in both **English (`en`)** and **Spanish (`es`)** with localized `#` headings (`# Financial Summary — ...` / `# Resumen Financiero — ...`) and localized `ExpenseCategory` breakdowns (`maintenance`, `gardening`, `security`, `utilities`, `repairs`, `supplies`, `other`).
-  - Updated `AdminPaymentReportScreen._publishSummaryToTransparency` and Cloud Function `syncTransparencyDocument` to publish a single Firestore `documents/{docId}` entry carrying `translatedTitles`, multi-locale `translatedFiles` (with epoch-versioned filenames for cache busting), `folderNameKey` / `localizedNames`, and `visibility`, while automatically deleting superseded Storage files when republishing the same period and keeping non-`official_manuals` folders visible to `'all'` by default.
-  - Added strict Cloud Function validation for `translatedTitles`, `translatedFiles`, `localizedNames`, `folderNameKey`, and managed `documents/` Storage path ownership (`isManagedTransparencyStoragePath`, `normalizeLocalizedStringMap`, `uploadTransparencyFile`).
-- **Hybrid System Folder & Category Localization (`TransparencyLocalizationHelper`)**:
-  - Introduced `TransparencyLocalizationHelper` resolving display names via `localizedNames[locale]` -> well-known `nameKey` / document ID / underscore marker tokens (such as `_financial-reports_`, `_official-manuals_`, `financial_reports`, `official_manuals`, and seeded categories `financial`, `normatives`, `contracts`, `communiques`, `manuals`, `general`) -> fallback raw name across folder cards, breadcrumbs (`_resolvedBreadcrumbs`), document search, category dropdowns/chips, move dialogs, and `DocumentViewerScreen`.
-- **In-App `ES | EN` Language Switcher & Multi-Variant Cache/Deletion Handling**:
-  - Updated `DocumentViewerScreen` to open the active app locale translation automatically when available, display the `ES | EN` `SegmentedButton` language switcher (`document_viewer_language_switcher`) when multiple language variants exist, prevent stale async load races across language switches, and show the active variant's file size and localized category badge.
-  - Updated `TransparencyScreen` to track active locale cache variants (`_cachedVariantFileByDocId`) and delete every translated Cloud Storage file and cached file (`collectDocumentFilesForDeletion`) upon document removal.
-- **Database Schema, Tests & Localization**:
-  - Updated `database_schema.md`, `app_en.arb`, and `app_es.arb` (22 new Transparency report, category, folder, and language switcher keys), and expanded Flutter unit/widget tests (`financial_report_calculator_test.dart`, `payment_report_matrix_test.dart`, `transparency_explorer_test.dart`) and Cloud Functions Node tests (`helpers.test.js`, `handlers.test.js`).
+### Added
+- **Bilingual Financial Transparency & Explorer Localization**:
+  - Published single bilingual (`en`/`es`) financial summary `documents/{docId}` entries (`translatedTitles`, `translatedFiles`, epoch-versioned filenames, `syncTransparencyDocument` Storage cleanup).
+  - Added `TransparencyLocalizationHelper` hybrid system-folder/category resolution and `DocumentViewerScreen` `ES | EN` `SegmentedButton` switcher with stale-request guarding.
 
 ## [1.0.36+37] — 2026-11-17
 
-### Added & Fixed
-- **Cloud Storage Web CORS Policy & Prerequisite Setup (`storage_cors.json` & `README.md`)**:
-  - Added [`storage_cors.json`](storage_cors.json) configuring `GET`/`HEAD` `Access-Control-Allow-Origin` and exposed response headers on Firebase Cloud Storage so Flutter Web clients (`DocumentCacheService`, `DocumentViewerScreen`) can fetch Transparency `.md`/`.pdf`/`.csv` files without `ClientException: Failed to fetch` CORS blocks, and applied it to the project Storage bucket.
-  - Updated `README.md` prerequisites & `gcloud` setup commands (covering `storage_cors.json`, `storage_lifecycle.json`, and Gen 2 Cloud Run `onCall` Public access IAM recovery notes) and added a static audit assertion for `storage_cors.json` in `functions/test/helpers.test.js`.
-- **Admin Auth User Directory & Onboarding Visibility (`adminListAuthUsers` & `AdminUserManagementScreen`)**:
-  - Added the `adminListAuthUsers` HTTPS callable Cloud Function in `functions/index.js` (protected by `admin` RBAC) using `admin.auth().listUsers()` (`getAuth().listUsers()`) paginated across batches and cross-referenced with Firestore `users` metadata (`hasFirestoreProfile`, `hasAddress`, `onboardingCompleted`) without exposing sensitive fields.
-  - Updated `AdminUserManagementScreen` to fetch and merge Auth users with Firestore `users`, render an `Onboarding Incomplete` badge and Auth-only notice on incomplete accounts (`!hasFirestoreProfile` or non-staff accounts missing `addressRef`), and add an `onboarding_incomplete_filter_chip` (`FilterChip`) to isolate incomplete-onboarding users.
-- **Admin User Email Updates (`adminUpdateEmail` & `AdminUserDetailScreen`)**:
-  - Added `adminUpdateEmail` in `functions/index.js` using `admin.auth().updateUser(uid, { email })` (updating Auth email, validating format via `isValidEmail`, mapping Auth conflict/not-found errors, and syncing `users/{uid}.email` when the Firestore profile exists).
-  - Added `EmailValidator` in `lib/core/backend/backend.dart` and an **Update User Email** action (`user_detail_update_email_button`) in `AdminUserDetailScreen`, plus bilingual localization keys (`updateEmailTitle`, `newEmailLabel`, `emailUpdatedSuccess`, `invalidEmailError`, `onboardingIncompleteBadge`, `incompleteOnboardingFilter`, `onboardingIncompleteDetailsNotice`, `authOnlyAccountNotice`) in `app_en.arb` and `app_es.arb`.
-  - Updated `functions/test/handlers.test.js` and `test/features/admin/admin_user_management_test.dart` with coverage for `adminListAuthUsers`, `adminUpdateEmail`, incomplete-onboarding filtering, and Auth-only profile visibility.
+### Added
+- **Storage Web CORS (`storage_cors.json`)**: Enabled `GET`/`HEAD` browser fetches from Firebase Hosting/Web clients + documented `gcloud` & Gen 2 Cloud Run invoker setup.
+- **Auth User Directory & Email Edit (`adminListAuthUsers`, `adminUpdateEmail`)**: Merged Firebase Auth users with Firestore profiles to flag `Onboarding Incomplete` accounts and allow admin email updates.
 
 ## [1.0.35+36] — 2026-11-16
 
 ### Added & Fixed
-- **Sign Out Button on Address Claim / Family Group Onboarding Screen (`lib/main.dart`)**:
-  - Added a persistent `TextButton.icon` (`onboarding_logout_button`) at the bottom of `_buildAddressSelectionAndProofForm` calling `Backend.auth.signOut()` with localized `l10n.logout` copy, ensuring newly registered or unassigned users can sign out regardless of whether they are on the **Claim Property** or **Join as Roommate / Family Group** tab (or when no unclaimed addresses are listed).
-  - Memoized resident address, ownership claim, and unclaimed address streams in `MyHomePageState` (`_getUnclaimedAddressesStream`, `_getUserAddressesStream`, `_getClaimsStream`) so rebuilding the onboarding screen does not miss initial stream snapshots or re-subscribe `StreamBuilder`s unnecessarily.
-  - Added a widget test in `test/widget_test.dart` verifying button visibility across both onboarding tabs and verifying `Backend.auth.signOut()` execution on tap.
+- **Onboarding Sign Out (`main.dart`)**: Added `onboarding_logout_button` across Claim/Roommate tabs and memoized onboarding streams.
 
 ## [1.0.34+35] — 2026-11-16
 
-### Changed & Fixed
-- **Welcome Message Template Mobile Layout & Default Body Pre-Fill (`AdminSettingsScreen`)**:
-  - Replaced the fixed `Row` inside the Custom Welcome Message card in `lib/features/admin/admin_settings_screen.dart` with a responsive `LayoutBuilder` (`< 520px` breakpoint) that renders the description across the full card width and stacks a compact `reset_default_template_button` right-aligned beneath it on mobile devices, eliminating severe vertical text squishing.
-  - Updated `_loadSettings()` so that when no custom email body has been persisted in `config/smtp_settings` (`customBody` missing or blank), `_customBodyController.text` automatically pre-fills with the localized `l10n.defaultWelcomeBody`.
-  - Added widget tests in `test/features/qr_access/qr_exit_scanner_and_settings_test.dart` covering default template body pre-fill, preservation of saved custom bodies, and Spanish `360x780` mobile layout positioning without overflow or text squishing.
+### Changed
+- **Welcome Email Template Layout (`admin_settings_screen.dart`)**: Pre-filled `defaultWelcomeBody` when unset and stacked reset button cleanly `< 520px`.
 
 ## [1.0.33+34] — 2026-11-16
 
 ### Changed & Fixed
-- **Financial Reports Screen Rebrand, Reordering & Mobile Overflow Fix (`AdminPaymentReportScreen`)**:
-  - Rebranded `downloadReportMenu` and `generateReportTitle` in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb` from *Download Payment Report* / *Payment Matrix Report* (`Descargar Reporte de Pagos` / `Reporte Matriz de Pagos`) to **Download Financial Reports** / **Financial Reports** (**Descargar Reportes Financieros** / **Reportes Financieros**).
-  - Reordered sections in `lib/features/admin/admin_payment_report_screen.dart` so the **Financial Summary Preview** card (`financial_summary_preview_card`) renders at the top below the screen header, followed by the **Start Month** / **End Month** dropdown pickers (`isExpanded: true` with text ellipsis), and all download/publish/bulk-import options grouped at the bottom (stacking secondary buttons cleanly on `< 520px` mobile viewports).
-  - Fixed horizontal text overflow inside `_buildFinancialPreviewCard` on narrow mobile viewports (e.g., `"Vista Previa del Resumen Financiero"`) by wrapping the card heading in `Expanded`, adding gap spacing and top alignment to `_PreviewLine`, and applying compact responsive screen/card padding below `600px`.
-  - Added Spanish mobile (`360x780`) layout/order/overflow regression test in `test/features/admin/payment_report_matrix_test.dart` and updated label assertions in `test/features/admin/admin_shell_screen_test.dart`.
+- **Financial Reports Rebrand & Layout (`admin_payment_report_screen.dart`)**: Rebranded to *Financial Reports*, moved KPI summary card to top, and fixed narrow mobile text overflow.
 
 ## [1.0.32+33] — 2026-11-16
 
 ### Fixed
-- **Mobile Responsive Layout in `AdminBulkPaymentImportScreen`**:
-  - Fixed unreadable vertical character-by-character wrapping and overlapping controls in the Starting Period selector on narrow mobile viewports (`< 520px`) by introducing `LayoutBuilder` breakpoints in `lib/features/admin/admin_bulk_payment_import_screen.dart` (`_buildPeriodRangeSelector`) that stack the full-width `Select Starting Period` button below the `Starting Period -> End Period` summary row (and switch to a vertical column below `220px`).
-  - Added responsive page/card padding (`12px`/`16px` on `< 600px` mobile vs. `24px`/`20px` on wider viewports) centered within a `960px` `ConstrainedBox`.
-  - Stacked template download/copy and results export action buttons cleanly at full width on compact screens (`_buildTemplateActions`, `_buildResultActions`, `_buildResponsiveButtonGroup`) with balanced vertical button padding.
-  - Replaced the fixed `Row` in the CSV Preview header (`_buildPreviewHeader`) with a responsive `LayoutBuilder` (`< 560px` vertical stack) to prevent horizontal overflow when previewing imported rows.
-  - Wrapped `_pickStartingPeriod` and `_showReconciliationDialog` dialog contents in `SingleChildScrollView`, added `isExpanded: true` to the Month/Year `DropdownButtonFormField`s (plus localized `l10n.ok` button text), and stacked comparison cards vertically on ultra-narrow dialogs (`< 260px`).
-- **Automated Responsive Widget Tests (`test/features/admin/admin_bulk_payment_import_test.dart`)**:
-  - Added Spanish mobile (`360x780`) and English desktop (`1024x800`) widget layout tests asserting zero overflow exceptions, readable label dimensions, stacked period/template controls on mobile, inline controls on desktop, and overflow-free period picker dialog rendering.
+- **Bulk Payment Import Mobile Layout (`admin_bulk_payment_import_screen.dart`)**: Added `< 520px` / `< 600px` breakpoints for period selector, buttons, preview header, and scrollable reconciliation/period dialogs.
 
 ## [1.0.31+32] — 2026-11-16
 
 ### Added
-- **Admin Expense Recording & Soft-Void Audit System**:
-  - Added Cloud Functions `createExpense` and `voidExpense` in `functions/index.js` along with `extractScopedStoragePath`, `extractExpenseStoragePath`, and `validateAndNormalizeExpenseEvidence` enforcing admin RBAC, UID-scoped Storage ownership (`expenses/<uid>/`), magic-byte header inspection (rejecting and deleting spoofed uploads), and immutable soft-void audit metadata (`status: 'voided'`, `voidedBy`, `voidedByName`, `voidedAt`, `voidReason`).
-  - Added admin-only Firestore rules for `/expenses/{expenseId}` (`allow read: if isAdmin(); allow write: if false;`), Storage rules for `/expenses/{uploaderUid}/**` (10 MB limit, `isAllowedExpenseEvidence()` for `pdf`/`jpg`/`png`/`webp`), and composite indexes on `expenses` in `firestore.indexes.json`.
-  - Created `lib/features/admin/expense_service.dart` (`ExpenseCategory`, `ExpenseEvidence`, `ExpenseRecord`, `ExpenseService`) with CSPRNG Storage path generation, `Content-Disposition: attachment` metadata, Storage object rollback on callable failures, and local temp camera cleanup via `TempImageCleanupService`.
-  - Created `lib/features/admin/admin_expenses_screen.dart` (`AdminExpensesScreen`, `AdminExpenseDetailScreen`, `_RecordExpenseModal`, `_VoidExpenseDialog`) with live net accumulated budget strip, period/category/status filters, dual evidence pickers (photo for acquired product/service + image/PDF for receipt/invoice), `RotatableImagePreview` inline rotation + full-screen inspection, PDF view/download delegation, and soft-void workflow.
-  - Added `AdminSection.expenses` under **Finance -> Community Expenses** in `AdminShellScreen`.
-- **Accumulated Budget Calculator & Multi-Report Financial Export Bundle**:
-  - Created `lib/features/admin/financial_report_calculator.dart` (`MonthlyLedgerRow`, `FinancialLedgerResult`, `FinancialReportCalculator`) performing integer-cent precision accounting across approved/paid maintenance quotas, approved/paid sanction fines, active (non-voided) expenses, and configurable opening balances, plus CSV formula injection neutralization (`sanitizeCsvTextCell`), `buildFinancialLedgerCsv`, and PII-free `buildTransparencyMarkdownReport`.
-  - Upgraded `AdminPaymentReportScreen` to preview live financial totals (Brought-Forward Balance, Maintenance Income, Sanction Income, Active Expenses, Ending Accumulated Budget) and export a **Multi-Report Financial Bundle** (private Address Payment Status Matrix CSV + Financial Ledger & Accumulated Budget Summary CSV) alongside individual download buttons.
-  - Added **Publish Financial Summary to Transparency** dialog (`_PublishTransparencyDialog`) and extended `syncTransparencyDocument` MIME handling (`.md`, `.csv`, `.txt`, images, `.pdf`). **Privacy Guarantee**: Only aggregated community totals and expense summaries are published as Markdown; the address payment status matrix and resident PII are strictly never disclosed publicly.
-- **Opening Balance Configuration in General Settings**:
-  - Added `initialBudgetBalance` and optional `initialBalancePeriod` (`YYYY-MM`) fields inside the **Payment & Grace Period** card in `AdminSettingsScreen`, persisted via auto-save to `config/app_settings`.
-- **Shared Transfer Helpers, Localization & Automated Tests**:
-  - Extended `DocumentTransferHelper` with `pickAllowedImage`, `pickExpenseReceipt`, and parameterized `pickAllowedDocument`.
-  - Added complete English and Spanish localization keys in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb` and regenerated `lib/l10n/app_localizations*.dart`.
-  - Added backend unit/handler/security rules tests (`functions/test/helpers.test.js`, `functions/test/handlers.test.js`, `functions/test/security_rules.test.js`) and Flutter unit/widget tests (`financial_report_calculator_test.dart`, `expense_service_test.dart`, `admin_expenses_screen_test.dart`, plus updates to `payment_report_matrix_test.dart`, `qr_exit_scanner_and_settings_test.dart`, and `admin_shell_screen_test.dart`).
+- **Admin Expenses, Accumulated Budget & Multi-Report Financial Export (`admin_expenses_screen.dart`, `expense_service.dart`, `financial_report_calculator.dart`, `functions/index.js`)**:
+  - Added `createExpense` / `voidExpense` callables (magic-byte + UID Storage path validation), `/expenses` rules/indexes, dual evidence capture, integer-cent accumulated budget KPIs & CSV bundle (`CWE-1236` sanitized), PII-free Markdown summary publishing, and Opening Balance settings (`initialBudgetBalance` / `initialBalancePeriod`).
 
 ## [1.0.30+31] — 2026-11-16
 
 ### Fixed
-- **Web Build & Cross-Platform CSV Upload in `AdminBulkPaymentImportScreen`**:
-  - Fixed compilation failure in `lib/features/admin/admin_bulk_payment_import_screen.dart` caused by `FilePicker.platform.pickFiles(...)` (removed in `file_picker ^11.0.2`), which broke `flutter build web`, `flutter analyze`, and Flutter test suites.
-  - Added `kIsWeb` HTML file picker (`html.FileUploadInputElement` + `html.FileReader`) on Web and updated native picking to `FilePicker.pickFiles(...)` with disk-path fallback, matching the codebase pattern in `AdminBulkUserImportScreen` and `AdminBulkAddressImportScreen`.
-  - Added handling for empty CSV errors (`parsed['error'] == 'empty'`), safe `num` to `int` coercions for Cloud Function summary counts, and replaced the hardcoded template-load error snackbar in `_downloadAllAddressesTemplate` with `l10n.errorPrefix(...)` (resolving the `unused_local_variable` warning).
-- **Bulk Payment Import Test Suite (`test/features/admin/admin_bulk_payment_import_test.dart`)**:
-  - Escaped the literal `$1,500.00` string interpolation error in the `splitCsvLine` unit test fixture and added parser tests for empty CSVs and semicolon delimiters.
-- **Generated Localizations (`lib/l10n/`)**:
-  - Regenerated localization outputs via `flutter gen-l10n` to keep generated files synchronized with `app_en.arb` and `app_es.arb`.
+- **Web File Picker Fix (`admin_bulk_payment_import_screen.dart`)**: Replaced removed `FilePicker.platform.pickFiles` API with `kIsWeb` HTML picker + `FilePicker.pickFiles`.
 
 ## [1.0.29+30] — 2026-11-14
 
 ### Added
-- **Bulk Previous Payments Import Interface (`AdminBulkPaymentImportScreen`)**:
-  - Implemented `lib/features/admin/admin_bulk_payment_import_screen.dart` allowing administrators to upload historical resident payments in bulk via CSV.
-  - Added interactive **Starting Period** calendar picker selector defaulting the end period to the current calendar month.
-  - Added dual template downloads: **Sample Template** (with dummy amounts) and **All Addresses Template** (pre-populating all registered community addresses with empty month columns).
-  - Built client-side parser supporting case-insensitive street matching, bilingual English/Spanish `mmm-yy` periods, monetary amount extraction (`$1,500.00`, `1500`), and empty/0 unpaid handling.
-  - Created sequential pre-import reconciliation dialog guiding admins through amount discrepancies (`existingAmount != csvAmount`) to choose "Keep Existing" vs. "Overwrite with CSV" prior to committing.
-  - Added comprehensive results reporting displaying summary metrics, color-coded per-address breakdown, and downloadable results CSV export.
-- **Callable Cloud Functions for Pre-Check & Bulk Import**:
-  - Added `adminPreCheckPaymentImport` in `functions/index.js` to resolve addresses, match existing approved payments, and detect amount mismatches in a single request.
-  - Added `adminBulkImportPayments` in `functions/index.js` to batch-create approved `payments` documents, apply reconciliation directives, skip identical periods idempotently, and trigger automatic `recalculateAddressPaymentStatus` on affected addresses.
-- **Admin Shell Navigation & Screen Shortcuts**:
-  - Activated `AdminSection.importPaymentHistory` in `admin_shell_screen.dart` under the **Finance** menu.
-  - Added direct navigation shortcut buttons in `AdminUploadPaymentScreen` and `AdminPaymentReportScreen`.
-- **Localization & Automated Tests**:
-  - Added complete English and Spanish translation keys in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
-  - Added unit tests in `functions/test/helpers.test.js` and `functions/test/handlers.test.js` verifying period parsing, street normalization, and RBAC enforcement.
-  - Added Flutter widget and parser tests in `test/features/admin/admin_bulk_payment_import_test.dart`.
+- **Bulk Historical Payment Import (`admin_bulk_payment_import_screen.dart`, `adminPreCheckPaymentImport`, `adminBulkImportPayments`)**: Interactive period range picker, dual CSV templates, EN/ES `mmm-yy` parser, sequential mismatch reconciliation, and results CSV export.
 
 ## [1.0.28+29] — 2026-11-13
 
 ### Changed
-- **Desktop & Keyboard Sign-In Flow on `LoginScreen`**:
-  - Added `textInputAction: TextInputAction.done` and `onSubmitted: (_) => _login()` to the password text field across both desktop/wide and mobile layouts, allowing users to authenticate by pressing Enter without having to manually click the Sign In button.
-  - Added `textInputAction: TextInputAction.next` to the email text field to advance focus naturally to the password field.
-  - Added `if (_isLoading) return;` guard to `_login()` to prevent accidental duplicate submission.
-  - Implemented `dispose()` for `_emailController` and `_passwordController` to prevent memory leaks.
-- **Automated Widget Tests**:
-  - Added widget test in `test/features/auth/auth_screens_test.dart` verifying that submitting the password field triggers the sign-in workflow on desktop web.
+- **Login Keyboard Submit (`login_screen.dart`)**: Added `TextInputAction.next`/`.done`, `onSubmitted`, duplicate-submit guard, and controller disposal.
 
 ## [1.0.27+28] — 2026-11-11
 
-### Added
-- **Shared Rotatable Evidence Preview Component (`RotatableImagePreview`)**:
-  - Created `lib/core/widgets/rotatable_image_preview.dart` encapsulating `RotatedBox`, `StorageNetworkImage`, full-surface clickable `InkWell`, and the two top-right circular overlay buttons: **Rotate Image (`90°`)** (`Icons.rotate_right`) and **View Full Image** (`Icons.open_in_full`), forwarding the active inline orientation (`initialQuarterTurns`) into `showInteractiveImageDialog`.
-
-### Changed
-- **Unified Inline Rotate & Full-Screen Controls Across All Evidence Approval Flows**:
-  - **Payment Approval (`AdminPaymentDetailScreen`)**: Upgraded both the primary proof-of-payment receipt viewer and the linked sanction infraction photo viewer (`concept == 'sanction'`) to `RotatableImagePreview`, with constrained scrollable payment metadata on mobile (`<= 650px`) to prevent vertical overflow.
-  - **Amenity Booking Approval (`AdminBookingApprovalScreen`)**: Rendered inline `RotatableImagePreview` containers with top-right rotate and full-screen buttons beneath image attachments (`jpg`, `jpeg`, `png`, `webp`) in the **Submitted Documentation** section while preserving `View / Download` actions for all document types.
-  - **Sanctions Evidence (`AdminSanctionsScreen` & `SanctionsScreen`)**: Replaced plain `StorageNetworkImage` thumbnails (and removed the legacy hardcoded `'Zoom'` badge in `SanctionsScreen`) with `RotatableImagePreview` so administrators and residents can rotate and expand infraction evidence directly on sanction cards.
-  - **Resident Ownership Approval (`AdminResidentDetailScreen`)**: Refactored `buildProofPreview()` to consume the shared `RotatableImagePreview` widget while preserving all existing keys and layout behavior.
-- **Automated Widget Tests**:
-  - Expanded `test/features/admin/admin_payment_approval_test.dart`, `test/features/admin/admin_booking_approval_test.dart`, and `test/features/sanctions/sanctions_screens_test.dart` to assert inline 90-degree rotation and `initialQuarterTurns` synchronization into the full-screen viewer across receipts, linked sanction evidence, image booking attachments, and sanction cards.
+### Added & Changed
+- **`RotatableImagePreview` (`rotatable_image_preview.dart`)**: Shared inline `90°` rotate + full-screen zoom component unified across Payment, Booking, Sanctions, and Resident Approval screens.
 
 ## [1.0.26+27] — 2026-11-10
 
-### Changed
-- **Master-Detail Resident Ownership Approval UI (`AdminResidentApprovalScreen` & `AdminResidentDetailScreen`)**:
-  - Redesigned `AdminResidentApprovalScreen` (`lib/features/auth/admin_resident_approval_screen.dart`) to match the `AdminPaymentApprovalScreen` master-detail workflow:
-    - Added branded `AppConfig.primaryColor` `AppBar` when opened standalone while hiding it seamlessly when embedded inside `AdminShellScreen` (`isEmbedded: true`).
-    - Replaced inline approve/reject list cards with compact, button-free, keyed stateful `_ResidentSummaryCard` widgets displaying physical address (`Street #Number`), `Pending Review` status badge, applicant name chip, property handover date chip, and trailing chevron to eliminate accidental mobile misclicks.
-    - Added dedicated `AdminResidentDetailScreen` adapting via `LayoutBuilder`: side-by-side split layout (`> 650px`) with expanded ownership proof preview on the left and claim metadata + `Reject` / `Approve Resident` actions on the right, and a stacked vertical layout (`<= 650px`) with constrained scrollable metadata and expanded proof preview on mobile.
-    - Masked applicant email addresses (`_maskEmail`) on the detail screen and added a localized privacy-by-design notice (`adminProofDeletionNotice`) explaining automatic Cloud Storage proof deletion upon approval or rejection.
-
-### Added
-- **Inline & Full-Screen 90-Degree Rotatable Ownership Proof Viewer (`AdminResidentDetailScreen` & `showInteractiveImageDialog`)**:
-  - Added inline 90-degree rotation button (`inline_rotate_image_button` / `inline_proof_rotated_box`) and full-screen expand trigger (`fullscreen_proof_button` / `ownership_proof_thumbnail`) directly on `AdminResidentDetailScreen` so sideways deeds or utility bills can be oriented immediately.
-  - Added optional `initialQuarterTurns` parameter to `showInteractiveImageDialog` (`lib/core/widgets/interactive_image_dialog.dart`) so inline rotation carries seamlessly into the full-screen 20%-padded pinch-to-zoom and rotatable viewer.
-- **Emulator Seed, Localization & Widget Tests**:
-  - Added `unknownAddress`, `residentRejectedSuccess`, and `adminProofDeletionNotice` in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
-  - Updated `scripts/seed_emulator.js` to support unverified (`role: null`) accounts and `quarterTurns` PNG pixel rotation, seeding 3 pending `ownership_claims` (`applicant@test.com`, `applicant2@test.com`, `applicant3@test.com`) with sideways, upside-down, and portrait proof images.
-  - Expanded `test/features/auth/auth_screens_test.dart` to test empty state, master-detail summary card navigation, wide `> 650px` side-by-side layout, PII email masking, inline + full-screen 90-degree rotation synchronization, approval workflow, and mobile Spanish rejection workflow.
+### Added & Changed
+- **Resident Approval Master-Detail & Proof Rotation (`admin_resident_approval_screen.dart`, `interactive_image_dialog.dart`)**: Keyed `_ResidentSummaryCard` queue -> responsive `AdminResidentDetailScreen` with masked email, inline/full-screen `initialQuarterTurns` rotation, proof-deletion notice, and rotated emulator seed claims.
 
 ## [1.0.25+26] — 2026-11-08
 
 ### Added
-- **Admin Amenity Documentation (`AdminFacilitiesScreen`)**:
-  - Administrators can attach multiple facility templates, waivers, guest-list forms, or reference rules (`PDF`, `DOC`, `DOCX`, `XLS`, `XLSX`, `JPG`, `JPEG`, `PNG`, `WEBP` up to 10 MB each) when creating or editing an amenity (`facilities.facilityDocuments[]`).
-  - Added per-document requirement modes: `mandatory_return` (resident must attach a completed copy), `optional_return` (optional attachment), and `informative` (download/view reference only).
-  - Implemented Cancel-safe staged document editing inside `_EditFacilityDialog`, automatic Cloud Storage cleanup for removed templates on Save, and full `facility_documents/{facilityId}/**` cleanup on facility deletion.
-- **Resident Facility Document Download & Booking Attachments (`BookingScreen`, `ManageBookingsScreen`, `FacilityDocumentsSection`)**:
-  - Residents can download/view amenity documentation (cached locally via `DocumentCacheService`) and attach completed files or bounded camera photos (`1600px` max + `TempImageCleanupService`) to their booking requests.
-  - Enforced client- and server-side blocking when any `mandatory_return` document is missing.
-  - Added submitted attachment `ActionChip` viewers and a localized 30-day purged notice (`bookingAttachmentsPurgedNotice`) in `ManageBookingsScreen`, plus attachment preloading and replacement inside `_ResubmitBookingDialog` when resubmitting rejected bookings (`resubmitBookingId`).
-  - Added automatic Cloud Storage rollback (`BookingService.rollbackUploadedUrls`) if `createBooking` fails after uploading attachments.
-- **Admin Booking Approval Attachment Review (`AdminBookingApprovalScreen`)**:
-  - Added real-time **Submitted Documentation** panel streaming `booking_attachments/{bookingId}` with requirement mode badges and one-tap **View / Download** actions before approving or rejecting a request.
-- **Security, Privacy Isolation & Automated 30-Day Retention**:
-  - Created isolated `booking_attachments/{bookingId}` Firestore collection readable exclusively by administrators, the booking creator (`userUid`), or linked household roommates (`isCallerAddressResident(addressId)`), keeping neighbor-readable `bookings` documents free of private Storage URLs (`hasAttachments`, `attachmentCount`, `attachmentsPurgedAt`).
-  - Enforced dual client + server 16-byte magic-byte signature verification (`PDF`, `PNG`, `JPEG`, `WEBP`, `ZIP/OOXML`, `OLE2`), strict exclusion of `SVG` and `HTML` MIME/extensions, CSPRNG Storage object paths, filename path-traversal sanitization, and `Content-Disposition: attachment` metadata headers.
-  - Added immediate attachment cleanup in `cancelBooking`, 30-day post-booking Firestore TTL (`booking_attachments.expireAt = endTime + 30d` with single-field index exemption), cascading `onBookingAttachmentDeleted` Cloud Storage cleanup, daily `purgeExpiredBookingAttachments` scheduled fallback sweep (querying indexed `bookingEndTime`), and a 125-day GCS Object Lifecycle rule in `storage_lifecycle.json`.
-- **Localization & Automated Tests**:
-  - Added 21 English and Spanish localization keys in `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`.
-  - Added unit, widget, Cloud Functions handler/helper, and Security Rules static audit tests across `test/features/booking/booking_documents_test.dart`, `test/features/admin/admin_facilities_test.dart`, `test/features/admin/admin_booking_approval_test.dart`, and `functions/test/`.
-
-### Documentation
-- **Project Prerequisites & `gcloud` Retention Provisioning (`README.md`)**:
-  - Added a top-level `## Prerequisites` section documenting required SDK/CLI toolchains and installation commands (`Flutter`, `Node.js 22`, `firebase-tools`, `flutterfire_cli`, and Google Cloud CLI `gcloud`).
-  - Documented the one-time `gcloud` authentication, native Cloud Firestore TTL policy enablement (`access_logs.expireAt`, `qr_codes.expireAt`, and `booking_attachments.expireAt`), Cloud Storage Object Lifecycle bucket update (`storage_lifecycle.json`), and verification commands, linked from Setup Step 5.
-
+- **Facility Documentation, Booking Attachments & Retention**:
+  - Admin `facilityDocuments` templates (`mandatory_return`, `optional_return`, `informative`), household/admin-isolated `booking_attachments/{bookingId}`, dual magic-byte verification, rejection resubmission with attachment replacement, `cancelBooking` Storage purge, 30d/7d/60d Firestore TTLs + triggers (`onBookingAttachmentDeleted`, `onAccessLogDeleted`), 62d/125d GCS lifecycle rules, and `README.md` `gcloud` prerequisite guide.

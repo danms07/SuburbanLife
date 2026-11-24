@@ -1,449 +1,158 @@
 # Suburban Life
 
-A white-label residential management platform built using **Flutter** and **Firebase**. Suburban Life provides secure, multi-platform solutions for residents, security staff, and administrators.
+White-label residential community management platform built with **Flutter** and **Firebase** for residents, security guards, and administrators.
+
+## Documentation Map
+
+| Doc | Use For |
+| :--- | :--- |
+| [`Structure.md`](Structure.md) | File index, exported Dart symbols, and architectural boundary rules |
+| [`database_schema.md`](database_schema.md) | Firestore collections, RTDB paths, Storage rules, 33 composite indexes & TTL policies |
+| [`functions/README.md`](functions/README.md) | 25 Cloud Function callables, 10 Firestore triggers, daily cron & FCM/RTDB notifications |
+| [`widget_catalog.md`](widget_catalog.md) | Reusable UI widgets, responsive breakpoints, and stable widget keys |
+| [`terraform/README.md`](terraform/README.md) | Automated GCP & Firebase provisioning via Terraform + existing-project importer |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history |
+
+*(End-user PDF manuals and future feature plans live in `docs/`.)*
 
 ---
 
-## Features
+## Core Capabilities
 
-- **Adaptive Admin NavDrawer Workspace & Role Footers**: Persistent left sidebar on desktop (`>= 900px`) and modal hamburger `Drawer` on mobile (`< 900px`) organizing administrative workflows into **Overview** (with pending approval cards and live community KPIs that collapse into expandable cards on mobile, conditional **Visitors currently inside** KPI shown when **Scan on exit** is enabled, 6 quick **Shortcuts** cards, and an Overview-only **Generate Access QR** FAB), collapsible category groups (**User Management**, **Residential Management**, **Finance**, **Transparency & Community**) with roll-up notification badges, a direct single-tap **General Settings** item, and a bottom-pinned `Logout` action with the localized **App Version** footer (`AppVersionLabel`, also displayed in the Resident navigation drawer and the Guard Panel bottom footer).
-- **Secure Multi-Role Access Control & Master-Detail Resident Onboarding Approval**: Integrated with Firebase Auth and Cloud Functions, including self-service resident signup with ownership proof capture, compact button-free pending claim cards, and a responsive **Resident Approval Detail** screen with PII-masked applicant email, inline + full-screen 90-degree rotatable document inspection, and privacy-by-design Cloud Storage cleanup upon decision.
-- **Bulk Resident & Address Import via CSV**: Administrator bulk creation with temporary passwords and automated claim granting.
-- **Address-Level Sanctions System**: Neighborhood infraction issuance with photographic evidence, wrapping portrait-friendly status filters, automated standing restrictions, inline 90-degree rotation and full-screen interactive zoom controls on infraction evidence cards, and direct payment flows.
-- **Enhanced Payment Form, Receipt Review & Rejection Recovery**: Strict validation for folio, concept (quota vs sanction), and payment date, advance periods toggle with checklist view, persistent missing-field warnings, admin approval detail screens with inline 90-degree rotation + full-screen 20%-padded zoom controls on both payment receipts and linked sanction evidence (`RotatableImagePreview`), customizable admin rejection reason pool, and one-tap recovery pre-filling for rejected payments.
-- **Admin Expense Recording, Accumulated Budget & Multi-Report Financial Export**: Admin-only expense management under **Finance -> Community Expenses** (`AdminExpensesScreen`) requiring product/service description, positive monetary amount, `YYYY-MM` billable period aligned with maintenance quotas, category, mandatory photo evidence of the acquired product/service (`JPG/PNG/WEBP`), and mandatory receipt/invoice evidence (`JPG/PNG/WEBP/PDF`) validated server-side via Storage path ownership and magic-byte header checks, with full soft-void audit trail (`status: 'voided'`, `voidReason`, preserved evidence). Supports optional configurable Opening Balance (`initialBudgetBalance` and `initialBalancePeriod`) in General Settings, integer-cent accumulated budget calculations aggregating approved/paid maintenance quotas + sanction fines minus active expenses, one-click Multi-Report Bundle CSV export (`Address Payment Status Matrix CSV` + `Financial Ledger & Accumulated Budget Summary CSV`), and an optional bilingual (Spanish & English) aggregated Markdown summary publish action to **Transparency** that strictly excludes address-level payment matrices or resident PII.
-- **Facility Booking Policies, Cooldowns, Quotas & Master-Detail Review**: Household-scoped (`addressRef`) booking policies supporting either a waiting **Cooldown Period** (`hours | days | months | years` measured from booking end to next booking start) or a calendar **Booking Quota** (`daily | monthly | yearly` max bookings per household in the community timezone), configurable **Amenity Documentation** templates (`mandatory_return`, `optional_return`, or `informative` across `PDF`, `Word`, `Excel`, `JPG`, `PNG`, `WEBP` up to 10 MB with magic-byte verification and `Content-Disposition: attachment`), resident document download and completed-file/photo attachment slots isolated in `booking_attachments/{bookingId}` with automated **30-day post-booking TTL cleanup**, advance anticipation windows, daily operating hours boundaries (`openingTime` - `closingTime`), live quota usage badges, anonymous confirmed-only schedule calendar streaming, a **Master-Detail Booking Approval** workflow (compact button-free summary cards opening a dedicated responsive `AdminBookingDetailScreen` with attachment inspection and inline rotatable & full-screen previews for image attachments), custom rejection rationale, atomic rejected-booking resubmission (with attachment replacement), and preset approval instruction templates.
-- **Rich Media & Emoji Community Announcements**: Broadcast announcements featuring high-resolution banner images, interactive full-screen viewer, quick-access announcement emojis, audience filtering (Everyone / Residents), and keyless Gemini AI Spanish-to-English translations.
-- **Collapsible Auto-Saving Admin Settings & SMTP Email Service**: Expandable/collapsible settings cards with real-time auto-save for switches and general settings, plus dedicated manual saving and handshake testing for SMTP server credentials and custom welcome email templates.
-- **QR-based Visitor Access, Optional Exit Scanning, Audit Logs & Automated TTL Retention**: Live validation logs, single-flight QR scan validation with disabled action/rescan buttons and a blocking floating wheel overlay while visitor details (including highlighted **Destination** address with localized `Admin office` handling) load or access submits, memory-bounded ID and license plate photo capture on entry with automatic local device cleanup immediately after Cloud Storage upload, automated **60-day TTL retention** for `access_logs` and linked Cloud Storage photos (`visitor_ids/**` and `visitor_plates/**` via `onAccessLogDeleted`, daily fallback sweeps, and a 62-day GCS Object Lifecycle safety net), automated **7-day TTL cleanup** for expired/validated/revoked QR passes (preserving active permanent passes and open visits), optional admin-configurable **Scan on exit** (`Escanear para salir`) mode with fast one-tap guard departure logging (supporting automatic entry/exit detection and legacy same-day QR passes), live **INSIDE** badges on resident QR passes, and an administrator audit screen with **Currently Inside** KPIs, entry/exit timestamps, adaptive multi-filter exploration (wrapping `ChoiceChip`s on mobile), wrapping search summary bars, and 20-event batches for unfiltered browsing.
-- **User Directory & Account Management**: Unified user and security guard directory merging Firebase Auth accounts (`adminListAuthUsers` via `getAuth().listUsers()`) with Firestore `users` profiles so admins can also inspect and filter users who have not completed onboarding (`Onboarding Incomplete` badge and filter chip), alongside whole-database query search (by street, name, or email), street dropdown and adaptive role filtering (`SegmentedButton` on wide viewports and wrapping `ChoiceChip`s on mobile), wrapping search summary bars, 20-user batched query pagination for unfiltered browsing, and compact button-free summary cards that open a dedicated **User Account Details** screen separating standard actions (email updates via `adminUpdateEmail`, password resets, role toggling, delivery date editing) from sensitive actions (address unbinding and account removals).
-- **Facility Booking & Document Viewers**: Seamless management of common spaces and important residential files.
-- **Cross-Platform Push Notifications & RTDB Mirrored Inbox**: End-to-end Firebase Cloud Messaging (`firebase_messaging`) alerts mirrored to Firebase Realtime Database (`/notifications/{uid}` & `/user_notification_settings/{uid}` with `database.rules.json` owner-only read/read-receipt rules and 30-day / 100-item retention) across Android (7 notification channels), iOS (APNs + Notification Entitlement), and Web (Service Worker + VAPID keys), covering admin payment/booking/claim approvals/rejections, sanctions, QR entry/exit alerts, roommate linking, announcements, visibility-gated transparency documents, and new admin review requests. Includes live `NotificationBellButton` unread counts, dismissible `InAppNotificationBanner` foreground alerts, an `All`/`Unread` notification inbox, permission lifecycle opt-in flows, and granular preferences letting users mute push or foreground banners and read exclusively via the bell badge.
+- **Multi-Role Workspace**: Adaptive Admin sidebar/drawer workspace (`Overview` KPIs, roll-up badges, shortcuts), Resident dashboard & multi-property header switcher, and Security Guard QR panel.
+- **Resident & Roommate Onboarding**: Password-validated signup, cascading address picker, ownership-proof upload & master-detail admin approval (`reviewOwnershipClaim`), plus QR/UID roommate linking.
+- **Financials, Expenses & Sanctions**: Monthly & advance multi-period payments with master-detail proof review and rejection recovery; admin expense ledger with dual evidence & soft-voiding (`createExpense`/`voidExpense`); opening balance + integer-cent accumulated budget reporting (CSV bundle & PII-free bilingual Transparency Markdown); address-level sanctions with inline/full-screen rotatable evidence.
+- **Amenity Bookings & Document Attachments**: Household-scoped cooldowns (`hours`–`years`) or calendar quotas (`daily`–`yearly`), operating hours, anticipation windows, required/optional returnable document templates (`booking_attachments/{bookingId}` w/ 30d TTL), master-detail approval, and atomic resubmission.
+- **Gatehouse QR Access & Audit Logs**: Single-flight guard QR scanner displaying destination addresses (`Admin office` aware), optional Scan-on-Exit fast departure mode, live `INSIDE` pass badges, bounded ID/plate temp capture cleanup, and 60d retention audit logs (`access_logs`).
+- **Transparency & Announcements**: Virtual folder/category file explorer with hybrid EN/ES localization, `ES | EN` in-app document viewer, role-based `all`/`admin` visibility, and announcements with Web clipboard paste + Vertex AI translation.
+- **Cross-Platform Notifications**: FCM push + RTDB inbox (`/notifications/{uid}` w/ 30d / 100-item retention) across Android (7 channels), iOS, and Web (`firebase-messaging-sw.js` + VAPID), bell badge, foreground banner, and per-category preferences.
 
 ---
 
 ## Prerequisites
 
-Before configuring and deploying **Suburban Life**, ensure the following SDKs and CLI tools are installed on your workstation:
+- **Flutter SDK** (Dart `^3.9.0`)
+- **Node.js `24`** (managed via `nvm default`; required by Cloud Functions & scripts)
+- **Firebase CLI**: `npm i -g firebase-tools`
+- **FlutterFire CLI**: `dart pub global activate flutterfire_cli`
+- **Google Cloud CLI (`gcloud`)** *(for one-time Firestore TTL, GCS lifecycle, and Storage CORS policies)*
+- **Terraform (`>= 1.6.0`, optional)** *(for [`terraform/README.md`](terraform/README.md) IaC provisioning)*
 
-- **Flutter SDK** (with Dart SDK `^3.9.0`)
-- **Node.js `22.x`** (managed via `nvm`, required for Cloud Functions and administrative scripts)
-- **Firebase CLI**:
-  ```bash
-  npm i -g firebase-tools
-  ```
-- **FlutterFire CLI**:
-  ```bash
-  dart pub global activate flutterfire_cli
-  ```
-- **Google Cloud CLI (`gcloud`)**: Required for one-time infrastructure policies that `firebase deploy` does not configure directly (native Cloud Firestore Time-to-Live policies, Google Cloud Storage Object Lifecycle rules, and Cloud Storage Web CORS headers via `storage_cors.json`). Install via [Google Cloud SDK docs](https://cloud.google.com/sdk/docs/install) (or on macOS via Homebrew):
-  ```bash
-  brew install --cask google-cloud-sdk
-  ```
-- **Terraform (`>= 1.6.0`, optional)**: Required only if using the [`terraform/`](terraform/README.md) Infrastructure-as-Code suite to automate GCP/Firebase project creation, API enablement, Firestore indexes/TTL/rules, Auth, Storage, App Check, and IAM setup.
+### One-Time `gcloud` Retention & Storage CORS Setup
 
-### Google Cloud CLI (`gcloud`) One-Time Retention & Storage CORS Setup
-
-Authenticate `gcloud`, set your target Firebase/GCP project, and apply the Firestore TTL, Cloud Storage lifecycle, and Web CORS policies once per environment (run **after** deploying `firestore.indexes.json` via `firebase deploy --only firestore:indexes` so single-field `expireAt` index exemptions are active):
+Run once per environment **after** deploying `firestore.indexes.json` (`firebase deploy --only firestore:indexes`):
 
 ```bash
-# 1. Authenticate and select your Firebase/GCP project
 gcloud auth login
 gcloud config set project <PROJECT_ID>
 
-# 2. Enable native Cloud Firestore TTL policies on `expireAt`
-# 60-day Gatehouse access log retention (cascades visitor photo cleanup via onAccessLogDeleted)
-gcloud firestore fields ttls update expireAt \
-  --collection-group=access_logs \
-  --enable-ttl \
-  --project=<PROJECT_ID>
+# Native Firestore TTL policies (60d access logs, 7d terminal QRs, 30d booking attachments)
+gcloud firestore fields ttls update expireAt --collection-group=access_logs --enable-ttl --project=<PROJECT_ID>
+gcloud firestore fields ttls update expireAt --collection-group=qr_codes --enable-ttl --project=<PROJECT_ID>
+gcloud firestore fields ttls update expireAt --collection-group=booking_attachments --enable-ttl --project=<PROJECT_ID>
 
-# 7-day post-expiration / post-revocation QR pass cleanup
-gcloud firestore fields ttls update expireAt \
-  --collection-group=qr_codes \
-  --enable-ttl \
-  --project=<PROJECT_ID>
+# GCS 62d/125d safety-net lifecycle + Web CORS for Transparency downloads
+gcloud storage buckets update gs://<STORAGE_BUCKET> --lifecycle-file=storage_lifecycle.json
+gcloud storage buckets update gs://<STORAGE_BUCKET> --cors-file=storage_cors.json
 
-# 30-day post-booking resident attachment cleanup (cascades file cleanup via onBookingAttachmentDeleted)
-gcloud firestore fields ttls update expireAt \
-  --collection-group=booking_attachments \
-  --enable-ttl \
-  --project=<PROJECT_ID>
-
-# 3. Apply Cloud Storage Object Lifecycle safety-net rules (62d visitor media, 125d booking attachments)
-#    and Web CORS headers (allows Flutter Web clients to fetch/render Transparency .md/.pdf/CSV files)
-gcloud storage buckets update gs://<STORAGE_BUCKET> \
-  --lifecycle-file=storage_lifecycle.json
-gcloud storage buckets update gs://<STORAGE_BUCKET> \
-  --cors-file=storage_cors.json
-
-# 4. (Optional) Verify async Firestore TTL operations and active bucket lifecycle & CORS config
+# Optional verification
 gcloud firestore operations list --project=<PROJECT_ID>
 gcloud storage buckets describe gs://<STORAGE_BUCKET> --format="json(lifecycle_config,cors_config)"
 ```
 
-> **Cloud Run Invoker Note (Gen 2 `onCall` Functions):** Firebase `onCall` functions verify Firebase App Check and Firebase Auth inside each handler, so their backing Cloud Run services must have **Public access** (`roles/run.invoker` for `allUsers`). Normally `firebase deploy --only functions` assigns this on creation, but if an existing callable service ever returns `[firebase_functions/internal] internal [0]` because Cloud Run rejects unauthenticated HTTP ingress/CORS preflight, restore it with `gcloud run services add-iam-policy-binding <function_lowercase> --region=us-central1 --project=<PROJECT_ID> --member="allUsers" --role="roles/run.invoker"`. Keep background Eventarc/Scheduler functions (`checkmonthlypaymentstatuses`, `onaccesslogdeleted`, `onbookingattachmentdeleted`, `onpaymentwritten`, `onsanctionwritten`) restricted to **Require authentication**.
+> **Gen 2 `onCall` Cloud Run Note:** Firebase `onCall` functions verify App Check & Auth in code, so their Cloud Run services require `roles/run.invoker` for `allUsers`. If a callable returns `[firebase_functions/internal] internal [0]` on preflight/ingress, grant `allUsers` invoker access on that lowercase function service while keeping triggers/cron services restricted.
 
 ---
 
 ## Setup & Configuration
 
-### Option A: Automated Setup via Terraform (Recommended)
-To provision a new GCP/Firebase project (or import an existing one) with all required APIs, Web/Android/iOS apps, Firestore database/indexes/TTL/rules, RTDB instance, Cloud Storage bucket/rules, reCAPTCHA Enterprise + App Check, and least-privilege IAM roles automatically, follow [`terraform/README.md`](terraform/README.md):
+### Option A: Automated Provisioning via Terraform (Recommended)
+
+See [`terraform/README.md`](terraform/README.md):
+
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
-# Adopting an existing project? Run: node ./generate_imports.js --project <existing-id>
-terraform init
-terraform apply
+# Existing project? Inspect & generate imports: node ./generate_imports.js --project <PROJECT_ID>
+terraform init && terraform apply
+terraform output -raw next_steps
 ```
-After `apply`, run `terraform output -raw next_steps` to complete `flutterfire configure`, `lib/core/config/app_config.dart`, RTDB rules / Storage CORS/lifecycle (if not enabled via TF provisioners), and Cloud Functions deployment.
 
 ### Option B: Manual Setup
 
-### 1. Create a Firebase Project
-1. Navigate to the [Firebase Console](https://console.firebase.google.com/).
-2. Click on **Add Project** and name it `Suburban Life` or your community's custom name.
-3. Enable **Google Analytics** (optional).
-4. Initialize Firebase in this repository by running:
+1. **Firebase Project & Config**: Create project in [Firebase Console](https://console.firebase.google.com/), enable Auth, Firestore, RTDB, Storage, and Functions, then run `flutterfire configure`.
+2. **Vertex AI (Announcement Translation)**: Enable `aiplatform.googleapis.com` and grant `roles/aiplatform.user` to the Cloud Functions runtime service account (`[PROJECT_ID]@appspot.gserviceaccount.com` or Terraform `functions_runtime` SA).
+3. **App Check & Crashlytics**:
+   - Web: Register **reCAPTCHA Enterprise** site key in Firebase Console -> App Check and set `AppConfig.recaptchaSiteKey` (plus `webPushVapidKey` / `rtdbDatabaseUrl`) in [`lib/core/config/app_config.dart`](lib/core/config/app_config.dart).
+   - Android / iOS: Register **Play Integrity** / **App Attest** in App Check.
+   - `CrashlyticsService` auto-captures `FlutterError.onError` & `PlatformDispatcher.instance.onError` in release builds (safe no-op in Web, debug, and Emulator modes).
+4. **Deploy Rules, Indexes & Functions**:
    ```bash
-   flutterfire configure
-   ```
-5. Ensure that **Firebase Auth**, **Cloud Firestore**, **Cloud Storage** and **Cloud Functions** are enabled in the console.
-
-### 2. Setup Vertex AI Permissions (Keyless Server-Side Model Execution)
-The Suburban Life platform uses Google Cloud's native Vertex AI platform to translate announcements keylessly (without managing insecure, manual API keys inside Secret Manager). 
-
-To authorize the Cloud Function's runner Service Account to interact with Vertex AI:
-1. Navigate to the [IAM & Admin console](https://console.cloud.google.com/iam-admin/iam) in the Google Cloud Platform.
-2. Locate the default Compute Engine or Cloud Functions Service Account used by your project:
-   - Typically formatted as: `[PROJECT_ID]@appspot.gserviceaccount.com`
-3. Grant the **Vertex AI User** (`roles/aiplatform.user`) role to this service account.
-4. Enable the **Vertex AI API** (`aiplatform.googleapis.com`) in the APIs & Services dashboard.
-
-### 3. Setup Firebase App Check (for production/release)
-App Check protects your backend resources from abuse by verifying that incoming traffic is originating from your actual app.
-
-#### Web Platform (reCAPTCHA Enterprise)
-1. Navigate to the **Firebase Console** and select **App Check** in the left navigation.
-2. Go to the **Apps** tab, select your Web App, and choose **reCAPTCHA Enterprise**.
-3. Generate a public **reCAPTCHA site key** in the Google Cloud / Firebase Console.
-4. Open [app_config.dart](lib/core/config/app_config.dart) and update the `recaptchaSiteKey` placeholder with your site key:
-   ```dart
-   static const String recaptchaSiteKey = 'your-actual-site-key';
+   firebase deploy --only firestore:indexes,firestore:rules,database,storage,functions
    ```
 
-#### Android (Play Integrity)
-1. Enable Play Integrity in the **Google Play Console**.
-2. In the **Firebase Console** under **App Check** > **Apps**, register Play Integrity for your Android App.
+---
 
-#### iOS (DeviceCheck / App Attest)
-1. In the **Firebase Console** under **App Check** > **Apps**, register DeviceCheck or App Attest for your iOS App.
+## Architecture & BaaS Abstraction
 
-### 4. Firebase Crashlytics & Error Reporting
-The app includes automated global exception trapping and error reporting via `CrashlyticsService`:
-- **Global Error Hooks**: `FlutterError.onError` intercepts framework build and layout errors, while `PlatformDispatcher.instance.onError` intercepts unhandled asynchronous errors (Futures, timers).
-- **Graceful Web Fallback**: On Web (where Crashlytics is currently unsupported or limited), calls are absorbed seamlessly with structured `debugPrint` logs, preventing runtime crashes while keeping the codebase ready for Web Crashlytics support.
-- **Collection Gating**: Error reporting is disabled automatically in debug and Firebase Emulator environments (`kDebugMode` or `useFirebaseEmulator: true`).
-- **User Association**: Crashlytics user identifiers (`setUserIdentifier`) are synced with Firebase Auth state transitions.
+```
+UI Layer (lib/features/*) -> Service Layer (*Service) -> Backend Locator (backend.dart) -> FirebaseBackend (firebase_backend.dart)
+```
 
-### 5. Enable Retention (Firestore TTL & Storage Lifecycle) & Web Storage CORS
-Gatehouse access logs (`access_logs`) and visitor photos (`visitor_ids/**`, `visitor_plates/**`) are automatically purged after **60 days**, inactive QR passes (`qr_codes`) are purged **7 days** after expiration or deactivation, and resident booking attachments (`booking_attachments` and `booking_attachments/**`) are purged **30 days** after the booking's scheduled end time. Web clients also require `storage_cors.json` applied to Cloud Storage so `.md`/`.pdf`/`.csv` Transparency documents and media can be fetched in browsers.
+- `lib/features/` never imports Firebase SDKs directly (enforced by [`test/import_boundary_test.dart`](test/import_boundary_test.dart)).
+- Swap Firebase for another backend by implementing `AuthService`, `DatabaseService`, `StorageService`, `FunctionsService`, `CrashlyticsService`, and `NotificationService` from [`lib/core/backend/backend.dart`](lib/core/backend/backend.dart) and registering them in [`lib/main.dart`](lib/main.dart) via `Backend.initialize(...)`.
 
-Deploy Firestore indexes (including single-field `expireAt` exemptions), security rules, Storage rules, and Cloud Functions first, then execute the one-time `gcloud` TTL, bucket lifecycle, and Storage CORS commands listed under [Google Cloud CLI (`gcloud`) One-Time Retention & Storage CORS Setup](#google-cloud-cli-gcloud-one-time-retention--storage-cors-setup):
+---
+
+## Development, Testing & CI
+
+### Local Run & Emulators
+
 ```bash
-firebase deploy --only firestore:indexes,firestore:rules,storage,functions
-```
+flutter pub get
+npm --prefix functions install
 
----
+# Start local emulators & seed addresses, settings, facilities, claims & default users
+nvm default
+firebase emulators:start --only firestore,database,functions,storage,auth
+node scripts/seed_emulator.js   # Or --remote with scripts/serviceAccountKey.json
 
-## Architecture & State Management
-
-The Suburban Life application follows a layered design to decouple the UI from the database provider, allowing for high maintainability and testability.
-
-### Layered Architecture
-
-```
-┌────────────────────────────────────────────────────────┐
-│                      UI Layer                          │
-│     (Flutter Widgets: screens, cards, forms)           │
-└──────────────────────────┬─────────────────────────────┘
-                           │ Calls
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│                  Service/Logic Layer                   │
-│     (e.g., AuthService, PaymentService, QRService)     │
-└──────────────────────────┬─────────────────────────────┘
-                           │ Interfaces
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│                  BaaS Abstraction Layer                │
-│             (backend.dart - locator/interfaces)        │
-└──────────────────────────┬─────────────────────────────┘
-                           │ Concrete Impls
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│                   Concrete Backend                     │
-│ (firebase_backend.dart implementing Backend interfaces)│
-└────────────────────────────────────────────────────────┘
-```
-
-- **UI Layer**: Composed of Flutter screens, custom widgets, and dialogs.
-- **Service/Logic Layer**: Orchestrates complex domain operations (e.g., validating dates, structuring payments, verifying QR rules) before passing them to the database services.
-- **BaaS Abstraction**: Defined in [backend.dart](lib/core/backend/backend.dart), providing abstract interfaces for Auth, Database, Storage, and Cloud Functions.
-- **Concrete Backend**: Firebase specific services defined in [firebase_backend.dart](lib/core/backend/firebase_backend.dart).
-
-### State Management
-State is managed using a clean mix of:
-- **Local Widget State**: Enforcing strict lifecycle control on text fields, form validators, and single-card state scopes (e.g., keyed widgets preventing redraws).
-- **Streams & Futures**: High-fidelity live bindings to Firestore (e.g., watching payment status, pending approvals, facility bookings) via `StreamBuilder` and `FutureBuilder` to deliver instantaneous database state synchronization.
-
----
-
-## BaaS Abstraction & Custom Backends
-
-Suburban Life is built with a backend-agnostic abstraction layer. This allows you to easily switch from Firebase to another BaaS (like Supabase, Appwrite, or a custom REST API) without modifying your UI screens.
-
-All interactions with Auth, Database, Storage, and Cloud Functions are routed through the `Backend` service locator in [backend.dart](lib/core/backend/backend.dart).
-
-### Custom Backend Implementation
-
-To plug in a custom backend:
-1. Implement the abstract service interfaces:
-   - `AuthService`
-   - `DatabaseService`
-   - `StorageService`
-   - `FunctionsService`
-2. Initialize the backend in your main entry point [main.dart](lib/main.dart) by calling `Backend.initialize()` with your custom implementations:
-   ```dart
-   Backend.initialize(
-     auth: MyCustomAuthService(),
-     db: MyCustomDatabaseService(),
-     storage: MyCustomStorageService(),
-     functions: MyCustomFunctionsService(),
-   );
-   ```
-
-By default, the application is pre-configured with Firebase implementations located in [firebase_backend.dart](lib/core/backend/firebase_backend.dart).
-
----
-
-## Development Workflow
-
-### Local Development Setup
-
-1. Install dependencies:
-   ```bash
-   flutter pub get
-   ```
-2. Navigate to the functions folder and install dependencies:
-   ```bash
-   cd functions
-   npm install
-   ```
-
-### Running Local Firebase Emulators
-To test cloud functions, firestore rules, and authentication flows locally:
-1. Ensure the Firebase CLI is installed:
-   ```bash
-   npm install -g firebase-tools
-   ```
-2. Start the local emulators:
-   ```bash
-   firebase emulators:start --only firestore,database,functions,storage,auth
-   ```
-3. In a separate terminal, seed the emulator with sample addresses, facilities, settings, announcements, pending payment & ownership claims, and default users (`admin@example.com`, `resident@test.com`, `roommate@test.com`, `guard@test.com`, `applicant@test.com`):
-   ```bash
-   node scripts/seed_emulator.js
-   ```
-   *(To seed a remote/staging Firebase project using `scripts/serviceAccountKey.json`, run `node scripts/seed_emulator.js --remote`)*
-4. Configure the app to target the emulator backend when running locally (automatically enabled on `localhost` / `127.0.0.1` on Web, or via `--dart-define=USE_FIREBASE_EMULATOR=true`).
-
-### Running the App
-Run the application on your target device:
-```bash
+# Run app (Web localhost auto-connects to emulators; override with --dart-define=USE_FIREBASE_EMULATOR=true)
 flutter run
 ```
 
-### Running Automated Tests
+### Automated Verification
 
-To run the complete suite of Flutter unit, widget, workflow, and architectural boundary tests:
 ```bash
-flutter test
-```
-
-To run Cloud Functions callable handler, helper, and static Security Rules audit tests:
-```bash
+flutter gen-l10n && flutter analyze --no-fatal-infos && flutter test
 npm --prefix functions test
-```
-
-To run Node.js automation script tests:
-```bash
 npm --prefix scripts test
+./scripts/run_rollout_tests.sh   # Full emulator rollout (Rules unit tests + Node + Flutter tests)
 ```
 
-To run the full end-to-end emulator rollout suite (starts Firebase Auth, Firestore, Functions, and Storage emulators, runs live `@firebase/rules-unit-testing` security rules verification, script tests, and all Flutter tests):
-```bash
-./scripts/run_rollout_tests.sh
-```
+GitHub Actions ([`.github/workflows/ci_tests.yml`](.github/workflows/ci_tests.yml)) runs `flutter gen-l10n`, `flutter analyze --no-fatal-infos`, `flutter test`, `functions` tests, and `scripts` tests on every push and PR.
 
-On GitHub, [`.github/workflows/ci_tests.yml`](.github/workflows/ci_tests.yml) automatically runs `flutter gen-l10n`, `flutter analyze --no-fatal-infos`, `flutter test`, `npm --prefix functions test`, and `npm --prefix scripts test` on every push and pull request.
+### Localization (`l10n`) & Launcher Icons
 
-### Adding Translations (l18n)
-All user-facing UI copy must have Spanish translations.
-1. Add new keys and English text to [app_en.arb](lib/l10n/app_en.arb).
-2. Add the corresponding translation to [app_es.arb](lib/l10n/app_es.arb).
-3. Regenerate files using:
-   ```bash
-   flutter gen-l10n
-   ```
+- Add keys in both [`app_en.arb`](lib/l10n/app_en.arb) and [`app_es.arb`](lib/l10n/app_es.arb), then run `flutter gen-l10n`.
+- After icon asset updates, run `dart run flutter_launcher_icons`.
 
-### Assets and Branding Icons
-If the app icon asset changes, regenerate native icons:
-```bash
-dart run flutter_launcher_icons
-```
+### Web Hosting Cache Busting
 
-### Web Hosting & Automatic Upgrades
-When deployed to Firebase Hosting, the web application includes an automated background update mechanism (`AppUpdateService`):
-- **Cache-Busting Headers**: `firebase.json` specifies `no-cache, no-store, must-revalidate` for `index.html`, `flutter_bootstrap.js`, `flutter_service_worker.js`, `/version.json`, `/manifest.json`, and `/icons/**`.
-- **Seamless Inactivity / Tab-Switch Reload**: The app periodically polls `/version.json` in the background. When a new deployment version is detected, it automatically purges browser `CacheStorage` and refreshes the application seamlessly when the user switches tabs or becomes idle.
+[`firebase.json.template`](firebase.json.template) sets `Cache-Control: no-cache, no-store, must-revalidate` on `index.html`, `flutter_bootstrap.js`, `flutter_service_worker.js`, `firebase-messaging-sw.js`, `/version.json`, `/manifest.json`, and `/icons/**`. `AppUpdateService` polls `/version.json`, clears `CacheStorage`, and reloads on idle or tab switch.
 
 ---
 
-## Address Population
+## Admin SDK & Automation Scripts (`scripts/`)
 
-A template for importing addresses has been included as [addresses_import.csv](addresses_import.csv) in the project root. You can open it in any spreadsheet editor.
+| Script | Purpose | Command Example |
+| :--- | :--- | :--- |
+| `populate_addresses.js` | Batch import [`addresses_import.csv`](addresses_import.csv) (`street_name,initial_number,final_number,exclusions`) | `node scripts/populate_addresses.js` |
+| `set_role.js` | Set custom claims (`admin`, `resident`, `guard`, `roommate`) keeping `addressRef` | `node scripts/set_role.js user@example.com admin [--emulator]` |
+| `set_resident_addresses_paid.js` | Mark linked addresses `'paid'` (`--dry-run`, `--emulator`, batches of 400) | `node scripts/set_resident_addresses_paid.js --emulator --dry-run` |
+| `seed_emulator.js` | Seed test addresses, settings, facilities, pending claims & users | `node scripts/seed_emulator.js [--remote]` |
+| `build_and_publish_docs.js` | Render [`docs/docs_pipeline.json`](docs/docs_pipeline.json) + Mermaid PNGs to PDF & publish to Transparency ([`.github/workflows/docs_pipeline.yml`](.github/workflows/docs_pipeline.yml)) | `npm --prefix scripts run docs:pdf` (`--no-publish`, `--emulator`) |
+| `run_rollout_tests.sh` | Zero-touch emulator + Rules + Node + Flutter rollout test suite | `./scripts/run_rollout_tests.sh` |
 
-### Formatting Guidelines:
-*   **`street_name`**: The exact name of the street.
-*   **`initial_number`**: The starting house number on that street.
-*   **`final_number`**: The ending house number on that street.
-*   **`exclusions`**: A comma-separated list of house numbers that do not exist between the initial and final numbers. Leave empty (`""`) if no exclusions exist.
-
-**Example row:**
-```csv
-"1st Avenue",99,101,"100"
-```
-
----
-
-## Importing Addresses via Admin SDK
-
-A helper script [populate_addresses.js](scripts/populate_addresses.js) is provided in the `scripts/` directory. 
-
-### Prerequisites:
-* Ensure `serviceAccountKey.json` is placed in the `scripts/` directory.
-* Make sure your [addresses_import.csv](addresses_import.csv) is populated.
-
-### Run the script:
-```bash
-cd scripts
-node populate_addresses.js
-```
-
----
-
-## Assigning User Roles via Admin SDK
-
-Use [set_role.js](scripts/set_role.js) to assign roles (`admin`, `resident`, `guard`, `roommate`) and synchronize Firebase Auth custom claims with Firestore. When promoting an existing resident to `admin`, the script preserves their `resident` claim and residential `addressRef` so they can switch freely between Admin and Resident views.
-
-```bash
-# Promote a user to admin in production:
-node scripts/set_role.js user@example.com admin
-
-# Assign a role against local Firebase Emulators:
-node scripts/set_role.js admin@example.com admin --emulator
-```
-
----
-
-## Batch Address Payment Status Maintenance
-
-A maintenance script [set_resident_addresses_paid.js](scripts/set_resident_addresses_paid.js) iterates through all addresses in Firestore that are already linked to a resident and transitions their `paymentStatus` to `'paid'`.
-
-### Features:
-* **Safe Dry-Run Mode**: Inspect matching addresses and preview status transitions without altering Firestore.
-* **Firebase Emulator Support**: Run seamlessly against local emulators (`--emulator`) without credentials.
-* **Batched Writes**: Updates are committed in chunks of 400 operations to respect Firestore's batch limits.
-* **System Address Safeguards**: Safely ignores system offices (`admin_office`).
-* **Bidirectional Link Detection**: Detects links via both `addresses.residentUid` and `users.addressRef`.
-
-### Usage:
-```bash
-# Preview in local emulator (dry-run):
-node scripts/set_resident_addresses_paid.js --emulator --dry-run
-
-# Apply in local emulator:
-node scripts/set_resident_addresses_paid.js --emulator
-
-# Preview in production:
-node scripts/set_resident_addresses_paid.js --dry-run
-
-# Apply in production:
-node scripts/set_resident_addresses_paid.js
-```
-
----
-
-## Bulk Resident Account Creation via CSV
-
-Administrators can create resident user accounts in bulk by uploading a CSV file through the app UI or calling the Cloud Function backend.
-
-### Quick Start:
-1. Refer to the sample template at [resident_import_template.csv](resident_import_template.csv).
-2. Populate the CSV with `name`, `email`, `password` (optional), `street` (optional), and `number` (optional).
-3. Open the app as an admin, navigate to **Bulk User Creation (CSV)**, download or copy the sample CSV template directly if needed, and select your populated file.
-4. Accounts are created server-side with instant **`resident`** claims (`{ resident: true }`). If `password` is omitted or does not satisfy complexity requirements, the system generates a cryptographically secure password meeting all Firebase Auth complexity rules (uppercase, lowercase, number, symbol, 12 chars).
-
-For complete architectural details, formula specs, and Cloud Function documentation, see [docs/bulk_user_creation.md](docs/bulk_user_creation.md).
-
-For a complete guide to all administrative tools (address import, payment approvals, user directory, amenities configurator, security guard management, and reporting), consult the Administrator User Manual available in:
-- [English Administrator User Manual](docs/admin_user_manual.md)
-- [Manual de Usuario para Administradores en Español](docs/admin_user_manual_es.md)
-
----
-
-## Automated Documentation-to-PDF Pipeline & Transparency Sync
-
-The repository includes an automated pipeline ([scripts/build_and_publish_docs.js](scripts/build_and_publish_docs.js)) and GitHub Actions workflow ([.github/workflows/docs_pipeline.yml](.github/workflows/docs_pipeline.yml)) that converts Markdown documentation into branded PDF files with pre-rendered `.png` diagrams and populates them into the **Transparency** section of the app.
-
-### Key Capabilities:
-1. **Declarative Document Selection (`parse`)**: Configure which documents to compile and publish in [docs/docs_pipeline.json](docs/docs_pipeline.json) using `"parse": true | false` (or override via CLI `--only=admin_user_manual_es`).
-2. **Mermaid Diagram-to-PNG Pre-Rendering**: Extracts `mermaid` blocks, renders high-resolution `.png` images via headless Chromium, and embeds them directly into the branded PDF layout.
-3. **Role-Based Document Visibility (`visibility`)**: Each document and folder specifies `"visibility": "admin" | "all"`. All documentation manuals generated by the pipeline (`Manual_Usuario_Administrador_ES.pdf`, `Descripcion_Tecnica_General_ES.pdf`, etc.) and their `official_manuals` folder are configured with `"visibility": "admin"`, restricting access exclusively to administrators in the Transparency UI, Firestore security rules, and Cloud Storage (`/documents/admin_only/`).
-4. **Automatic Cloud Storage & Firestore Sync**: Whenever Firebase credentials (`scripts/serviceAccountKey.json` locally, or `FIREBASE_SERVICE_ACCOUNT` / `FIREBASE_SERVICE_ACCOUNT_JSON` secrets in GitHub Actions) are present, running `npm run docs:pdf` or `npm run docs:publish` automatically uploads the generated PDF binaries to Firebase Storage and updates the Firestore `documents` collection.
-
-### Usage:
-```bash
-cd scripts
-
-# 1. Generate PDFs and automatically upload to Firebase Storage + Firestore (when credentials exist):
-npm run docs:pdf
-# or explicitly:
-npm run docs:publish
-
-# 2. Generate PDFs locally only (skip Firebase upload):
-node build_and_publish_docs.js --no-publish
-
-# 3. Publish to local Firebase Emulators:
-npm run docs:publish:emulator
-```
-
----
-
-## Automated Pre-Rollout Testing Suite
-
-To ensure flawless operation across all resident and administrative workflows before deployment, run the zero-touch test pipeline:
-
-```bash
-./scripts/run_rollout_tests.sh
-```
-
-This single command starts the Firebase Emulators, seeds all 170 physical addresses, app settings, amenities, and default test accounts, executes all integration suites (roommate linking, announcements, advance multi-period payments, debt recovery & feature gating, partial settlement, and facility booking lifecycle), and cleanly shuts down the emulator instances upon completion.
-
-
-
-
-
-
+- For bulk resident CSV creation spec, see [`docs/bulk_user_creation.md`](docs/bulk_user_creation.md) and [`resident_import_template.csv`](resident_import_template.csv).
+- End-user operational admin manuals: [`docs/admin_user_manual.md`](docs/admin_user_manual.md) (EN) and [`docs/admin_user_manual_es.md`](docs/admin_user_manual_es.md) (ES).
