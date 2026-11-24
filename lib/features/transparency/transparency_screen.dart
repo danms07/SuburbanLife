@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/document_cache_service.dart';
+import '../../core/services/web_file_transfer_helper.dart';
 import '../../core/widgets/interactive_image_dialog.dart';
 import '../../l10n/app_localizations.dart';
 import 'document_viewer_screen.dart';
@@ -605,16 +604,12 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
           });
         }
 
-        debugPrint('>>> [_openDocument] Web: creating blob from ${bytes.length} bytes for "$fileName"');
-        final blob = html.Blob([bytes]);
-        final blobUrl = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: blobUrl)
-          ..setAttribute('download', fileName)
-          ..target = '_blank';
-        html.document.body?.append(anchor);
-        anchor.click();
-        anchor.remove();
-        html.Url.revokeObjectUrl(blobUrl);
+        debugPrint('>>> [_openDocument] Web: downloading ${bytes.length} bytes for "$fileName"');
+        WebFileTransferHelper.downloadBytes(
+          bytes: bytes,
+          fileName: fileName,
+          target: '_blank',
+        );
 
         if (mounted) {
           messenger.showSnackBar(
@@ -627,7 +622,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
         }
       } catch (e, stack) {
         debugPrint('>>> [_openDocument] Web download/open error: $e\n$stack');
-        html.window.open(url, '_blank');
+        WebFileTransferHelper.openInNewTab(url);
       }
       return;
     }
@@ -785,20 +780,17 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
 
     try {
       if (kIsWeb) {
-        debugPrint('>>> [_uploadDocument] Web platform: launching html.FileUploadInputElement...');
-        final uploadInput = html.FileUploadInputElement()
-          ..accept = TransparencyScreen.webUploadAcceptAttribute;
-        uploadInput.click();
-
-        await uploadInput.onChange.first;
-        if (uploadInput.files == null || uploadInput.files!.isEmpty) {
+        debugPrint('>>> [_uploadDocument] Web platform: launching WebFileTransferHelper.pickFile...');
+        final selected = await WebFileTransferHelper.pickFile(
+          accept: TransparencyScreen.webUploadAcceptAttribute,
+        );
+        if (selected == null) {
           debugPrint('>>> [_uploadDocument] Web picker: user cancelled or empty.');
           return;
         }
 
-        final file = uploadInput.files!.first;
-        selectedFileName = TransparencyScreen.sanitizeUploadFileName(file.name);
-        fileSize = file.size;
+        selectedFileName = TransparencyScreen.sanitizeUploadFileName(selected.name);
+        fileSize = selected.size;
 
         if (!TransparencyScreen.isAllowedUploadExtension(selectedFileName)) {
           debugPrint('>>> [_uploadDocument] Rejected unsupported file extension: "$selectedFileName"');
@@ -820,21 +812,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
           return;
         }
 
-        final reader = html.FileReader();
-        reader.readAsArrayBuffer(file);
-        await reader.onLoadEnd.first;
-
-        final result = reader.result;
-        if (result != null) {
-          if (result is Uint8List) {
-            rawBytes = result;
-          } else if (result is ByteBuffer) {
-            rawBytes = result.asUint8List();
-          } else if (result is List<int>) {
-            rawBytes = Uint8List.fromList(result);
-          }
-        }
-        debugPrint('>>> [_uploadDocument] Web file read: name="$selectedFileName", bytes=${rawBytes?.length}, size=$fileSize');
+        rawBytes = await selected.readBytes();
+        debugPrint('>>> [_uploadDocument] Web file read: name="$selectedFileName", bytes=${rawBytes.length}, size=$fileSize');
       } else {
         debugPrint('>>> [_uploadDocument] Native platform: launching FilePicker...');
         final result = await FilePicker.pickFiles(

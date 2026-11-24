@@ -1,13 +1,12 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/csv_download_helper.dart';
+import '../../core/services/web_file_transfer_helper.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminBulkUserImportScreen extends StatefulWidget {
@@ -186,34 +185,18 @@ class _AdminBulkUserImportScreenState extends State<AdminBulkUserImportScreen> {
       Uint8List? rawBytes;
 
       if (kIsWeb) {
-        debugPrint('[BulkUserImport] Web platform: launching html.FileUploadInputElement...');
-        final uploadInput = html.FileUploadInputElement()
-          ..accept = '.csv,text/csv,text/plain,.txt';
-        uploadInput.click();
-
-        await uploadInput.onChange.first;
-        if (uploadInput.files == null || uploadInput.files!.isEmpty) {
+        debugPrint('[BulkUserImport] Web platform: launching WebFileTransferHelper.pickFile...');
+        final selected = await WebFileTransferHelper.pickFile(
+          accept: '.csv,text/csv,text/plain,.txt',
+        );
+        if (selected == null) {
           debugPrint('[BulkUserImport] Web picker: user cancelled.');
           return;
         }
 
-        final file = uploadInput.files!.first;
-        selectedFileName = file.name;
-        final reader = html.FileReader();
-        reader.readAsArrayBuffer(file);
-        await reader.onLoadEnd.first;
-
-        final result = reader.result;
-        if (result != null) {
-          if (result is Uint8List) {
-            rawBytes = result;
-          } else if (result is ByteBuffer) {
-            rawBytes = result.asUint8List();
-          } else if (result is List<int>) {
-            rawBytes = Uint8List.fromList(result);
-          }
-        }
-        debugPrint('[BulkUserImport] Web file read: name="$selectedFileName", bytes=${rawBytes?.length}');
+        selectedFileName = selected.name;
+        rawBytes = await selected.readBytes();
+        debugPrint('[BulkUserImport] Web file read: name="$selectedFileName", bytes=${rawBytes.length}');
       } else {
         debugPrint('[BulkUserImport] Native platform: launching FilePicker...');
         final result = await FilePicker.pickFiles(

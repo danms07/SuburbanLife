@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:universal_html/html.dart' as html;
+import 'web_file_transfer_helper.dart';
 
 /// Cross-platform CSV download and native file export utility.
 class CsvDownloadHelper {
@@ -11,18 +11,8 @@ class CsvDownloadHelper {
 
   /// Strips directory traversal segments from [fileName] so native exports
   /// always write strictly inside the target application documents directory.
-  static String sanitizeFileName(String fileName) {
-    final normalized = fileName.replaceAll('\\', '/');
-    final segments = normalized
-        .split('/')
-        .where((segment) => segment.isNotEmpty && segment != '.' && segment != '..')
-        .toList();
-    if (segments.isEmpty) {
-      return 'export.csv';
-    }
-    final baseName = segments.last.trim();
-    return baseName.isEmpty ? 'export.csv' : baseName;
-  }
+  static String sanitizeFileName(String fileName) =>
+      sanitizeWebFileName(fileName, fallback: 'export.csv');
 
   /// Exports UTF-8 [content] as [fileName].
   ///
@@ -37,15 +27,12 @@ class CsvDownloadHelper {
   }) async {
     final safeName = sanitizeFileName(fileName);
     if (kIsWeb) {
-      final bytes = utf8.encode(content);
-      final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute('download', safeName);
-      html.document.body?.append(anchor);
-      anchor.click();
-      anchor.remove();
-      html.Url.revokeObjectUrl(url);
+      final bytes = Uint8List.fromList(utf8.encode(content));
+      WebFileTransferHelper.downloadBytes(
+        bytes: bytes,
+        fileName: safeName,
+        mimeType: 'text/csv;charset=utf-8',
+      );
       return null;
     }
 

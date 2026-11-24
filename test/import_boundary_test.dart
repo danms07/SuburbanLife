@@ -210,5 +210,43 @@ void main() {
         reason: 'Every UI key in app_es.arb must have an English counterpart in app_en.arb. Missing: $missingInEnglish',
       );
     });
+
+    test('Enforce Wasm-safe Web imports across lib/ (no universal_html, dart:html, dart:js, package:js, or dart.library.html)', () {
+      final libDir = Directory('lib');
+      final dartFiles = libDir
+          .listSync(recursive: true)
+          .where((entity) => entity is File && entity.path.endsWith('.dart'))
+          .cast<File>();
+
+      final forbiddenPatterns = <RegExp>[
+        RegExp(r"package:universal_html/"),
+        RegExp(r"package:js/"),
+        RegExp(r"['\x22]dart:html['\x22]"),
+        RegExp(r"['\x22]dart:js['\x22]"),
+        RegExp(r"['\x22]dart:js_util['\x22]"),
+        RegExp(r"dart\.library\.html"),
+      ];
+
+      final violations = <String>[];
+      for (final file in dartFiles) {
+        final lines = file.readAsLinesSync();
+        for (int i = 0; i < lines.length; i++) {
+          final line = lines[i].trim();
+          if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) continue;
+          for (final pattern in forbiddenPatterns) {
+            if (pattern.hasMatch(line)) {
+              violations.add('${file.path}:${i + 1} - matches ${pattern.pattern}: "$line"');
+            }
+          }
+        }
+      }
+
+      expect(
+        violations,
+        isEmpty,
+        reason: 'Use package:web + dart:js_interop behind dart.library.js_interop conditional imports instead.\n'
+            'Violations:\n${violations.join('\n')}',
+      );
+    });
   });
 }

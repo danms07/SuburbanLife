@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/web_file_transfer_helper.dart';
 import '../../l10n/app_localizations.dart';
 
 class AdminBulkPaymentImportScreen extends StatefulWidget {
@@ -391,13 +390,12 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
     final l10n = AppLocalizations.of(context)!;
     try {
       if (kIsWeb) {
-        final bytes = utf8.encode(content);
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute('download', fileName)
-          ..click();
-        html.Url.revokeObjectUrl(url);
+        final bytes = Uint8List.fromList(utf8.encode(content));
+        WebFileTransferHelper.downloadBytes(
+          bytes: bytes,
+          fileName: fileName,
+          mimeType: 'text/csv;charset=utf-8',
+        );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -434,29 +432,13 @@ class _AdminBulkPaymentImportScreenState extends State<AdminBulkPaymentImportScr
       Uint8List? rawBytes;
 
       if (kIsWeb) {
-        final uploadInput = html.FileUploadInputElement()
-          ..accept = '.csv,text/csv,text/plain,.txt';
-        uploadInput.click();
+        final selected = await WebFileTransferHelper.pickFile(
+          accept: '.csv,text/csv,text/plain,.txt',
+        );
+        if (selected == null) return;
 
-        await uploadInput.onChange.first;
-        if (uploadInput.files == null || uploadInput.files!.isEmpty) return;
-
-        final file = uploadInput.files!.first;
-        selectedFileName = file.name;
-        final reader = html.FileReader();
-        reader.readAsArrayBuffer(file);
-        await reader.onLoadEnd.first;
-
-        final result = reader.result;
-        if (result != null) {
-          if (result is Uint8List) {
-            rawBytes = result;
-          } else if (result is ByteBuffer) {
-            rawBytes = result.asUint8List();
-          } else if (result is List<int>) {
-            rawBytes = Uint8List.fromList(result);
-          }
-        }
+        selectedFileName = selected.name;
+        rawBytes = await selected.readBytes();
       } else {
         final result = await FilePicker.pickFiles(
           type: FileType.custom,

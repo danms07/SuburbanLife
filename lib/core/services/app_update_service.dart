@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-import 'package:universal_html/html.dart' as html;
+import 'package:http/http.dart' as http;
+
+import 'app_update_web_bridge.dart';
 
 /// Service responsible for automatically detecting new deployments on Flutter Web
 /// and seamlessly reloading the application when the user is idle or in the background.
@@ -11,6 +13,7 @@ class AppUpdateService with WidgetsBindingObserver {
 
   static final AppUpdateService instance = AppUpdateService._internal();
 
+  final AppUpdateWebBridge _webBridge = getAppUpdateWebBridge();
   String? _currentVersion;
   Timer? _pollTimer;
   Timer? _idleTimer;
@@ -77,6 +80,7 @@ class AppUpdateService with WidgetsBindingObserver {
     _pollTimer = null;
     _idleTimer?.cancel();
     _idleTimer = null;
+    _webBridge.dispose();
     _currentVersion = null;
     _isUpdatePending = false;
     _isReloading = false;
@@ -125,21 +129,14 @@ class AppUpdateService with WidgetsBindingObserver {
 
   /// Sets up event listeners for user input (mouse, touch, keyboard) to track activity.
   void _setupInteractionListeners() {
-    void onInteraction([html.Event? event]) {
+    void onInteraction() {
       _lastInteractionTime = _now();
       _idleTimer?.cancel();
       _idleTimer = Timer(_idleThreshold, _onUserIdle);
     }
 
     if (kIsWeb) {
-      try {
-        html.window.onMouseMove.listen(onInteraction);
-        html.window.onKeyDown.listen(onInteraction);
-        html.window.onTouchStart.listen(onInteraction);
-        html.window.onClick.listen(onInteraction);
-      } catch (e) {
-        debugPrint('[AppUpdateService] Failed to attach interaction listeners: $e');
-      }
+      _webBridge.attachInteractionListeners(onInteraction);
     }
 
     _idleTimer = Timer(_idleThreshold, _onUserIdle);
@@ -156,22 +153,18 @@ class AppUpdateService with WidgetsBindingObserver {
   /// Listens to document visibility changes (e.g. user switching tabs).
   void _setupVisibilityListener() {
     if (!kIsWeb) return;
-    try {
-      html.document.onVisibilityChange.listen((_) {
-        final isHidden = _isTabHiddenOverride != null
-            ? _isTabHiddenOverride!()
-            : (html.document.hidden == true);
-        if (isHidden && _isUpdatePending && !_isReloading) {
-          debugPrint('[AppUpdateService] Tab hidden with pending update. Triggering reload.');
-          reloadApp();
-        } else if (!isHidden) {
-          // Tab became visible again; check if a newer version was deployed while away
-          checkForUpdates();
-        }
-      });
-    } catch (e) {
-      debugPrint('[AppUpdateService] Failed to attach visibility listener: $e');
-    }
+    _webBridge.attachVisibilityListener((bool isHidden) {
+      final effectiveHidden = _isTabHiddenOverride != null
+          ? _isTabHiddenOverride!()
+          : isHidden;
+      if (effectiveHidden && _isUpdatePending && !_isReloading) {
+        debugPrint('[AppUpdateService] Tab hidden with pending update. Triggering reload.');
+        reloadApp();
+      } else if (!effectiveHidden) {
+        // Tab became visible again; check if a newer version was deployed while away
+        checkForUpdates();
+      }
+    });
   }
 
   /// Starts periodic polling timer.
@@ -205,8 +198,9 @@ class AppUpdateService with WidgetsBindingObserver {
     }
     try {
       final timestamp = _now().millisecondsSinceEpoch;
-      final response = await html.HttpRequest.getString('/version.json?t=$timestamp');
-      return parseVersionPayload(response);
+      final response = await http.get(Uri.parse('/version.json?t=$timestamp'));
+      if (response.statusCode != 200) return null;
+      return parseVersionPayload(response.body);
     } catch (e) {
       return null;
     }
@@ -231,7 +225,7 @@ class AppUpdateService with WidgetsBindingObserver {
 
         final isHidden = _isTabHiddenOverride != null
             ? _isTabHiddenOverride!()
-            : (kIsWeb && html.document.hidden == true);
+            : (kIsWeb && _webBridge.isDocumentHidden);
         final isIdle = _now().difference(_lastInteractionTime) > _idleThreshold;
 
         if (isHidden || isIdle) {
@@ -256,36 +250,7 @@ class AppUpdateService with WidgetsBindingObserver {
       return;
     }
 
-    try {
-      // 1. Purge CacheStorage entries
-      final caches = html.window.caches;
-      if (caches != null) {
-        final keys = await caches.keys();
-        for (final key in keys) {
-          await caches.delete(key);
-        }
-      }
-    } catch (e) {
-      debugPrint('[AppUpdateService] Cache purging error: $e');
-    }
-
-    try {
-      // 2. Trigger Service Worker update
-      final sw = html.window.navigator.serviceWorker;
-      if (sw != null) {
-        final reg = await sw.getRegistration();
-        await reg.update();
-      }
-    } catch (e) {
-      debugPrint('[AppUpdateService] Service worker update error: $e');
-    }
-
-    try {
-      // 3. Hard reload window
-      html.window.location.reload();
-    } catch (e) {
-      debugPrint('[AppUpdateService] Window reload error: $e');
-    }
+    await _webBridge.purgeCachesUpdateSwAndReload();
   }
 
   /// Disposes timers and observers when teardown is needed.
@@ -294,6 +259,7 @@ class AppUpdateService with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
       _pollTimer?.cancel();
       _idleTimer?.cancel();
+      _webBridge.dispose();
     }
   }
 }

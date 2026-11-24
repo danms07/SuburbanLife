@@ -1,16 +1,15 @@
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
-import 'package:universal_html/html.dart' as html;
 import '../config/app_config.dart';
 import '../widgets/interactive_image_dialog.dart';
 import '../../l10n/app_localizations.dart';
 import 'document_cache_service.dart';
 import 'temp_image_cleanup_service.dart';
+import 'web_file_transfer_helper.dart';
 
 /// Represents a validated local file selected or captured by the user prior to upload.
 class PickedDocumentData {
@@ -345,15 +344,12 @@ class DocumentTransferHelper {
 
     try {
       if (kIsWeb) {
-        final uploadInput = html.FileUploadInputElement()..accept = effectiveWebAccept;
-        uploadInput.click();
-        await uploadInput.onChange.first;
-        if (uploadInput.files == null || uploadInput.files!.isEmpty) {
+        final selected = await WebFileTransferHelper.pickFile(accept: effectiveWebAccept);
+        if (selected == null) {
           return null;
         }
-        final file = uploadInput.files!.first;
-        sanitizedName = sanitizeFileName(file.name);
-        declaredSize = file.size;
+        sanitizedName = sanitizeFileName(selected.name);
+        declaredSize = selected.size;
 
         final extCheck = extractExtension(sanitizedName);
         if (extCheck.isEmpty || !effectiveExtensions.contains(extCheck)) {
@@ -365,17 +361,7 @@ class DocumentTransferHelper {
           return null;
         }
 
-        final reader = html.FileReader();
-        reader.readAsArrayBuffer(file);
-        await reader.onLoadEnd.first;
-        final res = reader.result;
-        if (res is Uint8List) {
-          rawBytes = res;
-        } else if (res is ByteBuffer) {
-          rawBytes = res.asUint8List();
-        } else if (res is List<int>) {
-          rawBytes = Uint8List.fromList(res);
-        }
+        rawBytes = await selected.readBytes();
       } else {
         final result = await FilePicker.pickFiles(
           type: FileType.custom,
@@ -589,15 +575,12 @@ class DocumentTransferHelper {
         }
         final bytes = await cacheService.getOrDownloadBytes(cacheId, url, safeFileName);
         final mime = resolveMimeType(ext) ?? 'application/octet-stream';
-        final blob = html.Blob([bytes], mime);
-        final blobUrl = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: blobUrl)
-          ..setAttribute('download', safeFileName)
-          ..rel = 'noopener noreferrer';
-        html.document.body?.append(anchor);
-        anchor.click();
-        anchor.remove();
-        html.Url.revokeObjectUrl(blobUrl);
+        WebFileTransferHelper.downloadBytes(
+          bytes: bytes,
+          fileName: safeFileName,
+          mimeType: mime,
+          rel: 'noopener noreferrer',
+        );
 
         if (context.mounted) {
           messenger.showSnackBar(
@@ -610,7 +593,7 @@ class DocumentTransferHelper {
         }
       } catch (e) {
         debugPrint('>>> [DocumentTransferHelper] Web download fallback triggered: ${e.runtimeType}');
-        html.window.open(url, '_blank');
+        WebFileTransferHelper.openInNewTab(url);
       }
       return;
     }

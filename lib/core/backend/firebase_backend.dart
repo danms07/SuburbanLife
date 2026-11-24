@@ -10,9 +10,9 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_database/firebase_database.dart' hide Query;
-import 'package:universal_html/html.dart' as html;
 import '../config/app_config.dart';
 import 'backend.dart';
+import 'firebase_web_bridge.dart';
 
 class FirebaseDbReference implements DbReference {
   final DocumentReference rawRef;
@@ -753,26 +753,10 @@ class FirebaseNotificationService implements NotificationService {
     });
 
     if (kIsWeb) {
-      try {
-        html.window.navigator.serviceWorker?.addEventListener(
-          'message',
-          (html.Event event) {
-            if (event is html.MessageEvent) {
-              final origin = event.origin;
-              if (origin.isNotEmpty && origin != html.window.location.origin) {
-                return;
-              }
-              final data = event.data;
-              if (data is Map && data['type'] == 'NOTIFICATION_CLICK') {
-                final route = sanitizeNotificationRoute(data['targetRoute']?.toString());
-                _openedRouteController.add(route);
-              }
-            }
-          },
-        );
-      } catch (e) {
-        debugPrint('ServiceWorker message listener unavailable: $e');
-      }
+      attachServiceWorkerNotificationListener((rawRoute) {
+        final route = sanitizeNotificationRoute(rawRoute);
+        _openedRouteController.add(route);
+      });
     }
   }
 
@@ -787,7 +771,7 @@ class FirebaseNotificationService implements NotificationService {
         final cleanUri = Uri.base.replace(
           queryParameters: cleanedParams.isEmpty ? null : cleanedParams,
         );
-        html.window.history.replaceState(null, '', cleanUri.toString());
+        replaceBrowserHistoryUrl(cleanUri.toString());
       }
     } catch (e) {
       debugPrint('Failed to inspect Web initial notificationRoute: $e');

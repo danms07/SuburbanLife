@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-23 (v1.0.49+50 — Agent-Optimized Documentation)*
+*Last Verified/Updated: 2026-11-23 (v1.0.50+51 — WebAssembly Compatibility Migration)*
 
 Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md) for which deep doc to read per task.
 
@@ -15,7 +15,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 - `widget_catalog.md`: Reusable UI widgets, layout breakpoints, and test `ValueKey`s.
 - `CHANGELOG.md`: Chronological release history.
 - `PRIVACY_POLICY.md`: Bilingual LFPDPPP/ARCO privacy notice.
-- `pubspec.yaml` / `l10n.yaml` / `analysis_options.yaml`: Flutter dependencies, app version (`1.0.49+50`), l10n codegen, and analyzer exclusions.
+- `pubspec.yaml` / `l10n.yaml` / `analysis_options.yaml`: Flutter dependencies (`web: ^1.1.2`), app version (`1.0.50+51`), l10n codegen, and analyzer exclusions.
 - `firebase.json.template`: Firebase deployment & emulator port config template (`firebase.json` is gitignored).
 - `firestore.rules` / `firestore.indexes.json`: Firestore security rules, 33 composite indexes, and 3 `expireAt` single-field exemptions.
 - `database.rules.json`: RTDB owner-only notification & preference rules.
@@ -64,22 +64,25 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 - `core/`:
   - `backend/backend.dart`: BaaS interfaces (`AuthService`, `DatabaseService`, `StorageService`, `FunctionsService`, `CrashlyticsService`, `NotificationService`), models (`AppUser`, `AppNotification`, `UserNotificationSettings`), query/mutation types, validators (`PasswordValidator`, `EmailValidator`), `Backend` locator.
   - `backend/firebase_backend.dart`: Firebase implementations (`FirebaseAuthService`, `FirebaseDatabaseService`, `FirebaseStorageService`, `FirebaseFunctionsService`, `FirebaseCrashlyticsService`, `FirebaseNotificationService`, `FirebaseBackend`).
+  - `backend/firebase_web_bridge*.dart`: Conditional `package:web` SW notification listener & history URL adapter (`_web`, `_stub`).
   - `config/app_config.dart`: Palette, typography, branding assets, reCAPTCHA/VAPID/RTDB config, `useFirebaseEmulator` toggle.
   - `services/`:
-    - `app_update_service.dart`: `AppUpdateService` web `/version.json` polling and CacheStorage reload.
-    - `cache_io_helper*.dart`: Conditional cross-platform cache I/O (`cache_io_helper_io.dart`, `cache_io_helper_web.dart`, `cache_io_helper_stub.dart`).
-    - `csv_download_helper.dart`: `CsvDownloadHelper` sanitized native file export and web Blob download.
+    - `app_update_service.dart`: `AppUpdateService` web `/version.json` polling (`package:http`) and CacheStorage reload.
+    - `app_update_web_bridge*.dart`: Conditional `package:web` interaction/visibility listeners, CacheStorage purge, SW update & reload bridge (`_web`, `_stub`).
+    - `cache_io_helper*.dart`: Conditional cross-platform cache I/O (`cache_io_helper_io.dart`, `cache_io_helper_web.dart`, `cache_io_helper_stub.dart`, `js_interop`).
+    - `csv_download_helper.dart`: `CsvDownloadHelper` sanitized native file export and web Blob download via `WebFileTransferHelper`.
     - `document_cache_service.dart`: `DocumentCacheService` cached download/eviction manager.
     - `document_transfer_helper.dart`: `DocumentTransferHelper` & `PickedDocumentData` (cross-platform picker, magic-byte validation, bounded camera capture, CSPRNG Storage paths).
     - `notification_router.dart`: `NotificationRouter` allow-listed deep linking from notifications.
-    - `temp_image_cleanup*.dart`: `TempImageCleanupService` cross-platform temp camera capture & Web `blob:` cleanup (`_io`, `_web`, `_stub`).
+    - `temp_image_cleanup*.dart`: `TempImageCleanupService` cross-platform temp camera capture & Web `blob:` cleanup (`_io`, `package:web` `_web`, `_stub`).
+    - `web_file_transfer*.dart`: Conditional `package:web` file picker, sanitized Blob download & new-tab helper (`web_file_transfer_helper.dart`, `_web`, `_stub`).
   - `widgets/`:
     - `app_version_label.dart`: `AppVersionLabel` reading bundled `web/version.json`.
     - `error_fallback_screen.dart`: `ErrorFallbackScreen` release `ErrorWidget.builder` UI.
     - `interactive_image_dialog.dart`: `showInteractiveImageDialog` full-screen zoom/pan/90° rotation modal.
     - `rotatable_image_preview.dart`: `RotatableImagePreview` card with inline 90° rotate & full-screen buttons.
     - `storage_network_image.dart`: `StorageNetworkImage` cross-platform cached/network image widget.
-    - `web_image_view*.dart`: Conditional `HtmlElementView` adapter for Web CORS images (`_web`, `_stub`).
+    - `web_image_view*.dart`: Conditional `HtmlElementView` adapter (`package:web`) for Web CORS images (`_web`, `_stub`).
 - `features/`:
   - `admin/`:
     - `admin_shell_screen.dart`: `AdminShellScreen` & `AdminSection` responsive sidebar/drawer workspace, roll-up badges, Overview KPIs & shortcuts.
@@ -102,7 +105,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
   - `announcements/`:
     - `announcement.dart`: `Announcement` model (images, translations, audience, `readBy`).
     - `announcements_screen.dart`: `AnnouncementsScreen` responsive feed and rich media/emoji publishing modal.
-    - `clipboard_image_helper*.dart`: Web clipboard image & paste listener (`clipboard_image_helper_web.dart` via `dart:js_interop`, `_stub.dart`).
+    - `clipboard_image_helper*.dart`: Web clipboard image & paste listener (`clipboard_image_helper_web.dart` via `dart:js_interop` & `package:web`, `_stub.dart`).
   - `auth/`:
     - `auth_service.dart`: Re-exports `AuthService` from `backend.dart`.
     - `login_screen.dart` / `signup_screen.dart` / `forgot_password_screen.dart`: `LoginScreen`, `SignupScreen`, `ForgotPasswordScreen`.
@@ -137,7 +140,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 
 - `test_driver/integration_test.dart`: Flutter Driver integration runner.
 - `test/helpers/fake_backend.dart`: In-memory `FakeBackend` + `FakeNotificationService` test doubles.
-- `test/import_boundary_test.dart`: Enforces BaaS import boundaries, zero `print()`, zero `.withOpacity()`, `initialValue:` usage, and EN/ES ARB key parity.
+- `test/import_boundary_test.dart`: Enforces BaaS & Wasm-safe import boundaries, zero `print()`, zero `.withOpacity()`, `initialValue:` usage, and EN/ES ARB key parity.
 - `test/widget_test.dart`: `MyHomePage` role switching, drawers, `AppVersionLabel`, and onboarding logout tests.
 - `test/integration/rollout_workflow_test.dart`: End-to-end resident, booking, payment, sanction, and admin workflows.
 - `test/core/`: `backend/backend_models_test.dart`, `crashlytics_service_test.dart`, `services/core_services_test.dart`, `services/temp_image_cleanup_test.dart`.

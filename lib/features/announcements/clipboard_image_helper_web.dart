@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'package:flutter/foundation.dart';
-import 'package:universal_html/html.dart' as html;
+import 'package:web/web.dart' as web;
 
 @JS('navigator')
 external _JsNavigator? get _navigator;
@@ -46,20 +46,19 @@ Future<Uint8List?> getWebClipboardImageBytes() async {
 
 StreamSubscription? listenToWebPaste(Function(Uint8List bytes) onImagePasted) {
   try {
-    return html.document.onPaste.listen((html.ClipboardEvent event) async {
+    return web.EventStreamProviders.pasteEvent
+        .forTarget(web.document)
+        .listen((web.ClipboardEvent event) async {
       final items = event.clipboardData?.items;
       if (items != null) {
-        final int count = items.length ?? 0;
+        final int count = items.length;
         for (int i = 0; i < count; i++) {
           final item = items[i];
-          if (item.type?.startsWith('image/') == true) {
+          if (item.type.startsWith('image/')) {
             final file = item.getAsFile();
             if (file != null) {
-              final reader = html.FileReader();
-              reader.readAsArrayBuffer(file);
-              await reader.onLoadEnd.first;
-              final bytes = Uint8List.fromList(reader.result as List<int>);
-              onImagePasted(bytes);
+              final buffer = (await file.arrayBuffer().toDart).toDart;
+              onImagePasted(buffer.asUint8List());
               break;
             }
           }

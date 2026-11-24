@@ -2,7 +2,7 @@ import 'package:image_picker/image_picker.dart';
 import 'temp_image_cleanup_stub.dart';
 import 'temp_image_cleanup_stub.dart'
     if (dart.library.io) 'temp_image_cleanup_io.dart'
-    if (dart.library.html) 'temp_image_cleanup_web.dart' as impl;
+    if (dart.library.js_interop) 'temp_image_cleanup_web.dart' as impl;
 
 export 'temp_image_cleanup_stub.dart';
 

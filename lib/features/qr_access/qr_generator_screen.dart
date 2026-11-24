@@ -9,7 +9,7 @@ import 'dart:ui' as ui;
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
-import 'package:universal_html/html.dart' as html;
+import 'package:suburban_life/core/services/web_file_transfer_helper.dart';
 
 class QrGeneratorScreen extends StatefulWidget {
   const QrGeneratorScreen({super.key});
@@ -553,12 +553,11 @@ class _QrGeneratorScreenState extends State<QrGeneratorScreen> {
   }
 
   void _triggerWebDownload(Uint8List bytes, String fileName, AppLocalizations l10n) {
-    final blob = html.Blob([bytes]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', fileName)
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    WebFileTransferHelper.downloadBytes(
+      bytes: bytes,
+      fileName: fileName,
+      mimeType: 'image/png',
+    );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

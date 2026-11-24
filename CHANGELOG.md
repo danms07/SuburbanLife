@@ -2,6 +2,14 @@
 
 All notable changes to **Suburban Life** are documented here.
 
+## [1.0.50+51] — 2026-11-23
+
+### Changed (WebAssembly Compatibility)
+- Replaced `universal_html` (`dart:html`) with `package:web` (`^1.1.2`) and `dart:js_interop` across all 13 Web call sites to enable full `flutter build web --wasm` compilation and clean Wasm dry runs.
+- Extracted shared conditional-import (`dart.library.js_interop`) web bridges: `WebFileTransferHelper` (`web_file_transfer*.dart`, consolidating browser `<input type="file">` picking, sanitized Blob downloads, and `noopener,noreferrer` new-tab opening across helpers/admin/QR/Transparency screens), `AppUpdateWebBridge` (`app_update_web_bridge*.dart`, plus `package:http` for `/version.json`), and `firebase_web_bridge*.dart`.
+- Updated `temp_image_cleanup_service.dart`, `cache_io_helper.dart`, `web_image_view*.dart`, `temp_image_cleanup_web.dart`, and `clipboard_image_helper*.dart` to use `dart.library.js_interop` and `package:web`.
+- Added Wasm-safe import boundary test in `test/import_boundary_test.dart` and bridge/sanitization unit tests in `test/core/services/core_services_test.dart`.
+
 ## [Unreleased] — 2026-11-23
 
 ### Changed (Documentation & Agent Token Efficiency)

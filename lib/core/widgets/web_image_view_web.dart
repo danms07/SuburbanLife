@@ -1,6 +1,6 @@
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/widgets.dart';
-import 'package:universal_html/html.dart' as html;
+import 'package:web/web.dart' as web;
 
 Widget buildWebImageView({
   required String imageUrl,
@@ -13,7 +13,7 @@ Widget buildWebImageView({
   ui_web.platformViewRegistry.registerViewFactory(
     viewType,
     (int viewId) {
-      final html.ImageElement element = html.ImageElement()
+      final element = web.HTMLImageElement()
         ..src = imageUrl
         ..style.height = '100%'
         ..style.width = '100%'

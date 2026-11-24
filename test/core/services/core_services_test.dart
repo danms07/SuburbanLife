@@ -4,10 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:suburban_life/core/backend/firebase_web_bridge.dart';
 import 'package:suburban_life/core/services/app_update_service.dart';
+import 'package:suburban_life/core/services/app_update_web_bridge.dart';
 import 'package:suburban_life/core/services/cache_io_helper.dart';
 import 'package:suburban_life/core/services/csv_download_helper.dart';
 import 'package:suburban_life/core/services/document_cache_service.dart';
+import 'package:suburban_life/core/services/web_file_transfer_helper.dart';
 import 'package:suburban_life/core/widgets/app_version_label.dart';
 import 'package:suburban_life/l10n/app_localizations.dart';
 
@@ -374,6 +377,34 @@ void main() {
 
       expect(find.byType(Text), findsNothing);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('Web Bridges & Sanitization', () {
+    test('sanitizeWebFileName strips traversal segments and control chars', () {
+      expect(sanitizeWebFileName('../../secret/file\r\n.pdf'), equals('file.pdf'));
+      expect(sanitizeWebFileName(r'..\..\win\report.csv'), equals('report.csv'));
+      expect(sanitizeWebFileName(r'..\..\..'), equals('download'));
+      expect(sanitizeWebFileName('', fallback: 'empty.csv'), equals('empty.csv'));
+    });
+
+    test('non-web bridge stubs are safe no-ops on VM targets', () async {
+      expect(await WebFileTransferHelper.pickFile(accept: '.csv'), isNull);
+      WebFileTransferHelper.downloadBytes(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        fileName: 'test.csv',
+      );
+      WebFileTransferHelper.openInNewTab('https://127.0.0.1/doc.pdf');
+
+      final updateBridge = getAppUpdateWebBridge();
+      expect(updateBridge.isDocumentHidden, isFalse);
+      updateBridge.attachInteractionListeners(() {});
+      updateBridge.attachVisibilityListener((_) {});
+      await updateBridge.purgeCachesUpdateSwAndReload();
+      updateBridge.dispose();
+
+      attachServiceWorkerNotificationListener((_) {});
+      replaceBrowserHistoryUrl('https://127.0.0.1/');
     });
   });
 }

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:universal_html/html.dart' as html;
 import '../../core/backend/backend.dart';
 import '../../core/config/app_config.dart';
+import '../../core/services/web_file_transfer_helper.dart';
 import '../../l10n/app_localizations.dart';
 import 'admin_bulk_payment_import_screen.dart';
 import 'financial_report_calculator.dart';
@@ -304,13 +304,12 @@ class _AdminPaymentReportScreenState extends State<AdminPaymentReportScreen> {
     if (kIsWeb) {
       for (int i = 0; i < files.length; i++) {
         final entry = files[i];
-        final bytes = utf8.encode(entry.content);
-        final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        html.AnchorElement(href: url)
-          ..setAttribute('download', entry.fileName)
-          ..click();
-        html.Url.revokeObjectUrl(url);
+        final bytes = Uint8List.fromList(utf8.encode(entry.content));
+        WebFileTransferHelper.downloadBytes(
+          bytes: bytes,
+          fileName: entry.fileName,
+          mimeType: 'text/csv;charset=utf-8',
+        );
         if (i + 1 < files.length) {
           await Future<void>.delayed(const Duration(milliseconds: 250));
         }
