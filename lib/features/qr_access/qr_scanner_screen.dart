@@ -139,6 +139,106 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     }
   }
 
+  String _extractDestinationAddress(
+    Map<String, dynamic>? qrData,
+    Map<String, dynamic>? openLog,
+  ) {
+    final directQrAddress =
+        (qrData?['addressDisplay'] ?? qrData?['destinationAddress'])?.toString().trim() ?? '';
+    if (directQrAddress.isNotEmpty) return directQrAddress;
+
+    final formattedQrAddress = QrCode.formatAddressParts(
+      qrData?['streetName'],
+      qrData?['number'],
+    );
+    if (formattedQrAddress.isNotEmpty) return formattedQrAddress;
+
+    final openLogAddress = openLog?['addressDisplay']?.toString().trim() ?? '';
+    if (openLogAddress.isNotEmpty) return openLogAddress;
+
+    return QrCode.formatAddressParts(openLog?['streetName'], openLog?['number']);
+  }
+
+  Future<String> _resolveAddressFromFirestoreFallback(String creatorUid) async {
+    try {
+      final userDoc = await DatabaseService().getDocument('users', creatorUid);
+      if (userDoc == null) return '';
+
+      final rawAddrRef = userDoc['addressRef'];
+      String? addressId;
+      if (rawAddrRef is DbReference) {
+        addressId = rawAddrRef.id;
+      } else if (rawAddrRef is String && rawAddrRef.trim().isNotEmpty) {
+        final trimmed = rawAddrRef.trim();
+        addressId = trimmed.contains('/') ? trimmed.split('/').last : trimmed;
+      } else if (userDoc['addressId'] != null) {
+        addressId = userDoc['addressId'].toString().trim();
+      }
+
+      if (addressId != null && addressId.isNotEmpty) {
+        final addrDoc = await DatabaseService().getDocument('addresses', addressId);
+        if (addrDoc != null) {
+          final formatted = QrCode.formatAddressParts(
+            addrDoc['streetName'],
+            addrDoc['number'],
+          );
+          if (formatted.isNotEmpty) return formatted;
+        }
+      }
+
+      if (userDoc['role']?.toString().toLowerCase() == 'admin') {
+        return 'Admin office';
+      }
+    } catch (e, stack) {
+      debugPrint('Fallback destination address lookup error: $e');
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'QrScannerScreen._resolveAddressFromFirestoreFallback',
+      );
+    }
+    return '';
+  }
+
+  String _localizeAddressDisplay(AppLocalizations l10n, String rawAddress) {
+    final trimmed = rawAddress.trim();
+    if (trimmed.isEmpty) return '';
+    final normalized = trimmed.toLowerCase();
+    if (normalized == 'admin office' ||
+        normalized == 'admin office #0' ||
+        normalized == 'oficina de administración' ||
+        normalized == 'oficina de administración #0' ||
+        normalized == 'oficina de administracion' ||
+        normalized == 'oficina de administracion #0') {
+      return l10n.adminOffice;
+    }
+    return trimmed;
+  }
+
+  QrCode _buildQrCodeFromResponse(
+    String fallbackId,
+    Map<String, dynamic> qrData, {
+    required String destinationAddress,
+    required bool isValid,
+    required AppLocalizations l10n,
+  }) {
+    final rawType = qrData['type']?.toString().trim().toLowerCase();
+    final parsedType =
+        rawType == QrType.permanent.name ? QrType.permanent : QrType.temporary;
+    return QrCode(
+      id: qrData['id']?.toString() ?? fallbackId,
+      creatorUid: qrData['creatorUid']?.toString() ?? '',
+      guestName: (qrData['visitorName'] ?? qrData['guestName'])?.toString() ??
+          l10n.guestFallback,
+      destinationAddress: destinationAddress.isNotEmpty ? destinationAddress : null,
+      vehicleType: qrData['vehicleType'] as String?,
+      vehiclePlates: (qrData['vehiclePlate'] ?? qrData['vehiclePlates'])?.toString(),
+      passengers: (qrData['passengers'] as num?)?.toInt(),
+      type: parsedType,
+      isValid: isValid,
+    );
+  }
+
   Future<void> _validateQr(String qrId, int validationToken) async {
     final cleanQrId = qrId.trim();
     try {
@@ -149,7 +249,6 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
       if (!mounted || validationToken != _activeValidationToken) return;
 
-      final l10n = AppLocalizations.of(context)!;
       final isGranted = res?['granted'] == true;
       final isExit = res?['isExit'] == true;
       final openLog = res?['openLog'] is Map
@@ -160,6 +259,16 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           : null;
       final serverReason = res?['reason']?.toString();
 
+      String resolvedAddress = _extractDestinationAddress(qrData, openLog);
+      final creatorUid = qrData?['creatorUid']?.toString().trim() ?? '';
+      if (isGranted && qrData != null && resolvedAddress.isEmpty && creatorUid.isNotEmpty) {
+        resolvedAddress = await _resolveAddressFromFirestoreFallback(creatorUid);
+        if (!mounted || validationToken != _activeValidationToken) return;
+      }
+
+      final l10n = AppLocalizations.of(context)!;
+      final localizedAddress = _localizeAddressDisplay(l10n, resolvedAddress);
+
       if (!isGranted || qrData == null) {
         setState(() {
           _isValidating = false;
@@ -168,30 +277,24 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           _isExitScan = false;
           _openLogData = null;
           if (qrData != null) {
-            _currentQrCode = QrCode(
-              id: qrData['id'] ?? cleanQrId,
-              creatorUid: qrData['creatorUid'] ?? '',
-              guestName: qrData['visitorName'] ?? qrData['guestName'] ?? l10n.guestFallback,
-              vehicleType: qrData['vehicleType'] as String?,
-              vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
-              passengers: qrData['passengers'] as int?,
-              type: QrType.temporary,
+            _currentQrCode = _buildQrCodeFromResponse(
+              cleanQrId,
+              qrData,
+              destinationAddress: localizedAddress,
               isValid: false,
+              l10n: l10n,
             );
           }
         });
         return;
       }
 
-      final qrCode = QrCode(
-        id: qrData['id'] ?? cleanQrId,
-        creatorUid: qrData['creatorUid'] ?? '',
-        guestName: qrData['visitorName'] ?? qrData['guestName'] ?? l10n.guestFallback,
-        vehicleType: qrData['vehicleType'] as String?,
-        vehiclePlates: qrData['vehiclePlate'] ?? qrData['vehiclePlates'],
-        passengers: qrData['passengers'] as int?,
-        type: QrType.temporary,
+      final qrCode = _buildQrCodeFromResponse(
+        cleanQrId,
+        qrData,
+        destinationAddress: localizedAddress,
         isValid: true,
+        l10n: l10n,
       );
 
       setState(() {
@@ -613,65 +716,114 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (_isValidQr && _currentQrCode != null) ...[
-                            Card(
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      l10n.visitorDetails,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppConfig.primaryColor,
-                                        fontFamily: AppConfig.fontFamily,
-                                      ),
-                                    ),
-                                    const Divider(),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${l10n.guestName}: ${_currentQrCode!.guestName}',
-                                      style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
-                                    ),
-                                    if (_currentQrCode!.vehicleType?.isNotEmpty ?? false) ...[
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${l10n.vehicleType}: ${_getTranslatedVehicleType(l10n, _currentQrCode!.vehicleType)}',
-                                        style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
-                                      ),
-                                    ],
-                                    if (_currentQrCode!.passengers != null) ...[
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${l10n.passengersCount}: ${_currentQrCode!.passengers}',
-                                        style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
-                                      ),
-                                    ],
-                                    if (_currentQrCode!.vehiclePlates?.isNotEmpty ?? false) ...[
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${l10n.vehiclePlates}: ${_currentQrCode!.vehiclePlates}',
-                                        style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
-                                      ),
-                                    ],
-                                    if (_isExitScan && entryTimeFormatted.isNotEmpty) ...[
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '${l10n.entryTimeLabel}: $entryTimeFormatted',
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.teal,
-                                          fontFamily: AppConfig.fontFamily,
+                            Builder(
+                              builder: (cardContext) {
+                                final colorScheme = Theme.of(cardContext).colorScheme;
+                                final destinationAddress = _localizeAddressDisplay(
+                                  l10n,
+                                  _currentQrCode!.destinationAddress ?? '',
+                                );
+                                return Card(
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          l10n.visitorDetails,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppConfig.primaryColor,
+                                            fontFamily: AppConfig.fontFamily,
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
+                                        const Divider(),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '${l10n.guestName}: ${_currentQrCode!.guestName}',
+                                          style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
+                                        ),
+                                        if (destinationAddress.isNotEmpty) ...[
+                                          const SizedBox(height: 10),
+                                          Container(
+                                            key: const ValueKey('qr_scanner_destination_address'),
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: colorScheme.primary.withValues(alpha: 0.08),
+                                              borderRadius: BorderRadius.circular(10),
+                                              border: Border.all(
+                                                color: colorScheme.primary.withValues(alpha: 0.22),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Padding(
+                                                  padding: const EdgeInsets.only(top: 1),
+                                                  child: Icon(
+                                                    Icons.home_outlined,
+                                                    size: 20,
+                                                    color: colorScheme.primary,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    '${l10n.destinationAddress}: $destinationAddress',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: colorScheme.primary,
+                                                      fontFamily: AppConfig.fontFamily,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                        if (_currentQrCode!.vehicleType?.isNotEmpty ?? false) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '${l10n.vehicleType}: ${_getTranslatedVehicleType(l10n, _currentQrCode!.vehicleType)}',
+                                            style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
+                                          ),
+                                        ],
+                                        if (_currentQrCode!.passengers != null) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '${l10n.passengersCount}: ${_currentQrCode!.passengers}',
+                                            style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
+                                          ),
+                                        ],
+                                        if (_currentQrCode!.vehiclePlates?.isNotEmpty ?? false) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '${l10n.vehiclePlates}: ${_currentQrCode!.vehiclePlates}',
+                                            style: const TextStyle(fontSize: 16, fontFamily: AppConfig.fontFamily),
+                                          ),
+                                        ],
+                                        if (_isExitScan && entryTimeFormatted.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '${l10n.entryTimeLabel}: $entryTimeFormatted',
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.teal,
+                                              fontFamily: AppConfig.fontFamily,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 16),
                             if (_isExitScan) ...[

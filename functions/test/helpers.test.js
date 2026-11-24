@@ -1272,3 +1272,16 @@ test('validateTransparencyDocInput supports bilingual translations, folderNameKe
   assert.equal(isManagedTransparencyStoragePath('payments/receipt.pdf'), false);
   assert.equal(isManagedTransparencyStoragePath(null), false);
 });
+
+test('formatAccessAddressDisplay formats residential addresses cleanly and omits placeholder 0', () => {
+  const { formatAccessAddressDisplay } = _test;
+
+  assert.equal(formatAccessAddressDisplay('Loreto', 10), 'Loreto #10');
+  assert.equal(formatAccessAddressDisplay('  Av. Catania ', ' 204 '), 'Av. Catania #204');
+  assert.equal(formatAccessAddressDisplay('Admin office', 0), 'Admin office');
+  assert.equal(formatAccessAddressDisplay('Admin office', '0'), 'Admin office');
+  assert.equal(formatAccessAddressDisplay('Calle Sol', null), 'Calle Sol');
+  assert.equal(formatAccessAddressDisplay('', 0), '');
+  assert.equal(formatAccessAddressDisplay('', 42), '#42');
+  assert.equal(formatAccessAddressDisplay(null, null), '');
+});

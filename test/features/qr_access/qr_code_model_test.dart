@@ -10,6 +10,7 @@ void main() {
         id: 'qr_101',
         creatorUid: 'resident_456',
         guestName: 'Carlos Visitor',
+        destinationAddress: 'Av. Catania #104',
         vehicleType: 'car',
         vehiclePlates: 'XYZ-789',
         passengers: 3,
@@ -22,6 +23,7 @@ void main() {
 
       expect(map['creatorUid'], equals('resident_456'));
       expect(map['guestName'], equals('Carlos Visitor'));
+      expect(map['destinationAddress'], equals('Av. Catania #104'));
       expect(map['vehicleType'], equals('car'));
       expect(map['vehiclePlates'], equals('XYZ-789'));
       expect(map['passengers'], equals(3));
@@ -30,10 +32,11 @@ void main() {
       expect(map['isValid'], isTrue);
     });
 
-    test('fromMap parses temporary and permanent types correctly', () {
+    test('fromMap parses temporary and permanent types and destinationAddress variants', () {
       final tempMap = {
         'creatorUid': 'user_1',
         'guestName': 'Guest One',
+        'addressDisplay': 'Loreto #10',
         'type': 'temporary',
         'expiryTime': fixedExpiry,
         'isValid': true,
@@ -41,15 +44,19 @@ void main() {
       final tempQr = QrCode.fromMap('qr_temp', tempMap);
       expect(tempQr.type, equals(QrType.temporary));
       expect(tempQr.guestName, equals('Guest One'));
+      expect(tempQr.destinationAddress, equals('Loreto #10'));
 
       final permMap = {
         'creatorUid': 'user_1',
         'guestName': 'Family Member',
+        'streetName': 'Av. Modena',
+        'number': 25,
         'type': 'permanent',
         'isValid': true,
       };
       final permQr = QrCode.fromMap('qr_perm', permMap);
       expect(permQr.type, equals(QrType.permanent));
+      expect(permQr.destinationAddress, equals('Av. Modena #25'));
     });
 
     test('fromMap applies default values when optional fields are omitted', () {
@@ -62,12 +69,22 @@ void main() {
       expect(qr.id, equals('qr_min'));
       expect(qr.creatorUid, equals('user_2'));
       expect(qr.guestName, equals('Guest'));
+      expect(qr.destinationAddress, isNull);
       expect(qr.type, equals(QrType.temporary));
       expect(qr.isValid, isTrue);
       expect(qr.vehicleType, isNull);
       expect(qr.vehiclePlates, isNull);
       expect(qr.passengers, isNull);
       expect(qr.expiryTime, isNull);
+    });
+
+    test('formatAddressParts formats street and number cleanly while omitting 0', () {
+      expect(QrCode.formatAddressParts('Loreto', 10), equals('Loreto #10'));
+      expect(QrCode.formatAddressParts('Admin office', 0), equals('Admin office'));
+      expect(QrCode.formatAddressParts('Admin office', '0'), equals('Admin office'));
+      expect(QrCode.formatAddressParts('Calle Sol', null), equals('Calle Sol'));
+      expect(QrCode.formatAddressParts('', 0), isEmpty);
+      expect(QrCode.formatAddressParts(null, null), isEmpty);
     });
   });
 }

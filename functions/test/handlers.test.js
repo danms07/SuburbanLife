@@ -2267,3 +2267,130 @@ test('createBooking omits non-JSON-serializable addressRef DocumentReference fro
   assert.equal(rawObj.addressRef, realAddrRef);
 });
 
+test('validateAndRegisterQrAccess resolves destination addressDisplay for residents, admin_office, admins without addressRef, and exit openLog fallback', async (t) => {
+  const env = createMockAdminEnvironment();
+  const resAddrRef = env.makeDocRef('addresses', 'addr_loreto_10');
+  const adminOfficeRef = env.makeDocRef('addresses', 'admin_office');
+
+  await env.makeDocRef('config', 'app_settings').set({
+    scanOnExitEnabled: true,
+    timeZone: 'America/Mexico_City',
+  });
+  await env.makeDocRef('users', 'guard_addr_1').set({
+    uid: 'guard_addr_1',
+    name: 'Guard Address',
+    role: 'guard',
+  });
+  await resAddrRef.set({
+    id: 'addr_loreto_10',
+    streetName: 'Loreto',
+    number: 10,
+    paymentStatus: 'paid',
+  });
+  await adminOfficeRef.set({
+    id: 'admin_office',
+    streetName: 'Admin office',
+    number: 0,
+    paymentStatus: 'paid',
+  });
+
+  await env.makeDocRef('users', 'res_addr_1').set({
+    uid: 'res_addr_1',
+    name: 'Resident Address',
+    role: 'resident',
+    addressRef: resAddrRef,
+  });
+  await env.makeDocRef('users', 'admin_with_ref').set({
+    uid: 'admin_with_ref',
+    name: 'Admin Linked',
+    role: 'admin',
+    addressRef: adminOfficeRef,
+  });
+  await env.makeDocRef('users', 'admin_no_ref').set({
+    uid: 'admin_no_ref',
+    name: 'Admin Unlinked',
+    role: 'admin',
+  });
+
+  const futureExpiry = new Date(Date.now() + 2 * 3600 * 1000);
+  await env.makeDocRef('qr_codes', 'qr_res_addr').set({
+    creatorUid: 'res_addr_1',
+    guestName: 'Maria Guest',
+    accessCategory: 'visitor',
+    type: 'temporary',
+    status: 'active',
+    expiryTime: futureExpiry,
+  });
+  await env.makeDocRef('qr_codes', 'qr_admin_office').set({
+    creatorUid: 'admin_with_ref',
+    guestName: 'Courier Admin Office',
+    accessCategory: 'supplier',
+    isOneTimeUse: true,
+    type: 'temporary',
+    status: 'active',
+    expiryTime: futureExpiry,
+  });
+  await env.makeDocRef('qr_codes', 'qr_admin_no_ref').set({
+    creatorUid: 'admin_no_ref',
+    guestName: 'Technician Admin',
+    accessCategory: 'visitor',
+    type: 'temporary',
+    status: 'active',
+    expiryTime: futureExpiry,
+  });
+
+  installMockAdmin(t, env);
+  const validateWrapped = fft.wrap(cloudFunctions.validateAndRegisterQrAccess);
+  const guardAuth = { uid: 'guard_addr_1', token: { guard: true } };
+
+  // 1. Resident QR validate_only returns "Loreto #10"
+  const resValidate = await validateWrapped({
+    data: { qrId: 'qr_res_addr', mode: 'validate_only' },
+    auth: guardAuth,
+  });
+  assert.equal(resValidate.granted, true);
+  assert.equal(resValidate.isExit, false);
+  assert.equal(resValidate.qrData.addressDisplay, 'Loreto #10');
+
+  // 2. Admin linked to admin_office (number: 0) omits "#0" -> "Admin office"
+  const adminOfficeValidate = await validateWrapped({
+    data: { qrId: 'qr_admin_office', mode: 'validate_only' },
+    auth: guardAuth,
+  });
+  assert.equal(adminOfficeValidate.granted, true);
+  assert.equal(adminOfficeValidate.qrData.addressDisplay, 'Admin office');
+
+  // 3. Admin without addressRef falls back to "Admin office"
+  const adminNoRefValidate = await validateWrapped({
+    data: { qrId: 'qr_admin_no_ref', mode: 'validate_only' },
+    auth: guardAuth,
+  });
+  assert.equal(adminNoRefValidate.granted, true);
+  assert.equal(adminNoRefValidate.qrData.addressDisplay, 'Admin office');
+
+  // 4. Register entry for resident QR, then unbind user's addressRef before exit scan ->
+  //    exit validate_only preserves destination address via openLog fallback
+  const entryReg = await validateWrapped({
+    data: { qrId: 'qr_res_addr', mode: 'validate_and_register' },
+    auth: guardAuth,
+  });
+  assert.equal(entryReg.granted, true);
+  assert.equal(entryReg.qrData.addressDisplay, 'Loreto #10');
+
+  await env.makeDocRef('users', 'res_addr_1').set({
+    uid: 'res_addr_1',
+    name: 'Resident Address',
+    role: 'resident',
+    addressRef: null,
+  });
+
+  const exitValidate = await validateWrapped({
+    data: { qrId: 'qr_res_addr', mode: 'validate_only' },
+    auth: guardAuth,
+  });
+  assert.equal(exitValidate.granted, true);
+  assert.equal(exitValidate.isExit, true);
+  assert.equal(exitValidate.qrData.addressDisplay, 'Loreto #10');
+  assert.equal(exitValidate.openLog.addressDisplay, 'Loreto #10');
+});
+

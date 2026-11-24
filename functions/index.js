@@ -4836,6 +4836,25 @@ function resolveOpenVisitLog({
 }
 
 /**
+ * Formats a street name and optional house number for QR access payloads and logs.
+ * Omits placeholder number `'0'` (used by `admin_office`) and empty values.
+ */
+function formatAccessAddressDisplay(streetName, houseNumber) {
+  const cleanStreet = (streetName || '').toString().trim();
+  const cleanNumber = houseNumber != null ? houseNumber.toString().trim() : '';
+  if (cleanStreet && cleanNumber && cleanNumber !== '0') {
+    return `${cleanStreet} #${cleanNumber}`;
+  }
+  if (cleanStreet) {
+    return cleanStreet;
+  }
+  if (cleanNumber && cleanNumber !== '0') {
+    return `#${cleanNumber}`;
+  }
+  return '';
+}
+
+/**
  * Validates a QR code and registers physical access or exit atomically in Cloud Functions.
  * Enforces:
  * - Guard or Admin caller authentication
@@ -4911,17 +4930,18 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
       if (userSnap.exists) {
         const userData = userSnap.data();
         residentName = userData.name || '';
-        if (userData.addressRef) {
-          addressRef = userData.addressRef;
-          const addrRef = typeof userData.addressRef === 'string'
-            ? db.doc(userData.addressRef)
-            : userData.addressRef;
+        const rawAddrRef = userData.addressRef || userData.addressId || null;
+        if (rawAddrRef) {
+          const addrRef = typeof rawAddrRef === 'string'
+            ? (rawAddrRef.includes('/') ? db.doc(rawAddrRef) : db.collection('addresses').doc(rawAddrRef))
+            : rawAddrRef;
+          addressRef = addrRef;
           const addrSnap = await transaction.get(addrRef);
           if (addrSnap.exists) {
             const addrData = addrSnap.data();
-            streetName = addrData.streetName || '';
-            houseNumber = addrData.number != null ? addrData.number.toString() : '';
-            addressDisplay = `${streetName} #${houseNumber}`.trim();
+            streetName = (addrData.streetName || '').toString().trim();
+            houseNumber = addrData.number != null ? addrData.number.toString().trim() : '';
+            addressDisplay = formatAccessAddressDisplay(streetName, houseNumber);
             if (addrData.paymentStatus) {
               const isWithinGrace = addrData.isWithinGracePeriod === true;
               const isConsideredPaid = addrData.paymentStatus === 'paid' ||
@@ -4931,6 +4951,11 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
               }
             }
           }
+        }
+        if (!addressDisplay && (userData.role || '').toString().toLowerCase() === 'admin') {
+          streetName = 'Admin office';
+          houseNumber = '0';
+          addressDisplay = 'Admin office';
         }
       }
     }
@@ -4990,6 +5015,11 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
 
       if (openLogSnap || qrData.isInside === true) {
         const openLogData = openLogSnap ? (openLogSnap.data() || {}) : {};
+        const openLogAddressDisplay = (openLogData.addressDisplay || '').toString().trim() ||
+          formatAccessAddressDisplay(openLogData.streetName, openLogData.number);
+        if (!responseQrData.addressDisplay && openLogAddressDisplay) {
+          responseQrData.addressDisplay = openLogAddressDisplay;
+        }
         const openLogSummary = {
           id: openLogSnap ? openLogSnap.id : '',
           entryTimestampMillis: extractTimestampMillis(openLogData.timestamp),
@@ -4997,6 +5027,7 @@ exports.validateAndRegisterQrAccess = onCall(callableOptions, async (request) =>
           visitorIdPhotoUrl: openLogData.visitorIdPhotoUrl || '',
           visitorPlatePhotoUrl: openLogData.visitorPlatePhotoUrl || '',
           reason: openLogData.reason || '',
+          addressDisplay: responseQrData.addressDisplay || openLogAddressDisplay,
         };
 
         if (mode === 'validate_only') {
@@ -5949,6 +5980,7 @@ exports._test = {
   extractTimestampMillis,
   isSameCalendarDayInTimezone,
   resolveOpenVisitLog,
+  formatAccessAddressDisplay,
   ACCESS_LOG_RETENTION_DAYS,
   ACCESS_LOG_RETENTION_MS,
   QR_CODE_RETENTION_DAYS,

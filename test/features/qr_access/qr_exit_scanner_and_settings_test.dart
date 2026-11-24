@@ -283,6 +283,7 @@ void main() {
               'id': 'qr_exit_test',
               'creatorUid': 'resident_1',
               'guestName': 'Supplier Exit Test',
+              'addressDisplay': 'Loreto #10',
               'vehicleType': 'car',
               'vehiclePlates': 'EXIT-777',
               'passengers': 2,
@@ -309,9 +310,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Verify Fast Exit UI is rendered without camera capture buttons
+      // Verify Fast Exit UI is rendered without camera capture buttons, including destination address
       expect(find.text('Visitor Exit Ready'), findsOneWidget);
       expect(find.textContaining('Supplier Exit Test'), findsOneWidget);
+      expect(find.byKey(const ValueKey('qr_scanner_destination_address')), findsOneWidget);
+      expect(find.text('Destination: Loreto #10'), findsOneWidget);
       expect(find.text('Visitor ID Photo'), findsOneWidget);
       expect(find.text('Vehicle Plate Photo'), findsOneWidget);
       expect(find.text('Capture ID Photo'), findsNothing);
@@ -588,6 +591,177 @@ void main() {
 
         validationCompleter.complete({'granted': false, 'reason': 'No encontrado'});
         await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
+      'displays localized destination address on entry scan in English and Spanish without overflow on narrow mobile screens',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 780);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        FakeBackendHelper.functions.registerHandler('validateAndRegisterQrAccess', (params) {
+          return {
+            'granted': true,
+            'isExit': false,
+            'qrData': {
+              'id': 'qr_dest_entry',
+              'creatorUid': 'resident_1',
+              'guestName': 'Lucia Visitor',
+              'addressDisplay': 'Boulevard Residencial de los Alamos #142',
+              'vehicleType': 'car',
+              'vehiclePlates': 'DEST-142',
+              'passengers': 2,
+              'type': 'temporary',
+            },
+          };
+        });
+
+        // English check on 360x780 mobile viewport
+        await tester.pumpWidget(wrapWithApp(const QrScannerScreen(), locale: const Locale('en')));
+        await tester.pump();
+
+        var mobileScanner = tester.widget<MobileScanner>(find.byType(MobileScanner));
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_dest_entry')]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.byKey(const ValueKey('qr_scanner_destination_address')), findsOneWidget);
+        expect(
+          find.text('Destination: Boulevard Residencial de los Alamos #142'),
+          findsOneWidget,
+        );
+
+        // Spanish check on 360x780 mobile viewport
+        await tester.pumpWidget(
+          wrapWithApp(
+            const QrScannerScreen(key: ValueKey('es_dest_scanner')),
+            locale: const Locale('es'),
+          ),
+        );
+        await tester.pump();
+
+        mobileScanner = tester.widget<MobileScanner>(find.byType(MobileScanner));
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_dest_entry')]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        expect(find.byKey(const ValueKey('qr_scanner_destination_address')), findsOneWidget);
+        expect(
+          find.text('Destino: Boulevard Residencial de los Alamos #142'),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'localizes Admin office destination address in English and Spanish and resolves Firestore fallback when addressDisplay is omitted',
+      (tester) async {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        // 1. Admin office normalization ("Admin office #0" -> localized Admin office / Oficina de administración)
+        FakeBackendHelper.functions.registerHandler('validateAndRegisterQrAccess', (params) {
+          return {
+            'granted': true,
+            'isExit': false,
+            'qrData': {
+              'id': 'qr_admin_dest',
+              'creatorUid': 'admin_1',
+              'guestName': 'Inspector Visit',
+              'addressDisplay': 'Admin office #0',
+              'vehicleType': 'walking',
+              'type': 'temporary',
+            },
+          };
+        });
+
+        await tester.pumpWidget(wrapWithApp(const QrScannerScreen(), locale: const Locale('en')));
+        await tester.pump();
+
+        var mobileScanner = tester.widget<MobileScanner>(find.byType(MobileScanner));
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_admin_dest')]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('qr_scanner_destination_address')), findsOneWidget);
+        expect(find.text('Destination: Admin office'), findsOneWidget);
+
+        await tester.pumpWidget(
+          wrapWithApp(
+            const QrScannerScreen(key: ValueKey('es_admin_dest_scanner')),
+            locale: const Locale('es'),
+          ),
+        );
+        await tester.pump();
+
+        mobileScanner = tester.widget<MobileScanner>(find.byType(MobileScanner));
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_admin_dest')]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('qr_scanner_destination_address')), findsOneWidget);
+        expect(find.text('Destino: Oficina de administración'), findsOneWidget);
+
+        // 2. Fallback lookup via users/{creatorUid}.addressRef -> addresses/{id} when addressDisplay is omitted
+        final addrRef = FakeBackendHelper.db.createReference('addresses', 'addr_fallback_1');
+        FakeBackendHelper.db.seedDocument('addresses', 'addr_fallback_1', {
+          'id': 'addr_fallback_1',
+          'streetName': 'Av. Modena',
+          'number': 25,
+          'paymentStatus': 'paid',
+        });
+        FakeBackendHelper.db.seedDocument('users', 'resident_fallback_1', {
+          'uid': 'resident_fallback_1',
+          'name': 'Fallback Resident',
+          'role': 'resident',
+          'addressRef': addrRef,
+        });
+
+        FakeBackendHelper.functions.registerHandler('validateAndRegisterQrAccess', (params) {
+          return {
+            'granted': true,
+            'isExit': false,
+            'qrData': {
+              'id': 'qr_fallback_dest',
+              'creatorUid': 'resident_fallback_1',
+              'guestName': 'Fallback Guest',
+              'vehicleType': 'car',
+              'type': 'temporary',
+            },
+          };
+        });
+
+        await tester.pumpWidget(
+          wrapWithApp(
+            const QrScannerScreen(key: ValueKey('fallback_dest_scanner')),
+            locale: const Locale('en'),
+          ),
+        );
+        await tester.pump();
+
+        mobileScanner = tester.widget<MobileScanner>(find.byType(MobileScanner));
+        mobileScanner.onDetect?.call(
+          BarcodeCapture(barcodes: const [Barcode(rawValue: 'qr_fallback_dest')]),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('qr_scanner_destination_address')), findsOneWidget);
+        expect(find.text('Destination: Av. Modena #25'), findsOneWidget);
       },
     );
 

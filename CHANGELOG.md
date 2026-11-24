@@ -2,6 +2,19 @@
 
 All notable changes to the **Suburban Life** project are documented in this file.
 
+## [1.0.49+50] — 2026-11-23
+
+### Added
+- **Guard QR Scanner Destination Address Display (`lib/features/qr_access/qr_code.dart`, `lib/features/qr_access/qr_scanner_screen.dart`, `functions/index.js`)**:
+  - Added `destinationAddress` and `QrCode.formatAddressParts` to the `QrCode` model, updating `toMap`/`fromMap` to parse `destinationAddress`, `addressDisplay`, and `streetName`/`number` while omitting the `'0'` placeholder number used by `admin_office`.
+  - Updated `QrScannerScreen` to resolve the visitor's destination address from the `validateAndRegisterQrAccess` response (`qrData.addressDisplay`, `openLog.addressDisplay` on exit, or a Firestore `users/{creatorUid}` -> `addresses` fallback when omitted), localize `Admin office` / `Oficina de administración`, and display a highlighted `Destination: ...` / `Destino: ...` row (`ValueKey('qr_scanner_destination_address')`) inside the Visitor Details card on both entry and exit scans.
+  - Added `formatAccessAddressDisplay` in `functions/index.js` and updated `validateAndRegisterQrAccess` to omit placeholder `'0'` numbers (preventing `'Admin office #0'`), resolve `'Admin office'` for admin creators without an `addressRef`, and fall back to `openLog.addressDisplay` during exit validation if a resident address was later unbound.
+
+### Tests & Documentation
+- Added unit tests for `formatAccessAddressDisplay` in `functions/test/helpers.test.js` and `validateAndRegisterQrAccess` address resolution tests (resident, `admin_office`, unlinked admin, and exit `openLog` fallback) in `functions/test/handlers.test.js`.
+- Added `QrCode` destination address model tests in `test/features/qr_access/qr_code_model_test.dart` and EN/ES `360x780` entry/exit destination address, `Admin office` localization, and Firestore fallback widget tests in `test/features/qr_access/qr_exit_scanner_and_settings_test.dart`.
+- Updated `Structure.md`, `widget_catalog.md`, `README.md`, and bumped app version to `1.0.49+50` (`pubspec.yaml` and `web/version.json`).
+
 ## [Unreleased] — 2026-11-19
 
 ### Added
