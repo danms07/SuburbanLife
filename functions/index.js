@@ -5950,6 +5950,521 @@ exports.voidExpense = onCall(callableOptions, async (request) => {
   };
 });
 
+const MAX_BULK_EXPENSE_ITEMS = 500;
+const EXPENSE_CATEGORY_ALIASES = {
+  maintenance: 'maintenance',
+  mantenimiento: 'maintenance',
+  gardening: 'gardening',
+  jardineria: 'gardening',
+  security: 'security',
+  seguridad: 'security',
+  utilities: 'utilities',
+  servicios: 'utilities',
+  'servicios publicos': 'utilities',
+  repairs: 'repairs',
+  reparaciones: 'repairs',
+  reparacion: 'repairs',
+  supplies: 'supplies',
+  suministros: 'supplies',
+  insumos: 'supplies',
+  other: 'other',
+  otros: 'other',
+  otro: 'other',
+};
+
+/**
+ * Normalizes an expense category input (English slug or Spanish label) into a canonical slug.
+ */
+function normalizeExpenseCategory(rawCategory) {
+  if (rawCategory === undefined || rawCategory === null || String(rawCategory).trim() === '') {
+    return { valid: true, category: 'other' };
+  }
+  const normalizedKey = normalizeStreetName(String(rawCategory));
+  const resolved = EXPENSE_CATEGORY_ALIASES[normalizedKey];
+  if (!resolved || !ALLOWED_EXPENSE_CATEGORIES.includes(resolved)) {
+    return {
+      valid: false,
+      error: `Invalid category "${String(rawCategory).trim()}". Allowed: ${ALLOWED_EXPENSE_CATEGORIES.join(', ')}.`,
+    };
+  }
+  return { valid: true, category: resolved };
+}
+
+/**
+ * Formats an epoch millisecond timestamp as 'YYYY-MM-DD' in the community timezone.
+ */
+function formatExpenseDateIso(millis, timeZone = 'America/Mexico_City') {
+  if (!Number.isFinite(millis) || millis <= 0) return '';
+  const parts = getDateInTimezone(millis, timeZone);
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+/**
+ * Parses an expense date (epoch ms or calendar date string) into a validated UTC-noon millisecond timestamp.
+ */
+function parseBulkExpenseDate(rawDate, fallbackPeriod = null) {
+  const minMs = Date.UTC(2000, 0, 1);
+  const maxMs = Date.UTC(2100, 11, 31, 23, 59, 59);
+
+  if (rawDate === undefined || rawDate === null || String(rawDate).trim() === '') {
+    if (fallbackPeriod && /^\d{4}-(0[1-9]|1[0-2])$/.test(fallbackPeriod)) {
+      const [y, m] = fallbackPeriod.split('-').map((n) => parseInt(n, 10));
+      return Date.UTC(y, m - 1, 1, 12, 0, 0);
+    }
+    return null;
+  }
+
+  if (typeof rawDate === 'number' || /^\d{10,15}$/.test(String(rawDate).trim())) {
+    const num = typeof rawDate === 'number' ? rawDate : Number(String(rawDate).trim());
+    if (!Number.isFinite(num) || num < minMs || num > maxMs) return null;
+    return Math.floor(num);
+  }
+
+  const str = String(rawDate).trim();
+  const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (isoMatch) {
+    const y = parseInt(isoMatch[1], 10);
+    const m = parseInt(isoMatch[2], 10);
+    const d = parseInt(isoMatch[3], 10);
+    if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+      return null;
+    }
+    return dt.getTime();
+  }
+
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (dmyMatch) {
+    const d = parseInt(dmyMatch[1], 10);
+    const m = parseInt(dmyMatch[2], 10);
+    const y = parseInt(dmyMatch[3], 10);
+    if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) {
+      return null;
+    }
+    return dt.getTime();
+  }
+
+  return null;
+}
+
+/**
+ * Validates and normalizes a single bulk expense row into canonical persistence fields and duplicate match key.
+ */
+function validateAndNormalizeBulkExpenseItem(rawItem, arrayIndex = 0, timeZone = 'America/Mexico_City') {
+  const safeObj = rawItem && typeof rawItem === 'object' && !Array.isArray(rawItem) ? rawItem : {};
+  const rowIndex = Number.isInteger(safeObj.rowIndex) && safeObj.rowIndex >= 0
+    ? safeObj.rowIndex
+    : arrayIndex;
+  const rowNumber = Number.isInteger(safeObj.rowNumber) && safeObj.rowNumber >= 1
+    ? safeObj.rowNumber
+    : arrayIndex + 2;
+
+  const productOrService = String(safeObj.productOrService || '').trim();
+  if (!productOrService || productOrService.length > 200) {
+    return {
+      valid: false,
+      rowIndex,
+      rowNumber,
+      productOrService,
+      error: 'Product or service description is required (1–200 chars).',
+    };
+  }
+
+  const rawAmountStr = typeof safeObj.amount === 'number'
+    ? safeObj.amount
+    : parseFloat(String(safeObj.amount ?? '').replace(/[$,\s]/g, ''));
+  const amountCents = Number.isFinite(rawAmountStr) ? Math.round(rawAmountStr * 100) : 0;
+  const roundedAmount = amountCents / 100;
+  if (!Number.isFinite(rawAmountStr) || amountCents <= 0 || roundedAmount > 100000000) {
+    return {
+      valid: false,
+      rowIndex,
+      rowNumber,
+      productOrService,
+      error: 'Expense amount must be a positive number.',
+    };
+  }
+
+  const rawPeriod = String(safeObj.billablePeriod || '').trim();
+  let billablePeriod = null;
+  if (rawPeriod) {
+    billablePeriod = parsePeriodHeader(rawPeriod);
+    if (!billablePeriod) {
+      return {
+        valid: false,
+        rowIndex,
+        rowNumber,
+        productOrService,
+        error: `Invalid billable period "${rawPeriod}". Expected YYYY-MM or mmm-yy.`,
+      };
+    }
+  }
+
+  const expenseDate = parseBulkExpenseDate(safeObj.expenseDate, billablePeriod);
+  if (expenseDate === null) {
+    return {
+      valid: false,
+      rowIndex,
+      rowNumber,
+      productOrService,
+      error: 'Invalid or missing expense date / billable period.',
+    };
+  }
+
+  const expenseDateIso = formatExpenseDateIso(expenseDate, timeZone);
+  if (!billablePeriod) {
+    billablePeriod = expenseDateIso.slice(0, 7);
+  }
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(billablePeriod)) {
+    return {
+      valid: false,
+      rowIndex,
+      rowNumber,
+      productOrService,
+      error: 'Billable period must follow YYYY-MM format.',
+    };
+  }
+
+  const catRes = normalizeExpenseCategory(safeObj.category);
+  if (!catRes.valid) {
+    return {
+      valid: false,
+      rowIndex,
+      rowNumber,
+      productOrService,
+      error: catRes.error,
+    };
+  }
+
+  const vendorName = String(safeObj.vendorName || '').trim();
+  if (vendorName.length > 120) {
+    return {
+      valid: false,
+      rowIndex,
+      rowNumber,
+      productOrService,
+      error: 'Vendor name must be at most 120 characters.',
+    };
+  }
+
+  const notes = String(safeObj.notes || '').trim();
+  if (notes.length > 500) {
+    return {
+      valid: false,
+      rowIndex,
+      rowNumber,
+      productOrService,
+      error: 'Notes must be at most 500 characters.',
+    };
+  }
+
+  const matchKey = `${billablePeriod}::${expenseDateIso}::${normalizeStreetName(productOrService)}::${amountCents}`;
+
+  return {
+    valid: true,
+    rowIndex,
+    rowNumber,
+    productOrService,
+    amount: roundedAmount,
+    amountCents,
+    billablePeriod,
+    expenseDate,
+    expenseDateIso,
+    category: catRes.category,
+    vendorName,
+    notes,
+    matchKey,
+  };
+}
+
+/**
+ * Fetches community timezone from config/app_settings with safe fallback.
+ */
+async function resolveCommunityTimeZone(db) {
+  try {
+    const settingsSnap = await db.collection('config').doc('app_settings').get();
+    if (settingsSnap.exists) {
+      const tz = String(settingsSnap.data()?.timeZone || '').trim();
+      if (tz) return tz;
+    }
+  } catch (err) {
+    console.warn('Could not fetch config/app_settings timeZone:', err);
+  }
+  return 'America/Mexico_City';
+}
+
+/**
+ * Builds an in-memory map of existing active expenses keyed by canonical composite match key.
+ */
+async function buildExistingActiveExpenseMatchMap(db, timeZone) {
+  const activeSnap = await db.collection('expenses')
+    .where('status', '==', 'active')
+    .get();
+  const matchMap = new Map();
+
+  for (const doc of activeSnap.docs) {
+    const d = doc.data() || {};
+    const amountCents = Math.round(Number(d.amount || 0) * 100);
+    const period = String(d.billablePeriod || '').trim();
+    const rawDateMs = extractTimestampMillis(d.expenseDate ?? d.createdAt);
+    const dateIso = formatExpenseDateIso(rawDateMs, timeZone);
+    const normTitle = normalizeStreetName(String(d.productOrService || ''));
+    if (!period || !dateIso || !normTitle || amountCents <= 0) continue;
+
+    const key = `${period}::${dateIso}::${normTitle}::${amountCents}`;
+    const entry = {
+      id: doc.id,
+      createdAt: extractTimestampMillis(d.createdAt),
+      source: String(d.source || 'manual'),
+      vendorName: String(d.vendorName || ''),
+      category: String(d.category || 'other'),
+    };
+    if (!matchMap.has(key)) {
+      matchMap.set(key, [entry]);
+    } else {
+      matchMap.get(key).push(entry);
+    }
+  }
+
+  return matchMap;
+}
+
+/**
+ * Callable Cloud Function: adminPreCheckExpenseImport
+ * Validates bulk expense rows and detects existing active expense matches (period, date, title, amount).
+ */
+exports.adminPreCheckExpenseImport = onCall(callableOptions, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Only administrators can pre-check bulk expenses.');
+  }
+
+  const { items } = request.data || {};
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new HttpsError('invalid-argument', 'Must provide a non-empty array of expense items.');
+  }
+  if (items.length > MAX_BULK_EXPENSE_ITEMS) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Cannot pre-check more than ${MAX_BULK_EXPENSE_ITEMS} expense items per batch.`
+    );
+  }
+
+  const db = admin.firestore();
+  const timeZone = await resolveCommunityTimeZone(db);
+  const existingMap = await buildExistingActiveExpenseMatchMap(db, timeZone);
+
+  const invalidRows = [];
+  const duplicates = [];
+  let validCount = 0;
+  let newItemsCount = 0;
+
+  for (let i = 0; i < items.length; i++) {
+    const normalized = validateAndNormalizeBulkExpenseItem(items[i], i, timeZone);
+    if (!normalized.valid) {
+      invalidRows.push({
+        rowIndex: normalized.rowIndex,
+        rowNumber: normalized.rowNumber,
+        productOrService: normalized.productOrService,
+        error: normalized.error,
+      });
+      continue;
+    }
+
+    validCount++;
+    const matches = existingMap.get(normalized.matchKey);
+    if (matches && matches.length > 0) {
+      const firstMatch = matches[0];
+      duplicates.push({
+        rowIndex: normalized.rowIndex,
+        rowNumber: normalized.rowNumber,
+        matchKey: normalized.matchKey,
+        productOrService: normalized.productOrService,
+        amount: normalized.amount,
+        billablePeriod: normalized.billablePeriod,
+        expenseDate: normalized.expenseDate,
+        expenseDateIso: normalized.expenseDateIso,
+        category: normalized.category,
+        vendorName: normalized.vendorName,
+        existingExpenseId: firstMatch.id,
+        existingCreatedAt: firstMatch.createdAt,
+        existingSource: firstMatch.source,
+        existingVendorName: firstMatch.vendorName,
+        existingCategory: firstMatch.category,
+        existingCount: matches.length,
+      });
+    } else {
+      newItemsCount++;
+    }
+  }
+
+  return {
+    validCount,
+    invalidRows,
+    duplicates,
+    newItemsCount,
+  };
+});
+
+/**
+ * Callable Cloud Function: adminBulkImportExpenses
+ * Server-validates and batch-persists historical/bulk expenses without requiring per-row evidence files,
+ * respecting admin reconciliation decisions ('skip' | 'import') for matching active expenses.
+ */
+exports.adminBulkImportExpenses = onCall(callableOptions, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated.');
+  }
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError('permission-denied', 'Only administrators can import bulk expenses.');
+  }
+
+  const { items, reconciliationDecisions } = request.data || {};
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new HttpsError('invalid-argument', 'Must provide a non-empty array of expense items.');
+  }
+  if (items.length > MAX_BULK_EXPENSE_ITEMS) {
+    throw new HttpsError(
+      'invalid-argument',
+      `Cannot import more than ${MAX_BULK_EXPENSE_ITEMS} expense items per batch.`
+    );
+  }
+
+  const decisionsMap =
+    reconciliationDecisions && typeof reconciliationDecisions === 'object' && !Array.isArray(reconciliationDecisions)
+      ? reconciliationDecisions
+      : {};
+
+  const db = admin.firestore();
+  const callerUid = request.auth.uid;
+  const timeZone = await resolveCommunityTimeZone(db);
+  const existingMap = await buildExistingActiveExpenseMatchMap(db, timeZone);
+
+  let createdByName = String(request.auth.token.name || request.auth.token.email || 'Admin').trim();
+  try {
+    const userDoc = await db.collection('users').doc(callerUid).get();
+    if (userDoc.exists) {
+      const userName = String(userDoc.data()?.name || '').trim();
+      if (userName) {
+        createdByName = userName;
+      }
+    }
+  } catch (userLookupErr) {
+    console.warn('Could not resolve admin display name in adminBulkImportExpenses:', userLookupErr);
+  }
+
+  const nowMillis = Date.now();
+  const results = [];
+  let successCount = 0;
+  let skippedCount = 0;
+  let failureCount = 0;
+
+  const batchList = [];
+  let currentBatch = db.batch();
+  let operationCount = 0;
+
+  for (let i = 0; i < items.length; i++) {
+    const normalized = validateAndNormalizeBulkExpenseItem(items[i], i, timeZone);
+    if (!normalized.valid) {
+      results.push({
+        rowIndex: normalized.rowIndex,
+        rowNumber: normalized.rowNumber,
+        productOrService: normalized.productOrService,
+        amount: 0,
+        billablePeriod: '',
+        expenseDateIso: '',
+        category: '',
+        status: 'error',
+        expenseId: '',
+        message: normalized.error,
+      });
+      failureCount++;
+      continue;
+    }
+
+    const existingMatches = existingMap.get(normalized.matchKey);
+    const decision = String(decisionsMap[String(normalized.rowIndex)] || '').trim().toLowerCase();
+    // Fail-safe: matching active expenses are skipped unless explicitly marked 'import'
+    if (existingMatches && existingMatches.length > 0 && decision !== 'import') {
+      results.push({
+        rowIndex: normalized.rowIndex,
+        rowNumber: normalized.rowNumber,
+        productOrService: normalized.productOrService,
+        amount: normalized.amount,
+        billablePeriod: normalized.billablePeriod,
+        expenseDateIso: normalized.expenseDateIso,
+        category: normalized.category,
+        status: 'skipped',
+        expenseId: existingMatches[0].id,
+        message: 'Skipped matching existing active expense.',
+      });
+      skippedCount++;
+      continue;
+    }
+
+    const expenseRef = db.collection('expenses').doc();
+    currentBatch.set(expenseRef, {
+      id: expenseRef.id,
+      productOrService: normalized.productOrService,
+      amount: normalized.amount,
+      billablePeriod: normalized.billablePeriod,
+      expenseDate: normalized.expenseDate,
+      category: normalized.category,
+      vendorName: normalized.vendorName,
+      notes: normalized.notes,
+      productEvidence: null,
+      receiptEvidence: null,
+      status: 'active',
+      source: 'bulk_csv_import',
+      createdBy: callerUid,
+      createdByName,
+      createdAt: nowMillis,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    operationCount++;
+    if (operationCount === 500) {
+      batchList.push(currentBatch);
+      currentBatch = db.batch();
+      operationCount = 0;
+    }
+
+    results.push({
+      rowIndex: normalized.rowIndex,
+      rowNumber: normalized.rowNumber,
+      productOrService: normalized.productOrService,
+      amount: normalized.amount,
+      billablePeriod: normalized.billablePeriod,
+      expenseDateIso: normalized.expenseDateIso,
+      category: normalized.category,
+      status: 'ok',
+      expenseId: expenseRef.id,
+      message: 'Imported successfully.',
+    });
+    successCount++;
+  }
+
+  if (operationCount > 0) {
+    batchList.push(currentBatch);
+  }
+  for (const batch of batchList) {
+    await batch.commit();
+  }
+
+  return {
+    success: true,
+    totalProcessed: items.length,
+    successCount,
+    skippedCount,
+    failureCount,
+    results,
+  };
+});
+
 // Export internal helper functions and configurations for unit testing
 exports._test = {
   generateSecurePassword,
@@ -6007,6 +6522,12 @@ exports._test = {
   ALLOWED_EXPENSE_RECEIPT_EXTENSIONS,
   ALLOWED_EXPENSE_CATEGORIES,
   MAX_EXPENSE_EVIDENCE_SIZE_BYTES,
+  MAX_BULK_EXPENSE_ITEMS,
+  EXPENSE_CATEGORY_ALIASES,
+  normalizeExpenseCategory,
+  formatExpenseDateIso,
+  parseBulkExpenseDate,
+  validateAndNormalizeBulkExpenseItem,
   validateAndNormalizeExpenseEvidence,
   validateAndNormalizeBookingAttachments,
   cleanupDeletedBookingAttachmentResources,

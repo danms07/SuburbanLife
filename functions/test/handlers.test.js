@@ -2394,3 +2394,152 @@ test('validateAndRegisterQrAccess resolves destination addressDisplay for reside
   assert.equal(exitValidate.openLog.addressDisplay, 'Loreto #10');
 });
 
+test('adminPreCheckExpenseImport and adminBulkImportExpenses enforce RBAC, batch caps, duplicate reconciliation, and bulk persistence', async (t) => {
+  const existingDateMs = Date.UTC(2026, 10, 15, 12, 0, 0);
+  const env = createMockAdminEnvironment({
+    config: {
+      app_settings: { timeZone: 'America/Mexico_City' },
+    },
+    users: {
+      admin_1: { uid: 'admin_1', name: 'Board Treasurer', role: 'admin' },
+      res_1: { uid: 'res_1', name: 'Resident User', role: 'resident' },
+    },
+    expenses: {
+      exp_active_match: {
+        id: 'exp_active_match',
+        productOrService: 'Common area gardening',
+        amount: 2450.5,
+        billablePeriod: '2026-11',
+        expenseDate: existingDateMs,
+        category: 'gardening',
+        vendorName: 'GreenCare Landscaping',
+        status: 'active',
+        source: 'manual',
+        createdBy: 'admin_1',
+        createdAt: existingDateMs,
+      },
+      exp_voided_ignored: {
+        id: 'exp_voided_ignored',
+        productOrService: 'Cancelled gate repair',
+        amount: 900,
+        billablePeriod: '2026-10',
+        expenseDate: Date.UTC(2026, 9, 10, 12, 0, 0),
+        category: 'repairs',
+        status: 'voided',
+        voidReason: 'Mistake',
+        createdBy: 'admin_1',
+        createdAt: existingDateMs,
+      },
+    },
+  });
+  installMockAdmin(t, env);
+
+  const sampleItems = [
+    {
+      rowIndex: 0,
+      rowNumber: 2,
+      productOrService: 'common area gardening',
+      amount: 2450.5,
+      billablePeriod: '2026-11',
+      expenseDate: existingDateMs,
+      category: 'gardening',
+      vendorName: 'GreenCare Landscaping',
+    },
+    {
+      rowIndex: 1,
+      rowNumber: 3,
+      productOrService: 'Cancelled gate repair',
+      amount: 900,
+      billablePeriod: '2026-10',
+      expenseDate: '2026-10-10',
+      category: 'repairs',
+      vendorName: 'ElectroGates',
+    },
+    {
+      rowIndex: 2,
+      rowNumber: 4,
+      productOrService: '   ',
+      amount: 50,
+      billablePeriod: '2026-11',
+    },
+  ];
+
+  // 1) Unauthenticated and non-admin callers rejected
+  await assert.rejects(
+    () => cloudFunctions.adminPreCheckExpenseImport.run({ auth: null, data: { items: sampleItems } }),
+    /authenticated/
+  );
+  await assert.rejects(
+    () => cloudFunctions.adminPreCheckExpenseImport.run({ auth: { uid: 'res_1', token: { resident: true } }, data: { items: sampleItems } }),
+    /Only administrators/
+  );
+  await assert.rejects(
+    () => cloudFunctions.adminBulkImportExpenses.run({ auth: null, data: { items: sampleItems } }),
+    /authenticated/
+  );
+  await assert.rejects(
+    () => cloudFunctions.adminBulkImportExpenses.run({ auth: { uid: 'res_1', token: { resident: true } }, data: { items: sampleItems } }),
+    /Only administrators/
+  );
+
+  // 2) Empty & oversized batches (> 500) rejected
+  await assert.rejects(
+    () => cloudFunctions.adminPreCheckExpenseImport.run({ auth: { uid: 'admin_1', token: { admin: true } }, data: { items: [] } }),
+    /non-empty array/
+  );
+  const oversized = Array.from({ length: 501 }, () => ({ productOrService: 'Test', amount: 10, billablePeriod: '2026-11' }));
+  await assert.rejects(
+    () => cloudFunctions.adminBulkImportExpenses.run({ auth: { uid: 'admin_1', token: { admin: true } }, data: { items: oversized } }),
+    /500/
+  );
+
+  // 3) Pre-check detects active duplicate (ignoring voided expense) and flags invalid row
+  const preCheck = await cloudFunctions.adminPreCheckExpenseImport.run({
+    auth: { uid: 'admin_1', token: { admin: true } },
+    data: { items: sampleItems },
+  });
+  assert.equal(preCheck.validCount, 2);
+  assert.equal(preCheck.newItemsCount, 1);
+  assert.equal(preCheck.invalidRows.length, 1);
+  assert.equal(preCheck.invalidRows[0].rowNumber, 4);
+  assert.equal(preCheck.duplicates.length, 1);
+  assert.equal(preCheck.duplicates[0].rowIndex, 0);
+  assert.equal(preCheck.duplicates[0].existingExpenseId, 'exp_active_match');
+
+  // 4) Execute import with default fail-safe skip on duplicate rowIndex 0
+  const skipRun = await cloudFunctions.adminBulkImportExpenses.run({
+    auth: { uid: 'admin_1', token: { admin: true } },
+    data: { items: sampleItems, reconciliationDecisions: {} },
+  });
+  assert.equal(skipRun.success, true);
+  assert.equal(skipRun.successCount, 1);
+  assert.equal(skipRun.skippedCount, 1);
+  assert.equal(skipRun.failureCount, 1);
+  assert.equal(skipRun.results[0].status, 'skipped');
+  assert.equal(skipRun.results[1].status, 'ok');
+  assert.equal(skipRun.results[2].status, 'error');
+
+  const createdDoc = (await env.makeDocRef('expenses', skipRun.results[1].expenseId).get()).data();
+  assert.equal(createdDoc.productOrService, 'Cancelled gate repair');
+  assert.equal(createdDoc.amount, 900);
+  assert.equal(createdDoc.billablePeriod, '2026-10');
+  assert.equal(createdDoc.status, 'active');
+  assert.equal(createdDoc.source, 'bulk_csv_import');
+  assert.equal(createdDoc.productEvidence, null);
+  assert.equal(createdDoc.receiptEvidence, null);
+  assert.equal(createdDoc.createdByName, 'Board Treasurer');
+
+  // 5) Explicit 'import' decision overrides duplicate skip and imports row 0
+  const importAnywayRun = await cloudFunctions.adminBulkImportExpenses.run({
+    auth: { uid: 'admin_1', token: { admin: true } },
+    data: {
+      items: [sampleItems[0]],
+      reconciliationDecisions: { '0': 'import' },
+    },
+  });
+  assert.equal(importAnywayRun.successCount, 1);
+  assert.equal(importAnywayRun.skippedCount, 0);
+  assert.equal(importAnywayRun.results[0].status, 'ok');
+});
+
+

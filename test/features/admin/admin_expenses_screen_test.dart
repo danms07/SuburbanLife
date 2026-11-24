@@ -286,6 +286,62 @@ void main() {
       expect(find.text('Gastos de la Comunidad'), findsOneWidget);
       expect(find.text('Registrar Gasto'), findsOneWidget);
       expect(find.text('Presupuesto Acumulado'), findsOneWidget);
+      expect(find.text('Importación Masiva (CSV)'), findsOneWidget);
+    });
+
+    testWidgets('displays Bulk CSV indicator on card and no-evidence notice on detail screen, and navigates to Bulk Import', (tester) async {
+      tester.view.physicalSize = const Size(430, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      FakeBackendHelper.db.seedDocument('expenses', 'exp_bulk_1', {
+        'id': 'exp_bulk_1',
+        'productOrService': 'Historical pool chemicals',
+        'amount': 650.0,
+        'billablePeriod': '2026-09',
+        'expenseDate': DateTime(2026, 9, 5).millisecondsSinceEpoch,
+        'category': 'supplies',
+        'status': 'active',
+        'source': 'bulk_csv_import',
+        'createdBy': 'admin_1',
+        'createdByName': 'Admin',
+        'productEvidence': null,
+        'receiptEvidence': null,
+      });
+
+      await tester.pumpWidget(_wrapWithApp(const AdminExpensesScreen()));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Historical pool chemicals'), findsOneWidget);
+      expect(find.text('Bulk CSV'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('expense_card_exp_bulk_1')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('expense_bulk_no_evidence_card')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Bulk CSV Import — No Evidence Attached'),
+        findsOneWidget,
+      );
+      expect(find.text('Bulk CSV Import'), findsOneWidget);
+
+      // Navigate back and open Bulk Expense Import screen via filter bar button
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey('bulk_import_expenses_button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bulk Expenses Import (CSV)'), findsNWidgets(2));
     });
   });
 }

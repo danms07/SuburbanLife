@@ -79,9 +79,9 @@ Inventory of shared UI components, responsive layout patterns, and stable widget
 - **Directory**: Merges `adminListAuthUsers` + Firestore `users` with `manage_users_refresh_indicator` swipe-to-refresh, `manage_users_create_user_button` FAB, whole-DB search, 20-item pagination, `onboarding_incomplete_filter_chip`, and adaptive role filter (`< 680px` wrapping `role_filter_chip_<role>` `ChoiceChip`s; `>= 680px` `SegmentedButton`).
 - **Detail (`user_card_<uid>`)**: `> 700px` side-by-side, `<= 700px` stacked; separates standard actions (`adminUpdateEmail`, password reset, role promotion except guards, delivery date edit) from Sensitive Actions (Unbind / Remove Account).
 
-### Bulk CSV Managers (Users, Addresses, Historical Payments)
-- **Files**: `admin_bulk_user_import_screen.dart`, `admin_bulk_address_import_screen.dart`, `admin_bulk_payment_import_screen.dart`
-- **Patterns**: `Wrap` template Download (`CsvDownloadHelper`) / Copy actions (`bulk_address_download_template_button`, `bulk_user_download_template_button`), preview tables, and result CSV export. Payment importer adapts below `600px` / `520px`, includes a scrollable starting-period Month/Year dialog and sequential Keep-Existing vs Overwrite reconciliation dialog.
+### Bulk CSV Managers (Users, Addresses, Historical Payments, Expenses)
+- **Files**: `admin_bulk_user_import_screen.dart`, `admin_bulk_address_import_screen.dart`, `admin_bulk_payment_import_screen.dart`, `admin_bulk_expense_import_screen.dart`
+- **Patterns**: `Wrap` template Download (`CsvDownloadHelper`) / Copy actions (`bulk_address_download_template_button`, `bulk_user_download_template_button`, `bulk_expense_download_template_button`), preview tables, and CWE-1236-sanitized result CSV export. Payment importer includes starting-period Month/Year and Keep-Existing vs Overwrite dialogs; Expense importer (`bulk_expense_pick_csv_button`, `bulk_expense_process_button`) includes invalid-row diagnostics and sequential Skip vs Import duplicate reconciliation (`bulk_expense_reconcile_skip_btn`, `bulk_expense_reconcile_import_btn`).
 
 ### Admin Settings (5 Auto-Saving Collapsible Cards)
 - **File**: `lib/features/admin/admin_settings_screen.dart` (`AdminSettingsScreen`)
@@ -93,7 +93,7 @@ Inventory of shared UI components, responsive layout patterns, and stable widget
 
 ### Community Expenses & Financial Reports
 - **Files**: `lib/features/admin/admin_expenses_screen.dart` (`AdminExpensesScreen`, `AdminExpenseDetailScreen`), `admin_payment_report_screen.dart` (`AdminPaymentReportScreen`)
-- **Expenses**: KPI strip (`expenses_kpi_income`, `expenses_kpi_expenses`, `expenses_kpi_budget`), keyed cards (`expense_card_<id>`), `add_expense_fab` -> `_RecordExpenseModal` (dual evidence pickers + `submit_expense_button`), `AdminExpenseDetailScreen` (`RotatableImagePreview` / `expense_receipt_download_btn` + `_VoidExpenseDialog`).
+- **Expenses**: KPI strip (`expenses_kpi_income`, `expenses_kpi_expenses`, `expenses_kpi_budget`), responsive filter bar with `bulk_import_expenses_button` launching `AdminBulkExpenseImportScreen`, keyed cards (`expense_card_<id>` with `Bulk CSV` badge on bulk rows), `add_expense_fab` -> `_RecordExpenseModal` (dual evidence pickers + `submit_expense_button`), `AdminExpenseDetailScreen` (`RotatableImagePreview` / `expense_receipt_download_btn` / `expense_bulk_no_evidence_card` + `_VoidExpenseDialog`).
 - **Financial Reports**: Places `financial_summary_preview_card` at top, `Start Month` / `End Month` dropdowns below (stacked `< 520px`), and bottom export/publish buttons (`download_report_bundle_button`, `download_status_matrix_only_button`, `download_financial_ledger_only_button`, `publish_transparency_report_button`, `open_bulk_payment_import_button`).
 
 ### Master-Detail Payment & Booking Approvals

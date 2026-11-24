@@ -81,6 +81,7 @@ class ExpenseRecord {
   final ExpenseEvidence productEvidence;
   final ExpenseEvidence receiptEvidence;
   final String status;
+  final String source;
   final String createdBy;
   final String createdByName;
   final int createdAtMs;
@@ -101,6 +102,7 @@ class ExpenseRecord {
     required this.productEvidence,
     required this.receiptEvidence,
     required this.status,
+    this.source = 'manual',
     required this.createdBy,
     required this.createdByName,
     required this.createdAtMs,
@@ -112,6 +114,10 @@ class ExpenseRecord {
 
   bool get isActive => status == 'active';
   bool get isVoided => status == 'voided';
+  bool get isBulkImported => source == 'bulk_csv_import';
+  bool get hasProductEvidence => productEvidence.url.isNotEmpty;
+  bool get hasReceiptEvidence => receiptEvidence.url.isNotEmpty;
+  bool get hasAnyEvidence => hasProductEvidence || hasReceiptEvidence;
 
   DateTime get expenseDate =>
       DateTime.fromMillisecondsSinceEpoch(expenseDateMs);
@@ -133,6 +139,7 @@ class ExpenseRecord {
 
     final createdMs = _parseMillis(map['createdAt']);
     final expenseMs = _parseMillis(map['expenseDate'], fallback: createdMs);
+    final rawSource = map['source']?.toString().trim() ?? '';
 
     return ExpenseRecord(
       id: map['id']?.toString() ?? '',
@@ -148,6 +155,7 @@ class ExpenseRecord {
       productEvidence: ExpenseEvidence.fromMap(prodMap),
       receiptEvidence: ExpenseEvidence.fromMap(recMap),
       status: map['status']?.toString() ?? 'active',
+      source: rawSource.isNotEmpty ? rawSource : 'manual',
       createdBy: map['createdBy']?.toString() ?? '',
       createdByName: map['createdByName']?.toString() ?? '',
       createdAtMs: createdMs,
@@ -326,6 +334,64 @@ class ExpenseService {
         e,
         stack,
         reason: 'ExpenseService.voidExpense',
+      );
+      rethrow;
+    }
+  }
+
+  /// Pre-validates bulk expense rows on the server and detects matching active expenses.
+  Future<Map<String, dynamic>> preCheckBulkImport(
+    List<Map<String, dynamic>> items,
+  ) async {
+    if (items.isEmpty) {
+      throw ArgumentError('At least one expense row is required for pre-check.');
+    }
+
+    try {
+      final res = await Backend.functions.callFunction(
+        'adminPreCheckExpenseImport',
+        {'items': items},
+      );
+      if (res is! Map) {
+        throw StateError('Invalid response received from server.');
+      }
+      return Map<String, dynamic>.from(res);
+    } catch (e, stack) {
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'ExpenseService.preCheckBulkImport',
+      );
+      rethrow;
+    }
+  }
+
+  /// Executes server-mediated bulk expense import with duplicate reconciliation decisions.
+  Future<Map<String, dynamic>> executeBulkImport({
+    required List<Map<String, dynamic>> items,
+    required Map<String, String> reconciliationDecisions,
+  }) async {
+    if (items.isEmpty) {
+      throw ArgumentError('At least one expense row is required for bulk import.');
+    }
+
+    try {
+      final res = await Backend.functions.callFunction(
+        'adminBulkImportExpenses',
+        {
+          'items': items,
+          'reconciliationDecisions': reconciliationDecisions,
+        },
+      );
+      if (res is! Map) {
+        throw StateError('Invalid response received from server.');
+      }
+      return Map<String, dynamic>.from(res);
+    } catch (e, stack) {
+      Backend.crashlytics.recordError(
+        e,
+        stack,
+        reason: 'ExpenseService.executeBulkImport',
       );
       rethrow;
     }

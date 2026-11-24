@@ -38,6 +38,8 @@ Node.js **24** runtime (`firebase-functions` v2, `firebase-admin` v14 modular SD
 | `adminPreCheckPaymentImport` | Admin | Pre-validates bulk historical payment rows `{ items }` and detects existing amount mismatches. |
 | `adminBulkImportPayments` | Admin | Applies `{ items, reconciliationDecisions }` idempotently and recalculates affected addresses. |
 | `createExpense` | Admin | Validates fields, UID-scoped Storage ownership (`expenses/{uid}/`), and 16-byte magic bytes (deletes spoofed files) for `productEvidence` (JPG/PNG/WEBP) + `receiptEvidence` (JPG/PNG/WEBP/PDF); writes `/expenses`. |
+| `adminPreCheckExpenseImport` | Admin | Validates up to 500 bulk expense rows `{ items }` and detects matching active expenses (`billablePeriod`, date, title, amount). |
+| `adminBulkImportExpenses` | Admin | Batch-persists validated bulk expenses (`source: 'bulk_csv_import'`, `null` evidences) honoring `{ reconciliationDecisions }` (`skip` \| `import`). |
 | `voidExpense` | Admin | Transactionally transitions `'active' -> 'voided'` with mandatory `voidReason` (preserves record + Storage proof). |
 
 ### QR Access, Transparency & Settings

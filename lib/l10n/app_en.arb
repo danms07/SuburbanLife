@@ -1435,5 +1435,130 @@
   "notificationCatAdminReviewsTitle": "Pending admin reviews",
   "notificationCatAdminReviewsDesc": "New payments, bookings, and claims waiting for admin review",
   "rejectClaimTitle": "Reject Ownership Claim",
-  "rejectClaimReasonHint": "Explain why this ownership claim cannot be approved (optional)"
+  "rejectClaimReasonHint": "Explain why this ownership claim cannot be approved (optional)",
+  "bulkExpenseImportButton": "Bulk Import (CSV)",
+  "expenseSourceLabel": "Source",
+  "expenseSourceManual": "Manual Entry",
+  "expenseSourceBulkCsv": "Bulk CSV Import",
+  "expenseBulkCsvChip": "Bulk CSV",
+  "expenseBulkNoEvidenceTitle": "Bulk CSV Import — No Evidence Attached",
+  "expenseBulkNoEvidenceBody": "This historical expense was imported via CSV without product photo or receipt attachments.",
+  "bulkExpenseImportTitle": "Bulk Expenses Import (CSV)",
+  "bulkExpenseImportSubtitle": "Upload historical or batch community expenses using a CSV file. Per-row photo or receipt attachments are not required.",
+  "bulkExpenseCsvColumnsHint": "Columns: productOrService, amount, billablePeriod (YYYY-MM or mmm-yy), expenseDate (YYYY-MM-DD or DD/MM/YYYY), category, vendorName, notes",
+  "bulkExpenseAllowedCategoriesHint": "Allowed categories: maintenance, gardening, security, utilities, repairs, supplies, other (English or Spanish).",
+  "uploadExpenseCsvButton": "Select Expenses CSV",
+  "bulkExpenseFileSummary": "{fileName} ({validCount} valid, {invalidCount} invalid)",
+  "@bulkExpenseFileSummary": {
+    "placeholders": {
+      "fileName": { "type": "String" },
+      "validCount": { "type": "int" },
+      "invalidCount": { "type": "int" }
+    }
+  },
+  "bulkExpenseInvalidRowsBanner": "{count} row(s) have validation issues and will not be imported:",
+  "@bulkExpenseInvalidRowsBanner": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkExpensePreviewTitle": "Preview Expenses ({count})",
+  "@bulkExpensePreviewTitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkExpensePreviewLimitNote": "Showing first {shown} of {total} valid rows.",
+  "@bulkExpensePreviewLimitNote": {
+    "placeholders": {
+      "shown": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "processExpenseImportButton": "Process Expense Import ({count})",
+  "@processExpenseImportButton": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkExpenseMissingHeadersError": "Missing required CSV columns. Include headers for Product/Service, Amount, and Billable Period or Expense Date.",
+  "bulkExpenseTooManyRowsError": "Maximum {max} rows allowed per CSV upload.",
+  "@bulkExpenseTooManyRowsError": {
+    "placeholders": {
+      "max": { "type": "int" }
+    }
+  },
+  "bulkExpenseNoValidRowsError": "No valid expense rows found to import.",
+  "bulkExpenseFileTooLargeError": "CSV file exceeds the 5 MB size limit.",
+  "bulkExpenseReconciliationTitle": "Matching Active Expense Found",
+  "bulkExpenseReconciliationSubtitle": "An active expense with the same period, date, product/service, and amount already exists.",
+  "bulkExpenseReconciliationProgress": "Duplicate {current} of {total}",
+  "@bulkExpenseReconciliationProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "bulkExpenseExistingInSystemLabel": "Existing in System",
+  "bulkExpenseUploadedInCsvLabel": "Row from CSV",
+  "bulkExpenseSkipButton": "Skip Row",
+  "bulkExpenseImportAnywayButton": "Import Anyway",
+  "bulkExpenseImportResultsTitle": "Expense Import Results",
+  "bulkExpenseImportSummary": "{successCount} imported, {skippedCount} skipped, {failureCount} failed",
+  "@bulkExpenseImportSummary": {
+    "placeholders": {
+      "successCount": { "type": "int" },
+      "skippedCount": { "type": "int" },
+      "failureCount": { "type": "int" }
+    }
+  },
+  "bulkExpenseColRow": "Row",
+  "bulkExpenseColProduct": "Product / Service",
+  "bulkExpenseColAmount": "Amount",
+  "bulkExpenseColPeriod": "Period",
+  "bulkExpenseColDate": "Date",
+  "bulkExpenseColCategory": "Category",
+  "bulkExpenseColVendor": "Vendor",
+  "bulkExpenseRowErrorInvalidProduct": "Row {row}: Product or service description is required (max 200 chars).",
+  "@bulkExpenseRowErrorInvalidProduct": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidAmount": "Row {row}: Amount must be a positive number.",
+  "@bulkExpenseRowErrorInvalidAmount": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidPeriod": "Row {row}: Invalid billable period (use YYYY-MM or mmm-yy).",
+  "@bulkExpenseRowErrorInvalidPeriod": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidDate": "Row {row}: Invalid or missing expense date / period (use YYYY-MM-DD or DD/MM/YYYY).",
+  "@bulkExpenseRowErrorInvalidDate": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidCategory": "Row {row}: Unrecognized category.",
+  "@bulkExpenseRowErrorInvalidCategory": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorVendorTooLong": "Row {row}: Vendor name exceeds 120 characters.",
+  "@bulkExpenseRowErrorVendorTooLong": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorNotesTooLong": "Row {row}: Notes exceed 500 characters.",
+  "@bulkExpenseRowErrorNotesTooLong": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  }
 }

@@ -2,6 +2,15 @@
 
 All notable changes to **Suburban Life** are documented here.
 
+## [1.0.51+52] — 2026-11-24
+
+### Added
+- **Bulk Expenses Upload (`admin_bulk_expense_import_screen.dart`, `admin_expenses_screen.dart`, `expense_service.dart`, `functions/index.js`)**:
+  - Added `AdminBulkExpenseImportScreen` accessible from `AdminExpensesScreen` (`bulk_import_expenses_button`) with bilingual CSV header/category parsing, period/date derivation, 5 MB / 500-row limits, binary payload rejection, invalid-row diagnostics, and CWE-1236-sanitized template/result CSV downloads (`CsvDownloadHelper`).
+  - Added `adminPreCheckExpenseImport` and `adminBulkImportExpenses` Cloud Functions enforcing admin RBAC, server-side validation, batch persistence (`source: 'bulk_csv_import'`, `null` evidences), and sequential Skip vs. Import reconciliation for matching active expenses (ignoring voided rows).
+  - Updated `ExpenseRecord`, `_ExpenseSummaryCard` (`Bulk CSV` badge), and `AdminExpenseDetailScreen` (`expense_bulk_no_evidence_card`).
+  - Added unit, handler, and widget tests in `functions/test/helpers.test.js`, `functions/test/handlers.test.js`, `test/features/admin/expense_service_test.dart`, `test/features/admin/admin_expenses_screen_test.dart`, and `test/features/admin/admin_bulk_expense_import_test.dart`.
+
 ## [1.0.50+51] — 2026-11-23
 
 ### Changed (WebAssembly Compatibility)

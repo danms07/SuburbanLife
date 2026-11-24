@@ -156,5 +156,82 @@ void main() {
       expect(captured?['expenseId'], equals('exp_1'));
       expect(captured?['voidReason'], equals('Entered duplicate receipt'));
     });
+
+    test('ExpenseRecord parses bulk_csv_import source and missing evidence safely', () {
+      final manual = ExpenseRecord.fromMap({
+        'id': 'exp_m',
+        'productOrService': 'Paint',
+        'amount': 300,
+        'billablePeriod': '2026-11',
+        'createdAt': 1000,
+        'productEvidence': {'url': 'https://fake/p.jpg'},
+        'receiptEvidence': {'url': 'https://fake/r.pdf'},
+      });
+      expect(manual.source, equals('manual'));
+      expect(manual.isBulkImported, isFalse);
+      expect(manual.hasProductEvidence, isTrue);
+      expect(manual.hasReceiptEvidence, isTrue);
+      expect(manual.hasAnyEvidence, isTrue);
+
+      final bulk = ExpenseRecord.fromMap({
+        'id': 'exp_b',
+        'productOrService': 'Historical gardening',
+        'amount': 1500,
+        'billablePeriod': '2026-10',
+        'source': 'bulk_csv_import',
+        'productEvidence': null,
+        'receiptEvidence': null,
+        'createdAt': 1000,
+      });
+      expect(bulk.source, equals('bulk_csv_import'));
+      expect(bulk.isBulkImported, isTrue);
+      expect(bulk.hasProductEvidence, isFalse);
+      expect(bulk.hasReceiptEvidence, isFalse);
+      expect(bulk.hasAnyEvidence, isFalse);
+    });
+
+    test('preCheckBulkImport and executeBulkImport validate inputs and call Cloud Functions', () async {
+      final service = ExpenseService();
+      await expectLater(
+        () => service.preCheckBulkImport([]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        () => service.executeBulkImport(items: [], reconciliationDecisions: {}),
+        throwsArgumentError,
+      );
+
+      Map<String, dynamic>? preCheckArgs;
+      FakeBackendHelper.functions.registerHandler('adminPreCheckExpenseImport', (params) {
+        preCheckArgs = params;
+        return {'validCount': 1, 'duplicates': [], 'invalidRows': []};
+      });
+
+      Map<String, dynamic>? importArgs;
+      FakeBackendHelper.functions.registerHandler('adminBulkImportExpenses', (params) {
+        importArgs = params;
+        return {'success': true, 'successCount': 1, 'skippedCount': 0, 'failureCount': 0, 'results': []};
+      });
+
+      final items = [
+        {
+          'rowIndex': 0,
+          'rowNumber': 2,
+          'productOrService': 'Gate repair',
+          'amount': 500.0,
+          'billablePeriod': '2026-11',
+        },
+      ];
+      final preRes = await service.preCheckBulkImport(items);
+      expect(preRes['validCount'], equals(1));
+      expect((preCheckArgs?['items'] as List).length, equals(1));
+
+      final importRes = await service.executeBulkImport(
+        items: items,
+        reconciliationDecisions: {'0': 'import'},
+      );
+      expect(importRes['successCount'], equals(1));
+      expect(importArgs?['reconciliationDecisions'], equals({'0': 'import'}));
+    });
   });
 }

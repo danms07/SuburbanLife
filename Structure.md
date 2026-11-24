@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-23 (v1.0.50+51 — WebAssembly Compatibility Migration)*
+*Last Verified/Updated: 2026-11-24 (v1.0.51+52 — Bulk Expenses Upload)*
 
 Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md) for which deep doc to read per task.
 
@@ -15,7 +15,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 - `widget_catalog.md`: Reusable UI widgets, layout breakpoints, and test `ValueKey`s.
 - `CHANGELOG.md`: Chronological release history.
 - `PRIVACY_POLICY.md`: Bilingual LFPDPPP/ARCO privacy notice.
-- `pubspec.yaml` / `l10n.yaml` / `analysis_options.yaml`: Flutter dependencies (`web: ^1.1.2`), app version (`1.0.50+51`), l10n codegen, and analyzer exclusions.
+- `pubspec.yaml` / `l10n.yaml` / `analysis_options.yaml`: Flutter dependencies (`web: ^1.1.2`), app version (`1.0.51+52`), l10n codegen, and analyzer exclusions.
 - `firebase.json.template`: Firebase deployment & emulator port config template (`firebase.json` is gitignored).
 - `firestore.rules` / `firestore.indexes.json`: Firestore security rules, 33 composite indexes, and 3 `expireAt` single-field exemptions.
 - `database.rules.json`: RTDB owner-only notification & preference rules.
@@ -42,7 +42,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 ## Backend, Infrastructure & Scripts
 
 - `functions/`: Node.js 24 Cloud Functions v2 (detailed in [`functions/README.md`](functions/README.md)).
-  - `index.js`: 25 `onCall` callables, 10 Firestore triggers, and `checkMonthlyPaymentStatuses` daily cron.
+  - `index.js`: 27 `onCall` callables, 10 Firestore triggers, and `checkMonthlyPaymentStatuses` daily cron.
   - `notifications.js`: Notification category/route validation, bilingual builders, FCM multicast + token pruning, RTDB mirror/pruner.
   - `brand_config.js`: Brand color/typography constants shared with emails/PDFs.
   - `test/`: `helpers.test.js`, `notifications.test.js`, `handlers.test.js`, `security_rules.test.js` (`npm --prefix functions test`).
@@ -89,10 +89,11 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
     - `admin_access_logs_screen.dart`: `AdminAccessLogsScreen` gatehouse audit viewer, filters, 20-item pagination, Currently Inside KPIs.
     - `admin_booking_approval_screen.dart`: `AdminBookingApprovalScreen` & `AdminBookingDetailScreen` master-detail booking & attachment review.
     - `admin_bulk_address_import_screen.dart`: `AdminBulkAddressImportScreen` CSV address range creator.
+    - `admin_bulk_expense_import_screen.dart`: `AdminBulkExpenseImportScreen` CSV expense importer with duplicate pre-check reconciliation.
     - `admin_bulk_payment_import_screen.dart`: `AdminBulkPaymentImportScreen` historical payment CSV importer with mismatch reconciliation.
     - `admin_bulk_user_import_screen.dart`: `AdminBulkUserImportScreen` bulk resident CSV creator.
     - `admin_create_user_screen.dart`: `AdminCreateUserScreen` single Resident/Guard/Admin account form.
-    - `admin_expenses_screen.dart`: `AdminExpensesScreen` & `AdminExpenseDetailScreen` expense ledger, dual-evidence capture, soft-void flow.
+    - `admin_expenses_screen.dart`: `AdminExpensesScreen` & `AdminExpenseDetailScreen` expense ledger, bulk import link, dual-evidence capture, soft-void flow.
     - `admin_facilities_screen.dart`: `AdminFacilitiesScreen` amenity settings, cooldown/quota rules, and staged document templates.
     - `admin_payment_approval_screen.dart`: `AdminPaymentApprovalScreen` & `AdminPaymentDetailScreen` master-detail receipt & linked sanction review.
     - `admin_payment_report_screen.dart`: `AdminPaymentReportScreen` accumulated budget KPIs, CSV matrix/ledger exports, PII-free Transparency publishing.
@@ -100,7 +101,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
     - `admin_settings_screen.dart`: `AdminSettingsScreen` 5 collapsible cards (payment/opening balance, QR exit, rejection reasons, SMTP, welcome email).
     - `admin_upload_payment_screen.dart`: `AdminUploadPaymentScreen` admin-on-behalf payment proof uploader.
     - `admin_user_management_screen.dart`: `AdminUserManagementScreen` & `AdminUserDetailScreen` Auth+Firestore directory, filters, account actions.
-    - `expense_service.dart`: `ExpenseCategory`, `ExpenseEvidence`, `ExpenseRecord`, `ExpenseService` (`createExpense`/`voidExpense` + Storage rollback).
+    - `expense_service.dart`: `ExpenseCategory`, `ExpenseEvidence`, `ExpenseRecord`, `ExpenseService` (`createExpense`/`voidExpense`/bulk CSV pre-check & import + Storage rollback).
     - `financial_report_calculator.dart`: `MonthlyLedgerRow`, `FinancialLedgerResult`, `FinancialReportCalculator` integer-cent accounting, CWE-1236 CSV sanitization, bilingual Markdown export.
   - `announcements/`:
     - `announcement.dart`: `Announcement` model (images, translations, audience, `readBy`).
@@ -145,7 +146,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 - `test/integration/rollout_workflow_test.dart`: End-to-end resident, booking, payment, sanction, and admin workflows.
 - `test/core/`: `backend/backend_models_test.dart`, `crashlytics_service_test.dart`, `services/core_services_test.dart`, `services/temp_image_cleanup_test.dart`.
 - `test/features/`:
-  - `admin/`: `access_logs_filter_test.dart`, `admin_booking_approval_test.dart`, `admin_bulk_payment_import_test.dart`, `admin_create_user_test.dart`, `admin_expenses_screen_test.dart`, `admin_facilities_test.dart`, `admin_payment_approval_test.dart`, `admin_shell_screen_test.dart`, `admin_user_management_test.dart`, `bulk_address_csv_parser_test.dart`, `bulk_user_csv_parser_test.dart`, `expense_service_test.dart`, `financial_report_calculator_test.dart`, `payment_report_matrix_test.dart`.
+  - `admin/`: `access_logs_filter_test.dart`, `admin_booking_approval_test.dart`, `admin_bulk_expense_import_test.dart`, `admin_bulk_payment_import_test.dart`, `admin_create_user_test.dart`, `admin_expenses_screen_test.dart`, `admin_facilities_test.dart`, `admin_payment_approval_test.dart`, `admin_shell_screen_test.dart`, `admin_user_management_test.dart`, `bulk_address_csv_parser_test.dart`, `bulk_user_csv_parser_test.dart`, `expense_service_test.dart`, `financial_report_calculator_test.dart`, `payment_report_matrix_test.dart`.
   - `announcements/`: `announcement_model_test.dart`.
   - `auth/`: `auth_screens_test.dart`, `password_validation_test.dart`.
   - `booking/`: `booking_documents_test.dart`, `booking_service_test.dart`.

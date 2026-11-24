@@ -1285,3 +1285,73 @@ test('formatAccessAddressDisplay formats residential addresses cleanly and omits
   assert.equal(formatAccessAddressDisplay('', 42), '#42');
   assert.equal(formatAccessAddressDisplay(null, null), '');
 });
+
+test('normalizeExpenseCategory maps English and Spanish category labels and rejects invalid slugs', () => {
+  const { normalizeExpenseCategory } = _test;
+
+  assert.deepEqual(normalizeExpenseCategory(''), { valid: true, category: 'other' });
+  assert.deepEqual(normalizeExpenseCategory(null), { valid: true, category: 'other' });
+  assert.deepEqual(normalizeExpenseCategory('Gardening'), { valid: true, category: 'gardening' });
+  assert.deepEqual(normalizeExpenseCategory('Jardinería'), { valid: true, category: 'gardening' });
+  assert.deepEqual(normalizeExpenseCategory('Mantenimiento'), { valid: true, category: 'maintenance' });
+  assert.deepEqual(normalizeExpenseCategory('Seguridad'), { valid: true, category: 'security' });
+  assert.deepEqual(normalizeExpenseCategory('Servicios Públicos'), { valid: true, category: 'utilities' });
+  assert.deepEqual(normalizeExpenseCategory('Reparación'), { valid: true, category: 'repairs' });
+  assert.deepEqual(normalizeExpenseCategory('Insumos'), { valid: true, category: 'supplies' });
+
+  const bad = normalizeExpenseCategory('entertainment');
+  assert.equal(bad.valid, false);
+  assert.match(bad.error, /Invalid category/);
+});
+
+test('parseBulkExpenseDate and validateAndNormalizeBulkExpenseItem handle valid and invalid inputs', () => {
+  const { parseBulkExpenseDate, validateAndNormalizeBulkExpenseItem } = _test;
+
+  assert.equal(parseBulkExpenseDate('2026-11-15'), Date.UTC(2026, 10, 15, 12, 0, 0));
+  assert.equal(parseBulkExpenseDate('15/11/2026'), Date.UTC(2026, 10, 15, 12, 0, 0));
+  assert.equal(parseBulkExpenseDate('', '2026-09'), Date.UTC(2026, 8, 1, 12, 0, 0));
+  assert.equal(parseBulkExpenseDate('2026-02-30'), null); // invalid calendar day
+  assert.equal(parseBulkExpenseDate('1995-01-01'), null); // below year 2000 bound
+
+  const valid = validateAndNormalizeBulkExpenseItem({
+    rowIndex: 0,
+    rowNumber: 2,
+    productOrService: '  Poda de Árboles ',
+    amount: '$1,250.556',
+    billablePeriod: 'Nov-26',
+    expenseDate: '2026-11-15',
+    category: 'Jardinería',
+    vendorName: 'GreenCare',
+    notes: 'Monthly trim',
+  }, 0, 'America/Mexico_City');
+
+  assert.equal(valid.valid, true);
+  assert.equal(valid.productOrService, 'Poda de Árboles');
+  assert.equal(valid.amount, 1250.56);
+  assert.equal(valid.amountCents, 125056);
+  assert.equal(valid.billablePeriod, '2026-11');
+  assert.equal(valid.expenseDateIso, '2026-11-15');
+  assert.equal(valid.category, 'gardening');
+  assert.equal(valid.matchKey, '2026-11::2026-11-15::poda de arboles::125056');
+
+  // Derives billablePeriod from expenseDate when period is omitted
+  const derivedPeriod = validateAndNormalizeBulkExpenseItem({
+    productOrService: 'Water bill',
+    amount: 450,
+    expenseDate: '2026-08-20',
+  }, 1, 'America/Mexico_City');
+  assert.equal(derivedPeriod.valid, true);
+  assert.equal(derivedPeriod.billablePeriod, '2026-08');
+  assert.equal(derivedPeriod.category, 'other');
+
+  // Rejects missing title, non-positive amount, and oversized vendor
+  assert.equal(validateAndNormalizeBulkExpenseItem({ productOrService: '', amount: 100, billablePeriod: '2026-11' }).valid, false);
+  assert.equal(validateAndNormalizeBulkExpenseItem({ productOrService: 'Bulb', amount: -5, billablePeriod: '2026-11' }).valid, false);
+  assert.equal(validateAndNormalizeBulkExpenseItem({
+    productOrService: 'Bulb',
+    amount: 100,
+    billablePeriod: '2026-11',
+    vendorName: 'x'.repeat(121),
+  }).valid, false);
+});
+

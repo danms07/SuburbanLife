@@ -112,7 +112,8 @@ erDiagram
 - `id`, `productOrService` (<=200), `billablePeriod` (`YYYY-MM`), `vendorName` (<=120), `notes` (<=500), `createdBy`, `createdByName`: `string`
 - `category`: `string` (`'maintenance' | 'gardening' | 'security' | 'utilities' | 'repairs' | 'supplies' | 'other'`)
 - `amount`: `number`, `expenseDate`, `createdAt`: `number` (epoch ms)
-- `productEvidence`: `map` (`jpg|jpeg|png|webp`), `receiptEvidence`: `map` (`jpg|jpeg|png|webp|pdf`) — `{ fileName, fileType, fileSize, url, storagePath, uploadedAt }` under `expenses/<createdBy>/`
+- `source`: `string?` (`'manual' | 'bulk_csv_import'`)
+- `productEvidence`: `map?` (`jpg|jpeg|png|webp`), `receiptEvidence`: `map?` (`jpg|jpeg|png|webp|pdf`) — `{ fileName, fileType, fileSize, url, storagePath, uploadedAt }` under `expenses/<createdBy>/` (required for `createExpense`; `null` for `bulk_csv_import`)
 - `status`: `string` (`'active' | 'voided'`)
 - `voidedBy`, `voidedByName`, `voidReason` (3–300 chars): `string?`, `voidedAt`: `number?`, `updatedAt`: `timestamp`
 

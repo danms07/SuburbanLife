@@ -5837,6 +5837,278 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Explain why this ownership claim cannot be approved (optional)'**
   String get rejectClaimReasonHint;
+
+  /// No description provided for @bulkExpenseImportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk Import (CSV)'**
+  String get bulkExpenseImportButton;
+
+  /// No description provided for @expenseSourceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get expenseSourceLabel;
+
+  /// No description provided for @expenseSourceManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Entry'**
+  String get expenseSourceManual;
+
+  /// No description provided for @expenseSourceBulkCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk CSV Import'**
+  String get expenseSourceBulkCsv;
+
+  /// No description provided for @expenseBulkCsvChip.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk CSV'**
+  String get expenseBulkCsvChip;
+
+  /// No description provided for @expenseBulkNoEvidenceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk CSV Import — No Evidence Attached'**
+  String get expenseBulkNoEvidenceTitle;
+
+  /// No description provided for @expenseBulkNoEvidenceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This historical expense was imported via CSV without product photo or receipt attachments.'**
+  String get expenseBulkNoEvidenceBody;
+
+  /// No description provided for @bulkExpenseImportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk Expenses Import (CSV)'**
+  String get bulkExpenseImportTitle;
+
+  /// No description provided for @bulkExpenseImportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload historical or batch community expenses using a CSV file. Per-row photo or receipt attachments are not required.'**
+  String get bulkExpenseImportSubtitle;
+
+  /// No description provided for @bulkExpenseCsvColumnsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns: productOrService, amount, billablePeriod (YYYY-MM or mmm-yy), expenseDate (YYYY-MM-DD or DD/MM/YYYY), category, vendorName, notes'**
+  String get bulkExpenseCsvColumnsHint;
+
+  /// No description provided for @bulkExpenseAllowedCategoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed categories: maintenance, gardening, security, utilities, repairs, supplies, other (English or Spanish).'**
+  String get bulkExpenseAllowedCategoriesHint;
+
+  /// No description provided for @uploadExpenseCsvButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Expenses CSV'**
+  String get uploadExpenseCsvButton;
+
+  /// No description provided for @bulkExpenseFileSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{fileName} ({validCount} valid, {invalidCount} invalid)'**
+  String bulkExpenseFileSummary(
+    String fileName,
+    int validCount,
+    int invalidCount,
+  );
+
+  /// No description provided for @bulkExpenseInvalidRowsBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} row(s) have validation issues and will not be imported:'**
+  String bulkExpenseInvalidRowsBanner(int count);
+
+  /// No description provided for @bulkExpensePreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview Expenses ({count})'**
+  String bulkExpensePreviewTitle(int count);
+
+  /// No description provided for @bulkExpensePreviewLimitNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing first {shown} of {total} valid rows.'**
+  String bulkExpensePreviewLimitNote(int shown, int total);
+
+  /// No description provided for @processExpenseImportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Process Expense Import ({count})'**
+  String processExpenseImportButton(int count);
+
+  /// No description provided for @bulkExpenseMissingHeadersError.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing required CSV columns. Include headers for Product/Service, Amount, and Billable Period or Expense Date.'**
+  String get bulkExpenseMissingHeadersError;
+
+  /// No description provided for @bulkExpenseTooManyRowsError.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum {max} rows allowed per CSV upload.'**
+  String bulkExpenseTooManyRowsError(int max);
+
+  /// No description provided for @bulkExpenseNoValidRowsError.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid expense rows found to import.'**
+  String get bulkExpenseNoValidRowsError;
+
+  /// No description provided for @bulkExpenseFileTooLargeError.
+  ///
+  /// In en, this message translates to:
+  /// **'CSV file exceeds the 5 MB size limit.'**
+  String get bulkExpenseFileTooLargeError;
+
+  /// No description provided for @bulkExpenseReconciliationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Matching Active Expense Found'**
+  String get bulkExpenseReconciliationTitle;
+
+  /// No description provided for @bulkExpenseReconciliationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'An active expense with the same period, date, product/service, and amount already exists.'**
+  String get bulkExpenseReconciliationSubtitle;
+
+  /// No description provided for @bulkExpenseReconciliationProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate {current} of {total}'**
+  String bulkExpenseReconciliationProgress(int current, int total);
+
+  /// No description provided for @bulkExpenseExistingInSystemLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing in System'**
+  String get bulkExpenseExistingInSystemLabel;
+
+  /// No description provided for @bulkExpenseUploadedInCsvLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Row from CSV'**
+  String get bulkExpenseUploadedInCsvLabel;
+
+  /// No description provided for @bulkExpenseSkipButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip Row'**
+  String get bulkExpenseSkipButton;
+
+  /// No description provided for @bulkExpenseImportAnywayButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Anyway'**
+  String get bulkExpenseImportAnywayButton;
+
+  /// No description provided for @bulkExpenseImportResultsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Expense Import Results'**
+  String get bulkExpenseImportResultsTitle;
+
+  /// No description provided for @bulkExpenseImportSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{successCount} imported, {skippedCount} skipped, {failureCount} failed'**
+  String bulkExpenseImportSummary(
+    int successCount,
+    int skippedCount,
+    int failureCount,
+  );
+
+  /// No description provided for @bulkExpenseColRow.
+  ///
+  /// In en, this message translates to:
+  /// **'Row'**
+  String get bulkExpenseColRow;
+
+  /// No description provided for @bulkExpenseColProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product / Service'**
+  String get bulkExpenseColProduct;
+
+  /// No description provided for @bulkExpenseColAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get bulkExpenseColAmount;
+
+  /// No description provided for @bulkExpenseColPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get bulkExpenseColPeriod;
+
+  /// No description provided for @bulkExpenseColDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get bulkExpenseColDate;
+
+  /// No description provided for @bulkExpenseColCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get bulkExpenseColCategory;
+
+  /// No description provided for @bulkExpenseColVendor.
+  ///
+  /// In en, this message translates to:
+  /// **'Vendor'**
+  String get bulkExpenseColVendor;
+
+  /// No description provided for @bulkExpenseRowErrorInvalidProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: Product or service description is required (max 200 chars).'**
+  String bulkExpenseRowErrorInvalidProduct(int row);
+
+  /// No description provided for @bulkExpenseRowErrorInvalidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: Amount must be a positive number.'**
+  String bulkExpenseRowErrorInvalidAmount(int row);
+
+  /// No description provided for @bulkExpenseRowErrorInvalidPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: Invalid billable period (use YYYY-MM or mmm-yy).'**
+  String bulkExpenseRowErrorInvalidPeriod(int row);
+
+  /// No description provided for @bulkExpenseRowErrorInvalidDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: Invalid or missing expense date / period (use YYYY-MM-DD or DD/MM/YYYY).'**
+  String bulkExpenseRowErrorInvalidDate(int row);
+
+  /// No description provided for @bulkExpenseRowErrorInvalidCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: Unrecognized category.'**
+  String bulkExpenseRowErrorInvalidCategory(int row);
+
+  /// No description provided for @bulkExpenseRowErrorVendorTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: Vendor name exceeds 120 characters.'**
+  String bulkExpenseRowErrorVendorTooLong(int row);
+
+  /// No description provided for @bulkExpenseRowErrorNotesTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {row}: Notes exceed 500 characters.'**
+  String bulkExpenseRowErrorNotesTooLong(int row);
 }
 
 class _AppLocalizationsDelegate

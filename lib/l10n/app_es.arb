@@ -1302,5 +1302,130 @@
   "notificationCatAdminReviewsTitle": "Solicitudes por aprobar (Admin)",
   "notificationCatAdminReviewsDesc": "Nuevos pagos, reservas y solicitudes pendientes de revisión",
   "rejectClaimTitle": "Rechazar Solicitud de Propiedad",
-  "rejectClaimReasonHint": "Explica por qué no se puede aprobar esta solicitud (opcional)"
+  "rejectClaimReasonHint": "Explica por qué no se puede aprobar esta solicitud (opcional)",
+  "bulkExpenseImportButton": "Importación Masiva (CSV)",
+  "expenseSourceLabel": "Origen",
+  "expenseSourceManual": "Registro Manual",
+  "expenseSourceBulkCsv": "Importación Masiva CSV",
+  "expenseBulkCsvChip": "CSV Masivo",
+  "expenseBulkNoEvidenceTitle": "Importación Masiva CSV — Sin Evidencia Adjunta",
+  "expenseBulkNoEvidenceBody": "Este gasto histórico se importó mediante CSV sin fotografía del producto ni comprobante adjunto.",
+  "bulkExpenseImportTitle": "Importación Masiva de Gastos (CSV)",
+  "bulkExpenseImportSubtitle": "Carga gastos comunitarios históricos o por lote usando un archivo CSV. No se requieren fotos ni comprobantes por fila.",
+  "bulkExpenseCsvColumnsHint": "Columnas: productOrService, amount, billablePeriod (AAAA-MM o mmm-aa), expenseDate (AAAA-MM-DD o DD/MM/AAAA), category, vendorName, notes",
+  "bulkExpenseAllowedCategoriesHint": "Categorías permitidas: maintenance (mantenimiento), gardening (jardinería), security (seguridad), utilities (servicios), repairs (reparaciones), supplies (suministros), other (otros).",
+  "uploadExpenseCsvButton": "Seleccionar CSV de Gastos",
+  "bulkExpenseFileSummary": "{fileName} ({validCount} válidos, {invalidCount} inválidos)",
+  "@bulkExpenseFileSummary": {
+    "placeholders": {
+      "fileName": { "type": "String" },
+      "validCount": { "type": "int" },
+      "invalidCount": { "type": "int" }
+    }
+  },
+  "bulkExpenseInvalidRowsBanner": "{count} fila(s) tienen errores de validación y no se importarán:",
+  "@bulkExpenseInvalidRowsBanner": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkExpensePreviewTitle": "Vista Previa de Gastos ({count})",
+  "@bulkExpensePreviewTitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkExpensePreviewLimitNote": "Mostrando las primeras {shown} de {total} filas válidas.",
+  "@bulkExpensePreviewLimitNote": {
+    "placeholders": {
+      "shown": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "processExpenseImportButton": "Procesar Importación de Gastos ({count})",
+  "@processExpenseImportButton": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bulkExpenseMissingHeadersError": "Faltan columnas requeridas en el CSV. Incluye encabezados para Producto/Servicio, Monto y Periodo o Fecha del Gasto.",
+  "bulkExpenseTooManyRowsError": "Se permiten máximo {max} filas por carga de CSV.",
+  "@bulkExpenseTooManyRowsError": {
+    "placeholders": {
+      "max": { "type": "int" }
+    }
+  },
+  "bulkExpenseNoValidRowsError": "No se encontraron filas de gastos válidas para importar.",
+  "bulkExpenseFileTooLargeError": "El archivo CSV supera el límite de 5 MB.",
+  "bulkExpenseReconciliationTitle": "Gasto Activo Coincidente Encontrado",
+  "bulkExpenseReconciliationSubtitle": "Ya existe un gasto activo con el mismo periodo, fecha, producto/servicio y monto.",
+  "bulkExpenseReconciliationProgress": "Duplicado {current} de {total}",
+  "@bulkExpenseReconciliationProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "bulkExpenseExistingInSystemLabel": "Existente en el Sistema",
+  "bulkExpenseUploadedInCsvLabel": "Fila del CSV",
+  "bulkExpenseSkipButton": "Omitir Fila",
+  "bulkExpenseImportAnywayButton": "Importar de Todos Modos",
+  "bulkExpenseImportResultsTitle": "Resultados de Importación de Gastos",
+  "bulkExpenseImportSummary": "{successCount} importados, {skippedCount} omitidos, {failureCount} fallidos",
+  "@bulkExpenseImportSummary": {
+    "placeholders": {
+      "successCount": { "type": "int" },
+      "skippedCount": { "type": "int" },
+      "failureCount": { "type": "int" }
+    }
+  },
+  "bulkExpenseColRow": "Fila",
+  "bulkExpenseColProduct": "Producto / Servicio",
+  "bulkExpenseColAmount": "Monto",
+  "bulkExpenseColPeriod": "Periodo",
+  "bulkExpenseColDate": "Fecha",
+  "bulkExpenseColCategory": "Categoría",
+  "bulkExpenseColVendor": "Proveedor",
+  "bulkExpenseRowErrorInvalidProduct": "Fila {row}: La descripción del producto o servicio es obligatoria (máx. 200 caracteres).",
+  "@bulkExpenseRowErrorInvalidProduct": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidAmount": "Fila {row}: El monto debe ser un número positivo.",
+  "@bulkExpenseRowErrorInvalidAmount": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidPeriod": "Fila {row}: Periodo facturable inválido (usa AAAA-MM o mmm-aa).",
+  "@bulkExpenseRowErrorInvalidPeriod": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidDate": "Fila {row}: Fecha o periodo del gasto inválido o faltante (usa AAAA-MM-DD o DD/MM/AAAA).",
+  "@bulkExpenseRowErrorInvalidDate": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorInvalidCategory": "Fila {row}: Categoría no reconocida.",
+  "@bulkExpenseRowErrorInvalidCategory": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorVendorTooLong": "Fila {row}: El nombre del proveedor supera 120 caracteres.",
+  "@bulkExpenseRowErrorVendorTooLong": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  },
+  "bulkExpenseRowErrorNotesTooLong": "Fila {row}: Las notas superan 500 caracteres.",
+  "@bulkExpenseRowErrorNotesTooLong": {
+    "placeholders": {
+      "row": { "type": "int" }
+    }
+  }
 }

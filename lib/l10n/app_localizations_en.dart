@@ -3229,4 +3229,183 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get rejectClaimReasonHint =>
       'Explain why this ownership claim cannot be approved (optional)';
+
+  @override
+  String get bulkExpenseImportButton => 'Bulk Import (CSV)';
+
+  @override
+  String get expenseSourceLabel => 'Source';
+
+  @override
+  String get expenseSourceManual => 'Manual Entry';
+
+  @override
+  String get expenseSourceBulkCsv => 'Bulk CSV Import';
+
+  @override
+  String get expenseBulkCsvChip => 'Bulk CSV';
+
+  @override
+  String get expenseBulkNoEvidenceTitle =>
+      'Bulk CSV Import — No Evidence Attached';
+
+  @override
+  String get expenseBulkNoEvidenceBody =>
+      'This historical expense was imported via CSV without product photo or receipt attachments.';
+
+  @override
+  String get bulkExpenseImportTitle => 'Bulk Expenses Import (CSV)';
+
+  @override
+  String get bulkExpenseImportSubtitle =>
+      'Upload historical or batch community expenses using a CSV file. Per-row photo or receipt attachments are not required.';
+
+  @override
+  String get bulkExpenseCsvColumnsHint =>
+      'Columns: productOrService, amount, billablePeriod (YYYY-MM or mmm-yy), expenseDate (YYYY-MM-DD or DD/MM/YYYY), category, vendorName, notes';
+
+  @override
+  String get bulkExpenseAllowedCategoriesHint =>
+      'Allowed categories: maintenance, gardening, security, utilities, repairs, supplies, other (English or Spanish).';
+
+  @override
+  String get uploadExpenseCsvButton => 'Select Expenses CSV';
+
+  @override
+  String bulkExpenseFileSummary(
+    String fileName,
+    int validCount,
+    int invalidCount,
+  ) {
+    return '$fileName ($validCount valid, $invalidCount invalid)';
+  }
+
+  @override
+  String bulkExpenseInvalidRowsBanner(int count) {
+    return '$count row(s) have validation issues and will not be imported:';
+  }
+
+  @override
+  String bulkExpensePreviewTitle(int count) {
+    return 'Preview Expenses ($count)';
+  }
+
+  @override
+  String bulkExpensePreviewLimitNote(int shown, int total) {
+    return 'Showing first $shown of $total valid rows.';
+  }
+
+  @override
+  String processExpenseImportButton(int count) {
+    return 'Process Expense Import ($count)';
+  }
+
+  @override
+  String get bulkExpenseMissingHeadersError =>
+      'Missing required CSV columns. Include headers for Product/Service, Amount, and Billable Period or Expense Date.';
+
+  @override
+  String bulkExpenseTooManyRowsError(int max) {
+    return 'Maximum $max rows allowed per CSV upload.';
+  }
+
+  @override
+  String get bulkExpenseNoValidRowsError =>
+      'No valid expense rows found to import.';
+
+  @override
+  String get bulkExpenseFileTooLargeError =>
+      'CSV file exceeds the 5 MB size limit.';
+
+  @override
+  String get bulkExpenseReconciliationTitle => 'Matching Active Expense Found';
+
+  @override
+  String get bulkExpenseReconciliationSubtitle =>
+      'An active expense with the same period, date, product/service, and amount already exists.';
+
+  @override
+  String bulkExpenseReconciliationProgress(int current, int total) {
+    return 'Duplicate $current of $total';
+  }
+
+  @override
+  String get bulkExpenseExistingInSystemLabel => 'Existing in System';
+
+  @override
+  String get bulkExpenseUploadedInCsvLabel => 'Row from CSV';
+
+  @override
+  String get bulkExpenseSkipButton => 'Skip Row';
+
+  @override
+  String get bulkExpenseImportAnywayButton => 'Import Anyway';
+
+  @override
+  String get bulkExpenseImportResultsTitle => 'Expense Import Results';
+
+  @override
+  String bulkExpenseImportSummary(
+    int successCount,
+    int skippedCount,
+    int failureCount,
+  ) {
+    return '$successCount imported, $skippedCount skipped, $failureCount failed';
+  }
+
+  @override
+  String get bulkExpenseColRow => 'Row';
+
+  @override
+  String get bulkExpenseColProduct => 'Product / Service';
+
+  @override
+  String get bulkExpenseColAmount => 'Amount';
+
+  @override
+  String get bulkExpenseColPeriod => 'Period';
+
+  @override
+  String get bulkExpenseColDate => 'Date';
+
+  @override
+  String get bulkExpenseColCategory => 'Category';
+
+  @override
+  String get bulkExpenseColVendor => 'Vendor';
+
+  @override
+  String bulkExpenseRowErrorInvalidProduct(int row) {
+    return 'Row $row: Product or service description is required (max 200 chars).';
+  }
+
+  @override
+  String bulkExpenseRowErrorInvalidAmount(int row) {
+    return 'Row $row: Amount must be a positive number.';
+  }
+
+  @override
+  String bulkExpenseRowErrorInvalidPeriod(int row) {
+    return 'Row $row: Invalid billable period (use YYYY-MM or mmm-yy).';
+  }
+
+  @override
+  String bulkExpenseRowErrorInvalidDate(int row) {
+    return 'Row $row: Invalid or missing expense date / period (use YYYY-MM-DD or DD/MM/YYYY).';
+  }
+
+  @override
+  String bulkExpenseRowErrorInvalidCategory(int row) {
+    return 'Row $row: Unrecognized category.';
+  }
+
+  @override
+  String bulkExpenseRowErrorVendorTooLong(int row) {
+    return 'Row $row: Vendor name exceeds 120 characters.';
+  }
+
+  @override
+  String bulkExpenseRowErrorNotesTooLong(int row) {
+    return 'Row $row: Notes exceed 500 characters.';
+  }
 }

@@ -7,6 +7,7 @@ import '../../core/services/temp_image_cleanup_service.dart';
 import '../../core/widgets/rotatable_image_preview.dart';
 import '../../l10n/app_localizations.dart';
 import '../payments/payment_service.dart';
+import 'admin_bulk_expense_import_screen.dart';
 import 'expense_service.dart';
 import 'financial_report_calculator.dart';
 
@@ -46,6 +47,14 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const _RecordExpenseModal(),
+    );
+  }
+
+  void _openBulkExpenseImport() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AdminBulkExpenseImportScreen(),
+      ),
     );
   }
 
@@ -337,22 +346,56 @@ class _AdminExpensesScreenState extends State<AdminExpensesScreen> {
     AppLocalizations l10n,
     List<String> periodOptions,
   ) {
+    final bulkImportButton = OutlinedButton.icon(
+      key: const ValueKey('bulk_import_expenses_button'),
+      onPressed: _openBulkExpenseImport,
+      icon: const Icon(Icons.upload_file, size: 18),
+      label: Text(l10n.bulkExpenseImportButton),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppConfig.primaryColor,
+        side: const BorderSide(color: AppConfig.primaryColor),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
+
+    final statusChips = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildStatusChip('active', l10n.expenseStatusActive),
+          const SizedBox(width: 8),
+          _buildStatusChip('voided', l10n.expenseStatusVoided),
+          const SizedBox(width: 8),
+          _buildStatusChip('all', l10n.filterAll),
+        ],
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildStatusChip('active', l10n.expenseStatusActive),
-                const SizedBox(width: 8),
-                _buildStatusChip('voided', l10n.expenseStatusVoided),
-                const SizedBox(width: 8),
-                _buildStatusChip('all', l10n.filterAll),
-              ],
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= 560) {
+                return Row(
+                  children: [
+                    Expanded(child: statusChips),
+                    const SizedBox(width: 12),
+                    bulkImportButton,
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  statusChips,
+                  const SizedBox(height: 8),
+                  bulkImportButton,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 10),
           LayoutBuilder(
@@ -707,6 +750,11 @@ class _ExpenseSummaryCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (expense.isBulkImported)
+                          _MetaChip(
+                            icon: Icons.table_chart_outlined,
+                            label: l10n.expenseBulkCsvChip,
+                          ),
                       ],
                     ),
                   ],
@@ -732,17 +780,26 @@ class _ExpenseSummaryCard extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.photo_camera_outlined,
-                          size: 14, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Icon(
-                        expense.receiptEvidence.isImage
-                            ? Icons.image_outlined
-                            : Icons.picture_as_pdf_outlined,
-                        size: 14,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 4),
+                      if (expense.hasProductEvidence) ...[
+                        const Icon(Icons.photo_camera_outlined,
+                            size: 14, color: Colors.grey),
+                        const SizedBox(width: 4),
+                      ],
+                      if (expense.hasReceiptEvidence) ...[
+                        Icon(
+                          expense.receiptEvidence.isImage
+                              ? Icons.image_outlined
+                              : Icons.picture_as_pdf_outlined,
+                          size: 14,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      if (!expense.hasAnyEvidence) ...[
+                        const Icon(Icons.table_chart_outlined,
+                            size: 14, color: Colors.grey),
+                        const SizedBox(width: 4),
+                      ],
                       const Icon(Icons.chevron_right, color: Colors.grey),
                     ],
                   ),
@@ -992,6 +1049,11 @@ class _AdminExpenseDetailScreenState extends State<AdminExpenseDetailScreen> {
                 label: l10n.expenseRecordedByLabel,
                 value: _expense.createdByName,
               ),
+            if (_expense.isBulkImported)
+              _DetailRow(
+                label: l10n.expenseSourceLabel,
+                value: l10n.expenseSourceBulkCsv,
+              ),
             if (_expense.notes.isNotEmpty)
               _DetailRow(
                 label: l10n.expenseNotesLabel,
@@ -1029,114 +1091,168 @@ class _AdminExpenseDetailScreenState extends State<AdminExpenseDetailScreen> {
     final prodEv = _expense.productEvidence;
     final recEv = _expense.receiptEvidence;
 
+    if (!_expense.hasAnyEvidence) {
+      return Card(
+        key: const ValueKey('expense_bulk_no_evidence_card'),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppConfig.primaryColor.withValues(alpha: 0.1),
+                child: const Icon(
+                  Icons.table_chart_outlined,
+                  color: AppConfig.primaryColor,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.expenseBulkNoEvidenceTitle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: AppConfig.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      l10n.expenseBulkNoEvidenceBody,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.expenseProductEvidenceLabel,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: AppConfig.primaryColor,
+        if (prodEv.url.isNotEmpty) ...[
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.expenseProductEvidenceLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: AppConfig.primaryColor,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                if (prodEv.url.isNotEmpty)
+                  const SizedBox(height: 10),
                   RotatableImagePreview(
                     imageUrl: prodEv.url,
                     dialogTitle: l10n.expenseProductEvidenceLabel,
                     height: 220,
                     thumbnailKey: const ValueKey('expense_product_thumbnail'),
-                    rotateButtonKey: const ValueKey('expense_product_rotate_btn'),
+                    rotateButtonKey:
+                        const ValueKey('expense_product_rotate_btn'),
                     fullscreenButtonKey:
                         const ValueKey('expense_product_fullscreen_btn'),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.expenseReceiptEvidenceLabel,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: AppConfig.primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                if (recEv.url.isNotEmpty && recEv.isImage)
-                  RotatableImagePreview(
-                    imageUrl: recEv.url,
-                    dialogTitle: l10n.expenseReceiptEvidenceLabel,
-                    height: 220,
-                    thumbnailKey: const ValueKey('expense_receipt_thumbnail'),
-                    rotateButtonKey: const ValueKey('expense_receipt_rotate_btn'),
-                    fullscreenButtonKey:
-                        const ValueKey('expense_receipt_fullscreen_btn'),
-                  )
-                else if (recEv.url.isNotEmpty)
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    leading: const Icon(
-                      Icons.picture_as_pdf,
-                      color: Colors.redAccent,
-                      size: 32,
-                    ),
-                    title: Text(
-                      recEv.fileName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      DocumentTransferHelper.formatFileSize(recEv.fileSize),
-                    ),
-                    trailing: ElevatedButton.icon(
-                      key: const ValueKey('expense_receipt_download_btn'),
-                      onPressed: () {
-                        DocumentTransferHelper.openOrDownloadDocument(
-                          context: context,
-                          cacheId: 'expense_${_expense.id}_receipt',
-                          url: recEv.url,
-                          fileName: recEv.fileName,
-                          title: l10n.expenseReceiptEvidenceLabel,
-                        );
-                      },
-                      icon: const Icon(Icons.download, size: 18),
-                      label: Text(l10n.downloadFacilityDocumentButton),
+          if (recEv.url.isNotEmpty) const SizedBox(height: 16),
+        ],
+        if (recEv.url.isNotEmpty)
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.expenseReceiptEvidenceLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: AppConfig.primaryColor,
                     ),
                   ),
-              ],
+                  const SizedBox(height: 10),
+                  if (recEv.isImage)
+                    RotatableImagePreview(
+                      imageUrl: recEv.url,
+                      dialogTitle: l10n.expenseReceiptEvidenceLabel,
+                      height: 220,
+                      thumbnailKey: const ValueKey('expense_receipt_thumbnail'),
+                      rotateButtonKey:
+                          const ValueKey('expense_receipt_rotate_btn'),
+                      fullscreenButtonKey:
+                          const ValueKey('expense_receipt_fullscreen_btn'),
+                    )
+                  else
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      leading: const Icon(
+                        Icons.picture_as_pdf,
+                        color: Colors.redAccent,
+                        size: 32,
+                      ),
+                      title: Text(
+                        recEv.fileName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        DocumentTransferHelper.formatFileSize(recEv.fileSize),
+                      ),
+                      trailing: ElevatedButton.icon(
+                        key: const ValueKey('expense_receipt_download_btn'),
+                        onPressed: () {
+                          DocumentTransferHelper.openOrDownloadDocument(
+                            context: context,
+                            cacheId: 'expense_${_expense.id}_receipt',
+                            url: recEv.url,
+                            fileName: recEv.fileName,
+                            title: l10n.expenseReceiptEvidenceLabel,
+                          );
+                        },
+                        icon: const Icon(Icons.download, size: 18),
+                        label: Text(l10n.downloadFacilityDocumentButton),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
       ],
     );
   }
