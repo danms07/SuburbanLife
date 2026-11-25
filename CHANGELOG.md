@@ -2,6 +2,14 @@
 
 All notable changes to **Suburban Life** are documented here.
 
+## [Unreleased — Backend] — 2026-11-25
+
+### Changed
+- **Dedicated QR Cleanup Cloud Scheduler Job (`cleanupExpiredQrCodes`)**:
+  - Extracted QR expiration (`expireOutdatedQrCodes`) and 7-day retention sweeps (`purgeExpiredQrCodes`) out of `checkMonthlyPaymentStatuses` into a dedicated `onSchedule` Cloud Function (`cleanupExpiredQrCodes`, running daily at `0 0 * * *` `America/Mexico_City` with `timeoutSeconds: 300`) via `runQrCodeCleanup` in `functions/index.js`, so QR lifecycle cleanup runs independently even if `checkMonthlyPaymentStatuses` is paused.
+  - Updated `expireOutdatedQrCodes` to evaluate both `'active'` and `'valid'` QR passes (`where('status', 'in', ['active', 'valid'])`), aligning with `firestore.rules`, `evaluateQrValidityStatus`, and `QrService.resolveEffectiveStatus`.
+  - Expanded `functions/test/helpers.test.js` and `functions/test/handlers.test.js` to verify `cleanupExpiredQrCodes` schedule configuration, `'valid'` pass expiration, `runQrCodeCleanup`, and isolation from `checkMonthlyPaymentStatuses`; updated `functions/README.md`, `Structure.md`, `README.md`, `database_schema.md`, `docs/technical_overview.md`, and `docs/technical_overview_es.md`.
+
 ## [1.0.51+52] — 2026-11-24
 
 ### Added

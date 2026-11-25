@@ -188,6 +188,9 @@ function createMockAdminEnvironment(initialCollections = {}, initialAuthUsers = 
           empty: docs.length === 0,
           size: docs.length,
           docs,
+          forEach(cb) {
+            docs.forEach(cb);
+          },
         };
       },
     };
@@ -1291,6 +1294,104 @@ test('purgeExpiredAccessLogs and purgeExpiredQrCodes delete expired records whil
 
   const backfilledQr = (await env.makeDocRef('qr_codes', 'qr_legacy_revoked_2d').get()).data();
   assert.ok(backfilledQr.expireAt && typeof backfilledQr.expireAt.toMillis === 'function');
+});
+
+test('cleanupExpiredQrCodes runs QR expiration and purge independently while checkMonthlyPaymentStatuses skips qr_codes', async (t) => {
+  const env = createMockAdminEnvironment();
+  installMockAdmin(t, env);
+
+  const nowMillis = Date.now();
+  const Timestamp = _test.admin.firestore.Timestamp;
+
+  // Verify dedicated schedule configuration
+  const endpoint = cloudFunctions.cleanupExpiredQrCodes.__endpoint;
+  assert.equal(endpoint.scheduleTrigger.schedule, '0 0 * * *');
+  assert.equal(endpoint.scheduleTrigger.timeZone, 'America/Mexico_City');
+  assert.equal(endpoint.timeoutSeconds, 300);
+
+  await env.makeDocRef('config', 'app_settings').set({
+    paymentCutoffDay: 1,
+    gracePeriodDays: 10,
+    timeZone: 'America/Mexico_City',
+  });
+  await env.makeDocRef('addresses', 'addr_sched_1').set({
+    streetName: 'Taormina',
+    number: 1,
+    deliveryDate: Timestamp.fromMillis(nowMillis - 60 * 24 * 60 * 60 * 1000),
+    paymentStatus: 'paid',
+  });
+  await env.makeDocRef('access_logs', 'log_sched_old').set({
+    status: 'allowed',
+    timestamp: Timestamp.fromMillis(nowMillis - 65 * 24 * 60 * 60 * 1000),
+    expireAt: Timestamp.fromMillis(nowMillis - 5 * 24 * 60 * 60 * 1000),
+  });
+
+  // QR passes spanning active-expired (>7d, <7d), valid-expired, revoked (>7d), permanent, and open-visit
+  await env.makeDocRef('qr_codes', 'qr_active_expired_10d').set({
+    status: 'active',
+    type: 'temporary',
+    expiryTime: Timestamp.fromMillis(nowMillis - 10 * 24 * 60 * 60 * 1000),
+  });
+  await env.makeDocRef('qr_codes', 'qr_valid_expired_2d').set({
+    status: 'valid',
+    type: 'temporary',
+    expiryTime: Timestamp.fromMillis(nowMillis - 2 * 24 * 60 * 60 * 1000),
+  });
+  await env.makeDocRef('qr_codes', 'qr_revoked_10d').set({
+    status: 'deactivated (revoked)',
+    deactivatedAt: Timestamp.fromMillis(nowMillis - 10 * 24 * 60 * 60 * 1000),
+    expireAt: Timestamp.fromMillis(nowMillis - 3 * 24 * 60 * 60 * 1000),
+  });
+  await env.makeDocRef('qr_codes', 'qr_perm_keep').set({
+    status: 'active',
+    type: 'permanent',
+    expireAt: null,
+  });
+  await env.makeDocRef('qr_codes', 'qr_inside_keep').set({
+    status: 'active',
+    type: 'temporary',
+    isInside: true,
+    expiryTime: Timestamp.fromMillis(nowMillis - 10 * 24 * 60 * 60 * 1000),
+  });
+
+  // 1. Running checkMonthlyPaymentStatuses must recalculate address status and purge access_logs,
+  //    but must NOT expire or delete any qr_codes documents.
+  await cloudFunctions.checkMonthlyPaymentStatuses.run({});
+
+  assert.equal((await env.makeDocRef('addresses', 'addr_sched_1').get()).data().paymentStatus, 'restricted');
+  assert.equal((await env.makeDocRef('access_logs', 'log_sched_old').get()).exists, false);
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_active_expired_10d').get()).data().status, 'active');
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_valid_expired_2d').get()).data().status, 'valid');
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_revoked_10d').get()).exists, true);
+
+  // 2. Running cleanupExpiredQrCodes expires outdated passes and purges passes past 7-day retention
+  await cloudFunctions.cleanupExpiredQrCodes.run({});
+
+  // >7d active-expired pass was transitioned and immediately purged
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_active_expired_10d').get()).exists, false);
+  // Revoked >7d pass was purged
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_revoked_10d').get()).exists, false);
+  // <7d valid-expired pass transitioned to 'deactivated (expired)' with 7-day expireAt backfilled
+  const recentExpired = (await env.makeDocRef('qr_codes', 'qr_valid_expired_2d').get()).data();
+  assert.equal(recentExpired.status, 'deactivated (expired)');
+  assert.equal(recentExpired.isValid, false);
+  assert.ok(recentExpired.expireAt && recentExpired.expireAt.toMillis() > nowMillis);
+  // Active permanent pass remains untouched
+  assert.equal((await env.makeDocRef('qr_codes', 'qr_perm_keep').get()).data().status, 'active');
+  // Open-visit pass transitions to deactivated (expired) while keeping expireAt = null
+  const insideExpired = (await env.makeDocRef('qr_codes', 'qr_inside_keep').get()).data();
+  assert.equal(insideExpired.status, 'deactivated (expired)');
+  assert.equal(insideExpired.expireAt, null);
+
+  // 3. Direct runQrCodeCleanup helper returns accurate counts
+  await env.makeDocRef('qr_codes', 'qr_helper_1d').set({
+    status: 'active',
+    type: 'temporary',
+    expiryTime: Timestamp.fromMillis(nowMillis - 24 * 60 * 60 * 1000),
+  });
+  const summary = await _test.runQrCodeCleanup(env.dbMock, nowMillis);
+  assert.equal(summary.expiredCount, 1);
+  assert.equal(summary.purgedCount, 0);
 });
 
 test('createBooking validates mandatory/optional/informative facilityDocuments, verifies Storage magic bytes, isolates booking_attachments, cleans up superseded files on resubmit, and purges on cancelBooking', async (t) => {

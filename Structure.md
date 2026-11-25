@@ -1,6 +1,6 @@
 # Directory Structure
 
-*Last Verified/Updated: 2026-11-24 (v1.0.51+52 — Bulk Expenses Upload)*
+*Last Verified/Updated: 2026-11-25 (v1.0.51+52 — Dedicated QR Cleanup Cron)*
 
 Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md) for which deep doc to read per task.
 
@@ -42,7 +42,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 ## Backend, Infrastructure & Scripts
 
 - `functions/`: Node.js 24 Cloud Functions v2 (detailed in [`functions/README.md`](functions/README.md)).
-  - `index.js`: 27 `onCall` callables, 10 Firestore triggers, and `checkMonthlyPaymentStatuses` daily cron.
+  - `index.js`: 27 `onCall` callables, 10 Firestore triggers, and 2 daily crons (`checkMonthlyPaymentStatuses`, `cleanupExpiredQrCodes`).
   - `notifications.js`: Notification category/route validation, bilingual builders, FCM multicast + token pruning, RTDB mirror/pruner.
   - `brand_config.js`: Brand color/typography constants shared with emails/PDFs.
   - `test/`: `helpers.test.js`, `notifications.test.js`, `handlers.test.js`, `security_rules.test.js` (`npm --prefix functions test`).

@@ -438,16 +438,28 @@ test('getQrExpiryMillis and expireOutdatedQrCodes handle expiration timestamps a
         expiryTime: new Date('2026-10-10T23:59:59.000Z'),
       }),
     },
+    {
+      ref: { id: 'qr_valid_legacy' },
+      data: () => ({
+        status: 'valid',
+        accessCategory: 'visitor',
+        expiryTime: new Date('2026-10-08T23:59:59.000Z'),
+      }),
+    },
   ];
 
+  let capturedWhere = null;
   const mockDb = {
     collection: () => ({
-      where: () => ({
-        get: async () => ({
-          empty: false,
-          docs: mockDocs,
-        }),
-      }),
+      where: (...args) => {
+        capturedWhere = args;
+        return {
+          get: async () => ({
+            empty: false,
+            docs: mockDocs,
+          }),
+        };
+      },
     }),
     batch: () => ({
       update: (ref, payload) => updatedDocs.push({ id: ref.id, payload }),
@@ -457,8 +469,9 @@ test('getQrExpiryMillis and expireOutdatedQrCodes handle expiration timestamps a
 
   const nowMillis = new Date('2026-10-12T12:00:00.000Z').getTime();
   const count = await expireOutdatedQrCodes(mockDb, nowMillis);
-  assert.equal(count, 2);
-  assert.equal(updatedDocs.length, 2);
+  assert.deepEqual(capturedWhere, ['status', 'in', ['active', 'valid']]);
+  assert.equal(count, 3);
+  assert.equal(updatedDocs.length, 3);
 
   assert.equal(updatedDocs[0].id, 'qr_expired_supplier');
   assert.equal(updatedDocs[0].payload.status, 'deactivated (expired)');
@@ -476,6 +489,14 @@ test('getQrExpiryMillis and expireOutdatedQrCodes handle expiration timestamps a
   assert.equal(updatedDocs[1].payload.status, 'deactivated (expired)');
   assert.equal(updatedDocs[1].payload.isValid, false);
   assert.equal(updatedDocs[1].payload.expireAt, null);
+
+  assert.equal(updatedDocs[2].id, 'qr_valid_legacy');
+  assert.equal(updatedDocs[2].payload.status, 'deactivated (expired)');
+  assert.equal(updatedDocs[2].payload.isValid, false);
+  assert.equal(
+    updatedDocs[2].payload.expireAt.toMillis(),
+    new Date('2026-10-08T23:59:59.000Z').getTime() + 7 * 24 * 60 * 60 * 1000
+  );
 });
 
 test('extractTimestampMillis and isSameCalendarDayInTimezone respect community timezone boundaries', (t) => {

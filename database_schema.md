@@ -180,5 +180,5 @@ All write-gated buckets enforce `< 10 MB` limit (`isValidUploadSize`). SVG/HTML 
 
 **3 TTL Policies & `fieldOverrides` (`indexes: []` single-field exemptions preventing write hotspots):**
 1. `access_logs.expireAt` (**60d**): TTL triggers `onAccessLogDeleted` (purges `visitor_ids/`, `visitor_plates/`, heals `qr_codes.isInside`); fallback cron `purgeExpiredAccessLogs`.
-2. `qr_codes.expireAt` (**7d** post-deactivation/expiry; `null` while permanent active or `isInside`): TTL + fallback cron `purgeExpiredQrCodes`.
+2. `qr_codes.expireAt` (**7d** post-deactivation/expiry; `null` while permanent active or `isInside`): TTL + dedicated daily cron `cleanupExpiredQrCodes` (`0 0 * * *`, `America/Mexico_City`) calling `expireOutdatedQrCodes` (`'active'` / `'valid'`) and `purgeExpiredQrCodes`.
 3. `booking_attachments.expireAt` (**30d** post-booking `endTime`): TTL triggers `onBookingAttachmentDeleted` (purges `booking_attachments/` + stamps `bookings.attachmentsPurgedAt`); fallback cron `purgeExpiredBookingAttachments` queries indexed `bookingEndTime`.

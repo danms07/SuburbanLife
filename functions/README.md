@@ -65,7 +65,8 @@ Node.js **24** runtime (`firebase-functions` v2, `firebase-admin` v14 modular SD
 | `notifyAccessResult` | `access_logs/{id}` write | Dispatches QR entry/exit notification and invalidates one-time passes when not `isInside`. |
 | `onAccessLogDeleted` | `access_logs/{id}` delete | Deletes allow-listed `visitor_ids/**` & `visitor_plates/**` in Storage (`404`-tolerant) and heals open `qr_codes.isInside`. |
 | `onBookingAttachmentDeleted` | `booking_attachments/{id}` delete | Deletes allow-listed `booking_attachments/**` in Storage and stamps `bookings/{id}.attachmentsPurgedAt`. |
-| `checkMonthlyPaymentStatuses` | Cron `0 0 * * *` (`America/Mexico_City`) | Recalculates all address payment statuses; expires outdated QRs; sweeps terminal QRs (>7d), `access_logs` (>60d), `booking_attachments` (>30d), and RTDB notifications (>30d or >100 items/user). |
+| `checkMonthlyPaymentStatuses` | Cron `0 0 * * *` (`America/Mexico_City`) | Recalculates all address payment statuses and sweeps `access_logs` (>60d), `booking_attachments` (>30d), and RTDB notifications (>30d or >100 items/user). |
+| `cleanupExpiredQrCodes` | Cron `0 0 * * *` (`America/Mexico_City`, timeout `300s`) | Independently expires outdated `'active'`/`'valid'` QR passes to `'deactivated (expired)'` and purges terminal QR passes past 7-day retention (`runQrCodeCleanup`). |
 
 ---
 

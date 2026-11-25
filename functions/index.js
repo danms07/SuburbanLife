@@ -1408,7 +1408,9 @@ async function recalculateAddressPaymentStatus(addressRef, isApproval = false, p
 
 /**
  * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
- * Evaluates payment cutoffs and grace periods across all active residential addresses.
+ * Evaluates payment cutoffs and grace periods across all active residential addresses
+ * and performs daily retention sweeps for access logs, booking attachments, and RTDB notifications.
+ * QR code expiration and 7-day purge sweeps run independently in `cleanupExpiredQrCodes`.
  */
 exports.checkMonthlyPaymentStatuses = onSchedule({
   schedule: '0 0 * * *',
@@ -1438,24 +1440,6 @@ exports.checkMonthlyPaymentStatuses = onSchedule({
     console.log(`checkMonthlyPaymentStatuses completed successfully for ${tasks.length} addresses.`);
   } catch (error) {
     console.error('Error executing checkMonthlyPaymentStatuses scheduled job:', error);
-  }
-
-  try {
-    const expiredCount = await expireOutdatedQrCodes(db);
-    if (expiredCount > 0) {
-      console.log(`Expired ${expiredCount} outdated QR codes.`);
-    }
-  } catch (qrError) {
-    console.error('Error expiring outdated QR codes in scheduled job:', qrError);
-  }
-
-  try {
-    const purgedQrCount = await purgeExpiredQrCodes(db);
-    if (purgedQrCount > 0) {
-      console.log(`Purged ${purgedQrCount} terminal QR codes past 7-day retention.`);
-    }
-  } catch (qrPurgeError) {
-    console.error('Error purging expired QR codes in scheduled job:', qrPurgeError);
   }
 
   try {
@@ -3839,11 +3823,14 @@ function evaluateQrCleanupAction(qrData, nowMillis = Date.now()) {
 }
 
 /**
- * Marks active QR codes whose expiration time has passed as 'deactivated (expired)'
+ * Marks active or valid QR codes whose expiration time has passed as 'deactivated (expired)'
  * and stamps their 7-day TTL `expireAt` (unless a visitor is currently inside).
  */
 async function expireOutdatedQrCodes(db, nowMillis = Date.now()) {
-  const activeSnap = await db.collection('qr_codes').where('status', '==', 'active').get();
+  const activeSnap = await db
+    .collection('qr_codes')
+    .where('status', 'in', ['active', 'valid'])
+    .get();
   if (activeSnap.empty) return 0;
 
   let expiredCount = 0;
@@ -3931,6 +3918,50 @@ async function purgeExpiredQrCodes(db, nowMillis = Date.now()) {
 
   return deletedCount;
 }
+
+/**
+ * Executes the two-step QR code retention sweep:
+ * 1. Transitions expired active/valid passes to 'deactivated (expired)' and stamps 7-day `expireAt`.
+ * 2. Purges terminal passes past their 7-day retention window and backfills missing `expireAt` fields.
+ */
+async function runQrCodeCleanup(db, nowMillis = Date.now()) {
+  let expiredCount = 0;
+  let purgedCount = 0;
+
+  try {
+    expiredCount = await expireOutdatedQrCodes(db, nowMillis);
+    if (expiredCount > 0) {
+      console.log(`Expired ${expiredCount} outdated QR codes.`);
+    }
+  } catch (qrError) {
+    console.error('Error expiring outdated QR codes in scheduled job:', qrError);
+  }
+
+  try {
+    purgedCount = await purgeExpiredQrCodes(db, nowMillis);
+    if (purgedCount > 0) {
+      console.log(`Purged ${purgedCount} terminal QR codes past 7-day retention.`);
+    }
+  } catch (qrPurgeError) {
+    console.error('Error purging expired QR codes in scheduled job:', qrPurgeError);
+  }
+
+  return { expiredCount, purgedCount };
+}
+
+/**
+ * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Transitions outdated QR passes to 'deactivated (expired)' and purges expired/terminal
+ * QR passes past their 7-day retention window independently from monthly payment checks.
+ */
+exports.cleanupExpiredQrCodes = onSchedule({
+  schedule: '0 0 * * *',
+  timeZone: 'America/Mexico_City',
+  timeoutSeconds: 300,
+}, async () => {
+  const db = admin.firestore();
+  await runQrCodeCleanup(db);
+});
 
 /**
  * Cascading cleanup executed when an `access_logs` document expires or is deleted:
@@ -6507,6 +6538,7 @@ exports._test = {
   isTerminalQrStatus,
   evaluateQrCleanupAction,
   purgeExpiredQrCodes,
+  runQrCodeCleanup,
   cleanupDeletedAccessLogResources,
   purgeExpiredAccessLogs,
   BOOKING_ATTACHMENT_RETENTION_DAYS,
