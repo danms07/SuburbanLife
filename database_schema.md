@@ -137,7 +137,7 @@ erDiagram
 
 Client reads are owner-only (`auth.uid === $uid`); notifications cannot be created/edited by clients except leaf `isRead` / `readAt` updates or deletion.
 
-- **`/notifications/{uid}/{notificationId}`** *(indexed on `createdAt`, `isRead`; pruned daily by `cleanupOldRtdbNotifications` at **30 days / 100 items**)*:
+- **`/notifications/{uid}/{notificationId}`** *(indexed on `createdAt`, `isRead`; pruned weekly by `cleanupOldRtdbNotifications` at **30 days / 100 items**)*:
   - `type` (<=64), `category` (`reviews | sanctions | qr_access | roommates | transparency | announcements | admin_reviews`), `titles` (`{ es, en }` <=200), `bodies` (`{ es, en }` <=500), `targetRoute` (<=64), `entityId?` (<=128), `createdAt` (epoch ms), `isRead` (`boolean`), `readAt?` (`number`), `metadata?` (primitive map).
 - **`/user_notification_settings/{uid}`**:
   - `locale` (`'es' | 'en'`), `pushEnabled`, `inAppBannerEnabled`: `boolean`, `updatedAt` (`number`), `categories`: `{ [category]: boolean }`.
@@ -179,6 +179,6 @@ All write-gated buckets enforce `< 10 MB` limit (`isValidUploadSize`). SVG/HTML 
 | `users` | 1 | `(role, name)` |
 
 **3 TTL Policies & `fieldOverrides` (`indexes: []` single-field exemptions preventing write hotspots):**
-1. `access_logs.expireAt` (**60d**): TTL triggers `onAccessLogDeleted` (purges `visitor_ids/`, `visitor_plates/`, heals `qr_codes.isInside`); dedicated daily cron `cleanupExpiredAccessLogs` (`0 0 * * *`, `America/Mexico_City`) calls `purgeExpiredAccessLogs`.
-2. `qr_codes.expireAt` (**7d** post-deactivation/expiry; `null` while permanent active or `isInside`): TTL + dedicated daily cron `cleanupExpiredQrCodes` (`0 0 * * *`, `America/Mexico_City`) calling `expireOutdatedQrCodes` (`'active'` / `'valid'`) and `purgeExpiredQrCodes`.
-3. `booking_attachments.expireAt` (**30d** post-booking `endTime`): TTL triggers `onBookingAttachmentDeleted` (purges `booking_attachments/` + stamps `bookings.attachmentsPurgedAt`); dedicated daily cron `cleanupExpiredBookingAttachments` (`0 0 * * *`, `America/Mexico_City`) calls `purgeExpiredBookingAttachments` querying indexed `bookingEndTime`.
+1. `access_logs.expireAt` (**60d**): TTL triggers `onAccessLogDeleted` (purges `visitor_ids/`, `visitor_plates/`, heals `qr_codes.isInside`); dedicated weekly cron `cleanupExpiredAccessLogs` (`0 2 * * 0`, `America/Mexico_City`) calls `purgeExpiredAccessLogs`.
+2. `qr_codes.expireAt` (**7d** post-deactivation/expiry; `null` while permanent active or `isInside`): TTL + dedicated daily cron `cleanupExpiredQrCodes` (`15 0 * * *`, `America/Mexico_City`) calling `expireOutdatedQrCodes` (`'active'` / `'valid'`) and `purgeExpiredQrCodes`.
+3. `booking_attachments.expireAt` (**30d** post-booking `endTime`): TTL triggers `onBookingAttachmentDeleted` (purges `booking_attachments/` + stamps `bookings.attachmentsPurgedAt`); dedicated weekly cron `cleanupExpiredBookingAttachments` (`30 2 * * 0`, `America/Mexico_City`) calls `purgeExpiredBookingAttachments` querying indexed `bookingEndTime`.

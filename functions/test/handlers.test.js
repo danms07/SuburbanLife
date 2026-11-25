@@ -1304,13 +1304,14 @@ test('dedicated cleanup schedulers run QR, access_logs, and booking_attachments 
   const Timestamp = _test.admin.firestore.Timestamp;
   const bucket = env.storageMock.bucket();
 
-  // Verify dedicated schedule configuration across all Firestore/Storage cleanup services
-  for (const fn of [
-    cloudFunctions.cleanupExpiredQrCodes,
-    cloudFunctions.cleanupExpiredAccessLogs,
-    cloudFunctions.cleanupExpiredBookingAttachments,
-  ]) {
-    assert.equal(fn.__endpoint.scheduleTrigger.schedule, '0 0 * * *');
+  // Verify dedicated staggered schedule configuration across Firestore/Storage cleanup services
+  const expectedSchedules = [
+    [cloudFunctions.cleanupExpiredQrCodes, '15 0 * * *'],
+    [cloudFunctions.cleanupExpiredAccessLogs, '0 2 * * 0'],
+    [cloudFunctions.cleanupExpiredBookingAttachments, '30 2 * * 0'],
+  ];
+  for (const [fn, cron] of expectedSchedules) {
+    assert.equal(fn.__endpoint.scheduleTrigger.schedule, cron);
     assert.equal(fn.__endpoint.scheduleTrigger.timeZone, 'America/Mexico_City');
     assert.equal(fn.__endpoint.timeoutSeconds, 300);
   }

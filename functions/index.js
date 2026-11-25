@@ -3889,11 +3889,14 @@ async function purgeExpiredQrCodes(db, nowMillis = Date.now()) {
   return deletedCount;
 }
 
-const CLEANUP_SCHEDULE_OPTIONS = Object.freeze({
-  schedule: '0 0 * * *',
+const CLEANUP_SCHEDULE_BASE = Object.freeze({
   timeZone: 'America/Mexico_City',
   timeoutSeconds: 300,
 });
+
+function cleanupScheduleOptions(schedule) {
+  return { ...CLEANUP_SCHEDULE_BASE, schedule };
+}
 
 /**
  * Executes a single scheduled cleanup step, logging positive item counts and
@@ -3933,11 +3936,11 @@ async function runQrCodeCleanup(db, nowMillis = Date.now()) {
 }
 
 /**
- * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Scheduled Cloud Function: Runs daily at 00:15 CST (America/Mexico_City).
  * Transitions outdated QR passes to 'deactivated (expired)' and purges expired/terminal
  * QR passes past their 7-day retention window independently from monthly payment checks.
  */
-exports.cleanupExpiredQrCodes = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
+exports.cleanupExpiredQrCodes = onSchedule(cleanupScheduleOptions('15 0 * * *'), async () => {
   const db = admin.firestore();
   await runQrCodeCleanup(db);
 });
@@ -4101,7 +4104,7 @@ async function purgeExpiredAccessLogs(
 }
 
 /**
- * Executes the daily retention sweep for expired `access_logs` documents
+ * Executes the weekly fallback retention sweep for expired `access_logs` documents
  * and their associated visitor media in Cloud Storage.
  */
 async function runAccessLogCleanup(db, bucket, nowMillis = Date.now()) {
@@ -4115,11 +4118,11 @@ async function runAccessLogCleanup(db, bucket, nowMillis = Date.now()) {
 }
 
 /**
- * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Scheduled Cloud Function: Runs weekly on Sunday at 02:00 CST (America/Mexico_City).
  * Purges expired `access_logs` records and associated visitor media past 60-day retention
- * independently from monthly payment checks.
+ * independently from monthly payment checks (supplementing 60-day Firestore TTL).
  */
-exports.cleanupExpiredAccessLogs = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
+exports.cleanupExpiredAccessLogs = onSchedule(cleanupScheduleOptions('0 2 * * 0'), async () => {
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
   await runAccessLogCleanup(db, bucket);
@@ -4762,7 +4765,7 @@ async function purgeExpiredBookingAttachments(
 }
 
 /**
- * Executes the daily retention sweep for expired `booking_attachments` documents
+ * Executes the weekly fallback retention sweep for expired `booking_attachments` documents
  * and their associated Cloud Storage files past 30-day post-booking retention.
  */
 async function runBookingAttachmentCleanup(db, bucket, nowMillis = Date.now()) {
@@ -4776,11 +4779,11 @@ async function runBookingAttachmentCleanup(db, bucket, nowMillis = Date.now()) {
 }
 
 /**
- * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Scheduled Cloud Function: Runs weekly on Sunday at 02:30 CST (America/Mexico_City).
  * Purges expired `booking_attachments` records and Cloud Storage objects past 30-day
- * post-booking retention independently from monthly payment checks.
+ * post-booking retention independently from monthly payment checks (supplementing 30-day TTL).
  */
-exports.cleanupExpiredBookingAttachments = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
+exports.cleanupExpiredBookingAttachments = onSchedule(cleanupScheduleOptions('30 2 * * 0'), async () => {
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
   await runBookingAttachmentCleanup(db, bucket);
@@ -4809,7 +4812,7 @@ exports.onBookingAttachmentDeleted = onDocumentDeleted(
 );
 
 /**
- * Executes the daily retention sweep for RTDB `/notifications/{uid}` entries,
+ * Executes the weekly retention sweep for RTDB `/notifications/{uid}` entries,
  * pruning items past 30-day or 100-item-per-user retention.
  */
 async function runRtdbNotificationCleanup(dbRtdb, nowMillis = Date.now()) {
@@ -4823,11 +4826,11 @@ async function runRtdbNotificationCleanup(dbRtdb, nowMillis = Date.now()) {
 }
 
 /**
- * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Scheduled Cloud Function: Runs weekly on Sunday at 03:00 CST (America/Mexico_City).
  * Prunes RTDB notification inbox entries past 30-day or 100-item-per-user retention
  * independently from monthly payment checks.
  */
-exports.cleanupOldRtdbNotifications = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
+exports.cleanupOldRtdbNotifications = onSchedule(cleanupScheduleOptions('0 3 * * 0'), async () => {
   const dbRtdb = getSafeRtdb(admin);
   await runRtdbNotificationCleanup(dbRtdb);
 });

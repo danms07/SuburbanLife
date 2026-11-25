@@ -907,7 +907,7 @@ test('pruneOldRtdbNotifications enforces 30-day & 100-item retention and deleteO
 
 test('cleanupOldRtdbNotifications runs RTDB pruning independently while checkMonthlyPaymentStatuses skips RTDB notifications', async (t) => {
   const endpoint = cloudFunctions.cleanupOldRtdbNotifications.__endpoint;
-  assert.equal(endpoint.scheduleTrigger.schedule, '0 0 * * *');
+  assert.equal(endpoint.scheduleTrigger.schedule, '0 3 * * 0');
   assert.equal(endpoint.scheduleTrigger.timeZone, 'America/Mexico_City');
   assert.equal(endpoint.timeoutSeconds, 300);
 

@@ -42,7 +42,7 @@ Concise map of repository files and primary symbols. See [`AGENTS.md`](AGENTS.md
 ## Backend, Infrastructure & Scripts
 
 - `functions/`: Node.js 24 Cloud Functions v2 (detailed in [`functions/README.md`](functions/README.md)).
-  - `index.js`: 27 `onCall` callables, 10 Firestore triggers, and 5 daily crons (`checkMonthlyPaymentStatuses`, `cleanupExpiredQrCodes`, `cleanupExpiredAccessLogs`, `cleanupExpiredBookingAttachments`, `cleanupOldRtdbNotifications`).
+  - `index.js`: 27 `onCall` callables, 10 Firestore triggers, and 5 scheduled crons (`checkMonthlyPaymentStatuses`, `cleanupExpiredQrCodes`, `cleanupExpiredAccessLogs`, `cleanupExpiredBookingAttachments`, `cleanupOldRtdbNotifications`).
   - `notifications.js`: Notification category/route validation, bilingual builders, FCM multicast + token pruning, RTDB mirror/pruner.
   - `brand_config.js`: Brand color/typography constants shared with emails/PDFs.
   - `test/`: `helpers.test.js`, `notifications.test.js`, `handlers.test.js`, `security_rules.test.js` (`npm --prefix functions test`).
