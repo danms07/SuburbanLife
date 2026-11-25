@@ -1408,9 +1408,9 @@ async function recalculateAddressPaymentStatus(addressRef, isApproval = false, p
 
 /**
  * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
- * Evaluates payment cutoffs and grace periods across all active residential addresses
- * and performs daily retention sweeps for access logs, booking attachments, and RTDB notifications.
- * QR code expiration and 7-day purge sweeps run independently in `cleanupExpiredQrCodes`.
+ * Evaluates payment cutoffs and grace periods across all active residential addresses.
+ * Retention sweeps run independently in `cleanupExpiredQrCodes`, `cleanupExpiredAccessLogs`,
+ * `cleanupExpiredBookingAttachments`, and `cleanupOldRtdbNotifications`.
  */
 exports.checkMonthlyPaymentStatuses = onSchedule({
   schedule: '0 0 * * *',
@@ -1440,36 +1440,6 @@ exports.checkMonthlyPaymentStatuses = onSchedule({
     console.log(`checkMonthlyPaymentStatuses completed successfully for ${tasks.length} addresses.`);
   } catch (error) {
     console.error('Error executing checkMonthlyPaymentStatuses scheduled job:', error);
-  }
-
-  try {
-    const bucket = admin.storage().bucket();
-    const purgedLogsCount = await purgeExpiredAccessLogs(db, bucket);
-    if (purgedLogsCount > 0) {
-      console.log(`Purged ${purgedLogsCount} access logs and associated media past 60-day retention.`);
-    }
-  } catch (logPurgeError) {
-    console.error('Error purging expired access logs in scheduled job:', logPurgeError);
-  }
-
-  try {
-    const bucket = admin.storage().bucket();
-    const purgedBookingAttCount = await purgeExpiredBookingAttachments(db, bucket);
-    if (purgedBookingAttCount > 0) {
-      console.log(`Purged ${purgedBookingAttCount} booking attachment records past 30-day post-booking retention.`);
-    }
-  } catch (attPurgeError) {
-    console.error('Error purging expired booking attachments in scheduled job:', attPurgeError);
-  }
-
-  try {
-    const dbRtdb = getSafeRtdb(admin);
-    const prunedNotifsCount = await pruneOldRtdbNotifications(dbRtdb, Date.now());
-    if (prunedNotifsCount > 0) {
-      console.log(`Pruned ${prunedNotifsCount} RTDB notifications past ${NOTIFICATION_RETENTION_DAYS}-day / ${MAX_NOTIFICATIONS_PER_USER}-item retention.`);
-    }
-  } catch (rtdbPruneError) {
-    console.error('Error pruning old RTDB notifications in scheduled job:', rtdbPruneError);
   }
 });
 
@@ -3919,32 +3889,45 @@ async function purgeExpiredQrCodes(db, nowMillis = Date.now()) {
   return deletedCount;
 }
 
+const CLEANUP_SCHEDULE_OPTIONS = Object.freeze({
+  schedule: '0 0 * * *',
+  timeZone: 'America/Mexico_City',
+  timeoutSeconds: 300,
+});
+
+/**
+ * Executes a single scheduled cleanup step, logging positive item counts and
+ * isolating thrown errors so scheduled jobs fail gracefully.
+ */
+async function runCleanupStep(errorContext, taskFn, formatSuccessLog) {
+  try {
+    const count = await taskFn();
+    if (count > 0) {
+      console.log(formatSuccessLog(count));
+    }
+    return count;
+  } catch (error) {
+    console.error(`Error ${errorContext} in scheduled job:`, error);
+    return 0;
+  }
+}
+
 /**
  * Executes the two-step QR code retention sweep:
  * 1. Transitions expired active/valid passes to 'deactivated (expired)' and stamps 7-day `expireAt`.
  * 2. Purges terminal passes past their 7-day retention window and backfills missing `expireAt` fields.
  */
 async function runQrCodeCleanup(db, nowMillis = Date.now()) {
-  let expiredCount = 0;
-  let purgedCount = 0;
-
-  try {
-    expiredCount = await expireOutdatedQrCodes(db, nowMillis);
-    if (expiredCount > 0) {
-      console.log(`Expired ${expiredCount} outdated QR codes.`);
-    }
-  } catch (qrError) {
-    console.error('Error expiring outdated QR codes in scheduled job:', qrError);
-  }
-
-  try {
-    purgedCount = await purgeExpiredQrCodes(db, nowMillis);
-    if (purgedCount > 0) {
-      console.log(`Purged ${purgedCount} terminal QR codes past 7-day retention.`);
-    }
-  } catch (qrPurgeError) {
-    console.error('Error purging expired QR codes in scheduled job:', qrPurgeError);
-  }
+  const expiredCount = await runCleanupStep(
+    'expiring outdated QR codes',
+    () => expireOutdatedQrCodes(db, nowMillis),
+    (count) => `Expired ${count} outdated QR codes.`
+  );
+  const purgedCount = await runCleanupStep(
+    'purging expired QR codes',
+    () => purgeExpiredQrCodes(db, nowMillis),
+    (count) => `Purged ${count} terminal QR codes past 7-day retention.`
+  );
 
   return { expiredCount, purgedCount };
 }
@@ -3954,11 +3937,7 @@ async function runQrCodeCleanup(db, nowMillis = Date.now()) {
  * Transitions outdated QR passes to 'deactivated (expired)' and purges expired/terminal
  * QR passes past their 7-day retention window independently from monthly payment checks.
  */
-exports.cleanupExpiredQrCodes = onSchedule({
-  schedule: '0 0 * * *',
-  timeZone: 'America/Mexico_City',
-  timeoutSeconds: 300,
-}, async () => {
+exports.cleanupExpiredQrCodes = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
   const db = admin.firestore();
   await runQrCodeCleanup(db);
 });
@@ -4120,6 +4099,31 @@ async function purgeExpiredAccessLogs(
 
   return totalDeleted;
 }
+
+/**
+ * Executes the daily retention sweep for expired `access_logs` documents
+ * and their associated visitor media in Cloud Storage.
+ */
+async function runAccessLogCleanup(db, bucket, nowMillis = Date.now()) {
+  const purgedLogsCount = await runCleanupStep(
+    'purging expired access logs',
+    () => purgeExpiredAccessLogs(db, bucket, nowMillis),
+    (count) => `Purged ${count} access logs and associated media past 60-day retention.`
+  );
+
+  return { purgedLogsCount };
+}
+
+/**
+ * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Purges expired `access_logs` records and associated visitor media past 60-day retention
+ * independently from monthly payment checks.
+ */
+exports.cleanupExpiredAccessLogs = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
+  const db = admin.firestore();
+  const bucket = admin.storage().bucket();
+  await runAccessLogCleanup(db, bucket);
+});
 
 /**
  * Firestore Trigger: Cleans up linked visitor ID/plate photos in Cloud Storage and
@@ -4758,6 +4762,31 @@ async function purgeExpiredBookingAttachments(
 }
 
 /**
+ * Executes the daily retention sweep for expired `booking_attachments` documents
+ * and their associated Cloud Storage files past 30-day post-booking retention.
+ */
+async function runBookingAttachmentCleanup(db, bucket, nowMillis = Date.now()) {
+  const purgedBookingAttCount = await runCleanupStep(
+    'purging expired booking attachments',
+    () => purgeExpiredBookingAttachments(db, bucket, nowMillis),
+    (count) => `Purged ${count} booking attachment records past 30-day post-booking retention.`
+  );
+
+  return { purgedBookingAttCount };
+}
+
+/**
+ * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Purges expired `booking_attachments` records and Cloud Storage objects past 30-day
+ * post-booking retention independently from monthly payment checks.
+ */
+exports.cleanupExpiredBookingAttachments = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
+  const db = admin.firestore();
+  const bucket = admin.storage().bucket();
+  await runBookingAttachmentCleanup(db, bucket);
+});
+
+/**
  * Firestore Trigger: Cleans up linked resident booking attachments in Cloud Storage
  * and stamps `attachmentsPurgedAt` whenever a `booking_attachments/{bookingId}` document
  * is deleted (via Firestore TTL, cancellation, or Admin).
@@ -4778,6 +4807,30 @@ exports.onBookingAttachmentDeleted = onDocumentDeleted(
     });
   }
 );
+
+/**
+ * Executes the daily retention sweep for RTDB `/notifications/{uid}` entries,
+ * pruning items past 30-day or 100-item-per-user retention.
+ */
+async function runRtdbNotificationCleanup(dbRtdb, nowMillis = Date.now()) {
+  const prunedNotifsCount = await runCleanupStep(
+    'pruning old RTDB notifications',
+    () => pruneOldRtdbNotifications(dbRtdb, nowMillis),
+    (count) => `Pruned ${count} RTDB notifications past ${NOTIFICATION_RETENTION_DAYS}-day / ${MAX_NOTIFICATIONS_PER_USER}-item retention.`
+  );
+
+  return { prunedNotifsCount };
+}
+
+/**
+ * Scheduled Cloud Function: Runs daily at 00:00 CST (America/Mexico_City).
+ * Prunes RTDB notification inbox entries past 30-day or 100-item-per-user retention
+ * independently from monthly payment checks.
+ */
+exports.cleanupOldRtdbNotifications = onSchedule({ ...CLEANUP_SCHEDULE_OPTIONS }, async () => {
+  const dbRtdb = getSafeRtdb(admin);
+  await runRtdbNotificationCleanup(dbRtdb);
+});
 
 /**
  * Extracts a millisecond epoch timestamp from Firestore Timestamp, Date, number, ISO string, or serialized map.
@@ -6541,6 +6594,7 @@ exports._test = {
   runQrCodeCleanup,
   cleanupDeletedAccessLogResources,
   purgeExpiredAccessLogs,
+  runAccessLogCleanup,
   BOOKING_ATTACHMENT_RETENTION_DAYS,
   BOOKING_ATTACHMENT_RETENTION_MS,
   ALLOWED_BOOKING_DOC_EXTENSIONS,
@@ -6564,6 +6618,7 @@ exports._test = {
   validateAndNormalizeBookingAttachments,
   cleanupDeletedBookingAttachmentResources,
   purgeExpiredBookingAttachments,
+  runBookingAttachmentCleanup,
   parsePeriodHeader,
   normalizeStreetName,
   toSerializableBookingResponse,
@@ -6582,6 +6637,7 @@ exports._test = {
   resolveRecipientSettingsMap,
   dispatchNotification,
   pruneOldRtdbNotifications,
+  runRtdbNotificationCleanup,
   cleanupUserRtdbNotificationData,
   buildPaymentReviewNotification,
   buildBookingReviewNotification,

@@ -1296,18 +1296,29 @@ test('purgeExpiredAccessLogs and purgeExpiredQrCodes delete expired records whil
   assert.ok(backfilledQr.expireAt && typeof backfilledQr.expireAt.toMillis === 'function');
 });
 
-test('cleanupExpiredQrCodes runs QR expiration and purge independently while checkMonthlyPaymentStatuses skips qr_codes', async (t) => {
+test('dedicated cleanup schedulers run QR, access_logs, and booking_attachments sweeps independently while checkMonthlyPaymentStatuses only updates payment statuses', async (t) => {
   const env = createMockAdminEnvironment();
   installMockAdmin(t, env);
 
   const nowMillis = Date.now();
   const Timestamp = _test.admin.firestore.Timestamp;
+  const bucket = env.storageMock.bucket();
 
-  // Verify dedicated schedule configuration
-  const endpoint = cloudFunctions.cleanupExpiredQrCodes.__endpoint;
-  assert.equal(endpoint.scheduleTrigger.schedule, '0 0 * * *');
-  assert.equal(endpoint.scheduleTrigger.timeZone, 'America/Mexico_City');
-  assert.equal(endpoint.timeoutSeconds, 300);
+  // Verify dedicated schedule configuration across all Firestore/Storage cleanup services
+  for (const fn of [
+    cloudFunctions.cleanupExpiredQrCodes,
+    cloudFunctions.cleanupExpiredAccessLogs,
+    cloudFunctions.cleanupExpiredBookingAttachments,
+  ]) {
+    assert.equal(fn.__endpoint.scheduleTrigger.schedule, '0 0 * * *');
+    assert.equal(fn.__endpoint.scheduleTrigger.timeZone, 'America/Mexico_City');
+    assert.equal(fn.__endpoint.timeoutSeconds, 300);
+  }
+
+  await bucket.file('visitor_ids/sched_old_id.jpg').save(Buffer.from('old-id'));
+  await bucket.file('visitor_ids/sched_recent_id.jpg').save(Buffer.from('recent-id'));
+  await bucket.file('booking_attachments/res_sched/old_form.pdf').save(Buffer.from('%PDF-1.7 old'));
+  await bucket.file('booking_attachments/res_sched/recent_form.pdf').save(Buffer.from('%PDF-1.7 new'));
 
   await env.makeDocRef('config', 'app_settings').set({
     paymentCutoffDay: 1,
@@ -1324,6 +1335,43 @@ test('cleanupExpiredQrCodes runs QR expiration and purge independently while che
     status: 'allowed',
     timestamp: Timestamp.fromMillis(nowMillis - 65 * 24 * 60 * 60 * 1000),
     expireAt: Timestamp.fromMillis(nowMillis - 5 * 24 * 60 * 60 * 1000),
+    visitorIdPhotoUrl: 'visitor_ids/sched_old_id.jpg',
+  });
+  await env.makeDocRef('access_logs', 'log_sched_recent').set({
+    status: 'allowed',
+    timestamp: Timestamp.fromMillis(nowMillis - 10 * 24 * 60 * 60 * 1000),
+    expireAt: Timestamp.fromMillis(nowMillis + 50 * 24 * 60 * 60 * 1000),
+    visitorIdPhotoUrl: 'visitor_ids/sched_recent_id.jpg',
+  });
+
+  const expiredBookingEnd = nowMillis - 35 * 24 * 60 * 60 * 1000;
+  await env.makeDocRef('bookings', 'bk_sched_old').set({
+    id: 'bk_sched_old',
+    status: 'closed',
+    hasAttachments: true,
+    attachmentCount: 1,
+    attachmentsPurgedAt: null,
+  });
+  await env.makeDocRef('booking_attachments', 'bk_sched_old').set({
+    bookingId: 'bk_sched_old',
+    bookingEndTime: expiredBookingEnd,
+    expireAt: Timestamp.fromMillis(expiredBookingEnd + 30 * 24 * 60 * 60 * 1000),
+    attachments: [{ storagePath: 'booking_attachments/res_sched/old_form.pdf' }],
+  });
+
+  const recentBookingEnd = nowMillis - 5 * 24 * 60 * 60 * 1000;
+  await env.makeDocRef('bookings', 'bk_sched_recent').set({
+    id: 'bk_sched_recent',
+    status: 'closed',
+    hasAttachments: true,
+    attachmentCount: 1,
+    attachmentsPurgedAt: null,
+  });
+  await env.makeDocRef('booking_attachments', 'bk_sched_recent').set({
+    bookingId: 'bk_sched_recent',
+    bookingEndTime: recentBookingEnd,
+    expireAt: Timestamp.fromMillis(recentBookingEnd + 30 * 24 * 60 * 60 * 1000),
+    attachments: [{ storagePath: 'booking_attachments/res_sched/recent_form.pdf' }],
   });
 
   // QR passes spanning active-expired (>7d, <7d), valid-expired, revoked (>7d), permanent, and open-visit
@@ -1354,44 +1402,80 @@ test('cleanupExpiredQrCodes runs QR expiration and purge independently while che
     expiryTime: Timestamp.fromMillis(nowMillis - 10 * 24 * 60 * 60 * 1000),
   });
 
-  // 1. Running checkMonthlyPaymentStatuses must recalculate address status and purge access_logs,
-  //    but must NOT expire or delete any qr_codes documents.
+  // 1. Running checkMonthlyPaymentStatuses must ONLY recalculate address status and must NOT
+  //    expire or delete any qr_codes, access_logs, or booking_attachments documents.
   await cloudFunctions.checkMonthlyPaymentStatuses.run({});
 
   assert.equal((await env.makeDocRef('addresses', 'addr_sched_1').get()).data().paymentStatus, 'restricted');
-  assert.equal((await env.makeDocRef('access_logs', 'log_sched_old').get()).exists, false);
   assert.equal((await env.makeDocRef('qr_codes', 'qr_active_expired_10d').get()).data().status, 'active');
   assert.equal((await env.makeDocRef('qr_codes', 'qr_valid_expired_2d').get()).data().status, 'valid');
   assert.equal((await env.makeDocRef('qr_codes', 'qr_revoked_10d').get()).exists, true);
+  assert.equal((await env.makeDocRef('access_logs', 'log_sched_old').get()).exists, true);
+  assert.equal(env.savedStorageFiles.has('visitor_ids/sched_old_id.jpg'), true);
+  assert.equal((await env.makeDocRef('booking_attachments', 'bk_sched_old').get()).exists, true);
+  assert.equal(env.savedStorageFiles.has('booking_attachments/res_sched/old_form.pdf'), true);
 
-  // 2. Running cleanupExpiredQrCodes expires outdated passes and purges passes past 7-day retention
+  // 2. Running cleanupExpiredQrCodes expires/purges QR passes without touching access_logs or booking_attachments
   await cloudFunctions.cleanupExpiredQrCodes.run({});
 
-  // >7d active-expired pass was transitioned and immediately purged
   assert.equal((await env.makeDocRef('qr_codes', 'qr_active_expired_10d').get()).exists, false);
-  // Revoked >7d pass was purged
   assert.equal((await env.makeDocRef('qr_codes', 'qr_revoked_10d').get()).exists, false);
-  // <7d valid-expired pass transitioned to 'deactivated (expired)' with 7-day expireAt backfilled
   const recentExpired = (await env.makeDocRef('qr_codes', 'qr_valid_expired_2d').get()).data();
   assert.equal(recentExpired.status, 'deactivated (expired)');
   assert.equal(recentExpired.isValid, false);
   assert.ok(recentExpired.expireAt && recentExpired.expireAt.toMillis() > nowMillis);
-  // Active permanent pass remains untouched
   assert.equal((await env.makeDocRef('qr_codes', 'qr_perm_keep').get()).data().status, 'active');
-  // Open-visit pass transitions to deactivated (expired) while keeping expireAt = null
   const insideExpired = (await env.makeDocRef('qr_codes', 'qr_inside_keep').get()).data();
   assert.equal(insideExpired.status, 'deactivated (expired)');
   assert.equal(insideExpired.expireAt, null);
+  assert.equal((await env.makeDocRef('access_logs', 'log_sched_old').get()).exists, true);
+  assert.equal((await env.makeDocRef('booking_attachments', 'bk_sched_old').get()).exists, true);
 
-  // 3. Direct runQrCodeCleanup helper returns accurate counts
+  // 3. Running cleanupExpiredAccessLogs purges expired access_logs & media without touching booking_attachments
+  await cloudFunctions.cleanupExpiredAccessLogs.run({});
+
+  assert.equal((await env.makeDocRef('access_logs', 'log_sched_old').get()).exists, false);
+  assert.equal(env.savedStorageFiles.has('visitor_ids/sched_old_id.jpg'), false);
+  assert.equal((await env.makeDocRef('access_logs', 'log_sched_recent').get()).exists, true);
+  assert.equal(env.savedStorageFiles.has('visitor_ids/sched_recent_id.jpg'), true);
+  assert.equal((await env.makeDocRef('booking_attachments', 'bk_sched_old').get()).exists, true);
+
+  // 4. Running cleanupExpiredBookingAttachments purges expired attachments & stamps parent booking
+  await cloudFunctions.cleanupExpiredBookingAttachments.run({});
+
+  assert.equal((await env.makeDocRef('booking_attachments', 'bk_sched_old').get()).exists, false);
+  assert.equal(env.savedStorageFiles.has('booking_attachments/res_sched/old_form.pdf'), false);
+  assert.equal(typeof (await env.makeDocRef('bookings', 'bk_sched_old').get()).data().attachmentsPurgedAt, 'number');
+  assert.equal((await env.makeDocRef('booking_attachments', 'bk_sched_recent').get()).exists, true);
+  assert.equal(env.savedStorageFiles.has('booking_attachments/res_sched/recent_form.pdf'), true);
+
+  // 5. Direct runner helpers return accurate counts
   await env.makeDocRef('qr_codes', 'qr_helper_1d').set({
     status: 'active',
     type: 'temporary',
     expiryTime: Timestamp.fromMillis(nowMillis - 24 * 60 * 60 * 1000),
   });
-  const summary = await _test.runQrCodeCleanup(env.dbMock, nowMillis);
-  assert.equal(summary.expiredCount, 1);
-  assert.equal(summary.purgedCount, 0);
+  const qrSummary = await _test.runQrCodeCleanup(env.dbMock, nowMillis);
+  assert.equal(qrSummary.expiredCount, 1);
+  assert.equal(qrSummary.purgedCount, 0);
+
+  await env.makeDocRef('access_logs', 'log_helper_old').set({
+    status: 'allowed',
+    timestamp: Timestamp.fromMillis(nowMillis - 65 * 24 * 60 * 60 * 1000),
+    expireAt: Timestamp.fromMillis(nowMillis - 2 * 24 * 60 * 60 * 1000),
+  });
+  const logSummary = await _test.runAccessLogCleanup(env.dbMock, bucket, nowMillis);
+  assert.equal(logSummary.purgedLogsCount, 1);
+
+  await env.makeDocRef('bookings', 'bk_helper_old').set({ id: 'bk_helper_old', attachmentsPurgedAt: null });
+  await env.makeDocRef('booking_attachments', 'bk_helper_old').set({
+    bookingId: 'bk_helper_old',
+    bookingEndTime: expiredBookingEnd,
+    expireAt: Timestamp.fromMillis(expiredBookingEnd + 30 * 24 * 60 * 60 * 1000),
+    attachments: [],
+  });
+  const attSummary = await _test.runBookingAttachmentCleanup(env.dbMock, bucket, nowMillis);
+  assert.equal(attSummary.purgedBookingAttCount, 1);
 });
 
 test('createBooking validates mandatory/optional/informative facilityDocuments, verifies Storage magic bytes, isolates booking_attachments, cleans up superseded files on resubmit, and purges on cancelBooking', async (t) => {

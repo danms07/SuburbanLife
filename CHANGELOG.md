@@ -5,10 +5,13 @@ All notable changes to **Suburban Life** are documented here.
 ## [Unreleased — Backend] — 2026-11-25
 
 ### Changed
-- **Dedicated QR Cleanup Cloud Scheduler Job (`cleanupExpiredQrCodes`)**:
-  - Extracted QR expiration (`expireOutdatedQrCodes`) and 7-day retention sweeps (`purgeExpiredQrCodes`) out of `checkMonthlyPaymentStatuses` into a dedicated `onSchedule` Cloud Function (`cleanupExpiredQrCodes`, running daily at `0 0 * * *` `America/Mexico_City` with `timeoutSeconds: 300`) via `runQrCodeCleanup` in `functions/index.js`, so QR lifecycle cleanup runs independently even if `checkMonthlyPaymentStatuses` is paused.
-  - Updated `expireOutdatedQrCodes` to evaluate both `'active'` and `'valid'` QR passes (`where('status', 'in', ['active', 'valid'])`), aligning with `firestore.rules`, `evaluateQrValidityStatus`, and `QrService.resolveEffectiveStatus`.
-  - Expanded `functions/test/helpers.test.js` and `functions/test/handlers.test.js` to verify `cleanupExpiredQrCodes` schedule configuration, `'valid'` pass expiration, `runQrCodeCleanup`, and isolation from `checkMonthlyPaymentStatuses`; updated `functions/README.md`, `Structure.md`, `README.md`, `database_schema.md`, `docs/technical_overview.md`, and `docs/technical_overview_es.md`.
+- **Dedicated Retention Cleanup Cloud Scheduler Services (`functions/index.js`)**:
+  - Separated all retention cleanup sweeps out of `checkMonthlyPaymentStatuses` (which now exclusively recalculates address payment cutoffs/grace periods) into four independent daily `onSchedule` Cloud Functions (`0 0 * * *`, `America/Mexico_City`, `timeoutSeconds: 300`) using shared `CLEANUP_SCHEDULE_OPTIONS` and `runCleanupStep`:
+    - `cleanupExpiredQrCodes` (`runQrCodeCleanup`): expires `'active'` / `'valid'` QR passes (`expireOutdatedQrCodes`) and purges terminal passes past 7-day retention (`purgeExpiredQrCodes`).
+    - `cleanupExpiredAccessLogs` (`runAccessLogCleanup`): purges `access_logs` and visitor media past 60-day retention (`purgeExpiredAccessLogs`).
+    - `cleanupExpiredBookingAttachments` (`runBookingAttachmentCleanup`): purges `booking_attachments` and Storage files past 30-day post-booking retention (`purgeExpiredBookingAttachments`).
+    - `cleanupOldRtdbNotifications` (`runRtdbNotificationCleanup`): prunes RTDB `/notifications/{uid}` entries past 30-day or 100-item-per-user retention (`pruneOldRtdbNotifications`).
+  - Expanded `functions/test/helpers.test.js`, `functions/test/handlers.test.js`, and `functions/test/notifications.test.js` to verify `'valid'` QR pass expiration, all 4 dedicated scheduler endpoints/helpers, and `checkMonthlyPaymentStatuses` isolation; updated `functions/README.md`, `Structure.md`, `README.md`, `database_schema.md`, `docs/technical_overview.md`, and `docs/technical_overview_es.md`.
 
 ## [1.0.51+52] — 2026-11-24
 

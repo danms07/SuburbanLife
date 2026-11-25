@@ -8,7 +8,7 @@ White-label residential community management platform built with **Flutter** and
 | :--- | :--- |
 | [`Structure.md`](Structure.md) | File index, exported Dart symbols, and architectural boundary rules |
 | [`database_schema.md`](database_schema.md) | Firestore collections, RTDB paths, Storage rules, 33 composite indexes & TTL policies |
-| [`functions/README.md`](functions/README.md) | 27 Cloud Function callables, 10 Firestore triggers, 2 daily crons & FCM/RTDB notifications |
+| [`functions/README.md`](functions/README.md) | 27 Cloud Function callables, 10 Firestore triggers, 5 daily crons & FCM/RTDB notifications |
 | [`widget_catalog.md`](widget_catalog.md) | Reusable UI widgets, responsive breakpoints, and stable widget keys |
 | [`terraform/README.md`](terraform/README.md) | Automated GCP & Firebase provisioning via Terraform + existing-project importer |
 | [`CHANGELOG.md`](CHANGELOG.md) | Release history |

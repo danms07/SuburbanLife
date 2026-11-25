@@ -904,3 +904,49 @@ test('pruneOldRtdbNotifications enforces 30-day & 100-item retention and deleteO
   assert.equal(env.rtdbRoot.notifications?.u_del, undefined);
   assert.equal(env.rtdbRoot.user_notification_settings?.u_del, undefined);
 });
+
+test('cleanupOldRtdbNotifications runs RTDB pruning independently while checkMonthlyPaymentStatuses skips RTDB notifications', async (t) => {
+  const endpoint = cloudFunctions.cleanupOldRtdbNotifications.__endpoint;
+  assert.equal(endpoint.scheduleTrigger.schedule, '0 0 * * *');
+  assert.equal(endpoint.scheduleTrigger.timeZone, 'America/Mexico_City');
+  assert.equal(endpoint.timeoutSeconds, 300);
+
+  const nowMillis = Date.now();
+  const oldTs = nowMillis - 31 * 24 * 60 * 60 * 1000;
+  const recentNotifs = {};
+  for (let i = 0; i < 105; i++) {
+    recentNotifs[`n_${String(i).padStart(3, '0')}`] = { createdAt: nowMillis - (105 - i) * 1000 };
+  }
+  recentNotifs.n_old_expired = { createdAt: oldTs };
+
+  const env = createNotificationTestEnv({
+    collections: {
+      config: {
+        app_settings: { paymentCutoffDay: 1, gracePeriodDays: 10, timeZone: 'America/Mexico_City' },
+      },
+    },
+    rtdbInitial: {
+      notifications: {
+        u_sched: recentNotifs,
+      },
+    },
+  });
+  installNotificationTestEnv(t, env);
+
+  // 1. checkMonthlyPaymentStatuses must not touch RTDB notifications
+  await cloudFunctions.checkMonthlyPaymentStatuses.run({});
+  assert.equal(Object.keys(env.rtdbRoot.notifications.u_sched).length, 106);
+
+  // 2. cleanupOldRtdbNotifications prunes expired and excess entries independently
+  await cloudFunctions.cleanupOldRtdbNotifications.run({});
+  const remaining = Object.keys(env.rtdbRoot.notifications.u_sched);
+  assert.equal(remaining.length, 100);
+  assert.equal(remaining.includes('n_old_expired'), false);
+  assert.equal(remaining.includes('n_000'), false);
+  assert.equal(remaining.includes('n_104'), true);
+
+  // 3. Direct runRtdbNotificationCleanup helper returns count
+  env.rtdbRoot.notifications.u_sched.n_extra_old = { createdAt: oldTs };
+  const summary = await _test.runRtdbNotificationCleanup(env.rtdbMock, nowMillis);
+  assert.equal(summary.prunedNotifsCount, 1);
+});
